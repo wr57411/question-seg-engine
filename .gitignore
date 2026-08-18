@@ -1,5 +1,6 @@
 node_modules/
 data/
-sample/
+sample/*
+!sample/README.md
 *.local
 .DS_Store
