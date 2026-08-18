@@ -1,0 +1,18 @@
+{
+  "name": "question-seg-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "试题结构化切分引擎骨架（MinerU 后处理）——版面层 + 语言层双层组合规则，垂直演进模型的起点",
+  "scripts": {
+    "demo": "tsx scripts/demo.ts",
+    "test": "node --import tsx --test \"tests/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

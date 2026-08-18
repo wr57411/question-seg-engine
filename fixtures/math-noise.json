@@ -1,0 +1,78 @@
+{
+  "docId": "math-noise",
+  "pdf_info": [
+    {
+      "page_idx": 0,
+      "page_size": [1654, 2339],
+      "blocks": [
+        {
+          "type": "text",
+          "bbox": [240, 90, 1400, 140],
+          "lines": [{ "spans": [{ "type": "text", "content": "干扰项测试卷（题号重复 / 答案区解析）" }] }]
+        },
+        {
+          "type": "text",
+          "bbox": [60, 210, 1600, 260],
+          "lines": [{ "spans": [{ "type": "text", "content": "一、选择题（本题共 4 小题）" }] }]
+        },
+
+        { "type": "text", "bbox": [60, 330, 1500, 380], "lines": [{ "spans": [{ "type": "text", "content": "1．已知集合 A = {1, 2, 3}，B = {2, 3, 4}，则 A ∩ B =（　　）" }] }] },
+        { "type": "text", "bbox": [100, 390, 400, 440], "lines": [{ "spans": [{ "type": "text", "content": "A．{1}" }] }] },
+        { "type": "text", "bbox": [100, 440, 400, 490], "lines": [{ "spans": [{ "type": "text", "content": "B．{2, 3}" }] }] },
+        { "type": "text", "bbox": [100, 490, 400, 540], "lines": [{ "spans": [{ "type": "text", "content": "C．{2, 3, 4}" }] }] },
+        { "type": "text", "bbox": [100, 540, 400, 590], "lines": [{ "spans": [{ "type": "text", "content": "D．{1, 2, 3, 4}" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 660, 1500, 710],
+          "lines": [{ "spans": [{ "type": "text", "content": "2．已知定义在 R 上的函数 f(x) 满足 f(x + y) = f(x)f(y)，且 f(1) = 2，则" }] }]
+        },
+        {
+          "type": "text",
+          "bbox": [60, 720, 1500, 780],
+          "lines": [{ "spans": [{ "type": "text", "content": "3．当且仅当 x > 0 时 f(x) > 1 成立。若 a = f(2)，b = f(3)，则（　　）" }] }]
+        },
+        { "type": "text", "bbox": [100, 790, 500, 840], "lines": [{ "spans": [{ "type": "text", "content": "A．a > b" }] }] },
+        { "type": "text", "bbox": [100, 840, 500, 890], "lines": [{ "spans": [{ "type": "text", "content": "B．a < b" }] }] },
+        { "type": "text", "bbox": [100, 890, 500, 940], "lines": [{ "spans": [{ "type": "text", "content": "C．a = b" }] }] },
+        { "type": "text", "bbox": [100, 940, 500, 990], "lines": [{ "spans": [{ "type": "text", "content": "D．无法确定" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 1060, 1500, 1110],
+          "lines": [{ "spans": [{ "type": "text", "content": "3．已知等比数列 {aₙ} 中，a₂ = 2，a₅ = 16，则 S₅ =（　　）" }] }]
+        },
+        { "type": "text", "bbox": [100, 1120, 500, 1170], "lines": [{ "spans": [{ "type": "text", "content": "A．31" }] }] },
+        { "type": "text", "bbox": [100, 1170, 500, 1220], "lines": [{ "spans": [{ "type": "text", "content": "B．32" }] }] },
+        { "type": "text", "bbox": [100, 1220, 500, 1270], "lines": [{ "spans": [{ "type": "text", "content": "C．63" }] }] },
+        { "type": "text", "bbox": [100, 1270, 500, 1320], "lines": [{ "spans": [{ "type": "text", "content": "D．64" }] }] },
+
+        { "type": "text", "bbox": [60, 1390, 1500, 1440], "lines": [{ "spans": [{ "type": "text", "content": "4．若直线 x + y = m 与圆 x² + y² = 4 相切，则 m =（　　）" }] }] },
+        { "type": "text", "bbox": [100, 1450, 500, 1500], "lines": [{ "spans": [{ "type": "text", "content": "A．±2√2" }] }] },
+        { "type": "text", "bbox": [100, 1500, 500, 1550], "lines": [{ "spans": [{ "type": "text", "content": "B．2√2" }] }] },
+        { "type": "text", "bbox": [100, 1550, 500, 1600], "lines": [{ "spans": [{ "type": "text", "content": "C．±2" }] }] },
+        { "type": "text", "bbox": [100, 1600, 500, 1650], "lines": [{ "spans": [{ "type": "text", "content": "D．4" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 1720, 1000, 1780],
+          "lines": [{ "spans": [{ "type": "text", "content": "二、参考答案与解析" }] }]
+        },
+        { "type": "text", "bbox": [60, 1800, 900, 1850], "lines": [{ "spans": [{ "type": "text", "content": "1．C" }] }] },
+        { "type": "text", "bbox": [60, 1850, 900, 1900], "lines": [{ "spans": [{ "type": "text", "content": "2．B" }] }] },
+        {
+          "type": "text",
+          "bbox": [60, 1900, 1500, 1950],
+          "lines": [{ "spans": [{ "type": "text", "content": "解析：由 f(1)=2 得 f(2)=f(1)f(1)=4，f(3)=f(2)f(1)=8，故 a < b。" }] }]
+        },
+        { "type": "text", "bbox": [60, 1950, 900, 2000], "lines": [{ "spans": [{ "type": "text", "content": "3．A" }] }] },
+        { "type": "text", "bbox": [60, 2000, 900, 2050], "lines": [{ "spans": [{ "type": "text", "content": "4．C" }] }] },
+        {
+          "type": "text",
+          "bbox": [60, 2050, 1500, 2100],
+          "lines": [{ "spans": [{ "type": "text", "content": "解析：圆心 (0,0) 到直线 x + y - m = 0 的距离 |m|/√2 = 2，得 m = ±2√2。" }] }]
+        }
+      ]
+    }
+  ]
+}

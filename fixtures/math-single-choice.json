@@ -1,0 +1,97 @@
+{
+  "docId": "math-single-choice",
+  "pdf_info": [
+    {
+      "page_idx": 0,
+      "page_size": [1654, 2339],
+      "blocks": [
+        {
+          "type": "text",
+          "bbox": [60, 90, 1200, 140],
+          "lines": [{ "spans": [{ "type": "text", "content": "2025 年全国高中数学联考模拟卷（一）" }] }]
+        },
+        {
+          "type": "text",
+          "bbox": [60, 200, 1600, 260],
+          "lines": [{ "spans": [{ "type": "text", "content": "注意事项：本试卷共 4 页，满分 150 分，考试时间 120 分钟。" }] }]
+        },
+        {
+          "type": "text",
+          "bbox": [60, 340, 1000, 400],
+          "lines": [{ "spans": [{ "type": "text", "content": "一、选择题（本题共 5 小题，每小题 5 分）" }] }]
+        },
+        {
+          "type": "text",
+          "bbox": [60, 420, 1500, 470],
+          "lines": [{
+            "spans": [
+              { "type": "text", "content": "1．设集合 A = {x | x² + " },
+              { "type": "formula", "content": "x-1=0" },
+              { "type": "text", "content": "}，则 A 的元素个数为（　　）" }
+            ]
+          }]
+        },
+        { "type": "text", "bbox": [100, 480, 400, 530], "lines": [{ "spans": [{ "type": "text", "content": "A．0" }] }] },
+        { "type": "text", "bbox": [100, 530, 400, 580], "lines": [{ "spans": [{ "type": "text", "content": "B．1" }] }] },
+        { "type": "text", "bbox": [100, 580, 400, 630], "lines": [{ "spans": [{ "type": "text", "content": "C．2" }] }] },
+        { "type": "text", "bbox": [100, 630, 400, 680], "lines": [{ "spans": [{ "type": "text", "content": "D．3" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 720, 1500, 770],
+          "lines": [{ "spans": [{ "type": "text", "content": "2．已知函数 f(x) = 2x² - 4x + 1，则 f(x) 在区间 [0, 3] 上的最大值为（　　）" }] }]
+        },
+        { "type": "text", "bbox": [100, 780, 400, 830], "lines": [{ "spans": [{ "type": "text", "content": "A．1" }] }] },
+        { "type": "text", "bbox": [100, 830, 400, 880], "lines": [{ "spans": [{ "type": "text", "content": "B．3" }] }] },
+        { "type": "text", "bbox": [100, 880, 400, 930], "lines": [{ "spans": [{ "type": "text", "content": "C．5" }] }] },
+        { "type": "text", "bbox": [100, 930, 400, 980], "lines": [{ "spans": [{ "type": "text", "content": "D．7" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 1020, 1500, 1070],
+          "lines": [{ "spans": [{ "type": "text", "content": "3．函数 y = sin(2x + π/3) 的图象向右平移 π/6 个单位后所得图象对应的函数为（　　）" }] }]
+        },
+        {
+          "type": "image",
+          "bbox": [700, 1080, 1100, 1300],
+          "path": "images/q3_sine_wave.png"
+        },
+        { "type": "text", "bbox": [100, 1180, 400, 1230], "lines": [{ "spans": [{ "type": "text", "content": "A．y = sin(2x + π/6)" }] }] },
+        { "type": "text", "bbox": [100, 1230, 400, 1280], "lines": [{ "spans": [{ "type": "text", "content": "B．y = sin(2x - π/6)" }] }] },
+        { "type": "text", "bbox": [100, 1280, 400, 1330], "lines": [{ "spans": [{ "type": "text", "content": "C．y = sin(2x + π/2)" }] }] },
+        { "type": "text", "bbox": [100, 1330, 400, 1380], "lines": [{ "spans": [{ "type": "text", "content": "D．y = sin(2x - π/2)" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 1420, 1500, 1470],
+          "lines": [{ "spans": [{ "type": "text", "content": "4．已知等差数列 {aₙ} 的前 n 项和为 Sₙ，且 a₃ + a₇ = 12，则 S₉ =（　　）" }] }]
+        },
+        { "type": "text", "bbox": [100, 1480, 400, 1530], "lines": [{ "spans": [{ "type": "text", "content": "A．27" }] }] },
+        { "type": "text", "bbox": [100, 1530, 400, 1580], "lines": [{ "spans": [{ "type": "text", "content": "B．36" }] }] },
+        { "type": "text", "bbox": [100, 1580, 400, 1630], "lines": [{ "spans": [{ "type": "text", "content": "C．54" }] }] },
+        { "type": "text", "bbox": [100, 1630, 400, 1680], "lines": [{ "spans": [{ "type": "text", "content": "D．72" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 1720, 1500, 1770],
+          "lines": [{ "spans": [{ "type": "text", "content": "5．若 tan θ = 2，则 sin 2θ 的值为（　　）" }] }]
+        },
+        { "type": "text", "bbox": [100, 1780, 400, 1830], "lines": [{ "spans": [{ "type": "text", "content": "A．3/5" }] }] },
+        { "type": "text", "bbox": [100, 1830, 400, 1880], "lines": [{ "spans": [{ "type": "text", "content": "B．4/5" }] }] },
+        { "type": "text", "bbox": [100, 1880, 400, 1930], "lines": [{ "spans": [{ "type": "text", "content": "C．±3/5" }] }] },
+        { "type": "text", "bbox": [100, 1930, 400, 1980], "lines": [{ "spans": [{ "type": "text", "content": "D．±4/5" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 2040, 1000, 2100],
+          "lines": [{ "spans": [{ "type": "text", "content": "二、参考答案" }] }]
+        },
+        { "type": "text", "bbox": [60, 2120, 600, 2170], "lines": [{ "spans": [{ "type": "text", "content": "1．B" }] }] },
+        { "type": "text", "bbox": [60, 2170, 600, 2220], "lines": [{ "spans": [{ "type": "text", "content": "2．C" }] }] },
+        { "type": "text", "bbox": [60, 2220, 600, 2270], "lines": [{ "spans": [{ "type": "text", "content": "3．A" }] }] },
+        { "type": "text", "bbox": [60, 2270, 600, 2320], "lines": [{ "spans": [{ "type": "text", "content": "4．C" }] }] },
+        { "type": "text", "bbox": [60, 2320, 600, 2370], "lines": [{ "spans": [{ "type": "text", "content": "5．D" }] }] }
+      ]
+    }
+  ]
+}

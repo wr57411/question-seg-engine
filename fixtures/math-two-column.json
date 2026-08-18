@@ -1,0 +1,58 @@
+{
+  "docId": "math-two-column",
+  "pdf_info": [
+    {
+      "page_idx": 0,
+      "page_size": [1654, 2339],
+      "blocks": [
+        {
+          "type": "text",
+          "bbox": [240, 90, 1400, 140],
+          "lines": [{ "spans": [{ "type": "text", "content": "高中数学综合训练卷（双栏排版样例）" }] }]
+        },
+        {
+          "type": "text",
+          "bbox": [60, 210, 1600, 260],
+          "lines": [{ "spans": [{ "type": "text", "content": "一、选择题（本题共 2 小题）" }] }]
+        },
+
+        { "type": "text", "bbox": [60, 330, 780, 380], "lines": [{ "spans": [{ "type": "text", "content": "1．已知复数 z 满足 (1 + i)z = 2i，则 |z| =（　　）" }] }] },
+        { "type": "text", "bbox": [80, 390, 400, 440], "lines": [{ "spans": [{ "type": "text", "content": "A．√2" }] }] },
+        { "type": "text", "bbox": [80, 440, 400, 490], "lines": [{ "spans": [{ "type": "text", "content": "B．1" }] }] },
+        { "type": "text", "bbox": [80, 490, 400, 540], "lines": [{ "spans": [{ "type": "text", "content": "C．√2/2" }] }] },
+        { "type": "text", "bbox": [80, 540, 400, 590], "lines": [{ "spans": [{ "type": "text", "content": "D．2" }] }] },
+
+        { "type": "text", "bbox": [60, 660, 780, 710], "lines": [{ "spans": [{ "type": "text", "content": "2．已知向量 a = (1, -2)，b = (3, m)，若 a ⊥ b，则 m =（　　）" }] }] },
+        { "type": "text", "bbox": [80, 720, 400, 770], "lines": [{ "spans": [{ "type": "text", "content": "A．6" }] }] },
+        { "type": "text", "bbox": [80, 770, 400, 820], "lines": [{ "spans": [{ "type": "text", "content": "B．-6" }] }] },
+        { "type": "text", "bbox": [80, 820, 400, 870], "lines": [{ "spans": [{ "type": "text", "content": "C．3/2" }] }] },
+        { "type": "text", "bbox": [80, 870, 400, 920], "lines": [{ "spans": [{ "type": "text", "content": "D．-3/2" }] }] },
+
+        {
+          "type": "text",
+          "bbox": [60, 1000, 1600, 1050],
+          "lines": [{ "spans": [{ "type": "text", "content": "二、解答题（本题共 2 小题，解答应写出文字说明、证明过程或演算步骤）" }] }]
+        },
+
+        { "type": "text", "bbox": [880, 1120, 1600, 1180], "lines": [{ "spans": [{ "type": "text", "content": "3．已知函数 f(x) = ax³ + bx² 的图象在点 (1, f(1)) 处的切线方程为 y = 3x - 2。" }] }] },
+        { "type": "formula", "bbox": [880, 1190, 1500, 1260], "latex": "f(x)=ax^{3}+bx^{2}" },
+        {
+          "type": "text",
+          "bbox": [880, 1270, 1600, 1340],
+          "lines": [{ "spans": [{ "type": "text", "content": "（1）求 a、b 的值；（2）求 f(x) 在区间 [0, 2] 上的最大值。" }] }]
+        },
+        { "type": "image", "bbox": [900, 1350, 1500, 1600], "path": "images/q3_parabola.png" },
+        {
+          "type": "text",
+          "bbox": [880, 1700, 1600, 1770],
+          "lines": [{ "spans": [{ "type": "text", "content": "4．设数列 {aₙ} 的前 n 项和为 Sₙ = n² + n，求数列 {aₙ} 的通项公式。" }] }]
+        },
+        {
+          "type": "text",
+          "bbox": [880, 1780, 1600, 1840],
+          "lines": [{ "spans": [{ "type": "text", "content": "并证明：当 n ≥ 2 时，aₙ₊₁ - aₙ = 2。" }] }]
+        }
+      ]
+    }
+  ]
+}
