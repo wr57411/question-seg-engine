@@ -1,0 +1,11 @@
+{
+  "code": 0,
+  "msg": "ok",
+  "trace_id": "d0c3372da638bbbb580a760728099bce",
+  "data": {
+    "batch_id": "45506cd0-429a-4e5b-9d10-9b27a07828ec",
+    "file_urls": [
+      "https://mineru.net/upload/demo"
+    ]
+  }
+}

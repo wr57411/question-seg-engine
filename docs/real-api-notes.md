@@ -36,7 +36,7 @@
   "data": {
     "batch_id": "45506cd0-429a-4e5b-9d10-9b27a07828ec",
     "file_urls": [
-      "https://mineru.oss-cn-shanghai.aliyuncs.com/api-upload/extract/2026-08-18/45506cd0-429a-4e5b-9d10-9b27a07828ec/ca8fac20-ddda-4fc0-bd3f-552a54b4e048.pdf?Expires=1787150193&OSSAccessKeyId=LTAI5t8fSGMgiRhQn4mpp926&Signature=GmSu%2B35wQu%2BQxLPBUbIdrHB%2BKeo%3D"
+      "https://mineru.oss-cn-shanghai.aliyuncs.com/api-upload/extract/2026-08-18/45506cd0-429a-4e5b-9d10-9b27a07828ec/ca8fac20-ddda-4fc0-bd3f-552a54b4e048.pdf"
     ]
   }
 }
