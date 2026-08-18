@@ -333,19 +333,31 @@ function mergeAnswers(ctx: Ctx): void {
   }
 }
 
-/** 题号唯一性检查：同号多题 → 大概率误切，全部降置信度 */
+/**
+ * 题号唯一性检查：**同一页内**同号多题 → 大概率误切，全部降置信度。
+ * 只按 pageIndex 分组统计：教辅/试卷每页重排题号（页 0:1-7、页 1:1-12…），
+ * 跨页同号是正常现象（question.id 已含页码，不构成歧义），不惩罚、不产生 review。
+ */
 function flagDuplicateNumbers(ctx: Ctx): void {
   for (const [num, qs] of ctx.questionMap) {
-    if (qs.length <= 1) continue;
+    const byPage = new Map<number, Question[]>();
     for (const q of qs) {
-      q.confidence = Math.max(0.2, q.confidence - 0.3);
-      if (q.confidence < REVIEW_THRESHOLD) q.status = "needs_review";
-      ctx.reviews.push({
-        questionId: q.id,
-        reason: `重复题号「${num}」：${qs.length} 道题共享，存在误切风险`,
-        blockIndex: -1,
-        snippet: q.stem.slice(0, 40) || q.number,
-      });
+      const list = byPage.get(q.source.pageIndex) ?? [];
+      list.push(q);
+      byPage.set(q.source.pageIndex, list);
+    }
+    for (const pageQs of byPage.values()) {
+      if (pageQs.length <= 1) continue;
+      for (const q of pageQs) {
+        q.confidence = Math.max(0.2, q.confidence - 0.3);
+        if (q.confidence < REVIEW_THRESHOLD) q.status = "needs_review";
+        ctx.reviews.push({
+          questionId: q.id,
+          reason: `重复题号「${num}」：第 ${q.source.pageIndex} 页 ${pageQs.length} 道题共享，存在误切风险`,
+          blockIndex: -1,
+          snippet: q.stem.slice(0, 40) || q.number,
+        });
+      }
     }
   }
 }
