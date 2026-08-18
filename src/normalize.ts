@@ -7,8 +7,12 @@
  */
 import type { BBox, BlockKind, PageInfo, ParsedBlock, ParsedDocument } from "./types.js";
 
-/** 归一化入口：可直接传 fs.readFileSync 解析出的任意 JSON */
+/** 归一化入口：可直接传 fs.readFileSync 解析出的任意 JSON。
+ * 兼容两种真实结构：
+ * - 顶层数组 → v1 扁平块列表（实测 data/smoke/content_list.json，2026-08-18）；
+ * - 顶层对象含 pdf_info → 旧版层级结构（官方旧文档，含 page_size/blocks）。 */
 export function normalizeContentList(raw: unknown, docId: string): ParsedDocument {
+  if (Array.isArray(raw)) return normalizeV1Flat(raw, docId);
   const root = asRecord(raw);
   const pdfInfo = asArray(root.pdf_info as unknown);
   const pages: PageInfo[] = pdfInfo.map((entry, idx) => normalizePage(entry, idx));
@@ -45,6 +49,89 @@ function attachTopLevelAssets(root: Record<string, unknown>, pages: PageInfo[]):
       }
     }
   }
+}
+
+/**
+ * v1 扁平结构（2026-08-18 真实样张实测，见 docs/real-api-notes.md §4.1）：
+ * 顶层数组 = 各页块平铺，每条 `{ type, text?, text_level?, bbox, page_idx }`，
+ * 无 page_size / lines / font_size。按 page_idx 分组回页。
+ *
+ * 元素映射：
+ * - text → 文本块（text 直接是元素级字段，非 lines/spans；firstLine 取首个 \n 段）
+ * - image / chart → 图片块（路径字段是 `img_path`，非 `path`）
+ * - equation → 公式块（LaTeX 在 `text`，以 $$...$$ 包裹，解包后存入 latex）
+ * - header / footer / page_number / aside_text → 版面家具，丢弃：
+ *   非试题内容，且会污染阅读顺序（aside_text 位于侧边，y 序会插入正文流中间）
+ *   或干扰状态机（footer 文本可能误触答案区/选项判定）。
+ * - 未知类型容错为文本块。
+ */
+function normalizeV1Flat(raw: unknown[], docId: string): ParsedDocument {
+  const byPage = new Map<number, Record<string, unknown>[]>();
+  for (const item of raw) {
+    const rec = asRecord(item);
+    const pageIdx = asInt(rec.page_idx) ?? 0;
+    const list = byPage.get(pageIdx) ?? [];
+    list.push(rec);
+    byPage.set(pageIdx, list);
+  }
+
+  const pages: PageInfo[] = [...byPage.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([idx, items]) => ({
+      index: idx,
+      // v1 无 page_size：置 0 走 layout 层默认页宽（真实 bbox 坐标系与
+      // layout.json 的 page_size 比例不一致，见 docs/real-api-notes.md §5）
+      width: 0,
+      height: 0,
+      blocks: items.flatMap((rec, i) => normalizeV1Element(rec, idx, i) ?? []),
+    }));
+
+  if (pages.length === 0) {
+    pages.push({ index: 0, width: 0, height: 0, blocks: [] });
+  }
+  return { docId, pages };
+}
+
+function normalizeV1Element(
+  rec: Record<string, unknown>,
+  pageIdx: number,
+  idx: number,
+): ParsedBlock | null {
+  const type = String(rec.type ?? "text");
+  const bbox = toBBox(rec.bbox);
+
+  switch (type) {
+    case "image":
+    case "chart": {
+      return { kind: "image", bbox, path: String(rec.img_path ?? `image-p${pageIdx}-${idx}.png`) };
+    }
+    case "equation": {
+      return { kind: "formula", bbox, latex: unwrapLatex(String(rec.text ?? "")) };
+    }
+    case "header":
+    case "footer":
+    case "page_number":
+    case "aside_text": {
+      return null;
+    }
+    default: {
+      const text = typeof rec.text === "string" ? rec.text : "";
+      const lines = text.split("\n").filter((s) => s.length > 0);
+      return {
+        kind: "text",
+        bbox,
+        text,
+        firstLine: lines[0] ?? "",
+        lineCount: Math.max(lines.length, 1),
+        maxFontSize: 0, // v1 无字号信息；下游规则暂不使用该字段
+      };
+    }
+  }
+}
+
+/** equation 块的 text 形如 "$$\n{ \frac { 5 } { 8 } } G\n$$"，解包为裸 LaTeX */
+function unwrapLatex(s: string): string {
+  return s.replace(/^\$\$\s*/, "").replace(/\s*\$\$$/, "").trim();
 }
 
 function normalizePage(rawEntry: unknown, fallbackIdx: number): PageInfo {

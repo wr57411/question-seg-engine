@@ -157,3 +157,20 @@
 3. **zip 下载字段**：`data.extract_result[].full_zip_url`（非 `file_url`；未完成时该键不存在，须做存在性检查）。
 4. **错误即 200**：所有业务错误以 HTTP 200 + `code != 0` 返回，客户端不能只看 HTTP 状态码。
 5. **v1/v2 双 content_list**：同一样张同时产出两个版本；项目回归样本 `data/smoke/content_list.json` 取 v1（355 条）。
+
+### 5.1 normalize.ts v1 适配点（Task 4，2026-08-18 实测）
+
+`normalizeContentList` 现在按顶层形态分流：`Array.isArray(raw)` → v1 扁平分支，对象含 `pdf_info` → 旧版层级分支（原逻辑不动，仍可解析）。v1 分支映射：
+
+| v1 元素 type | 归一化为 | 关键字段映射 |
+| --- | --- | --- |
+| `text` | `kind: text` | 文本直接是元素级 `text` 字段（**非** lines/spans）；`firstLine` 取首个 `\n` 段（样本中 41 条含换行）；无字号信息 → `maxFontSize: 0` |
+| `image` / `chart` | `kind: image` | 路径字段是 **`img_path`**（非 `path`）；无 img_path 时兜底 `image-p<page>-i<n>.png`，bbox 始终保留 |
+| `equation` | `kind: formula` | LaTeX 在 `text`，以 `$$...$$` 包裹（如 `"$$\n{ \frac { 5 } { 8 } } G\n$$"`），解包为裸 latex |
+| `header` / `footer` / `page_number` / `aside_text` | **丢弃** | 版面家具非试题内容：footer 文本可能干扰状态机（样本 footer 为励志语录）、aside_text 位于页边（y 序会插入正文流中间）、page_number 为纯数字。丢弃而非并入 text，保证切分只面对内容块 |
+
+- **page_size 缺失**：v1 每条只有 `page_idx`，无 page_size → `PageInfo.width/height = 0`，layout 层走默认页宽 1654 单栏排序。不尝试从 bbox 反推页宽：真实 bbox 坐标系与 layout.json 的 `page_size`（596×821）比例不一致（bbox x 达 ~980、y 达 ~970），无可靠几何信息。
+- **分栏限制（实测）**：本教辅样张真实为双栏（page 0：左栏题 1-4 与右栏题 5-7 同 y 并排），但栏间 x0 间隙仅 ~40-110，而 `detectColumns` 阈值是页宽 28%——默认页宽下全页判定单栏，按 y 排序导致左右栏题目交错（题号序 5,1,2,6,3,4,7）。精确分栏需 v2 content_list 或 layout.json（块字段为 `para_blocks` 系）的几何信息，属 Task 5+ 演进点。
+- **选项块粒度**：v1 把 4 个选项常合并进同一个 text 块（如 `"A. …B. …C. …D. …"`），规则引擎只认块首的 `A.` → 每题仅收集 1 个选项、其余选项留在题干文本内（reviews: 选项组中断 37/选项乱序 25）。这是 v1 块粒度的物理限制，非解析缺陷。
+
+**回归结果（Task 4）**：真实样本 355 条 → 归一化 304 个内容块（丢弃 51 条家具）→ 切出 **83 题**（与语言层题号模式独立预测数一致）、图片归属 97、公式块 3、回拼校验零失败（无 pickFail review）。全部 83 题为 needs_review（选项组收集失败 + 双栏交错导致跨页同号「重复题号」），符合 v1 扁平结构的预期下限——题号切口可用、选项/顺序质量留给 v2/LLM 阶段。

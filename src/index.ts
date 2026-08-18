@@ -10,8 +10,17 @@ export type { ParsedDocument, Question, SegmentationResult };
 export type { SegmentationStrategy } from "./strategy.js";
 export { normalizeContentList, ruleStrategy };
 
-/** 全流程：content_list JSON（任意对象）→ 结构化题目 */
+/** 全流程：content_list JSON（任意对象/数组）→ 结构化题目 */
 export function segmentFromContentList(raw: unknown, docId: string): SegmentationResult {
+  const doc = normalizeContentList(raw, docId);
+  return ruleStrategy.segment(doc);
+}
+
+/**
+ * 真实 content_list JSON → 结构化题目（接入层入口，Task 5 宿主接入用）。
+ * 与 segmentFromContentList 语义一致，单独命名以标识「真实样本回流」回归路径。
+ */
+export function segmentRealContentList(raw: unknown, docId: string): SegmentationResult {
   const doc = normalizeContentList(raw, docId);
   return ruleStrategy.segment(doc);
 }
