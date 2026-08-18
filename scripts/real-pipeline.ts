@@ -1,7 +1,7 @@
 // scripts/real-pipeline.ts
 /**
  * 端到端：本地样卷 → MinerU 云解析 → 解包 → 结构化切分 → 产物落盘。
- * 运行：node --import tsx scripts/real-pipeline.ts <文件或目录> [--out data/out] [--strategy rule-engine-v1]
+ * 运行：node --import tsx scripts/real-pipeline.ts <文件或目录> [outRoot]
  * API Key 从 process.env.mineru_API_KEY 读取，不打印。
  */
 import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";

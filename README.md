@@ -61,6 +61,24 @@ npm run check   # typecheck + test
 - 解析与答案未拆分为两个字段（schema 已预留 `solution`）。
 - 置信度阈值 0.75 与扣分项需真实样卷校准。
 
+## 真实 MinerU API
+
+真实云 API 的接入脚本（走真实网络，需 `mineru_API_KEY`，产物不入库）：
+
+```bash
+# 冒烟（开发期确认字段结构，产物入 data/smoke/）
+node --import tsx scripts/api-smoke.ts "sample/23必刷题 2相互作用.pdf"
+
+# 端到端管线（样卷目录 → data/out/<文件名>/）
+node --import tsx scripts/real-pipeline.ts sample
+```
+
+- `real-pipeline.ts` 按位置参数取 `<文件或目录> [outRoot]`（`outRoot` 默认 `data/out`）；
+  目录会遍历其中的 PDF/图片，逐文件跑全链路。
+- API Key 从 `process.env.mineru_API_KEY` 读取，仅服务端使用，不出现在产物与日志。
+- 真实网络调用不纳入 `npm test`；离线测试见 `tests/mineru-client.test.ts`、`tests/mineru-unpack.test.ts`。
+- 字段事实以 `docs/real-api-notes.md` 为准。
+
 ## 目录
 
 ```
