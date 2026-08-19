@@ -2,7 +2,7 @@
  * layout.ts —— 版面层（正式件）
  *
  * 只使用坐标与类别信息，不含任何题号/选项语义：
- * 1. 分栏检测：text 块左边缘 x0 的最大空隙 > 页宽 28% → 两栏；
+ * 1. 分栏检测：text 块 x0 的桶直方图聚类（稠密桶聚簇 + 簇中心距 > 页宽×minGapRatio → 两栏）；
  * 2. 阅读顺序恢复：单栏按 y 排序；两栏按「左栏自上而下 + 右栏自上而下」。
  *
  * 已知简化（演进点）：复杂版式（三栏、栏内多层级、跨栏卷头居中等）
@@ -28,26 +28,76 @@ export function layoutPage(page: PageInfo): LayoutInfo {
   return { columns, ordered: restoreReadingOrder(entries, columns, width) };
 }
 
-/** 分栏检测：文本/表格/公式块 x0 的最大空隙是否构成栏间空白 */
-export function detectColumns(entries: IndexedBlock[], pageWidth: number): number {
+export interface ColumnDetectorParams {
+  /** 页宽等分桶数 */
+  bucketCount: number;
+  /** 有效簇的最小块数（绝对下限） */
+  minClusterBlocks: number;
+  /** 有效簇的最小块数占比（相对下限，乘以总块数后与绝对下限取 max） */
+  minClusterRatio: number;
+  /** 两栏判定：列中心最小间距（相对页宽） */
+  minGapRatio: number;
+}
+
+export const DEFAULT_COLUMN_PARAMS: ColumnDetectorParams = {
+  bucketCount: 24,
+  minClusterBlocks: 5,
+  minClusterRatio: 0.1,
+  minGapRatio: 0.25,
+};
+
+/**
+ * 分栏检测：x0 桶直方图聚类。
+ * 机理（2026-08-19 真实数据校准）：双栏页左右各一簇（行级数据每簇 18~38 块），
+ * 居中标题/边注 1~2 块横跨栏间隙会破坏「最大间隙」判定，但不会形成稠密桶——
+ * 故用「稠密桶聚簇 + 簇中心距」替代单一间隙阈值。
+ */
+export function detectColumns(
+  entries: IndexedBlock[],
+  pageWidth: number,
+  params: ColumnDetectorParams = DEFAULT_COLUMN_PARAMS,
+): number {
   const xs = entries
     .filter((e) => e.block.kind !== "image")
-    .map((e) => e.block.bbox[0])
-    .sort((a, b) => a - b);
+    .map((e) => e.block.bbox[0]);
   if (xs.length < 4) return 1;
 
-  let maxGap = 0;
-  let splitAfter = -1;
-  for (let i = 1; i < xs.length; i++) {
-    const gap = (xs[i] ?? 0) - (xs[i - 1] ?? 0);
-    if (gap > maxGap) {
-      maxGap = gap;
-      splitAfter = i - 1;
+  const width = pageWidth > 0 ? pageWidth : 1654;
+  const bucketWidth = width / params.bucketCount;
+  const hist = new Array<number>(params.bucketCount).fill(0);
+  for (const x of xs) {
+    const idx = Math.min(params.bucketCount - 1, Math.floor(x / bucketWidth));
+    hist[idx] = (hist[idx] ?? 0) + 1;
+  }
+
+  const minBlocks = Math.max(params.minClusterBlocks, Math.floor(xs.length * params.minClusterRatio));
+  const clusters: { from: number; to: number; count: number }[] = [];
+  let cur: { from: number; to: number; count: number } | null = null;
+  for (let i = 0; i < params.bucketCount; i++) {
+    const v = hist[i] ?? 0;
+    if (v >= minBlocks) {
+      if (!cur) cur = { from: i, to: i, count: v };
+      else {
+        cur.to = i;
+        cur.count += v;
+      }
+    } else if (cur) {
+      clusters.push(cur);
+      cur = null;
     }
   }
-  // 栏间空隙必须足够大，且两侧块数量都不能太少（防单栏里个别孤立块误判）
-  if (maxGap > pageWidth * 0.28 && splitAfter >= 1 && xs.length - splitAfter - 1 >= 2) {
-    return 2;
+  if (cur) clusters.push(cur);
+
+  if (clusters.length >= 2) {
+    const centers = clusters
+      .map((c) => {
+        const lo = c.from * bucketWidth;
+        const hi = (c.to + 1) * bucketWidth;
+        const inCluster = xs.filter((x) => x >= lo && x < hi);
+        return inCluster.reduce((a, b) => a + b, 0) / Math.max(1, inCluster.length);
+      })
+      .sort((a, b) => a - b);
+    if ((centers[1] ?? 0) - (centers[0] ?? 0) > width * params.minGapRatio) return 2;
   }
   return 1;
 }
