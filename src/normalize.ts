@@ -205,6 +205,63 @@ function normalizeBlock(rawBlock: unknown): ParsedBlock[] {
   ];
 }
 
+/**
+ * 行级布局解析：以 MinerU result.zip 中的 layout.json 为主内容源。
+ * para_blocks 每块按 lines[] 展开为行级块（每行一个 ParsedBlock），
+ * 行内公式 span 内联为 $...$；page_size 取真实值。
+ * 解决 v1/v2 content_list 块粒度太粗（选项被合并进单块）的问题。
+ *
+ * 注意：真实 layout.json（2026-08-18 实测）行内公式 span 的 type 为
+ * `inline_equation`（brief 初稿写作 equation_inline），此处同时识别两种，
+ * 保证夹具（page 1 block 4/7 含 inline_equation）的 `$..$` 内联被验证。
+ */
+export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocument {
+  const root = asRecord(layoutRaw);
+  const pages = asArray(root.pdf_info as unknown)
+    .map((entry) => {
+      const rec = asRecord(entry);
+      const size = asArray(rec.page_size as unknown);
+      const blocks: ParsedBlock[] = [];
+      for (const pbRaw of asArray(rec.para_blocks as unknown)) {
+        const pb = asRecord(pbRaw);
+        const lines = asArray(pb.lines as unknown);
+        if (lines.length === 0) continue;
+        for (const lineRaw of lines) {
+          const line = asRecord(lineRaw);
+          const spans = asArray(line.spans as unknown);
+          const parts: string[] = [];
+          for (const spanRaw of spans) {
+            const span = asRecord(spanRaw);
+            const content = String(span.content ?? span.text ?? "");
+            if (!content) continue;
+            const spanType = String(span.type ?? "text");
+            const isInlineEquation =
+              spanType === "equation_inline" || spanType === "inline_equation";
+            parts.push(isInlineEquation ? `$${content.trim()}$` : content);
+          }
+          if (parts.length === 0) continue;
+          const text = parts.join("");
+          blocks.push({
+            kind: "text",
+            bbox: toBBox(line.bbox),
+            text,
+            firstLine: text,
+            lineCount: 1,
+            maxFontSize: 0,
+          });
+        }
+      }
+      return {
+        index: asInt(rec.page_idx) ?? 0,
+        width: asNumber(size?.[0]) ?? 1654,
+        height: asNumber(size?.[1]) ?? 2339,
+        blocks,
+      } satisfies PageInfo;
+    })
+    .sort((a, b) => a.index - b.index);
+  return { docId, pages };
+}
+
 function toBBox(v: unknown): BBox {
   const arr = asArray(v);
   if (arr.length < 4) return [0, 0, 0, 0];
