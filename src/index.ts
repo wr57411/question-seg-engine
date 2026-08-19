@@ -2,17 +2,23 @@
  * index.ts —— 对外出口：把「上游原料 → 结构化题目」的完整流水线
  * 收成三个函数，将来嵌入宿主应用时替换数据源实现即可。
  */
-import { normalizeContentList } from "./normalize.js";
+import { normalizeContentList, normalizeLayout } from "./normalize.js";
 import { getStrategy, ruleStrategy } from "./strategy.js";
 import type { ParsedDocument, Question, SegmentationResult } from "./types.js";
 
 export type { ParsedDocument, Question, SegmentationResult };
 export type { SegmentationStrategy } from "./strategy.js";
-export { normalizeContentList, ruleStrategy };
+export { normalizeContentList, normalizeLayout, ruleStrategy };
 
 /** 全流程：content_list JSON（任意对象/数组）→ 结构化题目 */
 export function segmentFromContentList(raw: unknown, docId: string): SegmentationResult {
   const doc = normalizeContentList(raw, docId);
+  return ruleStrategy.segment(doc);
+}
+
+/** 以 layout.json（行级几何信息）为主内容源的结构化入口 */
+export function segmentFromLayout(layoutRaw: unknown, docId: string): SegmentationResult {
+  const doc = normalizeLayout(layoutRaw, docId);
   return ruleStrategy.segment(doc);
 }
 

@@ -8,7 +8,7 @@ import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { MineruClient } from "../src/mineru/client.js";
 import { unpackResult } from "../src/mineru/unpack.js";
-import { segmentFromContentList, summarize } from "../src/index.js";
+import { segmentFromContentList, segmentFromLayout, summarize } from "../src/index.js";
 
 const KEY = process.env.mineru_API_KEY;
 if (!KEY) {
@@ -55,12 +55,20 @@ async function main() {
     writeFileSync(join(out, "result.zip"), zip);
 
     console.log("[4/5] 解包 + 结构化切分");
-    const { contentList, markdown, images } = unpackResult(zip);
+    const { contentList, layoutJson, markdown, images } = unpackResult(zip);
     writeFileSync(join(out, "content_list.json"), JSON.stringify(contentList, null, 2));
+    // zip 含 layout.json（实测条目名即 layout.json）时落盘，供二次回归/人工比对
+    if (layoutJson !== undefined) {
+      writeFileSync(join(out, "layout.json"), JSON.stringify(layoutJson, null, 2));
+    }
     writeFileSync(join(out, "full.md"), markdown);
     for (const img of images) writeFileSync(join(out, "images", basename(img.path)), img.data);
 
-    const result = segmentFromContentList(contentList, docId);
+    // 首选 layout.json（行级几何信息，选项结构化可用）；退化：无 layout 时走 content_list
+    const result =
+      layoutJson !== undefined
+        ? segmentFromLayout(layoutJson, docId)
+        : segmentFromContentList(contentList, docId);
     // 图片路径归一：content_list 的 img_path 形如 "images/<sha256>.jpg"（zip 内相对路径），
     // 落盘时图片按 basename 写入 images/ 目录；这里把题目里的 img.path 统一为 basename，
     // 保证 questions.json 的 path 与磁盘文件名一一对应。

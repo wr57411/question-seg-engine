@@ -8,6 +8,8 @@ import AdmZip from "adm-zip";
 
 export interface UnpackedResult {
   contentList: unknown;
+  /** zip 含 layout.json 时填充（实测条目名即 layout.json，无任务前缀） */
+  layoutJson?: unknown;
   markdown: string;
   /** images/ 目录下的图片（含路径，供 ImageRef.path 挂回题目） */
   images: { path: string; data: Buffer }[];
@@ -31,5 +33,8 @@ export function unpackResult(zipBuffer: Buffer): UnpackedResult {
     .filter((e) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(name(e)))
     .map((e) => ({ path: name(e), data: e.getData() }));
 
-  return { contentList, markdown, images };
+  const layoutEntry = entries.find((e) => name(e).toLowerCase().endsWith("layout.json"));
+  const out: UnpackedResult = { contentList, markdown, images };
+  if (layoutEntry) out.layoutJson = JSON.parse(layoutEntry.getData().toString("utf8"));
+  return out;
 }
