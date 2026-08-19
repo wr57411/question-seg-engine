@@ -121,3 +121,40 @@ export function stripOptionPrefix(line: string): string {
 export function nextKey(key: string): string {
   return String.fromCharCode(key.charCodeAt(0) + 1);
 }
+
+/**
+ * 粘连选项的后续标记：块内任意位置的 [A-H]+分隔符（允许与上文无空格粘连，如 "…上B.重力…"）。
+ * 注意两点：
+ * 1) 不校验后继字符——原 lookahead 方案（(?=[A-H][.．、)）:：]|$)）在 "B.3:5" / "B.重…"
+ *    （标记后直接是选项正文）时拆不动，与测试契约矛盾；是否「整块为选项连排」交给
+ *    splitConjoinedOptions 的块首标记守卫 + 调用方的 >=2 门控裁决。
+ * 2) 不带 /g 标志——非全局 exec 无 lastIndex 状态污染，每次都在「截到上一标记之后」的
+ *    rest 上从头找首个标记（即下一个选项起点），语义恰好正确。
+ */
+const OPTION_SPLIT = /([A-H])\s*[.．、)）:：]/;
+
+/**
+ * 粘连选项拆分：块内文本含多个连续选项标记时按标记切分（layout 行级展开缺失时的兜底，
+ * 或某行本身含多个选项如 "A.3:4 B.3:5"）。题干文本（无连续 A-D 标记）返回空数组。
+ * 注意：只处理「块首为选项标记且块内另有 ≥1 个后续标记」形态；混入正文数字/字母、
+ * 缺首标记的题干文本返回空（由上层走原路径）。
+ */
+export function splitConjoinedOptions(text: string): { key: string; text: string }[] {
+  const trimmed = text.trim();
+  const first = /^([A-H])\s*[.．、)）:：]\s*/.exec(trimmed);
+  if (!first) return [];
+  const out: { key: string; text: string }[] = [];
+  let rest = trimmed.slice(first[0].length);
+  let key = first[1]!.toUpperCase();
+  for (;;) {
+    const m = OPTION_SPLIT.exec(rest);
+    if (!m) break;
+    const seg = rest.slice(0, m.index).trim();
+    if (seg) out.push({ key, text: seg });
+    key = (m[1] ?? "").toUpperCase();
+    rest = rest.slice(m.index + m[0].length); // 直接跳过本标记（如 "B."），继续找下一个
+  }
+  // 最后一段
+  if (rest.trim()) out.push({ key, text: rest.trim() });
+  return out;
+}

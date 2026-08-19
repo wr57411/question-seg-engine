@@ -13,6 +13,7 @@ import {
   matchAnswerEntry,
   matchFirstLine,
   nextKey,
+  splitConjoinedOptions,
   stripOptionPrefix,
   stripQuestionPrefix,
 } from "./patterns.js";
@@ -152,6 +153,23 @@ class Ctx {
         return;
       }
       case "option": {
+        // 粘连多选项一行：直接批量入 pending（layout 行级未覆盖时的兜底）
+        const splits = splitConjoinedOptions(block.text);
+        if (splits.length >= 2 && splits[0]!.key === this.expectOptionKey) {
+          for (const s of splits) {
+            if (s.key === this.expectOptionKey) {
+              this.pendingOptions.push(s);
+              this.expectOptionKey = nextKey(s.key);
+              if (this.current) this.current.optEvidence = true;
+            } else {
+              this.settleOptions(this.current);
+              this.review(blockIndex, `粘连选项键不连续：期待 ${this.expectOptionKey}，实际 ${s.key}`, this.current);
+              break;
+            }
+          }
+          if (this.current) this.current.blockIndexes = [...this.current.blockIndexes, blockIndex];
+          return;
+        }
         this.onOption(block, m.optionKey ?? "", blockIndex);
         return;
       }
