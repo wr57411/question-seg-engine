@@ -20,6 +20,9 @@ test("行级展开：真实 layout 夹具切分非空且选项成组", () => {
   assert.ok(r.questions.length >= 1, "夹具应切出至少 1 道题");
   // 行级展开后应能出现选项组（夹具 page0 含 A.重力的作用点... 四行）
   assert.ok(r.stats.optionGroups >= 1, "行级展开应产出至少 1 个选项组");
+  // 图片归属：夹具含 3 张图（page0/1），normalizeLayout 挂回后必须能附加到题
+  // （回归：旧实现把 image 块整块跳过 → imagesAttached=0）
+  assert.ok(r.stats.imagesAttached >= 1, "layout 夹具图片应挂回并归属到题");
 });
 
 test("行级展开：夹具四选项组完整成组且无 review", () => {

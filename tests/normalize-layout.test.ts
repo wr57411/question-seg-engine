@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { normalizeLayout } from "../src/normalize.js";
+import { layoutPage } from "../src/layout.js";
 
 const raw = JSON.parse(
   readFileSync(new URL("./fixtures/layout.sample.json", import.meta.url), "utf8"),
@@ -32,4 +33,28 @@ test("normalizeLayout：para_blocks 按 line 展开且行序拼接等值原文�
     (b): b is Extract<typeof b, { kind: "text" }> => b.kind === "text" && /^A[.．、]/.test(b.firstLine),
   );
   assert.ok(optionLine, "应存在行级展开的选项行块");
+});
+
+test("normalizeLayout：image/chart 块挂回为 image ParsedBlock（path/bbox 正确）", () => {
+  const doc = normalizeLayout(raw, "layout-test");
+  const imgs = doc.pages.flatMap((p) =>
+    p.blocks.filter((b): b is Extract<typeof b, { kind: "image" }> => b.kind === "image"),
+  );
+  // 夹具 3 张图（page0 一张 [225,192,286,269]、page1 两张 [167,94,294,158] / [207,279,295,324]）
+  assert.equal(imgs.length, 3, "夹具 image 块应全部产出 image ParsedBlock");
+  // path 取自嵌套 blocks[].lines[].spans[].image_path，而非空串/占位
+  const first = imgs.find((i) => i.bbox[1] === 192);
+  assert.ok(first, "page0 的图应在 y=192");
+  assert.match(first!.path, /\.(jpg|jpeg|png)$/, "path 应挂回真实图片路径");
+  assert.deepEqual(first!.bbox, [225, 192, 286, 269], "bbox 应取自 span/块 bbox");
+  // 图片块按 bbox y 参与版面层阅读顺序：page0 的 y=192 图应出现在阅读顺序中，
+  // 且位于 y=193 文本行之前（阅读顺序由 layoutPage 决定，normalizeLayout 保留原块序）
+  const ordered = layoutPage(doc.pages[0]!).ordered;
+  const imgEntry = ordered.find((e) => e.block.kind === "image" && e.block.bbox[1] === 192);
+  assert.ok(imgEntry, "图片块应参与版面层阅读顺序");
+  const imgOrder = ordered.findIndex((e) => e.block === imgEntry!.block);
+  const nextByY = ordered
+    .slice(imgOrder + 1)
+    .find((e) => e.block.kind !== "image" && e.block.bbox[1] >= 193);
+  assert.ok(nextByY, "阅读顺序中图片后应还有后续文本块");
 });

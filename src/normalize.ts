@@ -224,6 +224,19 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
       const blocks: ParsedBlock[] = [];
       for (const pbRaw of asArray(rec.para_blocks as unknown)) {
         const pb = asRecord(pbRaw);
+        const pbType = String(pb.type ?? "text");
+
+        // 图片/图表块：真实 layout.json（2026-08-18 实测 95/95）没有块级 lines，
+        // 图片路径在嵌套 blocks[].lines[].spans[].image_path（span bbox 与块 bbox 一致）。
+        // 旧实现 `if (lines.length === 0) continue` 会把 image 块整块跳过 → layout 路径
+        // imagesAttached=0（v1 基线 97/97），图片归属静默回退且无测试拦截。
+        // 此处把 image_path 挂回为 image ParsedBlock；bbox 取 span/块 bbox，参与版面层阅读顺序。
+        if (pbType === "image" || pbType === "chart") {
+          const img = extractLayoutImage(pb);
+          if (img) blocks.push(img);
+          continue;
+        }
+
         const lines = asArray(pb.lines as unknown);
         if (lines.length === 0) continue;
         for (const lineRaw of lines) {
@@ -260,6 +273,46 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
     })
     .sort((a, b) => a.index - b.index);
   return { docId, pages };
+}
+
+/**
+ * 从 layout.json 的 image/chart para_block 提取 image ParsedBlock。
+ *
+ * 真实形态（2026-08-18 实测 95/95 图片块一致）：块级无 lines，图片路径在
+ * `blocks[].lines[].spans[].image_path`（span bbox 与块 bbox 相同）。
+ * 兜底：块级 `path` 字段（旧版结构）。
+ * 找不到任何图片路径返回 null（不产出悬空块）。
+ */
+function extractLayoutImage(
+  pb: Record<string, unknown>,
+): Extract<ParsedBlock, { kind: "image" }> | null {
+  const blockBBox = toBBox(pb.bbox);
+  // ① 嵌套子块 lines[].spans[].image_path（真实主形态）
+  for (const subRaw of asArray(pb.blocks as unknown)) {
+    const sub = asRecord(subRaw);
+    for (const lineRaw of asArray(sub.lines as unknown)) {
+      for (const spanRaw of asArray(asRecord(lineRaw).spans as unknown)) {
+        const span = asRecord(spanRaw);
+        const path = String(span.image_path ?? span.path ?? "");
+        if (path) {
+          const spanBBox = toBBox(span.bbox);
+          return {
+            kind: "image",
+            bbox: isZeroBox(spanBBox) ? blockBBox : spanBBox,
+            path,
+          };
+        }
+      }
+    }
+  }
+  // ② 块级 path 兜底（旧版结构）
+  const path = String(pb.path ?? "");
+  if (path) return { kind: "image", bbox: blockBBox, path };
+  return null;
+}
+
+function isZeroBox(b: BBox): boolean {
+  return b.every((n) => n === 0);
 }
 
 function toBBox(v: unknown): BBox {

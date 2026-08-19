@@ -149,8 +149,14 @@ review 数反而上升（63 → 128），如实记录原因：
 
 **后续动作**：① 分栏阈值校准：layout.json 页宽 596 下 28% 阈值偏严，改为按行 x0 分布聚类
 （或页内 bbox 直方图）判定栏数，预期可消除 103 条乱序 review 的大部；② 语言层 ARABIC_QUESTION
-排除小数点（`\d{1,3}\.\d` 不切题），消除 4 个幽灵题；③ layout normalize 补图片/公式块挂回，
-对齐 v1 的图片归属指标；④ 「选项乱序」review 文案中期待键被 settle 重置掩盖，后续修正展示。
+排除小数点（`\d{1,3}\.\d` 不切题），消除 4 个幽灵题；③ ~~layout normalize 补图片/公式块挂回，
+对齐 v1 的图片归属指标~~ —— **图片挂回已落地（2026-08-19）**：真实 layout.json 实测
+imagesAttached **0 → 97**，与 v1 基线 97/97 对齐（95 image 块 + 2 chart 块，路径在
+`blocks[].lines[].spans[].image_path`，span bbox 与块 bbox 一致）。独立公式块现状如实记录：
+真实样本中公式为**行内 inline_equation span**（162 处已内联）与 3 个 `interline_equation` 块
+（v1 计数 3），interline_equation 目前按行内 `$...$` 内联进题干，内容不丢，未产出独立
+formula ParsedBlock（formulaBlocks 仍 0）——与 v1 独立块计数等价，后续如需独立渲染再追加。
+④ 「选项乱序」review 文案中期待键被 settle 重置掩盖，后续修正展示。
 
 ### 10.4 冒烟结论（手写答案样卷）
 
