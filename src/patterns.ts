@@ -136,8 +136,11 @@ const OPTION_SPLIT = /([A-H])\s*[.．、)）:：]/;
 /**
  * 粘连选项拆分：块内文本含多个连续选项标记时按标记切分（layout 行级展开缺失时的兜底，
  * 或某行本身含多个选项如 "A.3:4 B.3:5"）。题干文本（无连续 A-D 标记）返回空数组。
- * 注意：只处理「块首为选项标记且块内另有 ≥1 个后续标记」形态；混入正文数字/字母、
- * 缺首标记的题干文本返回空（由上层走原路径）。
+ * 注意：
+ * - 只处理「块首为选项标记且块内另有 ≥1 个后续标记」形态；混入正文数字/字母、
+ *   缺首标记的题干文本返回空（由上层走原路径）。
+ * - 本函数不做 key 去重：正文若重现同名标记（如 "A.x B.y A.z"），输出会含两个 A 键——
+ *   去重/连续性由 rule-engine 的 expectOptionKey 门控裁决（不连续即 settle+review+文本回退）。
  */
 export function splitConjoinedOptions(text: string): { key: string; text: string }[] {
   const trimmed = text.trim();

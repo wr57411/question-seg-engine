@@ -156,18 +156,27 @@ class Ctx {
         // 粘连多选项一行：直接批量入 pending（layout 行级未覆盖时的兜底）
         const splits = splitConjoinedOptions(block.text);
         if (splits.length >= 2 && splits[0]!.key === this.expectOptionKey) {
+          // 不连续分支已调 appendToCurrent（其内部自带 blockIndex 登记），尾部登记需跳过避免重复
+          let preservedToStem = false;
           for (const s of splits) {
             if (s.key === this.expectOptionKey) {
               this.pendingOptions.push(s);
               this.expectOptionKey = nextKey(s.key);
               if (this.current) this.current.optEvidence = true;
             } else {
+              // 先捕获再 settle：settleOptions 会把 expectOptionKey 重置回 "A"
+              const expected = this.expectOptionKey;
               this.settleOptions(this.current);
-              this.review(blockIndex, `粘连选项键不连续：期待 ${this.expectOptionKey}，实际 ${s.key}`, this.current);
+              this.review(blockIndex, `粘连选项键不连续：期待 ${expected}，实际 ${s.key}`, this.current);
+              // 宁错审不错放：当前块（含断裂点之后的文本）整体回退题干，与既有 onOption 乱序路径一致
+              this.appendToCurrent(block.text, blockIndex);
+              preservedToStem = true;
               break;
             }
           }
-          if (this.current) this.current.blockIndexes = [...this.current.blockIndexes, blockIndex];
+          if (this.current && !preservedToStem) {
+            this.current.blockIndexes = [...this.current.blockIndexes, blockIndex];
+          }
           return;
         }
         this.onOption(block, m.optionKey ?? "", blockIndex);
