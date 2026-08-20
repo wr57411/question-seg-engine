@@ -24,8 +24,9 @@ export function layoutPage(page: PageInfo): LayoutInfo {
     pageIndex: page.index,
     block,
   }));
+  const centers = detectColumnCenters(entries, width);
   const columns = detectColumns(entries, width);
-  return { columns, ordered: restoreReadingOrder(entries, columns, width) };
+  return { columns, ordered: restoreReadingOrder(entries, columns, width, centers) };
 }
 
 export interface ColumnDetectorParams {
@@ -52,15 +53,22 @@ export const DEFAULT_COLUMN_PARAMS: ColumnDetectorParams = {
  * 居中标题/边注 1~2 块横跨栏间隙会破坏「最大间隙」判定，但不会形成稠密桶——
  * 故用「稠密桶聚簇 + 簇中心距」替代单一间隙阈值。
  */
-export function detectColumns(
+
+/**
+ * x0 桶聚类有效簇中心（升序）。
+ * 供分栏判定（detectColumns）与栏归属（restoreReadingOrder）复用，
+ * 使栏界不再依赖固定中线 pageWidth/2，而是「每块归最近簇中心」。
+ * 无有效簇（块数不足/簇密度不足）返回 []。
+ */
+export function detectColumnCenters(
   entries: IndexedBlock[],
   pageWidth: number,
   params: ColumnDetectorParams = DEFAULT_COLUMN_PARAMS,
-): number {
+): number[] {
   const xs = entries
     .filter((e) => e.block.kind !== "image")
     .map((e) => e.block.bbox[0]);
-  if (xs.length < 4) return 1;
+  if (xs.length < 4) return [];
 
   const width = pageWidth > 0 ? pageWidth : 1654;
   const bucketWidth = width / params.bucketCount;
@@ -88,32 +96,52 @@ export function detectColumns(
   }
   if (cur) clusters.push(cur);
 
-  if (clusters.length >= 2) {
-    const centers = clusters
-      .map((c) => {
-        const lo = c.from * bucketWidth;
-        const hi = (c.to + 1) * bucketWidth;
-        const inCluster = xs.filter((x) => x >= lo && x < hi);
-        return inCluster.reduce((a, b) => a + b, 0) / Math.max(1, inCluster.length);
-      })
-      .sort((a, b) => a - b);
-    if ((centers[1] ?? 0) - (centers[0] ?? 0) > width * params.minGapRatio) return 2;
-  }
+  return clusters
+    .map((c) => {
+      const lo = c.from * bucketWidth;
+      const hi = (c.to + 1) * bucketWidth;
+      const inCluster = xs.filter((x) => x >= lo && x < hi);
+      return inCluster.reduce((a, b) => a + b, 0) / Math.max(1, inCluster.length);
+    })
+    .sort((a, b) => a - b);
+}
+
+export function detectColumns(
+  entries: IndexedBlock[],
+  pageWidth: number,
+  params: ColumnDetectorParams = DEFAULT_COLUMN_PARAMS,
+): number {
+  const centers = detectColumnCenters(entries, pageWidth, params);
+  const width = pageWidth > 0 ? pageWidth : 1654;
+  if (centers.length >= 2 && (centers[1] ?? 0) - (centers[0] ?? 0) > width * params.minGapRatio) return 2;
   return 1;
 }
 
-/** 恢复阅读顺序（简化版：两栏时左栏整列在前） */
+/** 恢复阅读顺序：单栏/无簇中心按全页 y 排序；两栏时每块按「x0 距最近簇中心」归栏，左栏整列在前（栏内 y 排序） */
 export function restoreReadingOrder(
   entries: IndexedBlock[],
   columns: number,
   pageWidth: number,
+  centers: number[] = [],
 ): IndexedBlock[] {
   const byY = (a: IndexedBlock, b: IndexedBlock) => a.block.bbox[1] - b.block.bbox[1];
-  if (columns <= 1) return [...entries].sort(byY);
+  if (columns <= 1 || centers.length < 2) return [...entries].sort(byY);
 
-  const mid = pageWidth / 2;
-  const left = entries.filter((e) => e.block.bbox[0] < mid).sort(byY);
-  const right = entries.filter((e) => e.block.bbox[0] >= mid).sort(byY);
+  // 簇中心升序，第 0 个即最左簇；归属 = 距哪个簇中心最近（不再依赖固定中线 pageWidth/2）
+  const assign = (x: number) => {
+    let best = 0;
+    let bestDist = Infinity;
+    centers.forEach((c, i) => {
+      const d = Math.abs(c - x);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    return best;
+  };
+  const left = entries.filter((e) => assign(e.block.bbox[0]) === 0).sort(byY);
+  const right = entries.filter((e) => assign(e.block.bbox[0]) !== 0).sort(byY);
   return [...left, ...right];
 }
 
