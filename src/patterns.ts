@@ -54,9 +54,10 @@ const OPTION_LINE = /^([A-Ha-h])\s*[.．、)）:：]/;
 
 /**
  * 答案区条目：题号开头（答案区内的 "1．B"），复用题号模式两分支结构。
- * 与 ARABIC_QUESTION 同款守卫：半角点后紧跟数字（0.5…）不当作题号前缀。
+ * 与 ARABIC_QUESTION 同款守卫：半角点后接数字（0.5…/0 . 5…）不当作题号前缀；
+ * 分支 1 同款 \s* 容忍（"1 . B" 可解析），负前瞻跳过空白后断言非数字。
  */
-const ANSWER_ENTRY = /^(\d{1,3})\.(?!\d)\s*(\S.*)$|^(\d{1,3})\s*[．、)）]\s*(\S.*)$/;
+const ANSWER_ENTRY = /^(\d{1,3})\s*\.(?!\s*\d)\s*(\S.*)$|^(\d{1,3})\s*[．、)）]\s*(\S.*)$/;
 
 function matchKind(ok: boolean, kind: TextMatch["kind"]): LineMatch {
   return ok ? ({ ok: true, kind, captured: "" } as TextMatch) : { ok: false, kind: "other" };
@@ -112,11 +113,13 @@ export function matchAnswerEntry(line: string): { number: string; text: string }
   return { number: m[1] ?? m[3] ?? "", text: (m[2] ?? m[4] ?? "").trim() };
 }
 
-/** 剥离块首的题号前缀，返回纯题干（如 "1．设集合 A=..." → "设集合 A=..."） */
+/** 剥离块首的题号前缀，返回纯题干（如 "1．设集合 A=..." → "设集合 A=..."）。
+ * 分支 1 与 ARABIC_QUESTION 同款：数字与半角点间空格容忍、负前瞻跳空白后断言非数字，
+ * 保证「判定层接受的题号形态，剥离层一定剥得掉」（"1 . 设" 剥为 "设"）。 */
 export function stripQuestionPrefix(line: string): string {
   return line
     .trimStart()
-    .replace(/^\d{1,3}\.(?!\d)|^\d{1,3}\s*[．、)）]/, "")
+    .replace(/^\d{1,3}\s*\.(?!\s*\d)|^\d{1,3}\s*[．、)）]/, "")
     .replace(/^[（(]\s*\d{1,2}\s*[)）]/, "")
     .trimStart();
 }
