@@ -21,8 +21,12 @@ export interface TextMatch {
 
 export type LineMatch = TextMatch | { ok: false; kind: "other" };
 
-/** 阿拉伯数字题号：1. / 1． / 1、 / 1) 等（半角全角分隔符容忍） */
-const ARABIC_QUESTION = /^(\d{1,3})\s*[.．、)）]/;
+/**
+ * 阿拉伯数字题号：1. / 1． / 1、 / 1) 等（半角全角分隔符容忍）。
+ * 守卫：半角点后紧跟数字视为小数（0.5、0.4kg），不是题号——
+ * 真实教辅常见题干续行以「0.8,不计…」开头，误判会产生幽灵题号 0。
+ */
+const ARABIC_QUESTION = /^(\d{1,3})\.(?!\d)|^(\d{1,3})[．、)）]/;
 
 /** 括号小题号：（1） / (2) / （3），常见于解答题大题内 */
 const PAREN_QUESTION = /^[（(]\s*(\d{1,2})\s*[)）]/;
@@ -46,8 +50,11 @@ const ANSWER_ZONE_GUARD = isAnswerZone;
 /** 选项行：行首单字母 + 分隔符，如 A． / B. / C) / D、 */
 const OPTION_LINE = /^([A-Ha-h])\s*[.．、)）:：]/;
 
-/** 答案区条目：题号开头（答案区内的 "1．B"），复用题号模式 */
-const ANSWER_ENTRY = /^(\d{1,3})\s*[.．、)）]\s*(\S.*)$/;
+/**
+ * 答案区条目：题号开头（答案区内的 "1．B"），复用题号模式两分支结构。
+ * 与 ARABIC_QUESTION 同款守卫：半角点后紧跟数字（0.5…）不当作题号前缀。
+ */
+const ANSWER_ENTRY = /^(\d{1,3})\.(?!\d)\s*(\S.*)$|^(\d{1,3})\s*[．、)）]\s*(\S.*)$/;
 
 function matchKind(ok: boolean, kind: TextMatch["kind"]): LineMatch {
   return ok ? ({ ok: true, kind, captured: "" } as TextMatch) : { ok: false, kind: "other" };
@@ -84,7 +91,7 @@ export function matchFirstLine(line: string): LineMatch {
 
   const arabic = ARABIC_QUESTION.exec(s);
   if (arabic) {
-    return { ok: true, kind: "question_no", captured: arabic[1] ?? "" };
+    return { ok: true, kind: "question_no", captured: arabic[1] ?? arabic[2] ?? "" };
   }
 
   const opt = OPTION_LINE.exec(s);
@@ -100,14 +107,14 @@ export function matchFirstLine(line: string): LineMatch {
 export function matchAnswerEntry(line: string): { number: string; text: string } | null {
   const m = ANSWER_ENTRY.exec(line.trimStart());
   if (!m) return null;
-  return { number: m[1] ?? "", text: (m[2] ?? "").trim() };
+  return { number: m[1] ?? m[3] ?? "", text: (m[2] ?? m[4] ?? "").trim() };
 }
 
 /** 剥离块首的题号前缀，返回纯题干（如 "1．设集合 A=..." → "设集合 A=..."） */
 export function stripQuestionPrefix(line: string): string {
   return line
     .trimStart()
-    .replace(/^\d{1,3}\s*[.．、)）]/, "")
+    .replace(/^\d{1,3}\.(?!\d)|^\d{1,3}\s*[．、)）]/, "")
     .replace(/^[（(]\s*\d{1,2}\s*[)）]/, "")
     .trimStart();
 }
