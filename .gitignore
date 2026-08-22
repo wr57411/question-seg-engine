@@ -4,3 +4,5 @@ sample/*
 !sample/README.md
 *.local
 .DS_Store
+# SDD workspace（不入库）
+.superpowers/
