@@ -76,15 +76,26 @@
           <span class="stat stat-ok">ok: <strong id="stat-ok">0</strong></span>
           <span class="stat stat-review">review: <strong id="stat-review">0</strong></span>
         </div>
-        <div class="filters mono" id="filters" role="group" aria-label="题型筛选">
-          <button class="filter is-active" data-filter="all" type="button">全部</button>
-          <button class="filter" data-filter="choice" type="button">选择</button>
-          <button class="filter" data-filter="subjective" type="button">主观</button>
+        <div class="masthead-actions">
+          <button class="review-btn" id="review-btn" type="button" aria-pressed="false">
+            <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+            <span id="review-btn-label">Review (0)</span>
+          </button>
+          <div class="filters mono" id="filters" role="group" aria-label="题型筛选">
+            <button class="filter is-active" data-filter="all" type="button">全部</button>
+            <button class="filter" data-filter="choice" type="button">选择</button>
+            <button class="filter" data-filter="subjective" type="button">主观</button>
+          </div>
         </div>
       </div>
     </header>
 
     <div class="rule"></div>
+
+    <!-- 质检队列视图（Review 入口）——默认隐藏，showReview() 时显示 -->
+    <section class="review-queue" id="review" aria-label="质检队列" hidden>
+      <!-- JS 注入：质检队列卡片流 -->
+    </section>
 
     <!-- 纸张卡片流（A4 794px） -->
     <section class="paper-flow" id="paper" aria-label="题目列表">

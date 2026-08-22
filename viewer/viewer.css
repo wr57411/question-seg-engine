@@ -122,6 +122,54 @@ body {
 
 .rule { height: 2px; background: linear-gradient(90deg, var(--ink) 0, var(--line) 40%, transparent 90%); margin: 0 0 40px; }
 
+/* ============ masthead 操作区（Review 入口 + 筛选） ============ */
+.masthead-actions { display: flex; align-items: center; gap: 12px; }
+.review-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--paper); background: var(--cinnabar); border: 1px solid var(--cinnabar);
+  border-radius: 4px; padding: 6px 14px; transition: all 0.18s;
+}
+.review-btn .icon { width: 14px; height: 14px; }
+.review-btn:hover { background: #923024; border-color: #923024; }
+.review-btn.is-empty { background: transparent; color: var(--slate); border-color: var(--line); }
+.review-btn.is-active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+/* ============ 质检队列视图（Review / P3） ============ */
+.review-queue {
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(36,39,43,0.05);
+  padding: var(--paper-margin);
+}
+.review-head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 2px solid var(--ink); padding-bottom: var(--st-16); margin-bottom: var(--st-16); flex-wrap: wrap; gap: 10px; }
+.review-title { font-size: 22px; line-height: 32px; font-weight: 600; letter-spacing: -0.01em; margin: 0; display: flex; align-items: center; gap: 8px; }
+.review-title .icon { color: var(--cinnabar); }
+.review-count { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: var(--cinnabar); background: var(--paper); border: 1px solid var(--cinnabar); border-radius: 999px; padding: 2px 10px; }
+.review-desc { color: var(--slate); font-size: 15px; margin: 0 0 var(--st-16); max-width: 640px; }
+
+.review-item { padding: var(--st-16) 0; border-top: 1px solid var(--line); }
+.review-item:first-of-type { border-top: none; }
+.review-item-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.review-id { font-family: var(--mono); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.review-id .icon { width: 13px; height: 13px; color: var(--cinnabar); }
+.review-conf { font-family: var(--mono); font-size: 11.5px; color: var(--cinnabar); border: 1px solid var(--cinnabar); border-radius: 3px; padding: 1px 8px; }
+.review-err { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper); background: var(--cinnabar); border-radius: 3px; padding: 1px 7px; }
+.review-go { margin-left: auto; padding: 4px 12px; font-size: 11px; }
+.review-stem { font-size: 15px; line-height: 1.7; color: var(--ink); margin: 0 0 0 20px; white-space: pre-wrap; border-left: 2px solid var(--line); padding-left: 14px; }
+
+.review-empty { text-align: center; padding: 48px 24px; }
+.review-empty .stamp-circle {
+  width: 84px; height: 84px; margin: 0 auto 18px;
+  border: 2px solid var(--cinnabar); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transform: rotate(-2deg); color: var(--cinnabar);
+}
+.review-empty .stamp-circle .icon { width: 42px; height: 42px; }
+.review-empty h3 { font-size: 22px; margin: 0 0 8px; }
+.review-empty p { color: var(--slate); margin: 0 0 20px; }
+.review-empty .btn { max-width: 320px; }
+
 /* ============ 纸张卡片流 ============ */
 .paper-flow { display: flex; flex-direction: column; gap: var(--st-32); }
 
@@ -145,6 +193,13 @@ body {
   border-left: 3px solid var(--cinnabar);
 }
 .card.needs_review .rev-tag { display: inline-flex; }
+
+/* 质检队列「进入单题」后滚动到目标卡的短暂高亮 */
+.card.review-highlight {
+  outline: 2px solid var(--cinnabar);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(176,58,46,0.12);
+}
 
 /* --- 卡片头 --- */
 .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: var(--st-16); }
@@ -287,6 +342,7 @@ body {
   .main { margin-left: 0; padding: 24px 16px 140px; }
   .masthead { flex-direction: column; align-items: flex-start; gap: 14px; }
   .masthead-right { align-items: flex-start; width: 100%; }
+  .masthead-actions { flex-wrap: wrap; }
   .stat-group { flex-wrap: wrap; }
   .card { padding: 24px; }
   :root { --blank-subjective: 240px; }
@@ -297,7 +353,7 @@ body {
 
 /* 打印友好 */
 @media print {
-  .toc, .mobile-menu, .masthead-right, .filters { display: none; }
+  .toc, .mobile-menu, .masthead-right, .filters, .review-btn { display: none; }
   .main { margin: 0; }
   .card { box-shadow: none; page-break-inside: avoid; }
 }

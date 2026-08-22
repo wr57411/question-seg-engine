@@ -8,6 +8,8 @@
     "demo": "tsx scripts/demo.ts",
     "view": "tsx scripts/view-server.ts",
     "view:server": "tsx scripts/view-server.ts",
+    "view:cap": "node scripts/view-cap.mjs",
+    "view:test": "node scripts/browser-gate.mjs",
     "test": "node --import tsx --test \"tests/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test"

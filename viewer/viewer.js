@@ -11,7 +11,12 @@ const DOC = resolveDoc(location.search);
 const baseFor = (doc) => `../data/out/${encodeURIComponent(doc)}`;
 let BASE = baseFor(DOC);
 
-const state = { answersVisible: false, filter: "all", questions: [] };
+const state = {
+  answersVisible: false,
+  filter: "all",
+  questions: [],
+  reviewMode: false, // true 时显示质检队列视图（showReview），false 显示主列表（showOverview）
+};
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const icon = (id, cls = "icon") =>
@@ -185,6 +190,14 @@ function updateStats() {
   $("#stat-total").textContent = total;
   $("#stat-ok").textContent = ok;
   $("#stat-review").textContent = review;
+  // Review 按钮计数同步（Review (N)，N = needs_review 数）
+  const label = $("#review-btn-label");
+  if (label) label.textContent = `Review (${review})`;
+  const btn = $("#review-btn");
+  if (btn) {
+    btn.classList.toggle("is-empty", review === 0);
+    btn.setAttribute("aria-pressed", String(state.reviewMode));
+  }
 }
 
 function applyFilter() {
@@ -227,6 +240,112 @@ function setFilter(f) {
     b.classList.toggle("is-active", b.dataset.filter === f)
   );
   applyFilter();
+}
+
+/* ---------------- 质检队列视图（Review 入口 / P3） ---------------- */
+// 切换质检队列视图：显示 id="review" 容器并渲染队列；隐藏主列表；body 加 .review-mode
+function showReview() {
+  state.reviewMode = true;
+  renderReviewQueue();
+  $("#paper").hidden = true;
+  const rb = $("#review");
+  rb.hidden = false;
+  document.body.classList.add("review-mode");
+  const btn = $("#review-btn");
+  btn.classList.add("is-active");
+  btn.setAttribute("aria-pressed", "true");
+}
+
+// 返回总览视图（恢复卡片流 + 筛选 + 目录）
+function showOverview() {
+  state.reviewMode = false;
+  const rb = $("#review");
+  rb.hidden = true;
+  $("#paper").hidden = false;
+  document.body.classList.remove("review-mode");
+  const btn = $("#review-btn");
+  btn.classList.remove("is-active");
+  btn.setAttribute("aria-pressed", "false");
+}
+
+// 渲染质检队列：列出所有 needs_review 题，每项可点击进入单题
+function renderReviewQueue() {
+  const rb = $("#review");
+  rb.innerHTML = "";
+  const reviewQs = state.questions.filter((q) => q.status === "needs_review");
+
+  const head = document.createElement("div");
+  head.className = "review-head";
+  head.innerHTML =
+    `<h2 class="review-title">${icon("i-alert")} 质检队列</h2>` +
+    `<span class="review-count">${reviewQs.length} Pending Review</span>`;
+  rb.appendChild(head);
+
+  const desc = document.createElement("p");
+  desc.className = "review-desc";
+  desc.textContent = "以下题目因置信度偏低或结构异常，需人工编辑复核。";
+  rb.appendChild(desc);
+
+  if (!reviewQs.length) {
+    const empty = document.createElement("div");
+    empty.className = "review-empty";
+    empty.innerHTML =
+      `<div class="stamp-circle">${icon("i-check")}</div>` +
+      `<h3>All questions reviewed.</h3>` +
+      `<p>暂无待审题目。</p>`;
+    const back = document.createElement("button");
+    back.className = "btn btn-ink w-full";
+    back.type = "button";
+    back.textContent = "返回总览";
+    back.addEventListener("click", showOverview);
+    empty.appendChild(back);
+    rb.appendChild(empty);
+    return;
+  }
+
+  for (const q of reviewQs) {
+    const item = document.createElement("article");
+    item.className = "review-item";
+    item.dataset.target = anchorId(q);
+    const qid = `Q-${q.number || q.id}`;
+    const conf = Math.round((q.confidence ?? 0) * 100);
+    const err = reviewError(q);
+    item.innerHTML = `
+      <div class="review-item-head">
+        <span class="review-id">${icon("i-alert")} ${escapeHtml(qid)}</span>
+        <span class="review-conf">Conf ${conf}%</span>
+        <span class="review-err">${escapeHtml(err)}</span>
+        <button class="btn btn-ghost review-go" type="button" data-go>进入单题</button>
+      </div>
+      <p class="review-stem">${escapeHtml(q.stem)}</p>`;
+    // 进入单题：滚动到对应题卡并回到总览（高亮目标卡）
+    item.querySelector("[data-go]").addEventListener("click", (e) => {
+      e.stopPropagation();
+      goToQuestion(q);
+    });
+    item.addEventListener("click", () => goToQuestion(q));
+    rb.appendChild(item);
+  }
+}
+
+// 质检队列项 → 回到总览并滚动到目标题卡（含单题高亮）
+function goToQuestion(q) {
+  showOverview();
+  const target = document.getElementById(anchorId(q));
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.classList.add("review-highlight");
+    setTimeout(() => target.classList.remove("review-highlight"), 2600);
+  }
+}
+
+// 根据数据泛化错误摘要（用于质检队列的红色错误标签）
+function reviewError(q) {
+  const msg = q.review_note || q.error || "";
+  if (msg) return String(msg);
+  if (q.type === "subjective") return "SUBJECTIVE FLAG";
+  if ((q.confidence ?? 1) < 0.7) return "LOW CONFIDENCE";
+  return "ANOMALY DETECTED";
 }
 
 /* ---------------- 全局答案开关 ---------------- */
@@ -289,6 +408,12 @@ async function main() {
 
   // 全局答案开关
   $("#toggle-answers").addEventListener("click", () => setAnswersVisible(!state.answersVisible));
+
+  // 质检队列 Review 入口（P3）：点击切换 质检队列视图 <-> 总览
+  $("#review-btn").addEventListener("click", () => {
+    if (state.reviewMode) showOverview();
+    else showReview();
+  });
 
   // 题型筛选
   $("#filters").addEventListener("click", (e) => {
