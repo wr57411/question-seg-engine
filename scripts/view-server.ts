@@ -55,6 +55,10 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`viewer: http://localhost:${PORT}/`);
-  console.log(`docId: ${docId}（questions.json 不存在? 先跑 npm run pipeline）`);
+  const enc = encodeURIComponent(docId);
+  console.log(`viewer: http://localhost:${PORT}/viewer/?doc=${enc}`);
+  console.log(`  完整地址（含 doc 参数，可直接复制使用）`);
+  console.log(`  默认卷：${docId}`);
+  console.log(`  换卷：npm run view <docId> 或用 ?doc=<docId> 查询参数`);
+  console.log(`  提示：doc 参数需完整（含空格用 %20），截断会导致数据加载失败`);
 });
