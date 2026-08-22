@@ -3,8 +3,10 @@
 // 解耦红线：本文件不得 import ../src/ 任何内容。数据来源见 CONTRACT.md。
 // ============================================================
 
-/** URL ?doc= 参数，默认 23必刷题 2相互作用 */
-const DOC = new URLSearchParams(location.search).get("doc") ?? "23必刷题 2相互作用";
+import { DEFAULT_DOC, resolveDoc, loadWithFallback } from "./doc-utils.js";
+
+/** URL ?doc= 参数（含"缺失/非法回退默认"容错），由 doc-utils 解析 */
+const DOC = resolveDoc(location.search);
 const BASE = `../data/out/${encodeURIComponent(DOC)}`;
 
 const state = { answersVisible: false, filter: "all", questions: [] };
@@ -13,15 +15,12 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const icon = (id, cls = "icon") =>
   `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
 
-/* ---------------- 数据加载 ---------------- */
+/* ---------------- 数据加载（doc 容错：失败时回退默认一次，并给出明确提示） ---------------- */
 async function load() {
-  const res = await fetch(`${BASE}/questions.json`);
-  if (!res.ok) {
-    throw new Error(
-      `questions.json 加载失败（${res.status}）——先运行 npm run view 或检查 doc 参数`
-    );
-  }
-  return await res.json();
+  return loadWithFallback(
+    async (doc) => fetch(`../data/out/${encodeURIComponent(doc)}/questions.json`),
+    DOC,
+  );
 }
 
 /* ---------------- 契约适配 ---------------- */
