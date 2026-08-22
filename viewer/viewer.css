@@ -170,7 +170,7 @@ body {
 .review-empty p { color: var(--slate); margin: 0 0 20px; }
 .review-empty .btn { max-width: 320px; }
 
-/* ============ 纸张卡片流 ============ */
+/* 卡片流（A4 794px） */
 .paper-flow { display: flex; flex-direction: column; gap: var(--st-32); }
 
 /* --- 卡片 --- */
@@ -200,6 +200,14 @@ body {
   outline-offset: 3px;
   box-shadow: 0 0 0 6px rgba(176,58,46,0.12);
 }
+
+/* ============ Review 模式（body.review-mode） ============
+   状态钩子 class：主视图切换由 #paper.hidden / #review.hidden 承载；
+   本块承载 review 模式下的额外样式——淡化目录题的题号索引（队列视图不依赖题号跳转，
+   且避免"Q-6 重复"的目录项在 review 模式下造成困惑）。不影响主区布局/卡片流。 */
+body.review-mode .toc-nav { opacity: 0.35; pointer-events: none; }
+body.review-mode .toc-foot { opacity: 0.6; }
+body.review-mode .review-btn.is-active { background: var(--cinnabar); border-color: var(--cinnabar); }
 
 /* --- 卡片头 --- */
 .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: var(--st-16); }

@@ -145,7 +145,7 @@ function renderCard(q, i) {
 
   card.innerHTML = `
     <header class="card-head">
-      <span class="q-id">Q-${q.number || q.id}</span>
+      <span class="q-id">${displayLabel(q)}</span>
       <span class="q-type">${typeLabel}</span>
       ${
         q.section
@@ -307,7 +307,7 @@ function renderReviewQueue() {
     const item = document.createElement("article");
     item.className = "review-item";
     item.dataset.target = anchorId(q);
-    const qid = `Q-${q.number || q.id}`;
+    const qid = displayLabel(q);
     const conf = Math.round((q.confidence ?? 0) * 100);
     const err = reviewError(q);
     item.innerHTML = `
@@ -390,6 +390,21 @@ function closeTocOnResize() {
 /* ---------------- 工具 ---------------- */
 function anchorId(q) {
   return `q-${(q.id || q.number).replace(/[^\w\u4e00-\u9fa5:-]/g, "_")}`;
+}
+
+// 展示标签：避免"题号重复"歧义（真实数据多卷题目 number 都为 6）。
+// 若 number 在全量题目里唯一 → 用 "Q-6"；重复 → 用 id 里的页码段（如 p7:q43 → "p7-6"）
+// 或直接回退 id，确保每张卡/队列项展示可区分。
+function displayLabel(q) {
+  const n = q.number;
+  const label = `Q-${n || q.id}`;
+  if (!n) return `Q-${q.id}`;
+  const sameNum = state.questions.filter((x) => x.number === n).length;
+  if (sameNum <= 1) return label;
+  // number 重复：附加 id 中的页码段（更好读），id 形如 "<卷>:p7:q43"
+  const m = String(q.id).match(/:p(\d+):q(\d+)$/);
+  if (m) return `Q-${n} (p${m[1]})`;
+  return `Q-${q.id}`;
 }
 function escapeHtml(s) {
   return String(s ?? "")
