@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scholarly Review - Question Bank</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&amp;family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-tertiary-fixed": "#001e30",
+                        "on-primary-fixed": "#191c20",
+                        "surface-variant": "#e7e2d8",
+                        "primary-fixed-dim": "#c5c6cc",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f8f3e9",
+                        "on-surface": "#1d1c16",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-container": "#7391ab",
+                        "outline": "#75777b",
+                        "on-primary-fixed-variant": "#44474b",
+                        "on-secondary-container": "#6f0806",
+                        "background": "#fef9ef",
+                        "on-primary-container": "#8c8e93",
+                        "on-tertiary-fixed-variant": "#2b4a61",
+                        "primary-container": "#24272b",
+                        "secondary-fixed": "#ffdad5",
+                        "surface": "#fef9ef",
+                        "surface-container-highest": "#e7e2d8",
+                        "inverse-on-surface": "#f5f0e6",
+                        "primary-fixed": "#e1e2e8",
+                        "secondary-container": "#fe7362",
+                        "secondary": "#aa352a",
+                        "surface-bright": "#fef9ef",
+                        "secondary-fixed-dim": "#ffb4a9",
+                        "on-surface-variant": "#45474a",
+                        "surface-container": "#f2ede3",
+                        "surface-dim": "#dedad0",
+                        "on-background": "#1d1c16",
+                        "inverse-surface": "#32302a",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#5c5e63",
+                        "on-secondary-fixed": "#410001",
+                        "tertiary-container": "#04293f",
+                        "tertiary": "#001321",
+                        "surface-container-high": "#ede8de",
+                        "inverse-primary": "#c5c6cc",
+                        "tertiary-fixed-dim": "#abcae6",
+                        "tertiary-fixed": "#cbe6ff",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "primary": "#0f1216",
+                        "on-secondary-fixed-variant": "#891d15",
+                        "error-container": "#ffdad6",
+                        "rice-grey": "#CFC5B2",
+                        "ink-ink-subtle": "rgba(36, 39, 43, 0.6)",
+                        "outline-variant": "#c5c6ca"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.25rem",
+                        lg: "0.5rem",
+                        xl: "0.75rem",
+                        full: "9999px"
+                    },
+                    spacing: {
+                        "paper-margin": "48px",
+                        "max-content-width": "794px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "stack-sm": "8px",
+                        "gutter": "24px",
+                        "sidebar-width": "240px"
+                    },
+                    fontFamily: {
+                        "body-md": ["\"Source Serif 4\""],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "body-lg": ["\"Source Serif 4\""],
+                        "stamp-text": ["\"Source Serif 4\""],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg": ["\"Source Serif 4\""]
+                    },
+                    fontSize: {
+                        "body-md": ["16px", { lineHeight: "28px", fontWeight: "400" }],
+                        "headline-md": ["22px", { lineHeight: "32px", fontWeight: "600" }],
+                        "body-lg": ["18px", { lineHeight: "32px", fontWeight: "400" }],
+                        "stamp-text": ["14px", { lineHeight: "20px", letterSpacing: "0.1em", fontWeight: "700" }],
+                        "label-mono": ["13px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "500" }],
+                        "headline-lg": ["30px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .dashed-line {
+            background-image: linear-gradient(to right, #CFC5B2 50%, transparent 50%);
+            background-size: 8px 1px;
+            background-repeat: repeat-x;
+            background-position: bottom;
+        }
+        .stamp-rotation {
+            transform: rotate(-1deg);
+        }
+        body {
+            background-color: #f2ede3; /* surface-container as base */
+        }
+    </style>
+</head>
+<body class="text-on-surface font-body-md min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface-dim text-on-surface dark:text-on-surface font-headline-md text-headline-md docked full-width top-0 border-b border-outline-variant flat no shadows fixed top-0 right-0 left-sidebar-width z-50 flex justify-between items-center px-paper-margin h-16">
+<div class="flex items-center gap-gutter">
+<span class="font-headline-lg text-headline-lg text-primary">Scholarly Review</span>
+<div class="hidden lg:flex items-center gap-stack-md ml-stack-lg">
+<span class="text-on-surface-variant font-label-mono text-label-mono hover:text-primary transition-opacity cursor-pointer">Total: 40</span>
+<span class="text-on-surface-variant font-label-mono text-label-mono hover:text-primary transition-opacity cursor-pointer">Correct: 28</span>
+<span class="text-secondary border-b-2 border-secondary font-label-mono text-label-mono cursor-pointer">Review: 12</span>
+</div>
+</div>
+<div class="flex items-center gap-stack-md">
+<button class="bg-primary text-on-primary font-label-mono text-label-mono px-4 py-2 rounded flex items-center gap-2 hover:bg-on-primary-fixed-variant transition-colors">
+<span class="material-symbols-outlined text-sm">visibility</span>
+                Toggle All Answers
+            </button>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<button class="p-2 hover:text-primary transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="p-2 hover:text-primary transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined">print</span>
+</button>
+<button class="p-2 hover:text-primary transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="bg-primary dark:bg-primary-container text-on-primary dark:text-on-primary-fixed font-label-mono text-label-mono docked h-full w-sidebar-width left-0 bg-primary flat no shadows fixed inset-y-0 left-0 w-sidebar-width flex flex-col z-40">
+<div class="p-6 border-b border-on-primary-fixed-variant">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-primary leading-tight">Exam Paper</h2>
+<p class="text-on-primary-container text-xs mt-1">Series 2024-B</p>
+</div>
+</div>
+<button class="w-full bg-secondary text-on-secondary font-label-mono py-2 px-4 rounded hover:opacity-90 transition-opacity">
+                Finalize Grade
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto py-4">
+<ul class="flex flex-col gap-1 px-3">
+<li>
+<a class="bg-background text-primary font-bold flex items-center gap-3 px-3 py-2 rounded hover:bg-on-primary-fixed-variant transition-colors" href="#">
+<span class="material-symbols-outlined">folder_open</span>
+<span>Directory</span>
+</a>
+</li>
+<li>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded hover:bg-on-primary-fixed-variant transition-colors" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+<span>Annotated</span>
+</a>
+</li>
+<li>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center justify-between px-3 py-2 rounded hover:bg-on-primary-fixed-variant transition-colors" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined">assignment_late</span>
+<span>Review</span>
+</div>
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+</a>
+</li>
+<li>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded hover:bg-on-primary-fixed-variant transition-colors" href="#">
+<span class="material-symbols-outlined">history</span>
+<span>Archive</span>
+</a>
+</li>
+<li>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded hover:bg-on-primary-fixed-variant transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+</li>
+</ul>
+<div class="mt-8 px-6">
+<p class="text-on-primary-container text-xs mb-3 uppercase tracking-wider">Sections</p>
+<ul class="flex flex-col gap-2 border-l border-on-primary-fixed-variant ml-2 pl-4">
+<li class="relative">
+<a class="text-on-primary text-sm hover:text-white flex items-center justify-between" href="#">
+                            Q1 - Q10 (Theory)
+                            <div class="w-1.5 h-1.5 rounded-full bg-secondary"></div>
+</a>
+</li>
+<li class="relative">
+<a class="text-on-primary-container text-sm hover:text-white" href="#">Q11 - Q25 (Applied)</a>
+</li>
+<li class="relative">
+<a class="text-on-primary-container text-sm hover:text-white" href="#">Q26 - Q40 (Case Study)</a>
+</li>
+</ul>
+</div>
+</div>
+<div class="p-4 border-t border-on-primary-fixed-variant">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded hover:bg-on-primary-fixed-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">help</span>
+<span>Help</span>
+</a>
+</li>
+<li>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded hover:bg-on-primary-fixed-variant transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">logout</span>
+<span>Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-[240px] pt-16 min-h-screen flex justify-center p-8">
+<!-- The Paper Container -->
+<div class="w-full max-w-[794px] bg-background shadow-sm border border-outline-variant relative pb-32">
+<!-- Paper Header -->
+<div class="border-b border-rice-grey border-dashed p-8 flex justify-between items-end">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-primary mb-2">Section A: Theoretical Foundations</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Reviewing highlighted submissions requiring attention.</p>
+</div>
+<div class="text-right">
+<div class="font-label-mono text-label-mono text-on-surface-variant bg-surface-variant px-3 py-1 rounded inline-block border border-outline-variant">
+                        ID: EXM-24B-01
+                    </div>
+</div>
+</div>
+<!-- Questions Flow -->
+<div class="px-12 py-8 flex flex-col gap-12">
+<!-- Question 1 (Needs Review) -->
+<div class="relative">
+<div class="flex items-start gap-4 mb-4">
+<div class="font-label-mono text-label-mono font-bold text-primary w-8 pt-1">01.</div>
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-2">
+<span class="font-label-mono text-[11px] uppercase tracking-wider text-on-surface-variant border border-rice-grey px-2 py-0.5 rounded-sm">Multiple Choice</span>
+<div class="w-2 h-2 rounded-full bg-secondary" title="Needs Review"></div>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface mb-6">
+                                According to the principles of structural linguistics presented in Chapter 4, which of the following best describes the relationship between the signifier and the signified?
+                            </p>
+<ul class="flex flex-col gap-3 font-body-md pl-4 border-l-2 border-surface-variant">
+<li class="flex items-center gap-3">
+<span class="font-label-mono text-on-surface-variant">A.</span>
+<span>It is naturally predetermined by the object's physical characteristics.</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="font-label-mono text-on-surface-variant">B.</span>
+<span class="text-primary font-semibold">It is fundamentally arbitrary and established through convention.</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="font-label-mono text-on-surface-variant">C.</span>
+<span class="line-through text-on-surface-variant">It evolves strictly according to chronological phonetic shifts.</span>
+<span class="material-symbols-outlined text-sm text-on-surface-variant">close</span>
+</li>
+<li class="flex items-center gap-3">
+<span class="font-label-mono text-on-surface-variant">D.</span>
+<span>It relies on the individual speaker's psychological state.</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Answer Stamp Overlay -->
+<div class="ml-12 mt-6 p-4 border-2 border-secondary stamp-rotation bg-surface inline-block relative shadow-sm">
+<div class="font-stamp-text text-stamp-text text-secondary mb-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">verified</span>
+                            OFFICIAL KEY: B
+                        </div>
+<p class="font-body-md text-sm text-on-surface-variant max-w-md">
+                            Reference: Saussure's concept of the arbitrary nature of the sign (Course in General Linguistics). Student selected C, indicating confusion with historical linguistics.
+                        </p>
+</div>
+</div>
+<div class="w-full dashed-line h-px"></div>
+<!-- Question 2 (Subjective / Short Answer) -->
+<div class="relative">
+<div class="flex items-start gap-4 mb-4">
+<div class="font-label-mono text-label-mono font-bold text-primary w-8 pt-1">04.</div>
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-2">
+<span class="font-label-mono text-[11px] uppercase tracking-wider text-on-surface-variant border border-rice-grey px-2 py-0.5 rounded-sm">Short Essay</span>
+<div class="w-2 h-2 rounded-full bg-secondary" title="Needs Review"></div>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface mb-6">
+                                Briefly explain the concept of 'cognitive dissonance' and provide one practical example of how it might manifest in a consumer purchasing decision.
+                            </p>
+<!-- Simulated handwritten student response -->
+<div class="bg-surface-variant bg-opacity-30 p-6 font-body-md italic text-on-surface-variant relative">
+<div class="absolute inset-0 flex flex-col justify-between py-6 pointer-events-none">
+<div class="dashed-line h-px w-full opacity-50"></div>
+<div class="dashed-line h-px w-full opacity-50"></div>
+<div class="dashed-line h-px w-full opacity-50"></div>
+</div>
+<p class="relative z-10 leading-[32px]">
+                                    Cognitive dissonance is when a person feels confused because they have too many choices. For example, when buying a car, a consumer might not know which brand is best and feels stressed about picking the wrong one, so they just buy what their friend has.
+                                </p>
+</div>
+</div>
+</div>
+<!-- Answer Stamp Overlay -->
+<div class="ml-12 mt-6 p-4 border-2 border-secondary stamp-rotation bg-surface relative shadow-sm max-w-xl">
+<div class="font-stamp-text text-stamp-text text-secondary mb-2 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">warning</span>
+                                CORRECTION REQUIRED
+                            </div>
+<span class="font-label-mono text-xs px-2 py-0.5 bg-secondary text-on-secondary rounded">Partial Credit (1/3)</span>
+</div>
+<p class="font-body-md text-sm text-on-surface mb-3 border-l-2 border-secondary pl-3">
+<strong class="font-semibold">Expected Key Points:</strong><br/>
+                            1. Discomfort arising from holding conflicting beliefs/attitudes or behavior contradicting beliefs.<br/>
+                            2. Post-purchase rationalization (e.g., buyer's remorse after expensive purchase).
+                        </p>
+<p class="font-body-md text-sm text-on-surface-variant italic">
+                            Evaluator Note: Student conflated 'choice overload' (paradox of choice) with cognitive dissonance.
+                        </p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

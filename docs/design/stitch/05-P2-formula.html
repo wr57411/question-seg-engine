@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scholarly Review - Single Question</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" integrity="sha384-GvrOXuhMATgEsSwCs4smul74iXGOixntILdUW9XmUC6+HX0sLNAK3q71bZlhwOym" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script crossorigin="anonymous" defer="" integrity="sha384-cpW21h6RZv/phavutF+AuVYrr+dA8xD9zs6FwLpaCct6O9ctzYFfXb3Bhyb3bZ4/" src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+<script crossorigin="anonymous" defer="" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbOxyj0O1rxVqTGbTq21X6uc/b" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});" src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#001e30",
+                        "on-primary-fixed": "#191c20",
+                        "surface-variant": "#e7e2d8",
+                        "primary-fixed-dim": "#c5c6cc",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f8f3e9",
+                        "on-surface": "#1d1c16",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-container": "#7391ab",
+                        "outline": "#75777b",
+                        "on-primary-fixed-variant": "#44474b",
+                        "on-secondary-container": "#6f0806",
+                        "background": "#fef9ef",
+                        "on-primary-container": "#8c8e93",
+                        "on-tertiary-fixed-variant": "#2b4a61",
+                        "primary-container": "#24272b",
+                        "secondary-fixed": "#ffdad5",
+                        "surface": "#fef9ef",
+                        "surface-container-highest": "#e7e2d8",
+                        "inverse-on-surface": "#f5f0e6",
+                        "primary-fixed": "#e1e2e8",
+                        "secondary-container": "#fe7362",
+                        "secondary": "#aa352a",
+                        "surface-bright": "#fef9ef",
+                        "secondary-fixed-dim": "#ffb4a9",
+                        "on-surface-variant": "#45474a",
+                        "surface-container": "#f2ede3",
+                        "surface-dim": "#dedad0",
+                        "on-background": "#1d1c16",
+                        "inverse-surface": "#32302a",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#5c5e63",
+                        "on-secondary-fixed": "#410001",
+                        "tertiary-container": "#04293f",
+                        "tertiary": "#001321",
+                        "surface-container-high": "#ede8de",
+                        "inverse-primary": "#c5c6cc",
+                        "tertiary-fixed-dim": "#abcae6",
+                        "tertiary-fixed": "#cbe6ff",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "primary": "#0f1216",
+                        "on-secondary-fixed-variant": "#891d15",
+                        "error-container": "#ffdad6",
+                        "rice-grey": "#CFC5B2",
+                        "ink-ink-subtle": "rgba(36, 39, 43, 0.6)",
+                        "outline-variant": "#c5c6ca"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "paper-margin": "48px",
+                        "max-content-width": "794px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "stack-sm": "8px",
+                        "gutter": "24px",
+                        "sidebar-width": "240px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["\"Source Serif 4\""],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "body-lg": ["\"Source Serif 4\""],
+                        "stamp-text": ["\"Source Serif 4\""],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg": ["\"Source Serif 4\""]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "32px", "fontWeight": "400" }],
+                        "stamp-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg": ["30px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); }
+        .dashed-line { border-bottom: 1px dashed theme('colors.rice-grey'); }
+    </style>
+</head>
+<body class="text-on-background font-body-md antialiased min-h-screen flex flex-col md:flex-row">
+<!-- SideNavBar -->
+<nav class="hidden md:flex bg-primary dark:bg-primary-container docked h-full w-sidebar-width left-0 fixed inset-y-0 flex-col z-40">
+<div class="p-6 pb-8 border-b border-on-primary-fixed-variant border-opacity-30">
+<h1 class="font-headline-md text-headline-md text-on-primary mb-1">Exam Paper</h1>
+<p class="font-label-mono text-label-mono text-on-primary-container opacity-60">Series 2024-B</p>
+</div>
+<ul class="flex-1 overflow-y-auto py-4 space-y-2 px-3">
+<li>
+<a class="flex items-center px-4 py-3 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors font-label-mono text-label-mono" href="#">
+<span class="material-symbols-outlined mr-3">folder_open</span>
+                    Directory
+                </a>
+</li>
+<li>
+<a class="flex items-center px-4 py-3 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors font-label-mono text-label-mono" href="#">
+<span class="material-symbols-outlined mr-3">edit_note</span>
+                    Annotated
+                </a>
+</li>
+<li>
+<a class="flex items-center px-4 py-3 rounded bg-background text-primary font-bold font-label-mono text-label-mono shadow-sm" href="#" style="transform: scale(0.98);">
+<span class="material-symbols-outlined mr-3" style="font-variation-settings: 'FILL' 1;">assignment_late</span>
+                    Review
+                </a>
+</li>
+<li>
+<a class="flex items-center px-4 py-3 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors font-label-mono text-label-mono" href="#">
+<span class="material-symbols-outlined mr-3">history</span>
+                    Archive
+                </a>
+</li>
+</ul>
+<div class="p-4 space-y-2 border-t border-on-primary-fixed-variant border-opacity-30">
+<button class="w-full py-2 px-4 bg-background text-primary font-label-mono text-label-mono rounded hover:bg-surface-variant transition-colors text-left font-bold mb-4 flex justify-center items-center">
+                Finalize Grade
+            </button>
+<a class="flex items-center px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors font-label-mono text-label-mono" href="#">
+<span class="material-symbols-outlined mr-3 text-[18px]">settings</span> Settings
+            </a>
+<a class="flex items-center px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors font-label-mono text-label-mono" href="#">
+<span class="material-symbols-outlined mr-3 text-[18px]">help</span> Help
+            </a>
+<a class="flex items-center px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors font-label-mono text-label-mono mt-2" href="#">
+<span class="material-symbols-outlined mr-3 text-[18px]">logout</span> Logout
+            </a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="hidden md:flex bg-surface dark:bg-surface-dim docked full-width top-0 border-b border-outline-variant flat no shadows fixed right-0 left-sidebar-width z-50 justify-between items-center px-paper-margin h-16">
+<div class="flex items-center gap-6">
+<span class="font-headline-lg text-headline-lg text-primary tracking-tight">Scholarly Review</span>
+</div>
+<div class="flex items-center gap-8">
+<nav class="flex gap-6">
+<a class="text-on-surface-variant font-label-mono text-label-mono hover:text-primary transition-opacity" href="#">Total: 40</a>
+<a class="text-on-surface-variant font-label-mono text-label-mono hover:text-primary transition-opacity" href="#">Correct: 28</a>
+<a class="text-secondary border-b-2 border-secondary font-label-mono text-label-mono pb-1 opacity-70" href="#">Review: 12</a>
+</nav>
+<div class="flex items-center gap-4 border-l border-outline-variant pl-6">
+<button class="font-label-mono text-label-mono text-primary hover:text-secondary transition-colors border border-outline px-3 py-1 rounded">Toggle All Answers</button>
+<button class="text-on-surface hover:text-primary transition-colors"><span class="material-symbols-outlined">filter_list</span></button>
+<button class="text-on-surface hover:text-primary transition-colors"><span class="material-symbols-outlined">print</span></button>
+<button class="text-on-surface hover:text-primary transition-colors"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-sidebar-width pt-20 md:pt-24 pb-32 px-4 md:px-paper-margin flex justify-center">
+<!-- Paper Container (A4 Proportions) -->
+<div class="w-full max-w-max-content-width bg-surface-container-lowest shadow-sm border border-outline-variant rounded-sm p-8 md:p-12 relative">
+<!-- Question Metadata Header -->
+<div class="flex justify-between items-start mb-8 dashed-line pb-4">
+<div class="flex items-center gap-3">
+<span class="font-label-mono text-label-mono text-on-surface-variant bg-surface-container px-2 py-1 rounded-sm border border-rice-grey">Q_ID: PHYS-402-12</span>
+<span class="inline-flex items-center gap-1 font-label-mono text-label-mono text-secondary">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> Needs Review
+                    </span>
+</div>
+<div class="font-label-mono text-label-mono text-on-surface-variant">
+                    Score: <span class="text-primary font-bold">-- / 10</span>
+</div>
+</div>
+<!-- Question Content -->
+<article class="mb-12">
+<h2 class="font-headline-md text-headline-md text-primary mb-6">Derive the expectation value of the Hamiltonian for the trial wavefunction of a quantum harmonic oscillator.</h2>
+<div class="font-body-lg text-body-lg text-on-surface space-y-6 leading-relaxed">
+<p>Consider a trial wavefunction of the form:</p>
+<div class="py-4 text-center overflow-x-auto">
+                        $$ \psi(x, \alpha) = \left(\frac{2\alpha}{\pi}\right)^{1/4} e^{-\alpha x^2} $$
+                    </div>
+<p>The Hamiltonian for the one-dimensional quantum harmonic oscillator is given by:</p>
+<div class="py-4 text-center overflow-x-auto">
+                        $$ \hat{H} = -\frac{\hbar^2}{2m}\frac{d^2}{dx^2} + \frac{1}{2}m\omega^2 x^2 $$
+                    </div>
+<p>Evaluate the integral for the expectation value $ \langle \hat{H} \rangle = \int_{-\infty}^{\infty} \psi^*(x, \alpha) \hat{H} \psi(x, \alpha) dx $ and find the value of $\alpha$ that minimizes this expectation value.</p>
+</div>
+</article>
+<!-- Student Answer Area (Simulated Input) -->
+<div class="mb-12 relative">
+<h3 class="font-label-mono text-label-mono text-on-surface-variant mb-4 uppercase tracking-widest">Student Response</h3>
+<!-- Dashed Lined Area for subjective answer -->
+<div class="space-y-8 pt-2">
+<div class="dashed-line relative">
+<div class="absolute -top-6 left-0 font-body-md text-on-surface text-opacity-80 font-mono text-[15px] italic">
+                           The kinetic energy expectation value is calculated as:
+                        </div>
+</div>
+<div class="dashed-line relative">
+<div class="absolute -top-6 left-12 font-body-md text-on-surface text-opacity-80 font-mono text-[15px] italic">
+                             $$ \langle T \rangle = \frac{\hbar^2 \alpha}{m} $$
+                        </div>
+</div>
+<div class="dashed-line relative">
+<div class="absolute -top-6 left-0 font-body-md text-on-surface text-opacity-80 font-mono text-[15px] italic">
+                             The potential energy is:
+                        </div>
+</div>
+<div class="dashed-line relative">
+<div class="absolute -top-6 left-12 font-body-md text-on-surface text-opacity-80 font-mono text-[15px] italic">
+                              $$ \langle V \rangle = \frac{m\omega^2}{8\alpha} $$
+                         </div>
+</div>
+<div class="dashed-line relative">
+<div class="absolute -top-6 left-0 font-body-md text-on-surface text-opacity-80 font-mono text-[15px] italic">
+                             Total energy $E(\alpha) = \frac{\hbar^2 \alpha}{m} + \frac{m\omega^2}{8\alpha}$. Minimizing w.r.t $\alpha$:
+                         </div>
+</div>
+<div class="dashed-line relative">
+<div class="absolute -top-6 left-12 font-body-md text-on-surface text-opacity-80 font-mono text-[15px] italic">
+                              $\frac{dE}{d\alpha} = \frac{\hbar^2}{m} - \frac{m\omega^2}{8\alpha^2} = 0 \implies \alpha = \frac{m\omega}{2\sqrt{2}\hbar}$
+                         </div>
+</div>
+<div class="dashed-line"></div>
+</div>
+<!-- Teacher Correction Overlay (The "Stamp") -->
+<div class="absolute top-1/2 right-4 -translate-y-1/4 rotate-2 border-2 border-secondary bg-surface-container-lowest p-4 shadow-sm w-72 z-10 pointer-events-none opacity-90">
+<div class="font-stamp-text text-stamp-text text-secondary mb-2 border-b border-secondary pb-1 flex items-center justify-between">
+<span>CORRECTION NOTED</span>
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface mt-2 text-sm leading-snug">
+                        Incorrect potential energy integral. Should be $\frac{m\omega^2}{8\alpha} \rightarrow \frac{m\omega^2}{8\alpha} $ is wrong, it is $\frac{m\omega^2}{8\alpha}$ ? No, $\langle x^2 \rangle = \frac{1}{4\alpha}$. So $\langle V \rangle = \frac{m\omega^2}{8\alpha}$. Minimization yields $\alpha = \frac{m\omega}{2\hbar}$.
+                    </p>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Controls for single question view -->
+<div class="fixed bottom-0 left-0 md:left-sidebar-width right-0 bg-surface-container-lowest border-t border-outline-variant p-4 px-paper-margin flex justify-between items-center z-40">
+<button class="flex items-center gap-2 px-4 py-2 border border-rice-grey rounded text-on-surface font-label-mono text-label-mono hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            Prev Question
+        </button>
+<div class="flex items-center gap-4">
+<button class="px-6 py-2 border border-secondary text-secondary font-label-mono text-label-mono rounded hover:bg-secondary-fixed transition-colors">
+                Mark Incorrect
+            </button>
+<button class="px-6 py-2 bg-primary text-on-primary font-label-mono text-label-mono rounded hover:bg-on-primary-fixed-variant transition-colors">
+                Approve (Full Marks)
+            </button>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 border border-rice-grey rounded text-on-surface font-label-mono text-label-mono hover:bg-surface-variant transition-colors">
+            Next Question
+            <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</body></html>

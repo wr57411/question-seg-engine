@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scholarly Review - Question Bank</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&amp;family=Source+Serif+4:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#001e30",
+                        "on-primary-fixed": "#191c20",
+                        "surface-variant": "#e7e2d8",
+                        "primary-fixed-dim": "#c5c6cc",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f8f3e9",
+                        "on-surface": "#1d1c16",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-container": "#7391ab",
+                        "outline": "#75777b",
+                        "on-primary-fixed-variant": "#44474b",
+                        "on-secondary-container": "#6f0806",
+                        "background": "#fef9ef",
+                        "on-primary-container": "#8c8e93",
+                        "on-tertiary-fixed-variant": "#2b4a61",
+                        "primary-container": "#24272b",
+                        "secondary-fixed": "#ffdad5",
+                        "surface": "#fef9ef",
+                        "surface-container-highest": "#e7e2d8",
+                        "inverse-on-surface": "#f5f0e6",
+                        "primary-fixed": "#e1e2e8",
+                        "secondary-container": "#fe7362",
+                        "secondary": "#aa352a",
+                        "surface-bright": "#fef9ef",
+                        "secondary-fixed-dim": "#ffb4a9",
+                        "on-surface-variant": "#45474a",
+                        "surface-container": "#f2ede3",
+                        "surface-dim": "#dedad0",
+                        "on-background": "#1d1c16",
+                        "inverse-surface": "#32302a",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#5c5e63",
+                        "on-secondary-fixed": "#410001",
+                        "tertiary-container": "#04293f",
+                        "tertiary": "#001321",
+                        "surface-container-high": "#ede8de",
+                        "inverse-primary": "#c5c6cc",
+                        "tertiary-fixed-dim": "#abcae6",
+                        "tertiary-fixed": "#cbe6ff",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "primary": "#0f1216",
+                        "on-secondary-fixed-variant": "#891d15",
+                        "error-container": "#ffdad6",
+                        "rice-grey": "#CFC5B2",
+                        "ink-ink-subtle": "rgba(36, 39, 43, 0.6)",
+                        "outline-variant": "#c5c6ca"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "paper-margin": "48px",
+                        "max-content-width": "794px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "stack-sm": "8px",
+                        "gutter": "24px",
+                        "sidebar-width": "240px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["\"Source Serif 4\""],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "body-lg": ["\"Source Serif 4\""],
+                        "stamp-text": ["\"Source Serif 4\""],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg": ["\"Source Serif 4\""]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "32px", "fontWeight": "400" }],
+                        "stamp-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg": ["30px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); }
+        .dashed-line { border-bottom: 1px dashed theme('colors.rice-grey'); }
+    </style>
+</head>
+<body class="antialiased min-h-screen text-on-background">
+<!-- SideNavBar -->
+<nav class="bg-primary dark:bg-primary-container text-on-primary dark:text-on-primary-fixed font-label-mono text-label-mono docked h-full w-sidebar-width left-0 bg-primary flat no shadows fixed inset-y-0 left-0 w-sidebar-width flex flex-col z-40 hidden md:flex">
+<div class="p-6 flex flex-col gap-4 border-b border-primary-container">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center overflow-hidden border border-outline-variant">
+<img alt="Scholar Profile" class="w-full h-full object-cover" data-alt="A small, stylized avatar portrait of an academic or scholar, featuring subtle pencil shading and a clean, minimalist background, fitting an editorial print aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9qumwmMGu1adpzzluXtJFztGEnQ_XaWU2q15umtJd1CXktcbWi7fmeZUOwRCwoB2iIjqG3nQS2wgY_gf2XE2MWllGjfGo5pdkmh2Iq3pOXyWRyIMUtioZoN4rehEiBGnAtxRmJBXMeGsHlfSPpMMLeJrhIgdQyYOsULLLkZn1WvqAZb9G2N1iEoP20YRJljy16IskXVhkou-FlZlZJQOeh3ynQTyJL69VCIvHs0bbKb_LG1XoSwPCsA"/>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md text-on-primary m-0 p-0 leading-tight">Exam Paper</h1>
+<span class="text-on-primary-container opacity-80 text-[11px] uppercase tracking-wider">Series 2024-B</span>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
+<a class="bg-background text-primary font-bold flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-on-primary-fixed-variant Active: scale 0.98" href="#">
+<span class="material-symbols-outlined text-[18px]">folder_open</span>
+                Directory
+            </a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined text-[18px]">edit_note</span>
+                Annotated
+            </a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined text-[18px]">assignment_late</span>
+                Review
+                <span class="ml-auto w-2 h-2 rounded-full bg-secondary"></span>
+</a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined text-[18px]">history</span>
+                Archive
+            </a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-sm transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+                Settings
+            </a>
+</div>
+<div class="p-4 mt-auto border-t border-primary-container">
+<button class="w-full bg-on-primary text-primary font-label-mono py-2 px-4 rounded-sm hover:bg-surface-variant transition-colors mb-4 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+                Finalize Grade
+            </button>
+<div class="flex flex-col gap-1">
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-sm text-xs transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined text-[16px]">help</span>
+                    Help
+                </a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-sm text-xs transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined text-[16px]">logout</span>
+                    Logout
+                </a>
+</div>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface-dim text-on-surface dark:text-on-surface font-headline-md text-headline-md docked full-width top-0 border-b border-outline-variant flat no shadows fixed top-0 right-0 left-sidebar-width z-50 flex justify-between items-center px-paper-margin h-16 hidden md:flex">
+<div class="flex items-center gap-4">
+<span class="font-headline-lg text-headline-lg text-primary">Scholarly Review</span>
+<div class="h-6 w-px bg-outline-variant mx-2"></div>
+<div class="flex gap-4 font-label-mono text-label-mono">
+<span class="text-on-surface-variant">Total: 85</span>
+<span class="text-on-surface-variant">Correct: 83</span>
+<span class="text-secondary border-b-2 border-secondary pb-1">Review: 2</span>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 bg-surface-container py-1 px-3 rounded border border-outline-variant">
+<span class="font-label-mono text-label-mono text-on-surface-variant">Toggle All Answers</span>
+<button class="w-8 h-4 bg-outline-variant rounded-full relative transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1">
+<span class="absolute left-0.5 top-0.5 w-3 h-3 bg-surface rounded-full transition-transform"></span>
+</button>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<button class="hover:text-primary transition-opacity Active: opacity-70 flex items-center justify-center w-8 h-8 rounded hover:bg-surface-container">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="hover:text-primary transition-opacity Active: opacity-70 flex items-center justify-center w-8 h-8 rounded hover:bg-surface-container">
+<span class="material-symbols-outlined">print</span>
+</button>
+<button class="hover:text-primary transition-opacity Active: opacity-70 flex items-center justify-center w-8 h-8 rounded hover:bg-surface-container">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-24 pb-12 px-4 md:pl-[280px] md:pr-12 min-h-screen flex justify-center">
+<!-- A4 Paper Container -->
+<div class="w-full max-w-[794px] bg-surface-container-lowest border border-outline-variant shadow-sm py-12 px-10 md:px-16 flex flex-col gap-12 relative">
+<!-- Section Header -->
+<div class="mb-4">
+<div class="flex items-center gap-2 mb-2">
+<span class="font-label-mono text-label-mono text-on-surface-variant border border-outline-variant rounded px-2 py-0.5 text-[10px]">SECTION III</span>
+<div class="h-px bg-outline-variant flex-1"></div>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface m-0">Advanced Statistical Mechanics</h2>
+</div>
+<!-- Question Card 1 -->
+<div class="relative group">
+<div class="flex items-start justify-between mb-4">
+<div class="flex items-center gap-3">
+<span class="font-label-mono text-label-mono text-primary font-bold">Q-304</span>
+<div class="h-1.5 w-1.5 rounded-full bg-on-surface-variant"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant border border-surface-container-high rounded px-2 py-0.5 text-xs bg-surface-container">15 Points</span>
+</div>
+<div class="font-body-lg text-body-lg text-on-surface mb-6 leading-relaxed">
+                    Consider a gas of <span class="font-body-md text-body-md italic">N</span> non-interacting fermions in a 3D harmonic oscillator potential. Derive the expression for the Fermi energy \(E_F\) in the thermodynamic limit where \(N \to \infty\).
+                </div>
+<!-- Answer Lines -->
+<div class="flex flex-col gap-8 mt-8 opacity-60">
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+</div>
+</div>
+<div class="w-full h-px border-t border-dashed border-outline-variant my-4"></div>
+<!-- Question Card 2 (Needs Review) -->
+<div class="relative group bg-surface-container-low -mx-4 px-4 py-6 rounded-sm border-l-2 border-secondary">
+<div class="flex items-start justify-between mb-4">
+<div class="flex items-center gap-3">
+<span class="font-label-mono text-label-mono text-secondary font-bold">Q-305</span>
+<div class="h-2 w-2 rounded-full bg-secondary"></div>
+<span class="font-label-mono text-label-mono text-secondary text-[10px] uppercase tracking-wider bg-secondary-fixed px-1 rounded-sm">Review Needed</span>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant border border-surface-container-high rounded px-2 py-0.5 text-xs bg-surface-container">20 Points</span>
+</div>
+<div class="font-body-lg text-body-lg text-on-surface mb-6 leading-relaxed">
+                    Explain the physical significance of the Bose-Einstein condensation and calculate the critical temperature \(T_c\) for an ideal Bose gas in three dimensions.
+                </div>
+<!-- Answer Lines -->
+<div class="flex flex-col gap-8 mt-8 opacity-60">
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+</div>
+</div>
+<div class="w-full h-px border-t border-dashed border-outline-variant my-4"></div>
+<!-- Question Card 3 -->
+<div class="relative group">
+<div class="flex items-start justify-between mb-4">
+<div class="flex items-center gap-3">
+<span class="font-label-mono text-label-mono text-primary font-bold">Q-306</span>
+<div class="h-1.5 w-1.5 rounded-full bg-on-surface-variant"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface-variant border border-surface-container-high rounded px-2 py-0.5 text-xs bg-surface-container">10 Points</span>
+</div>
+<div class="font-body-lg text-body-lg text-on-surface mb-6 leading-relaxed">
+                    Briefly describe the fluctuation-dissipation theorem and its implications for non-equilibrium systems near thermal equilibrium. Provide one concrete example.
+                </div>
+<!-- Answer Lines -->
+<div class="flex flex-col gap-8 mt-8 opacity-60">
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+<div class="dashed-line w-full h-px"></div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

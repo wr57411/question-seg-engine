@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Exam Paper Mobile - Scholarly Review</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&amp;family=Source+Serif+4:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#001e30",
+                    "on-primary-fixed": "#191c20",
+                    "surface-variant": "#e7e2d8",
+                    "primary-fixed-dim": "#c5c6cc",
+                    "on-primary": "#ffffff",
+                    "surface-container-low": "#f8f3e9",
+                    "on-surface": "#1d1c16",
+                    "surface-container-lowest": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-container": "#7391ab",
+                    "outline": "#75777b",
+                    "on-primary-fixed-variant": "#44474b",
+                    "on-secondary-container": "#6f0806",
+                    "background": "#fef9ef",
+                    "on-primary-container": "#8c8e93",
+                    "on-tertiary-fixed-variant": "#2b4a61",
+                    "primary-container": "#24272b",
+                    "secondary-fixed": "#ffdad5",
+                    "surface": "#fef9ef",
+                    "surface-container-highest": "#e7e2d8",
+                    "inverse-on-surface": "#f5f0e6",
+                    "primary-fixed": "#e1e2e8",
+                    "secondary-container": "#fe7362",
+                    "secondary": "#aa352a",
+                    "surface-bright": "#fef9ef",
+                    "secondary-fixed-dim": "#ffb4a9",
+                    "on-surface-variant": "#45474a",
+                    "surface-container": "#f2ede3",
+                    "surface-dim": "#dedad0",
+                    "on-background": "#1d1c16",
+                    "inverse-surface": "#32302a",
+                    "on-tertiary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "surface-tint": "#5c5e63",
+                    "on-secondary-fixed": "#410001",
+                    "tertiary-container": "#04293f",
+                    "tertiary": "#001321",
+                    "surface-container-high": "#ede8de",
+                    "inverse-primary": "#c5c6cc",
+                    "tertiary-fixed-dim": "#abcae6",
+                    "tertiary-fixed": "#cbe6ff",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "primary": "#0f1216",
+                    "on-secondary-fixed-variant": "#891d15",
+                    "error-container": "#ffdad6",
+                    "rice-grey": "#CFC5B2",
+                    "ink-ink-subtle": "rgba(36, 39, 43, 0.6)",
+                    "outline-variant": "#c5c6ca"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "paper-margin": "16px",
+                    "max-content-width": "794px",
+                    "stack-md": "16px",
+                    "stack-lg": "32px",
+                    "stack-sm": "8px",
+                    "gutter": "24px",
+                    "sidebar-width": "240px"
+            },
+            "fontFamily": {
+                    "body-md": [
+                            "\"Source Serif 4\""
+                    ],
+                    "headline-md": [
+                            "\"Source Serif 4\""
+                    ],
+                    "body-lg": [
+                            "\"Source Serif 4\""
+                    ],
+                    "stamp-text": [
+                            "\"Source Serif 4\""
+                    ],
+                    "label-mono": [
+                            "JetBrains Mono"
+                    ],
+                    "headline-lg": [
+                            "\"Source Serif 4\""
+                    ]
+            },
+            "fontSize": {
+                    "body-md": [
+                            "18px",
+                            {
+                                    "lineHeight": "30px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "34px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-lg": [
+                            "20px",
+                            {
+                                    "lineHeight": "34px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "stamp-text": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.1em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-mono": [
+                            "13px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-lg": [
+                            "28px",
+                            {
+                                    "lineHeight": "36px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.surface-dim');
+        }
+        .paper-card {
+            background-color: theme('colors.surface-container-lowest');
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .dashed-line {
+            border-bottom: 1px dashed theme('colors.rice-grey');
+        }
+        .stamp-overlay {
+            border: 2px solid theme('colors.secondary');
+            color: theme('colors.secondary');
+            transform: rotate(-2deg);
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md text-on-surface antialiased bg-surface-dim pt-[64px]">
+<!-- TopNavBar for Mobile -->
+<header class="fixed top-0 right-0 left-0 z-50 flex justify-between items-center px-paper-margin h-[64px] bg-surface border-b border-outline-variant">
+<div class="flex items-center gap-4">
+<button class="text-on-surface hover:text-primary transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">menu</span>
+</button>
+<span class="font-headline-lg text-headline-lg text-primary tracking-tight">Scholarly Review</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="text-on-surface hover:text-primary transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">search</span>
+</button>
+<button class="text-on-surface hover:text-primary transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Sub-header for Mobile Navigation Links / Stats -->
+<div class="bg-surface px-paper-margin py-3 border-b border-outline-variant flex justify-between items-center overflow-x-auto sticky top-[64px] z-40">
+<div class="flex gap-4 font-label-mono text-label-mono whitespace-nowrap">
+<span class="text-on-surface-variant">Total: 40</span>
+<span class="text-secondary font-bold">Correct: 28</span>
+<span class="text-on-surface-variant">Review: 12</span>
+</div>
+</div>
+<!-- Main Content Area -->
+<main class="w-full px-4 py-8 mx-auto flex flex-col gap-6">
+<!-- Question 1: Text Input (Not Answered) -->
+<article class="paper-card rounded-lg p-6 relative">
+<header class="flex justify-between items-center mb-4 dashed-line pb-2">
+<span class="font-label-mono text-label-mono text-on-surface-variant">ID: Q-8832</span>
+<div class="w-3 h-3 rounded-full bg-surface-variant border border-outline-variant"></div>
+</header>
+<div class="mb-6">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Discuss the implications of the Treaty of Versailles on the Weimar Republic's economy.</h2>
+<p class="text-on-surface-variant italic font-body-md text-body-md">Provide a detailed analysis considering hyperinflation.</p>
+</div>
+<div class="flex flex-col gap-[32px] mt-8">
+<div class="dashed-line w-full"></div>
+<div class="dashed-line w-full"></div>
+<div class="dashed-line w-full"></div>
+<div class="dashed-line w-full"></div>
+</div>
+</article>
+<!-- Question 2: Multiple Choice (Answer Revealed - Stamped) -->
+<article class="paper-card rounded-lg p-6 relative overflow-hidden">
+<header class="flex justify-between items-center mb-4 dashed-line pb-2">
+<span class="font-label-mono text-label-mono text-on-surface-variant">ID: Q-9104</span>
+<div class="w-3 h-3 rounded-full bg-secondary"></div>
+</header>
+<div class="mb-6">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-4">Which celestial body was reclassified as a "dwarf planet" by the IAU in 2006?</h2>
+<div class="flex flex-col gap-3">
+<label class="flex items-center gap-3 p-3 border border-outline-variant rounded bg-surface">
+<input class="form-radio text-primary focus:ring-primary h-5 w-5 border-outline-variant" name="q2" type="radio"/>
+<span class="font-body-md text-body-md">Eris</span>
+</label>
+<label class="flex items-center gap-3 p-3 border border-outline-variant rounded bg-surface">
+<input checked="" class="form-radio text-primary focus:ring-primary h-5 w-5 border-outline-variant" name="q2" type="radio"/>
+<span class="font-body-md text-body-md">Pluto</span>
+</label>
+<label class="flex items-center gap-3 p-3 border border-outline-variant rounded bg-surface">
+<input class="form-radio text-primary focus:ring-primary h-5 w-5 border-outline-variant" name="q2" type="radio"/>
+<span class="font-body-md text-body-md">Ceres</span>
+</label>
+<label class="flex items-center gap-3 p-3 border border-outline-variant rounded bg-surface">
+<input class="form-radio text-primary focus:ring-primary h-5 w-5 border-outline-variant" name="q2" type="radio"/>
+<span class="font-body-md text-body-md">Makemake</span>
+</label>
+</div>
+</div>
+<!-- Stamped Answer Overlay -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface-container-lowest/90 backdrop-blur-sm p-4 w-[90%] shadow-lg pointer-events-none stamp-overlay">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<div>
+<h3 class="font-stamp-text text-stamp-text uppercase mb-1">Correct Answer: Pluto</h3>
+<p class="font-body-md text-body-md text-on-surface">The student correctly identified the subject of the 2006 IAU reclassification. Note: Eris's discovery prompted this re-evaluation.</p>
+</div>
+</div>
+</div>
+</article>
+</main>
+</body></html>

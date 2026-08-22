@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scholarly Review - Question Bank Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#001e30",
+                        "on-primary-fixed": "#191c20",
+                        "surface-variant": "#e7e2d8",
+                        "primary-fixed-dim": "#c5c6cc",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f8f3e9",
+                        "on-surface": "#1d1c16",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-container": "#7391ab",
+                        "outline": "#75777b",
+                        "on-primary-fixed-variant": "#44474b",
+                        "on-secondary-container": "#6f0806",
+                        "background": "#fef9ef",
+                        "on-primary-container": "#8c8e93",
+                        "on-tertiary-fixed-variant": "#2b4a61",
+                        "primary-container": "#24272b",
+                        "secondary-fixed": "#ffdad5",
+                        "surface": "#fef9ef",
+                        "surface-container-highest": "#e7e2d8",
+                        "inverse-on-surface": "#f5f0e6",
+                        "primary-fixed": "#e1e2e8",
+                        "secondary-container": "#fe7362",
+                        "secondary": "#aa352a",
+                        "surface-bright": "#fef9ef",
+                        "secondary-fixed-dim": "#ffb4a9",
+                        "on-surface-variant": "#45474a",
+                        "surface-container": "#f2ede3",
+                        "surface-dim": "#dedad0",
+                        "on-background": "#1d1c16",
+                        "inverse-surface": "#32302a",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#5c5e63",
+                        "on-secondary-fixed": "#410001",
+                        "tertiary-container": "#04293f",
+                        "tertiary": "#001321",
+                        "surface-container-high": "#ede8de",
+                        "inverse-primary": "#c5c6cc",
+                        "tertiary-fixed-dim": "#abcae6",
+                        "tertiary-fixed": "#cbe6ff",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "primary": "#0f1216",
+                        "on-secondary-fixed-variant": "#891d15",
+                        "error-container": "#ffdad6",
+                        "rice-grey": "#CFC5B2",
+                        "ink-ink-subtle": "rgba(36, 39, 43, 0.6)",
+                        "outline-variant": "#c5c6ca"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "paper-margin": "48px",
+                        "max-content-width": "794px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "stack-sm": "8px",
+                        "gutter": "24px",
+                        "sidebar-width": "240px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["\"Source Serif 4\""],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "body-lg": ["\"Source Serif 4\""],
+                        "stamp-text": ["\"Source Serif 4\""],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg": ["\"Source Serif 4\""]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "32px", "fontWeight": "400" }],
+                        "stamp-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg": ["30px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .dashed-line {
+            background-image: linear-gradient(to right, theme('colors.rice-grey') 50%, transparent 50%);
+            background-size: 8px 1px;
+            background-repeat: repeat-x;
+            background-position: bottom;
+            height: 32px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen antialiased flex selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+<!-- SideNavBar -->
+<nav class="fixed inset-y-0 left-0 w-sidebar-width flex flex-col bg-primary dark:bg-primary-container z-40">
+<!-- Header -->
+<div class="p-stack-md border-b border-primary-container">
+<div class="flex items-center gap-stack-sm mb-stack-md">
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center overflow-hidden shrink-0 border border-outline">
+<img alt="Scholar Profile" class="w-full h-full object-cover" data-alt="A striking digital installation art piece featuring glowing, generative geometric shapes suspended in a vast, minimalist gallery space. The room is illuminated by high-key, soft white lighting that creates a bright, modern light-mode aesthetic. The artwork relies on a sophisticated palette of deep blacks and pristine whites, punctuated by intense accents of vibrant red. The mood is serene yet technologically advanced." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEbh41gS6AI5vSLbPisHr8z_g_UhgQWLbKu30xVKIdfG6jA1-2eQCTmGuav1UbhnTuULdp2FQEwWaCsJSS4D-5wnezI9HI2I-AG-Ts6oU2CQa3Lz9LrVO6A36TmqVzx6x_p3UiD3LMxBHTMqU-1pF8Ecwn4h3JY1_IRiultei45wpYFGEzflv5ECv0s011TUOOd2rwUlNK61u-AombDB3rgsc0pMVxMguzt4xiCjikg4PfOt1UdfLhfQ"/>
+</div>
+<div>
+<h2 class="font-label-mono text-label-mono text-on-primary">Exam Paper</h2>
+<p class="font-label-mono text-[11px] text-on-primary-container uppercase">Series 2024-B</p>
+</div>
+</div>
+<button class="w-full py-2 px-4 bg-surface text-primary font-label-mono text-label-mono rounded hover:bg-surface-variant transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" style="font-size: 16px;">done_all</span> Finalize Grade
+            </button>
+</div>
+<!-- Scrollable Tabs -->
+<div class="flex-1 overflow-y-auto py-stack-md flex flex-col gap-1 px-stack-sm">
+<a class="bg-background text-primary font-bold flex items-center gap-3 px-3 py-2 rounded-lg group transition-colors hover:bg-on-primary-fixed-variant" href="#" style="transform: scale(0.98);">
+<span class="material-symbols-outlined">folder_open</span>
+<span class="font-label-mono text-label-mono">Directory</span>
+</a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-lg group transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+<span class="font-label-mono text-label-mono">Annotated</span>
+</a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-lg group transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined">assignment_late</span>
+<span class="font-label-mono text-label-mono">Review</span>
+</a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-lg group transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-mono text-label-mono">Archive</span>
+</a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-lg group transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-mono text-label-mono">Settings</span>
+</a>
+</div>
+<!-- Footer -->
+<div class="p-stack-md border-t border-primary-container flex flex-col gap-2">
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-lg group transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-mono text-label-mono">Help</span>
+</a>
+<a class="text-on-primary-container opacity-60 hover:opacity-100 flex items-center gap-3 px-3 py-2 rounded-lg group transition-colors hover:bg-on-primary-fixed-variant" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-mono text-label-mono">Logout</span>
+</a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-sidebar-width z-50 flex justify-between items-center px-paper-margin h-16 bg-surface dark:bg-surface-dim border-b border-outline-variant">
+<div class="flex items-center gap-stack-lg">
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">Scholarly Review</h1>
+<nav class="hidden md:flex items-center gap-stack-md mt-1">
+<span class="text-on-surface-variant font-label-mono text-label-mono opacity-70 hover:text-primary transition-opacity cursor-pointer">Total: 40</span>
+<span class="text-on-surface-variant font-label-mono text-label-mono opacity-70 hover:text-primary transition-opacity cursor-pointer">Correct: 28</span>
+<span class="text-secondary font-label-mono text-label-mono border-b-2 border-secondary pb-1">Review: 12</span>
+</nav>
+</div>
+<div class="flex items-center gap-stack-md">
+<!-- Search / Filter Indicator -->
+<div class="hidden lg:flex items-center gap-2 px-3 py-1.5 border border-rice-grey rounded font-label-mono text-label-mono text-on-surface-variant bg-surface-container-low">
+<span class="material-symbols-outlined" style="font-size: 18px;">filter_alt</span>
+                Subjective Questions
+                <button class="ml-2 hover:text-primary"><span class="material-symbols-outlined" style="font-size: 16px;">close</span></button>
+</div>
+<button class="px-4 py-2 border border-rice-grey font-label-mono text-label-mono text-primary rounded hover:bg-surface-variant transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined" style="font-size: 18px;">visibility_off</span> Toggle All Answers
+            </button>
+<div class="flex items-center gap-2 border-l border-rice-grey pl-stack-md">
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded hover:bg-surface-variant"><span class="material-symbols-outlined">filter_list</span></button>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded hover:bg-surface-variant"><span class="material-symbols-outlined">print</span></button>
+<button class="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors rounded hover:bg-surface-variant"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-sidebar-width mt-16 flex-1 p-paper-margin flex justify-center pb-32">
+<div class="w-full max-w-max-content-width flex flex-col gap-stack-lg bg-surface relative">
+<!-- Context Header -->
+<div class="mb-stack-lg border-b border-rice-grey pb-stack-md flex justify-between items-end">
+<div>
+<span class="font-label-mono text-label-mono text-on-surface-variant tracking-wider uppercase">Section III</span>
+<h2 class="font-headline-md text-headline-md text-primary mt-2">Long-Form Analysis</h2>
+</div>
+<div class="font-label-mono text-label-mono text-on-surface-variant">
+                    Displaying 3 of 12
+                </div>
+</div>
+<!-- Subjective Question Card 1 -->
+<article class="relative flex flex-col gap-stack-md">
+<div class="flex items-start gap-gutter">
+<div class="w-12 shrink-0 pt-1 flex flex-col items-center gap-2">
+<span class="font-label-mono text-label-mono text-on-surface-variant">Q.14</span>
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+</div>
+<div class="flex-1">
+<p class="font-body-lg text-body-lg text-on-surface mb-stack-md">
+                            Analyze the socio-economic impacts of the Industrial Revolution on urban working-class families in 19th-century England. Consider both immediate working conditions and long-term demographic shifts. Provide specific historical examples to support your argument.
+                        </p>
+<!-- Metadata Tags -->
+<div class="flex gap-2 mb-stack-lg">
+<span class="px-2 py-1 border border-tertiary-fixed-dim text-tertiary font-label-mono text-[11px] rounded uppercase tracking-wider">History</span>
+<span class="px-2 py-1 border border-tertiary-fixed-dim text-tertiary font-label-mono text-[11px] rounded uppercase tracking-wider">15 Points</span>
+<span class="px-2 py-1 border border-rice-grey text-on-surface-variant font-label-mono text-[11px] rounded uppercase tracking-wider bg-surface-container-low"><span class="material-symbols-outlined" style="font-size: 12px; vertical-align: middle; margin-right: 2px;">edit</span> Subjective</span>
+</div>
+<!-- Dashed Answer Area -->
+<div class="w-full mt-stack-md opacity-50 relative">
+<!-- Answer Stamp Overlay (Hidden by default, shown to demonstrate capability if toggled) -->
+<!-- <div class="absolute inset-0 bg-surface/80 flex items-center justify-center z-10 pointer-events-none">
+                                <div class="border-2 border-secondary text-secondary font-stamp-text text-stamp-text px-4 py-2 uppercase transform -rotate-2" style="box-shadow: 4px 4px 0px theme('colors.secondary-fixed-dim');">Awaiting Review</div>
+                            </div> -->
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+</div>
+</div>
+</div>
+</article>
+<hr class="border-t border-dashed border-rice-grey my-stack-sm"/>
+<!-- Subjective Question Card 2 -->
+<article class="relative flex flex-col gap-stack-md">
+<div class="flex items-start gap-gutter">
+<div class="w-12 shrink-0 pt-1 flex flex-col items-center gap-2">
+<span class="font-label-mono text-label-mono text-on-surface-variant">Q.15</span>
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+</div>
+<div class="flex-1">
+<p class="font-body-lg text-body-lg text-on-surface mb-stack-md">
+                            Evaluate the ethical implications of autonomous decision-making systems in medical diagnostics. Contrast the potential for increased efficiency and accuracy with the risks of algorithmic bias and the erosion of the physician-patient relationship.
+                        </p>
+<!-- Metadata Tags -->
+<div class="flex gap-2 mb-stack-lg">
+<span class="px-2 py-1 border border-tertiary-fixed-dim text-tertiary font-label-mono text-[11px] rounded uppercase tracking-wider">Ethics</span>
+<span class="px-2 py-1 border border-tertiary-fixed-dim text-tertiary font-label-mono text-[11px] rounded uppercase tracking-wider">Technology</span>
+<span class="px-2 py-1 border border-tertiary-fixed-dim text-tertiary font-label-mono text-[11px] rounded uppercase tracking-wider">20 Points</span>
+<span class="px-2 py-1 border border-rice-grey text-on-surface-variant font-label-mono text-[11px] rounded uppercase tracking-wider bg-surface-container-low"><span class="material-symbols-outlined" style="font-size: 12px; vertical-align: middle; margin-right: 2px;">edit</span> Subjective</span>
+</div>
+<!-- Dashed Answer Area -->
+<div class="w-full mt-stack-md opacity-50 relative">
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+<div class="dashed-line"></div>
+</div>
+</div>
+</div>
+</article>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scholarly Review - Question Bank Loading</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#001e30",
+                        "on-primary-fixed": "#191c20",
+                        "surface-variant": "#e7e2d8",
+                        "primary-fixed-dim": "#c5c6cc",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f8f3e9",
+                        "on-surface": "#1d1c16",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-container": "#7391ab",
+                        "outline": "#75777b",
+                        "on-primary-fixed-variant": "#44474b",
+                        "on-secondary-container": "#6f0806",
+                        "background": "#fef9ef",
+                        "on-primary-container": "#8c8e93",
+                        "on-tertiary-fixed-variant": "#2b4a61",
+                        "primary-container": "#24272b",
+                        "secondary-fixed": "#ffdad5",
+                        "surface": "#fef9ef",
+                        "surface-container-highest": "#e7e2d8",
+                        "inverse-on-surface": "#f5f0e6",
+                        "primary-fixed": "#e1e2e8",
+                        "secondary-container": "#fe7362",
+                        "secondary": "#aa352a",
+                        "surface-bright": "#fef9ef",
+                        "secondary-fixed-dim": "#ffb4a9",
+                        "on-surface-variant": "#45474a",
+                        "surface-container": "#f2ede3",
+                        "surface-dim": "#dedad0",
+                        "on-background": "#1d1c16",
+                        "inverse-surface": "#32302a",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#5c5e63",
+                        "on-secondary-fixed": "#410001",
+                        "tertiary-container": "#04293f",
+                        "tertiary": "#001321",
+                        "surface-container-high": "#ede8de",
+                        "inverse-primary": "#c5c6cc",
+                        "tertiary-fixed-dim": "#abcae6",
+                        "tertiary-fixed": "#cbe6ff",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "primary": "#0f1216",
+                        "on-secondary-fixed-variant": "#891d15",
+                        "error-container": "#ffdad6",
+                        "rice-grey": "#CFC5B2",
+                        "ink-ink-subtle": "rgba(36, 39, 43, 0.6)",
+                        "outline-variant": "#c5c6ca"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "paper-margin": "48px",
+                        "max-content-width": "794px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "stack-sm": "8px",
+                        "gutter": "24px",
+                        "sidebar-width": "240px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["\"Source Serif 4\""],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "body-lg": ["\"Source Serif 4\""],
+                        "stamp-text": ["\"Source Serif 4\""],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg": ["\"Source Serif 4\""]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["22px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "32px", "fontWeight": "400" }],
+                        "stamp-text": ["14px", { "lineHeight": "20px", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg": ["30px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    },
+                    "animation": {
+                        "shimmer": "shimmer 2s infinite linear",
+                    },
+                    "keyframes": {
+                        "shimmer": {
+                            "0%": { "background-position": "-1000px 0" },
+                            "100%": { "background-position": "1000px 0" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.surface');
+            color: theme('colors.on-surface');
+        }
+        
+        .shimmer-bg {
+            background: #f6f2e9;
+            background-image: linear-gradient(to right, #f6f2e9 0%, #ede8de 20%, #f6f2e9 40%, #f6f2e9 100%);
+            background-repeat: no-repeat;
+            background-size: 1000px 100%; 
+            animation-duration: 2s;
+            animation-fill-mode: forwards; 
+            animation-iteration-count: infinite;
+            animation-name: shimmer;
+            animation-timing-function: linear;
+        }
+
+        .shimmer-dark {
+             background: #1a1d21;
+            background-image: linear-gradient(to right, #1a1d21 0%, #24272b 20%, #1a1d21 40%, #1a1d21 100%);
+            background-repeat: no-repeat;
+            background-size: 1000px 100%; 
+            animation-duration: 2s;
+            animation-fill-mode: forwards; 
+            animation-iteration-count: infinite;
+            animation-name: shimmer;
+            animation-timing-function: linear;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: -1000px 0;
+            }
+            100% {
+                background-position: 1000px 0;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex font-body-md text-body-md">
+<!-- SideNavBar -->
+<nav class="hidden md:flex fixed inset-y-0 left-0 w-sidebar-width flex-col bg-primary text-on-primary">
+<!-- Header -->
+<div class="p-6 border-b border-surface-tint/20 flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full shimmer-dark"></div>
+<div class="flex-1">
+<div class="h-5 w-24 rounded shimmer-dark mb-1"></div>
+<div class="h-3 w-16 rounded shimmer-dark"></div>
+</div>
+</div>
+<div class="mt-4">
+<div class="h-8 w-32 rounded shimmer-dark mb-2"></div>
+<div class="h-4 w-20 rounded shimmer-dark"></div>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex-1 px-4 py-6 flex flex-col gap-2 overflow-y-auto font-label-mono text-label-mono">
+<!-- Active Item (Directory) -->
+<div class="flex items-center gap-3 px-4 py-3 rounded bg-background text-primary font-bold">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">folder_open</span>
+<span>Directory</span>
+</div>
+<!-- Inactive Items Skeleton -->
+<div class="flex items-center gap-3 px-4 py-3 rounded text-on-primary-container opacity-60">
+<div class="w-5 h-5 rounded shimmer-dark"></div>
+<div class="h-4 w-24 rounded shimmer-dark"></div>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded text-on-primary-container opacity-60">
+<div class="w-5 h-5 rounded shimmer-dark"></div>
+<div class="h-4 w-20 rounded shimmer-dark"></div>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded text-on-primary-container opacity-60">
+<div class="w-5 h-5 rounded shimmer-dark"></div>
+<div class="h-4 w-16 rounded shimmer-dark"></div>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 rounded text-on-primary-container opacity-60">
+<div class="w-5 h-5 rounded shimmer-dark"></div>
+<div class="h-4 w-20 rounded shimmer-dark"></div>
+</div>
+</div>
+<!-- CTA & Footer -->
+<div class="p-6 border-t border-surface-tint/20 flex flex-col gap-4">
+<div class="h-10 w-full rounded shimmer-dark"></div>
+<div class="flex flex-col gap-2 mt-4 font-label-mono text-label-mono text-on-primary-container opacity-60">
+<div class="flex items-center gap-3 px-2 py-1">
+<div class="w-5 h-5 rounded shimmer-dark"></div>
+<div class="h-4 w-16 rounded shimmer-dark"></div>
+</div>
+<div class="flex items-center gap-3 px-2 py-1">
+<div class="w-5 h-5 rounded shimmer-dark"></div>
+<div class="h-4 w-16 rounded shimmer-dark"></div>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-sidebar-width min-h-screen flex flex-col bg-surface">
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-0 md:left-sidebar-width z-50 flex justify-between items-center px-paper-margin h-16 bg-surface border-b border-outline-variant">
+<div class="font-headline-lg text-headline-lg text-primary">
+                Scholarly Review
+            </div>
+<div class="flex-1 max-w-md mx-8">
+<div class="h-10 w-full rounded-full shimmer-bg border border-outline-variant/30"></div>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden lg:flex gap-4 font-label-mono text-label-mono text-on-surface-variant">
+<div class="h-5 w-16 rounded shimmer-bg"></div>
+<div class="h-5 w-20 rounded shimmer-bg"></div>
+<div class="h-5 w-16 rounded shimmer-bg"></div>
+</div>
+<div class="h-9 w-32 rounded shimmer-bg border border-outline-variant"></div>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<div class="w-6 h-6 rounded-full shimmer-bg"></div>
+<div class="w-6 h-6 rounded-full shimmer-bg"></div>
+<div class="w-6 h-6 rounded-full shimmer-bg"></div>
+</div>
+</div>
+</header>
+<!-- Paper Container (Scrollable) -->
+<div class="pt-24 pb-32 px-4 md:px-paper-margin flex justify-center w-full">
+<div class="w-full max-w-max-content-width flex flex-col gap-stack-lg">
+<!-- Loading State Header -->
+<div class="mb-stack-md flex justify-between items-end border-b border-rice-grey pb-4 border-dashed">
+<div>
+<div class="h-4 w-24 rounded shimmer-bg mb-3"></div>
+<div class="h-8 w-64 rounded shimmer-bg"></div>
+</div>
+<div class="h-6 w-32 rounded-full shimmer-bg"></div>
+</div>
+<!-- Skeleton Question Cards -->
+<!-- Card 1 -->
+<div class="p-8 border border-outline-variant bg-surface-container-lowest flex flex-col gap-6 relative overflow-hidden">
+<div class="flex justify-between items-center font-label-mono text-label-mono">
+<div class="h-4 w-16 rounded shimmer-bg"></div>
+<div class="h-4 w-20 rounded shimmer-bg"></div>
+</div>
+<div class="flex flex-col gap-3">
+<div class="h-6 w-full rounded shimmer-bg"></div>
+<div class="h-6 w-5/6 rounded shimmer-bg"></div>
+<div class="h-6 w-4/6 rounded shimmer-bg"></div>
+</div>
+<div class="mt-4 flex flex-col gap-4 pl-4 border-l-2 border-surface-variant">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded-full shimmer-bg"></div>
+<div class="h-5 w-3/4 rounded shimmer-bg"></div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded-full shimmer-bg"></div>
+<div class="h-5 w-2/3 rounded shimmer-bg"></div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded-full shimmer-bg"></div>
+<div class="h-5 w-4/5 rounded shimmer-bg"></div>
+</div>
+</div>
+</div>
+<!-- Card 2 (Dashed Input type skeleton) -->
+<div class="p-8 border border-outline-variant bg-surface-container-lowest flex flex-col gap-6 relative overflow-hidden">
+<div class="flex justify-between items-center font-label-mono text-label-mono">
+<div class="h-4 w-16 rounded shimmer-bg"></div>
+<div class="h-4 w-24 rounded shimmer-bg"></div>
+</div>
+<div class="flex flex-col gap-3">
+<div class="h-6 w-11/12 rounded shimmer-bg"></div>
+<div class="h-6 w-3/4 rounded shimmer-bg"></div>
+</div>
+<div class="mt-8 flex flex-col gap-8">
+<div class="h-px w-full shimmer-bg border-b border-dashed border-rice-grey"></div>
+<div class="h-px w-full shimmer-bg border-b border-dashed border-rice-grey"></div>
+<div class="h-px w-full shimmer-bg border-b border-dashed border-rice-grey"></div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="p-8 border border-outline-variant bg-surface-container-lowest flex flex-col gap-6 relative overflow-hidden">
+<div class="flex justify-between items-center font-label-mono text-label-mono">
+<div class="h-4 w-16 rounded shimmer-bg"></div>
+<div class="h-4 w-20 rounded shimmer-bg"></div>
+</div>
+<div class="flex flex-col gap-3">
+<div class="h-6 w-full rounded shimmer-bg"></div>
+<div class="h-6 w-2/3 rounded shimmer-bg"></div>
+</div>
+<div class="mt-4 flex flex-col gap-4 pl-4 border-l-2 border-surface-variant">
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded-full shimmer-bg"></div>
+<div class="h-5 w-1/2 rounded shimmer-bg"></div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-4 h-4 rounded-full shimmer-bg"></div>
+<div class="h-5 w-3/4 rounded shimmer-bg"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

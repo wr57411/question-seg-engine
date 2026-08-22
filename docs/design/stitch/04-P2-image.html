@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Exam Paper - Single Question Review</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "on-tertiary-fixed": "#001e30",
+                            "on-primary-fixed": "#191c20",
+                            "surface-variant": "#e7e2d8",
+                            "primary-fixed-dim": "#c5c6cc",
+                            "on-primary": "#ffffff",
+                            "surface-container-low": "#f8f3e9",
+                            "on-surface": "#1d1c16",
+                            "surface-container-lowest": "#ffffff",
+                            "on-error-container": "#93000a",
+                            "on-tertiary-container": "#7391ab",
+                            "outline": "#75777b",
+                            "on-primary-fixed-variant": "#44474b",
+                            "on-secondary-container": "#6f0806",
+                            "background": "#fef9ef",
+                            "on-primary-container": "#8c8e93",
+                            "on-tertiary-fixed-variant": "#2b4a61",
+                            "primary-container": "#24272b",
+                            "secondary-fixed": "#ffdad5",
+                            "surface": "#fef9ef",
+                            "surface-container-highest": "#e7e2d8",
+                            "inverse-on-surface": "#f5f0e6",
+                            "primary-fixed": "#e1e2e8",
+                            "secondary-container": "#fe7362",
+                            "secondary": "#aa352a",
+                            "surface-bright": "#fef9ef",
+                            "secondary-fixed-dim": "#ffb4a9",
+                            "on-surface-variant": "#45474a",
+                            "surface-container": "#f2ede3",
+                            "surface-dim": "#dedad0",
+                            "on-background": "#1d1c16",
+                            "inverse-surface": "#32302a",
+                            "on-tertiary": "#ffffff",
+                            "on-error": "#ffffff",
+                            "surface-tint": "#5c5e63",
+                            "on-secondary-fixed": "#410001",
+                            "tertiary-container": "#04293f",
+                            "tertiary": "#001321",
+                            "surface-container-high": "#ede8de",
+                            "inverse-primary": "#c5c6cc",
+                            "tertiary-fixed-dim": "#abcae6",
+                            "tertiary-fixed": "#cbe6ff",
+                            "error": "#ba1a1a",
+                            "on-secondary": "#ffffff",
+                            "primary": "#0f1216",
+                            "on-secondary-fixed-variant": "#891d15",
+                            "error-container": "#ffdad6",
+                            "rice-grey": "#CFC5B2",
+                            "ink-ink-subtle": "rgba(36, 39, 43, 0.6)",
+                            "outline-variant": "#c5c6ca"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                    },
+                    "spacing": {
+                            "paper-margin": "48px",
+                            "max-content-width": "794px",
+                            "stack-md": "16px",
+                            "stack-lg": "32px",
+                            "stack-sm": "8px",
+                            "gutter": "24px",
+                            "sidebar-width": "240px"
+                    },
+                    "fontFamily": {
+                            "body-md": ["\"Source Serif 4\""],
+                            "headline-md": ["\"Source Serif 4\""],
+                            "body-lg": ["\"Source Serif 4\""],
+                            "stamp-text": ["\"Source Serif 4\""],
+                            "label-mono": ["JetBrains Mono"],
+                            "headline-lg": ["\"Source Serif 4\""]
+                    },
+                    "fontSize": {
+                            "body-md": ["16px", {"lineHeight": "28px", "fontWeight": "400"}],
+                            "headline-md": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                            "body-lg": ["18px", {"lineHeight": "32px", "fontWeight": "400"}],
+                            "stamp-text": ["14px", {"lineHeight": "20px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                            "label-mono": ["13px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                            "headline-lg": ["30px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .dashed-line {
+            background-image: linear-gradient(to right, #CFC5B2 50%, transparent 50%);
+            background-size: 8px 1px;
+            background-repeat: repeat-x;
+            background-position: bottom;
+        }
+        .stamped-border {
+            border: 2px solid #aa352a;
+            transform: rotate(-1deg);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen">
+<!-- TopNavBar -->
+<nav class="bg-surface dark:bg-surface-dim text-on-surface dark:text-on-surface border-b border-outline-variant fixed top-0 right-0 left-0 md:left-sidebar-width z-50 flex justify-between items-center px-paper-margin h-16">
+<div class="flex items-center gap-4">
+<span class="font-headline-lg text-headline-lg text-primary">Scholarly Review</span>
+<div class="hidden md:flex gap-6 ml-8">
+<a class="text-on-surface-variant font-label-mono text-label-mono hover:text-primary transition-opacity" href="#">Total: 40</a>
+<a class="text-on-surface-variant font-label-mono text-label-mono hover:text-primary transition-opacity" href="#">Correct: 28</a>
+<a class="text-secondary border-b-2 border-secondary font-label-mono text-label-mono hover:text-primary transition-opacity opacity-70" href="#">Review: 12</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary font-label-mono text-label-mono px-4 py-2 rounded">Toggle All Answers</button>
+<div class="flex gap-2">
+<button class="text-on-surface hover:text-primary transition-colors"><span class="material-symbols-outlined">filter_list</span></button>
+<button class="text-on-surface hover:text-primary transition-colors"><span class="material-symbols-outlined">print</span></button>
+<button class="text-on-surface hover:text-primary transition-colors"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+</div>
+</nav>
+<!-- SideNavBar -->
+<aside class="bg-primary dark:bg-primary-container text-on-primary dark:text-on-primary-fixed fixed inset-y-0 left-0 w-sidebar-width flex-col hidden md:flex z-40 pt-16">
+<div class="p-6 border-b border-ink-ink-subtle">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-full bg-surface-variant overflow-hidden">
+<img alt="Scholar Profile" class="w-full h-full object-cover" data-alt="A distinguished older scholar looking closely at a paper in a dusty, sunlit library, reminiscent of an old university. Focus is tight on the face, showcasing wisdom. Neutral, slightly desaturated color palette favoring warm sepia and grey tones. High resolution portrait." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdHw0l6LEV3yTbZciNIBWgl8jQK77v84R3Z171ViUBgbVHDV4HoVVzxcHIhaX3au39Pf7Bb0WeVHfgPd750wmhbw2hqvNUMxzltRqWum7fDGIPbYKZgPUKYsIq4LpilWOnTgNyQ2nGs7AaP5U_GHhmNOvYf64HhzWpISY2xza1TXsHuUiV_9aEw0h8V4dv-R3e6kW2Fv-skn-PVSFnKLUbKHxUHhaS23JNPWcOcublMGHQu1hOvdaJZg"/>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-primary">Exam Paper</h2>
+<p class="font-label-mono text-label-mono opacity-80">Series 2024-B</p>
+</div>
+</div>
+<button class="w-full bg-on-primary text-primary font-label-mono text-label-mono py-2 rounded hover:bg-surface-variant transition-colors">Finalize Grade</button>
+</div>
+<nav class="flex-1 overflow-y-auto py-4 font-label-mono text-label-mono">
+<ul class="space-y-1 px-2">
+<li><a class="flex items-center gap-3 px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors" href="#"><span class="material-symbols-outlined">folder_open</span> Directory</a></li>
+<li><a class="flex items-center gap-3 px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors" href="#"><span class="material-symbols-outlined">edit_note</span> Annotated</a></li>
+<li><a class="flex items-center gap-3 px-4 py-2 rounded bg-background text-primary font-bold scale-[0.98]" href="#"><span class="material-symbols-outlined">assignment_late</span> Review</a></li>
+<li><a class="flex items-center gap-3 px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors" href="#"><span class="material-symbols-outlined">history</span> Archive</a></li>
+<li><a class="flex items-center gap-3 px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors" href="#"><span class="material-symbols-outlined">settings</span> Settings</a></li>
+</ul>
+</nav>
+<div class="p-4 border-t border-ink-ink-subtle mt-auto font-label-mono text-label-mono">
+<ul class="space-y-1">
+<li><a class="flex items-center gap-3 px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors" href="#"><span class="material-symbols-outlined">help</span> Help</a></li>
+<li><a class="flex items-center gap-3 px-4 py-2 rounded text-on-primary-container opacity-60 hover:opacity-100 hover:bg-on-primary-fixed-variant transition-colors" href="#"><span class="material-symbols-outlined">logout</span> Logout</a></li>
+</ul>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="pt-24 pb-32 md:pl-sidebar-width min-h-screen flex justify-center">
+<div class="w-full max-w-[max-content-width] px-4 md:px-0">
+<div class="flex gap-8">
+<!-- Main Question Area -->
+<article class="flex-1 bg-surface-container-lowest p-8 relative">
+<div class="flex justify-between items-start mb-6">
+<span class="font-label-mono text-label-mono text-on-surface-variant tracking-widest">Q. 14</span>
+<div class="w-3 h-3 rounded-full bg-secondary"></div>
+</div>
+<h3 class="font-headline-md text-headline-md mb-6">Analyze the interference pattern generated by the double-slit setup below. Calculate the expected fringe spacing assuming monochromatic light of λ = 632.8 nm.</h3>
+<div class="w-full bg-surface-container mb-8 p-4 relative overflow-hidden">
+<img alt="Double Slit Experiment Diagram" class="w-full h-auto" data-alt="A clean, minimalist vector-style diagram of a physics double slit experiment. Showing a light source, two slits, and an interference pattern on a screen. High contrast ink black lines on a textured off-white background, simulating a textbook illustration. Academic and precise." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYTDb_9BMFzS7QXcvxoSFe54X1Qj9HBI7DtG8aUaQxmd7W3Iw4BcOd4BdehL_ZefiNG_a7JTXIEfGBx3b8uvWPTIpUNlePtBGk9Vz9vk12qR5TgbEFgVe1CJCYGr_bZCZeZiQE4a4HmVu0Ca0_e6hxBM3au69lxB01KqFHNhtVYm_qshr8VIuLDObOe9DKDAvcLDDxyBT2dZPuS75Jzppghab7Zxrwz3TP8cUugLLjkl3g7fgnmRO9UQ"/>
+</div>
+<div class="space-y-6">
+<div class="dashed-line h-8 w-full"></div>
+<div class="dashed-line h-8 w-full"></div>
+<div class="dashed-line h-8 w-full relative">
+<!-- Answer Stamp -->
+<div class="absolute left-8 bottom-2 stamped-border px-4 py-1 text-secondary font-stamp-text text-stamp-text bg-surface/90">
+                                y = (λL) / d
+                            </div>
+</div>
+<div class="dashed-line h-8 w-full"></div>
+</div>
+</article>
+<!-- Metadata Side Panel -->
+<aside class="w-48 hidden lg:block shrink-0 pt-16 border-l border-rice-grey pl-6">
+<div class="space-y-8 sticky top-32">
+<div>
+<p class="font-label-mono text-label-mono text-on-surface-variant mb-1">PAGE</p>
+<p class="font-body-lg text-body-lg">04 / 12</p>
+</div>
+<div>
+<p class="font-label-mono text-label-mono text-on-surface-variant mb-1">CONFIDENCE</p>
+<p class="font-body-lg text-body-lg">68%</p>
+</div>
+<div>
+<p class="font-label-mono text-label-mono text-on-surface-variant mb-1">STATUS</p>
+<span class="inline-flex items-center gap-2 border border-secondary text-secondary px-2 py-1 font-label-mono text-label-mono text-[11px] uppercase tracking-wider">
+                                Needs Review
+                            </span>
+</div>
+<div>
+<p class="font-label-mono text-label-mono text-on-surface-variant mb-2">NOTES</p>
+<p class="font-body-md text-body-md italic text-on-surface-variant leading-relaxed text-sm">Student miscalculated the distance 'd' between slits. The formula applied is correct.</p>
+</div>
+</div>
+</aside>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation -->
+<footer class="fixed bottom-0 left-0 right-0 md:left-sidebar-width bg-surface border-t border-outline-variant p-4 flex justify-between items-center z-40 max-w-[max-content-width] mx-auto xl:max-w-none xl:px-paper-margin">
+<button class="flex items-center gap-2 border border-rice-grey px-4 py-2 font-label-mono text-label-mono hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-sm">arrow_back</span>
+            Prev Question
+        </button>
+<span class="font-label-mono text-label-mono text-on-surface-variant tracking-widest">14 / 40</span>
+<button class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 font-label-mono text-label-mono hover:bg-primary-container transition-colors">
+            Next Question
+            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</footer>
+</body></html>
