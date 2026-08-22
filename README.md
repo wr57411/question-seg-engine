@@ -81,6 +81,21 @@ node --import tsx scripts/real-pipeline.ts sample
 - 真实网络调用不纳入 `npm test`；离线测试见 `tests/mineru-client.test.ts`、`tests/mineru-unpack.test.ts`。
 - 字段事实以 `docs/real-api-notes.md` 为准。
 
+## 展示层（独立模块）
+
+浏览器查看结构化题目（试题区/答题区/答案区、答案开关、按题型留白、公式渲染）：
+
+```bash
+npm run view                 # 默认打开 23必刷题 2相互作用
+npm run view "23必刷题 2相互作用"
+# 然后访问 http://localhost:4173/viewer/
+```
+
+- 解耦边界：viewer/ 不依赖引擎代码，只消费 data/out/<docId>/questions.json + images/（契约见 viewer/docs/CONTRACT.md）
+- 换展示层：遵守 CONTRACT 即可整体替换 viewer/
+- 页面需联网加载 KaTeX CDN（公式渲染）；离线时公式以 $..$ 文本显示
+- 数据源说明：`data/out/<docId>/questions.json` 是最新算法产物（本仓库由 `segmentFromLayout(data/smoke/unpacked/layout.json)` 本地生成，非联网重新解析；data/ 为运行时产物、git 忽略不入库）
+
 ## 目录
 
 ```
@@ -94,7 +109,9 @@ src/
   strategy.ts    切分策略接口 + 注册表
   index.ts       对外出口
 fixtures/        三份假夹具（单栏 / 双栏 / 干扰项）
-tests/           node:test 用例（31 个）
+tests/           node:test 用例（含 viewer-contract / viewer-logic 适配断言）
 scripts/demo.ts  演示
+scripts/view-server.ts  演示/预览静态服务器（零依赖，npm run view）
+viewer/          展示层独立模块（viewer.js/css/index.html，解耦红线见 docs/CONTRACT.md）
 docs/DECISIONS.md  切片决策记录（第二交付物）
 ```

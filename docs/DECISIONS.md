@@ -181,3 +181,32 @@ formula ParsedBlock（formulaBlocks 仍 0）——与 v1 独立块计数等价�
 `waiting-file → 5s → done`），9MB 15 页样张从上传到 done ≤20s。
 
 **后续动作**：按页计费单价在正式版预算阶段核实；自部署对比按 §7 在切片完成后挑 2~3 页执行。
+
+## 11. 展示层独立模块（2026-08-22）
+
+**决策**：题目浏览器 `viewer/` 作为**独立模块**存在，与引擎 `src/` 完全解耦——
+viewer/ 目录内任何文件都**不得 import 引擎 src/ 的代码**（红线写入 CONTRACT.md 与 viewer-types.d.ts 注释）。
+数据来源是引擎产出的序列化形态，而非引擎运行时对象。
+
+**契约边界**：viewer/ 只消费两样东西——
+- `data/out/<docId>/questions.json`：`SegmentationResult.questions` 的 JSON 序列化（字段权威见 `src/types.ts` 的 `Question`）
+- `data/out/<docId>/images/<裸文件名>`：`questions[].images[].path` 为**裸文件名**（不含路径），展示层自行拼接 `images/` 前缀
+
+**ViewerQuestion 独立声明**：类型契约在 `viewer/viewer-types.d.ts` 以 `ViewerQuestion` 接口独立声明，
+不 import 引擎 src/。引擎字段变更时须同步该文件与 CONTRACT.md，并跑 `tests/viewer-contract.test.ts`。
+
+**两条适配规则**（CONTRACT v1，纯展示逻辑）：
+① **答案拆分**：answer 若含 `\n解析：`，拆为「答案值 + 解析」两段渲染（引擎暂未拆出独立 solution 字段）。
+② **图片路径**：拼接 `images/${path}`。
+
+**留白常量**：答题区高度按题型——choice `0px` / subjective `378px`（A4 纸张 297mm → 1123px @96dpi，10cm=100mm → `1123×100/297≈378px`）；
+未来 blank（填空）预留 `151px`（4cm）。该算式三处一致：viewer.css 的 `--blank-*`、tests/viewer-logic.test.ts、CONTRACT 表格。
+
+**美学方向**：「编辑部印刷物」——纸张质感、朱砂/石青/墨色点缀、衬线标题，避免 Web 常见渐变/圆角卡片风。
+浏览器验证状态：见 task-2-report / task-3-report 的 HTTP 与浏览器冒烟记录。
+
+**数据口径（重要，如实记录）**：viewer 消费的 `data/out/<docId>/questions.json` 为
+`segmentFromLayout(data/smoke/unpacked/layout.json)` 本地生成的**最新算法产物**，不是联网重新解析 MinerU、
+也不是回填真实云 API 的原始输出。`data/` 目录为运行时产物、git 忽略不入库（`data/sample/` 除外）。
+
+**状态**：已落库（TS 契约 + CONTRACT.md + viewer-contract/viewer-logic 单测 + view-server + 浏览器页面）。
