@@ -46,3 +46,12 @@
 ## 后续动作
 
 验收通过 → 回到 viewer 实施计划（docs/superpowers/plans/2026-08-22-viewer-independent-module.md），以本设计稿 + designMd 的 token（色值/字体/间距/794px/240px 常量）为实现基准开发。实现时按上述适配项：中文接真数据 + 字体 fallback + shimmer。
+
+## 增补（2026-08-22 · viewer A 组）
+
+**浏览器截图视觉审查已纳入验收流程，缺口关闭。**
+viewer 模块在 `docs/design/viewer-review.md` 确立「截图视觉审视」为验收主轴：`view-cap.mjs` 逐状态截图 →
+主模型 Read 逐屏审视（重叠/错位/间距/溢出/字体/图片）→ 发现项修复并记入 `viewer-review.md` →
+`browser-gate.mjs` DOM Gate 仅作元素存在性辅助（不替代视觉审板）。
+设计稿的 6 条验收口径（三区结构/答案开关两级可感知/needs_review 可辨可直达/视觉五要素/三态画面/移动端代表稿）
+在本轮截图 + DOM 几何实测（卡高 442/471/831px、answerH 0/378px、85 题齐全）中复核通过。

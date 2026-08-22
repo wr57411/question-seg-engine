@@ -210,3 +210,38 @@ viewer/ 目录内任何文件都**不得 import 引擎 src/ 的代码**（红线
 也不是回填真实云 API 的原始输出。`data/` 目录为运行时产物、git 忽略不入库（`data/sample/` 除外）。
 
 **状态**：已落库（TS 契约 + CONTRACT.md + viewer-contract/viewer-logic 单测 + view-server + 浏览器页面）。
+
+## 12. viewer 体验修复 A 组（2026-08-22）
+
+用户实测点名三个观感/可用性问题，A 组集中修复（对应 reviewer 逐状态审视记录见 [docs/design/viewer-review.md](design/viewer-review.md)）。
+
+**① view-server 打印完整编码 URL**
+`npm run view` 启动日志改为打印**带完整 doc 参数的可点击地址**（含 `%20` 空格），
+避免用户复制被空格/超长截断后的 URL 导致打开空白页。
+
+**② viewer doc 容错 effectiveDoc**
+`?doc=` 参数被截断/非法/数据不存在时，viewer 不再静默空白，而是：
+`loadWithFallback` 回退默认卷一次，并以**生效的默认卷**（effectiveDoc）渲染页面标题、图片 BASE；
+默认卷也失败才抛错进入 `#empty` 空态。相关纯逻辑抽到 `viewer/doc-utils.js`（viewer 首个 ES module import），
+`resolveDoc` / `loadWithFallback` / `DEFAULT_DOC` 三处签名一致，被 `viewer-doc.test.ts` 断言。
+
+**③ 截图视觉审查纳入验收（核心经验教训）**
+验收**以截图视觉审视为准**：`npm run view:cap`（`view-cap.mjs`）逐状态截图 → 主模型 Read 逐屏审视版面
+（重叠/错位/间距/溢出/字体/图片）→ 发现项写入 `docs/design/viewer-review.md` 并**实际修复** → 再截图对照。
+经验教训：**单一 DOM Gate 不足**——`browser-gate.mjs` 只断言元素「存在」（`#paper>0`、`#stat-total>=80`、
+`#filters`、`#toggle-answers`、`#review-btn`），**无法捕捉重叠/错位/溢出/字重等版面问题**，必须配合截图审板。
+另一条客观事实如实记录：**IAB 截图与 DOM 渲染不同步**——非 review 各状态截图抓帧为骨架占位（skeleton），
+未能形成"版面无异常"的截图式证据；此时以 **DOM 几何实测**为权威判据（卡高 442/471/831px、answerH 0/378px、
+85 题齐全），只有 review（质检队列）态抓到真实渲染条目（2 条 `Q-6 Conf 60% SUBJECTIVE FLAG`）。
+该差异属验收主轴的真实呈现，非隐藏；修复截图时序属 controller 截图环境增强，不影响 DOM 判据结论。
+
+**Review 入口（Task 3）**：`#review-btn`（Review (N)）+ 质检队列视图 + `goToQuestion(id)` 跳转高亮 +
+质检队列 `Q-6` 重复题号展示歧义已修复（`displayLabel(q)` 在 number 重复时回退 `Q-6 (p7)` 带页码形式）。
+
+**状态**：A 组已完成（view-server URL / doc 容错 / Review 入口 + 截图采集与 DOM Gate 互补），`npm run check` 50/50 全绿。
+
+**已入待办 B 组（不实现，明确记入）**：
+- P3：Review 入口缺失的入口逻辑补全（现入口可进，后续交互深化）。
+- 单题「SHOW ANSWER」按钮文案与全局开关同步（当前单题开关与全局 Toggle 文本状态并未完全联动）。
+- `#empty` 空态残留 bug（真实空态当前数据不触发，空态样式/逻辑需在触发场景下复查）。
+- 纸卡 A4 宽度：`calc()` 双计 `--sidebar` 导致宽度换算需复查（A4 纸张宽度与栏宽减法一致性）。

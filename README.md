@@ -96,6 +96,14 @@ npm run view "23必刷题 2相互作用"
 - 页面需联网加载 KaTeX CDN（公式渲染）；离线时公式以 $..$ 文本显示
 - 数据源说明：`data/out/<docId>/questions.json` 是最新算法产物（本仓库由 `segmentFromLayout(data/smoke/unpacked/layout.json)` 本地生成，非联网重新解析；data/ 为运行时产物、git 忽略不入库）
 
+**查看 / 验收命令（A 组修复后）**：
+
+- `npm run view` 会打印**带完整 doc 参数的地址**（含 `%20` 空格，可直接复制），避免 URL 截断导致空白。
+- `npm run view:cap -- --states=complete,truncated,filter,answer,needs` 生成各状态截图（落盘 `docs/design/viewer-cap/`）。
+- **验收以截图视觉审视为准**：`npm run view:cap` 截图 → 主模型 Read 逐屏审视版面（重叠/错位/间距/溢出/字体/图片）→ 发现项写入 `docs/design/viewer-review.md` 并修复 → 再截图对照。
+- `npm run view:test` 为 DOM 存在性 Gate（元素在不在），是截图的**辅助**，不替代视觉审板。
+- doc 参数截断/非法时 viewer 自动回退默认卷并提示（不静默空白）。
+
 ## 目录
 
 ```
