@@ -74,3 +74,9 @@
 | empty | 回退默认 | 逻辑背书 | 无异常 |
 
 > 备注：各非 review 状态截图抓帧为骨架占位是 IAB 截图与 DOM 渲染时序不同步所致（等待 1200ms 后仍为占位）。修复该时序需在 IAB 下轮询直至 `.card` 出现，属于 controller 截图环境的增强，不影响本任务 DOM 判据结论。
+
+## 终审复核（2026-08-22）
+
+- review-current.png（当前数据重跑 Review 入口）：`itemCount=2`，条目为 `Q-6 (p7) Conf 60% SUBJECTIVE FLAG`、`Q-6 (p9) Conf 60% SUBJECTIVE FLAG`，均带「进入单题」。
+- 与 view-server 实际 data/out 数据核验一致：needs_review 两条 = `p7:q43`（number 6, subjective, conf 0.6）、`p9:q55`（number 6, subjective, conf 0.6）。
+- 结论：截图证据与运行数据一致，无脱节；displayLabel 消除 Q-6 歧义（p7/p9）与 `.review-mode` CSS 均生效。
