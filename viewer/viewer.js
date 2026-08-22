@@ -3,11 +3,13 @@
 // 解耦红线：本文件不得 import ../src/ 任何内容。数据来源见 CONTRACT.md。
 // ============================================================
 
-import { DEFAULT_DOC, resolveDoc, loadWithFallback } from "./doc-utils.js";
+import { resolveDoc, loadWithFallback } from "./doc-utils.js";
 
 /** URL ?doc= 参数（含"缺失/非法回退默认"容错），由 doc-utils 解析 */
 const DOC = resolveDoc(location.search);
-const BASE = `../data/out/${encodeURIComponent(DOC)}`;
+// BASE 依赖实际生效 doc（回退后），故用函数延迟计算，并在 main() 中按 effectiveDoc 赋值
+const baseFor = (doc) => `../data/out/${encodeURIComponent(doc)}`;
+let BASE = baseFor(DOC);
 
 const state = { answersVisible: false, filter: "all", questions: [] };
 
@@ -281,6 +283,7 @@ function escapeHtml(s) {
 
 /* ---------------- 启动 ---------------- */
 async function main() {
+  // 标题先用初始 DOC 占位；成功加载后再用实际生效 doc（可能回退默认）覆盖
   $("#masthead-doc").textContent = DOC;
   $("#toc-doc").textContent = DOC;
 
@@ -297,7 +300,12 @@ async function main() {
   closeTocOnResize();
 
   try {
-    state.questions = await load();
+    const { questions, effectiveDoc } = await load();
+    state.questions = questions;
+    // 用实际生效 doc（可能已回退默认）驱动标题与图片路径 BASE，而非初始 DOC
+    BASE = baseFor(effectiveDoc);
+    $("#masthead-doc").textContent = effectiveDoc;
+    $("#toc-doc").textContent = effectiveDoc;
   } catch (err) {
     $("#placeholder").hidden = true;
     const flow = $("#paper");

@@ -24,7 +24,8 @@ export function resolveDoc(search) {
  * - 回退仍失败（或本来就是默认卷失败）→ 抛明确错误（含"可能不完整/回退默认卷也失败"提示）。
  * @param {(doc: string) => Promise<Response>} fetcher 可注入的加载函数（测试传模拟响应）
  * @param {string} doc 经 resolveDoc 解析后的目标 doc
- * @returns {Promise<unknown>} questions JSON
+ * @returns {Promise<{ questions: unknown; effectiveDoc: string }>} 加载结果 + 实际生效 doc
+ *   注：effectiveDoc 用于 masthead/toc 标题与图片路径 BASE，回退时其值为 DEFAULT_DOC。
  */
 export function loadWithFallback(fetcher, doc) {
   const attempt = async (d) => {
@@ -32,7 +33,8 @@ export function loadWithFallback(fetcher, doc) {
     if (!res || !res.ok) {
       throw new Error(`questions.json 加载失败（${res?.status ?? "unknown"}）`);
     }
-    return await res.json();
+    const questions = await res.json();
+    return { questions, effectiveDoc: d };
   };
   return attempt(doc).catch((e) => {
     if (doc !== DEFAULT_DOC) {

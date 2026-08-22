@@ -22,9 +22,10 @@ test("loadWithFallback：真实 doc 正常，截断 doc 回退默认一次，默
     if (doc === DEFAULT_DOC) return { ok: true, json: async () => ({ qs: ["a"] }) };
     throw new Error("fetch 404");
   };
-  // 截断 doc → 回退默认成功
+  // 截断 doc → 回退默认成功，且 effectiveDoc 指向默认卷
   const r = await loadWithFallback(fetcher, "23必刷题");
-  assert.deepEqual(r, { qs: ["a"] });
+  assert.deepEqual(r.questions, { qs: ["a"] });
+  assert.equal(r.effectiveDoc, DEFAULT_DOC);
   assert.equal(calls, 2);
   // 默认也失败 → 抛（含"回退默认卷也失败/可能不完整"提示）
   const bad = async () => {
@@ -32,4 +33,16 @@ test("loadWithFallback：真实 doc 正常，截断 doc 回退默认一次，默
   };
   await assert.rejects(loadWithFallback(bad, "23必刷题"), /always fail/);
   await assert.rejects(loadWithFallback(bad, "不存在的卷"), /可能不完整/);
+});
+
+test("loadWithFallback：非默认 doc 首载即成功，不触发回退（真实 doc 不误伤）", async () => {
+  let calls = 0;
+  const fetcher = async (doc: string) => {
+    calls++;
+    return { ok: true, status: 200, json: async () => ({ qs: ["real"], doc }) };
+  };
+  const r = await loadWithFallback(fetcher, "物理力学");
+  assert.deepEqual(r.questions, { qs: ["real"], doc: "物理力学" });
+  assert.equal(r.effectiveDoc, "物理力学"); // effectiveDoc = 传入 doc（非默认，未回退）
+  assert.equal(calls, 1); // 仅触达一次，未回退默认
 });

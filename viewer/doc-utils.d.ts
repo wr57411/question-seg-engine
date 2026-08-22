@@ -14,4 +14,9 @@ export type Fetcher = (doc: string) => Promise<{
   json: () => Promise<unknown>;
 }>;
 
-export function loadWithFallback(fetcher: Fetcher, doc: string): Promise<unknown>;
+export type LoadResult = {
+  questions: unknown;
+  effectiveDoc: string;
+};
+
+export function loadWithFallback(fetcher: Fetcher, doc: string): Promise<LoadResult>;
