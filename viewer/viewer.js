@@ -208,6 +208,16 @@ function applyFilter() {
   // 骨架屏保留至首屏渲染完成即可
   vis.forEach((q, i) => flow.appendChild(renderCard(q, i)));
   renderToc();
+  // 重建卡片是全新的 DOM：按 state 统一回填答案可见性，并重新渲染 KaTeX 公式
+  applyAnswerVisibility();
+  renderMath();
+}
+
+/* ---------------- 答案可见性（全局 + 单题共用，保证 rebuild 后与 state 一致） ---------------- */
+function applyAnswerVisibility() {
+  document.querySelectorAll(".card").forEach((c) => c.classList.toggle("show-answer", state.answersVisible));
+  const btn = $("#toggle-answers");
+  $("span", btn).textContent = state.answersVisible ? "Hide All Answers" : "Toggle All Answers";
 }
 
 function setFilter(f) {
@@ -221,9 +231,7 @@ function setFilter(f) {
 /* ---------------- 全局答案开关 ---------------- */
 function setAnswersVisible(v) {
   state.answersVisible = v;
-  document.querySelectorAll(".card").forEach((c) => c.classList.toggle("show-answer", v));
-  const btn = $("#toggle-answers");
-  $("span", btn).textContent = v ? "Hide All Answers" : "Toggle All Answers";
+  applyAnswerVisibility();
 }
 
 /* ---------------- KaTeX 渲染（离线降级原文） ---------------- */

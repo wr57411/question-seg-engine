@@ -97,8 +97,10 @@ body {
 .toc-foot { padding: var(--st-16) var(--gutter); border-top: 1px solid rgba(246,241,231,0.12); }
 
 /* ============ 主区 ============ */
-.main { margin-left: var(--sidebar); padding: var(--paper-margin) var(--paper-margin) 160px; max-width: var(--max-content) + var(--sidebar) + var(--paper-margin)*2; }
-@media (min-width: 1200px) { .main { margin-left: auto; margin-right: auto; max-width: var(--max-content); } }
+/* 非对称：240px 目录栏 + 右侧流畅区；卡片流左对齐（不居中，per brief）。
+   左对齐依据 brief「卡片流左对齐（不居中）」；因此不引入 >=1200px 的 margin:auto 居中。
+   max-width 用于避免极宽视口下纸卡过度拉伸，仍保留 A4 纸面宽度约束。 */
+.main { margin-left: var(--sidebar); padding: var(--paper-margin) var(--paper-margin) 160px; max-width: calc(var(--max-content) + var(--sidebar) + var(--paper-margin) * 2); }
 
 /* 页眉 */
 .masthead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: var(--st-16); padding-bottom: var(--st-16); }
