@@ -12,7 +12,13 @@ test("契约：真实 questions.json 可被 ViewerQuestion 消费（每字段形
     assert.equal(typeof q.number, "string");
     assert.ok(["choice", "subjective"].includes(q.type as string));
     assert.equal(typeof q.stem, "string");
+    assert.equal(typeof q.section, "string");
     assert.ok(Array.isArray(q.options));
+    for (const o of q.options as { key: unknown; text: unknown }[]) {
+      assert.equal(typeof o.key, "string");
+      assert.equal(typeof o.text, "string");
+    }
+    if ("answer" in q) assert.equal(typeof q.answer, "string");
     assert.ok(Array.isArray(q.images));
     assert.ok(["ok", "needs_review"].includes(q.status as string));
     assert.equal(typeof q.confidence, "number");

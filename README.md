@@ -112,6 +112,6 @@ fixtures/        三份假夹具（单栏 / 双栏 / 干扰项）
 tests/           node:test 用例（含 viewer-contract / viewer-logic 适配断言）
 scripts/demo.ts  演示
 scripts/view-server.ts  演示/预览静态服务器（零依赖，npm run view）
-viewer/          展示层独立模块（viewer.js/css/index.html，解耦红线见 docs/CONTRACT.md）
+viewer/          展示层独立模块（viewer.js/css/index.html，解耦红线见 viewer/docs/CONTRACT.md）
 docs/DECISIONS.md  切片决策记录（第二交付物）
 ```
