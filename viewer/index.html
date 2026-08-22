@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>试题查看 · Editorial Review</title>
+
+  <!-- KaTeX（联网加载公式，离线时降级为 $..$ 原文，不报错） -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="./viewer.css" />
+</head>
+<body>
+  <!-- ============ 内联 SVG 图标（线条式，非 emoji） ============ -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 5.5C4 4.67 4.67 4 5.5 4H19v14H5.5A1.5 1.5 0 0 0 4 19.5v-14z"/>
+      <path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H19"/>
+      <path d="M11 4v9l2.5-1.5L16 13V4"/>
+    </symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/>
+      <circle cx="12" cy="12" r="2.6"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.5 12.5l5 5L19.5 7"/>
+    </symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.5 21 20H3l9-16.5z"/>
+      <path d="M12 10v4"/>
+      <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+      <path d="M4 7h16M4 12h16M4 17h16"/>
+    </symbol>
+  </svg>
+
+  <!-- ============ 目录栏（240px 墨黑、sticky） ============ -->
+  <aside class="toc" id="toc" aria-label="题目目录">
+    <div class="toc-head">
+      <div class="toc-brand">
+        <svg class="icon" aria-hidden="true"><use href="#i-book"/></svg>
+        <span>试题目录</span>
+      </div>
+      <div class="toc-sub" id="toc-doc">23必刷题 2相互作用</div>
+    </div>
+    <nav class="toc-nav" id="toc-nav" aria-label="题目索引">
+      <!-- JS 注入：section 分组 + 题号 + 状态色点 -->
+    </nav>
+    <div class="toc-foot">
+      <button class="btn btn-ink w-full" id="toggle-answers" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg>
+        <span>Toggle All Answers</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- 移动端汉堡 -->
+  <button class="mobile-menu" id="mobile-menu" type="button" aria-label="打开目录">
+    <svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg>
+  </button>
+
+  <!-- ============ 主区 ============ -->
+  <main class="main">
+    <!-- 页眉：标题 + 统计 + 筛选 + 全局答案开关 -->
+    <header class="masthead">
+      <div class="masthead-left">
+        <h1 class="title">Scholarly Review</h1>
+        <p class="subtitle" id="masthead-doc">23必刷题 2相互作用</p>
+      </div>
+      <div class="masthead-right">
+        <div class="stat-group mono" id="stats">
+          <span class="stat">Total: <strong id="stat-total">0</strong></span>
+          <span class="stat stat-ok">ok: <strong id="stat-ok">0</strong></span>
+          <span class="stat stat-review">review: <strong id="stat-review">0</strong></span>
+        </div>
+        <div class="filters mono" id="filters" role="group" aria-label="题型筛选">
+          <button class="filter is-active" data-filter="all" type="button">全部</button>
+          <button class="filter" data-filter="choice" type="button">选择</button>
+          <button class="filter" data-filter="subjective" type="button">主观</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="rule"></div>
+
+    <!-- 纸张卡片流（A4 794px） -->
+    <section class="paper-flow" id="paper" aria-label="题目列表">
+      <!-- JS 注入卡片；此处为加载骨架（offline/慢网时可见） -->
+      <div class="skeleton-strip" id="placeholder">
+        <div class="sk-card"><span class="sk-line w-1/3"></span><span class="sk-line w-full"></span><span class="sk-line w-5/6"></span></div>
+        <div class="sk-card"><span class="sk-line w-1/4"></span><span class="sk-line w-full"></span><span class="sk-line w-2/3"></span></div>
+        <div class="sk-card"><span class="sk-line w-2/5"></span><span class="sk-line w-full"></span><span class="sk-line w-3/4"></span></div>
+      </div>
+      <p class="empty-note" id="empty" hidden>没有符合条件的题目。</p>
+    </section>
+  </main>
+
+  <script type="module" src="./viewer.js"></script>
+</body>
+</html>

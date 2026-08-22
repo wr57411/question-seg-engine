@@ -29,7 +29,9 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   try {
     let path = normalize(decodeURIComponent(url.pathname));
+    // "/" 或任意目录路径（以 / 结尾）一律落到该目录的 index.html
     if (path === "/") path = "/viewer/index.html";
+    else if (path.endsWith("/")) path += "index.html";
     const file = join(ROOT, path);
     // 路径安全：只允许 /viewer 与 /data/out 前缀，且归一化后必须仍落在 ROOT 内
     if (!file.startsWith(ROOT) || !/^\/?(viewer|data\/out)/.test(path)) {
