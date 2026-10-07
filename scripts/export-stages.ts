@@ -202,6 +202,9 @@ function main(): void {
 
   const outDir = join("data", "out", docId);
   mkdirSync(outDir, { recursive: true });
+  // questions.json 与 stages.json 同源重生成：viewer 与 stages 消费同一份引擎产物，
+  // 避免算法修复后两个展示层各说各话
+  writeFileSync(join(outDir, "questions.json"), JSON.stringify(result.questions, null, 2));
   writeFileSync(join(outDir, "stages.json"), JSON.stringify(snapshot, null, 1));
 
   // 原卷 PDF 一并复制到 data/out/<docId>/，供展示层「原卷对照」内嵌浏览；

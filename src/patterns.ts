@@ -53,6 +53,17 @@ const ANSWER_ZONE_GUARD = isAnswerZone;
 const OPTION_LINE = /^([A-Ha-h])\s*[.．、)）:：]/;
 
 /**
+ * 物体列举守卫：「字母+顿号+字母」是物理题干高频的对象列举
+ * （"A、B用两根轻绳连""A、B、C均处于平衡"），不是选项行。
+ * 误判后果严重：伪选项 A 占住 expectOptionKey，后续真选项全部
+ * 被「键不连续」裁决挤成乱序、整组丢失（2026-10-07 真实 15 页回归，
+ * 4 道题因它丢选项）。真实选项「A、xxx」正文紧跟字母的情形极罕见，可牺牲。
+ */
+function isObjectEnumeration(marker: string, rest: string): boolean {
+  return marker.endsWith("、") && /^[A-Ha-h]/.test(rest);
+}
+
+/**
  * 答案区条目：题号开头（答案区内的 "1．B"），复用题号模式两分支结构。
  * 与 ARABIC_QUESTION 同款守卫：半角点后接数字（0.5…/0 . 5…）不当作题号前缀；
  * 分支 1 同款 \s* 容忍（"1 . B" 可解析），负前瞻跳过空白后断言非数字。
@@ -99,8 +110,11 @@ export function matchFirstLine(line: string): LineMatch {
 
   const opt = OPTION_LINE.exec(s);
   if (opt) {
-    const key = (opt[1] ?? "").toUpperCase();
-    return { ok: true, kind: "option", captured: "", optionKey: key };
+    const rest = s.slice(opt[0].length);
+    if (!isObjectEnumeration(opt[0], rest)) {
+      const key = (opt[1] ?? "").toUpperCase();
+      return { ok: true, kind: "option", captured: "", optionKey: key };
+    }
   }
 
   return { ok: false, kind: "other" };
@@ -136,14 +150,16 @@ export function nextKey(key: string): string {
 
 /**
  * 粘连选项的后续标记：块内任意位置的 [A-H]+分隔符（允许与上文无空格粘连，如 "…上B.重力…"）。
- * 注意两点：
+ * 注意三点：
  * 1) 不校验后继字符——原 lookahead 方案（(?=[A-H][.．、)）:：]|$)）在 "B.3:5" / "B.重…"
  *    （标记后直接是选项正文）时拆不动，与测试契约矛盾；是否「整块为选项连排」交给
  *    splitConjoinedOptions 的块首标记守卫 + 调用方的 >=2 门控裁决。
  * 2) 不带 /g 标志——非全局 exec 无 lastIndex 状态污染，每次都在「截到上一标记之后」的
  *    rest 上从头找首个标记（即下一个选项起点），语义恰好正确。
+ * 3) 顿号带守卫：[、](?![A-Ha-h])——「设A、B接触」里的 "A、" 是物体列举不是选项
+ *    边界（见 isObjectEnumeration），拆分时必须跳过，否则题干被拆出伪选项段。
  */
-const OPTION_SPLIT = /([A-H])\s*[.．、)）:：]/;
+const OPTION_SPLIT = /([A-H])\s*(?:[.．)）:：]|[、](?![A-Ha-h]))/;
 
 /**
  * 粘连选项拆分：块内文本含多个连续选项标记时按标记切分（layout 行级展开缺失时的兜底，
@@ -151,12 +167,15 @@ const OPTION_SPLIT = /([A-H])\s*[.．、)）:：]/;
  * 注意：
  * - 只处理「块首为选项标记且块内另有 ≥1 个后续标记」形态；混入正文数字/字母、
  *   缺首标记的题干文本返回空（由上层走原路径）。
- * - 本函数不做 key 去重：正文若重现同名标记（如 "A.x B.y A.z"），输出会含两个 A 键——
+ * - 连续同键合并取更长文本：上游 MinerU 偶发整行重复
+ *   （"C.M所受…大C.M所受…大小一定一直增加"），拆出 C、C 两个同键段会撞上
+ *   expectOptionKey 门控误判「键不连续」而丢整组（2026-10-07 真实回归）。
+ * - 仍不做非相邻同键去重：正文若重现同名标记（如 "A.x B.y A.z"），
  *   去重/连续性由 rule-engine 的 expectOptionKey 门控裁决（不连续即 settle+review+文本回退）。
  */
 export function splitConjoinedOptions(text: string): { key: string; text: string }[] {
   const trimmed = text.trim();
-  const first = /^([A-H])\s*[.．、)）:：]\s*/.exec(trimmed);
+  const first = /^([A-H])\s*(?:[.．)）:：]|[、](?![A-Ha-h]))\s*/.exec(trimmed);
   if (!first) return [];
   const out: { key: string; text: string }[] = [];
   let rest = trimmed.slice(first[0].length);
@@ -171,5 +190,15 @@ export function splitConjoinedOptions(text: string): { key: string; text: string
   }
   // 最后一段
   if (rest.trim()) out.push({ key, text: rest.trim() });
-  return out;
+  // 连续同键合并（上游整行重复防护）：同名段取更长文本
+  const merged: { key: string; text: string }[] = [];
+  for (const seg of out) {
+    const last = merged[merged.length - 1];
+    if (last && last.key === seg.key) {
+      if (seg.text.length > last.text.length) last.text = seg.text;
+    } else {
+      merged.push(seg);
+    }
+  }
+  return merged;
 }

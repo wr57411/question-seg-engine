@@ -196,6 +196,17 @@ function lineFont(hPx) {
   return Math.max(8, Math.min(20, Math.round(hPx * 0.72)));
 }
 
+/* 字号同时适配框宽与框高：CJK 记 1em、其他记 0.55em 估宽，
+ * 超宽则缩字号——「出现的东西大小要匹配」，避免文字溢出边框的别扭感 */
+const CJK_RE = /[\u2E80-\u9FFF\uF900-\uFFFD\u3000-\u303F\uFF00-\uFFEF]/;
+function fitFontSize(text, boxWpx, boxHpx) {
+  const hFit = lineFont(boxHpx);
+  let ems = 0;
+  for (const ch of text) ems += CJK_RE.test(ch) ? 1 : 0.55;
+  if (ems <= 0) return hFit;
+  return Math.max(7, Math.min(hFit, (boxWpx / ems) * 0.98));
+}
+
 /** 行级块节点（阶段 2/3 与对比模式共用；canvasW 为画布像素宽，用于字号换算） */
 function blockNode(b, p, canvasW = CANVAS_W) {
   const node = posStyle(el("div", `blk blk-line kind-${b.kind}`), b.bbox, p.width, p.height);
@@ -207,8 +218,9 @@ function blockNode(b, p, canvasW = CANVAS_W) {
     node.append(img);
   } else {
     const txt = el("span", "txt", b.text);
-    const hPx = ((b.bbox[3] - b.bbox[1]) / p.width) * canvasW;
-    txt.style.fontSize = `${lineFont(hPx)}px`;
+    const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * canvasW;
+    const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * canvasW;
+    txt.style.fontSize = `${fitFontSize(b.text, boxW, boxH)}px`;
     node.append(txt);
   }
   return node;
@@ -239,8 +251,9 @@ function renderRaw(p) {
     const node = posStyle(el("div", `blk blk-raw type-${b.type}`), b.bbox, p.width, p.height);
     node.title = `[${TYPE_LABEL_CN(b.type)}] ${b.text}`;
     const txt = el("span", "txt", b.text || `(${TYPE_LABEL_CN(b.type)})`);
-    const hPx = ((b.bbox[3] - b.bbox[1]) / p.height) * (CANVAS_W * (p.height / p.width));
-    txt.style.fontSize = `${lineFont(hPx * 0.9)}px`;
+    const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * CANVAS_W;
+    const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * CANVAS_W;
+    txt.style.fontSize = `${fitFontSize(b.text, boxW, boxH * 0.9)}px`;
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
@@ -302,9 +315,10 @@ function renderSeg(p) {
         `q-chip ${colorCls}`,
         `第${q.number}题 · ${q.type === "choice" ? "选择" : "主观"} · ${Math.round(q.confidence * 100)}%`,
       );
+      // 牌子内嵌在题目首块左上角：只标注真正的题目，绝不飘到页眉等非题目区
       chip.style.left = `${(first.bbox[0] / p.width) * 100}%`;
       chip.style.top = `${(first.bbox[1] / p.height) * 100}%`;
-      chip.style.transform = "translate(-2px, -20px)";
+      chip.style.transform = "translate(0, -1px)";
       chip.addEventListener("click", () => showDetail(q, p));
       c.append(chip);
     }
@@ -432,9 +446,10 @@ function renderCompare(p) {
     const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);
     if (!first) continue;
     const chip = el("span", "q-chip plain", `第${q.number}题`);
+    // 内嵌首块左上角（同切题页）：牌子只出现在题目自身位置
     chip.style.left = `${(first.bbox[0] / p.width) * 100}%`;
     chip.style.top = `${(first.bbox[1] / p.height) * 100}%`;
-    chip.style.transform = "translate(-2px, -18px)";
+    chip.style.transform = "translate(0, -1px)";
     chip.addEventListener("click", () => showDetail(q, p));
     c.append(chip);
   }

@@ -42,6 +42,8 @@ interface Draft {
   options: Option[];
   /** 是否见过选项块（区分「无选项题」与「选项收集失败」） */
   optEvidence: boolean;
+  /** 选项键前向断裂（期待 A/B 却先出现 C/D）：组不完整，多半是上游漏检 */
+  optGap: boolean;
   images: ImageRef[];
   blockIndexes: number[];
   pageIndex: number;
@@ -153,9 +155,11 @@ class Ctx {
         return;
       }
       case "option": {
-        // 粘连多选项一行：直接批量入 pending（layout 行级未覆盖时的兜底）
+        // 选项行结构化拆分（含粘连多选项一行：layout 行级未覆盖时的兜底）。
+        // 门控 >=1：单段结果（含「连续同键合并」后的上游重复行）同样走结构化路径，
+        // 与 onOption 的 stripOptionPrefix 全文回退相比，段文本已去过重复噪声。
         const splits = splitConjoinedOptions(block.text);
-        if (splits.length >= 2 && splits[0]!.key === this.expectOptionKey) {
+        if (splits.length >= 1 && splits[0]!.key === this.expectOptionKey) {
           // 不连续分支已调 appendToCurrent（其内部自带 blockIndex 登记），尾部登记需跳过避免重复
           let preservedToStem = false;
           for (const s of splits) {
@@ -213,11 +217,29 @@ class Ctx {
       return;
     }
 
-    // 键不连续：结算已收集的选项组，该块按普通文本处理
+    // 前向缺键（期待 A/B 却直接出现 C/D）：收下该选项段并标记缺键，
+    // 让缺键+数量扣分把题送进人工校对。典型成因是上游漏检纯公式选项
+    // （2026-10-07 真实回归：热狗题 A/B 为 {5/8}G 类公式，layout.json 无字母前缀）。
+    // 旧实现整块回退题干 → 选项组静默消失且置信度不降，违反「不静默失败」。
+    if (key > this.expectOptionKey) {
+      const expected = this.expectOptionKey;
+      this.pendingOptions.push({ key, text: stripOptionPrefix(block.text) });
+      this.expectOptionKey = nextKey(key);
+      cur.optEvidence = true;
+      cur.optGap = true;
+      cur.blockIndexes = [...cur.blockIndexes, blockIndex];
+      this.review(blockIndex, `选项缺键：期待 ${expected}，实际 ${key}（疑似上游漏检）`, cur);
+      return;
+    }
+
+    // 键回退/重复（乱序噪声）：结算已收集的选项组，该块按普通文本处理。
+    // 期望键须在 settle 前捕获——settleOptions 会把 expectOptionKey 重置回 "A"，
+    // 否则评审文案永远显示「期待 A」，误导质检（2026-10-07 修复）。
+    const expected = this.expectOptionKey;
     if (this.pendingOptions.length > 0) {
       this.settleOptions(cur);
     }
-    this.review(blockIndex, `选项乱序：期待 ${this.expectOptionKey}，实际 ${key}`, cur);
+    this.review(blockIndex, `选项乱序：期待 ${expected}，实际 ${key}`, cur);
     this.appendToCurrent(block.text, blockIndex);
   }
 
@@ -265,6 +287,7 @@ class Ctx {
       stemParts: stem ? [stem] : [],
       options: [],
       optEvidence: false,
+      optGap: false,
       images: [],
       blockIndexes: [entry.index],
       pageIndex: entry.pageIndex,
@@ -338,6 +361,7 @@ function confidenceOf(d: Draft): number {
   let c = 1.0;
   if (!d.stemParts.join("").trim()) c -= 0.6; // 空题干：误切高发
   if (d.optEvidence && d.options.length === 0) c -= 0.4; // 有选项痕迹但收集失败
+  if (d.optGap) c -= 0.3; // 缺键：选项组不完整（上游漏检/误切）
   if (d.options.length > 0 && d.options.length !== EXPECTED_OPTION_COUNT) c -= 0.1;
   return Math.max(0.2, Math.min(1, c));
 }
