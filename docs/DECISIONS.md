@@ -245,3 +245,38 @@ viewer/ 目录内任何文件都**不得 import 引擎 src/ 的代码**（红线
 - 单题「SHOW ANSWER」按钮文案与全局开关同步（当前单题开关与全局 Toggle 文本状态并未完全联动）。
 - `#empty` 空态残留 bug（真实空态当前数据不触发，空态样式/逻辑需在触发场景下复查）。
 - 纸卡 A4 宽度：`calc()` 双计 `--sidebar` 导致宽度换算需复查（A4 纸张宽度与栏宽减法一致性）。
+## 13. 阶段样品展示与自反馈环（2026-10-07）
+
+**决策**：新增独立展示模块 `stages/`（六阶段动线：原卷 → 原料 → 阅读顺序 → 切题 → 质检 → 成品），
+每阶段配白话说明条（电脑做到了什么 / 你该看什么），让非技术用户与主模型都能
+**从可视化成果直接审阅引擎行为**。设计文档见
+[docs/superpowers/plans/2026-10-07-stage-showcase.md](superpowers/plans/2026-10-07-stage-showcase.md)。
+
+**架构口径**：`scripts/export-stages.ts` 是唯一可 import 引擎代码的展示层上游，
+产出的 `data/out/<docId>/stages.json` 即契约（文本截断、页内序号化，只服务视觉审阅）；
+`stages/` 前端与 viewer/ 同守「不 import 引擎代码」红线。`npm run stages` 一键导出+起服务。
+
+**两条数据口径（单测锁定，自反馈首修）**：
+1. `Question.source.blockIndexes` 语义澄清为**跨页全局序号**（segmentWithRules 会把
+   IndexedBlock.index 重写为阅读流连续编号）——此前 types.ts 注释「按文档内顺序」有歧义，
+   展示层首版误当页内序号导致第 8 页起题目全部判空。快照层重建「全局序号 → 页内块序号」映射，
+   types.ts 注释同步澄清。
+2. 题目可**跨页**（本卷 9 道）：快照按「块的落页」分组，同一题在每页各出一条（同 id 可追溯），
+   展示层逐块描边 + 首块挂牌，跨栏/跨页题不再被并集矩形罩住整页。
+
+**自反馈环（本轮新增的验收机制）**：主模型 Read 原卷页图（`pdftoppm` 渲染
+`data/out/<docId>/pages/`，无工具时前端降级 PDF 内嵌）↔ Read 阶段截图 → 对照发现项 →
+修复或如实记录 → 复拍。首轮发现项 F1~F8 记录于
+[docs/design/stages-review.md](design/stages-review.md)——其中 F1（页眉居中标题进右栏序）、
+F7（竖排侧标签不成块）、F8（行内 LaTeX 空格噪声）为**如实呈现的引擎/上游现状**，
+F2/F3/F4 为展示层已修复项；F5（公式语义正确率）沿用既有抽检原则。
+
+**原卷对照的实现选择**：优先 `pdftoppm` 渲染逐页 PNG（本机 15 页 ~120dpi，任何浏览器可靠显示、
+主模型可直接 Read）；IAB 内核不渲染内嵌 PDF，故 PDF 仅作降级路径。pdftoppm 为可选依赖，
+缺失时功能退化不影响其余阶段。
+
+**质检口径白话化**：诊断记录（ReviewNote 全量，含已兜底）与「需人工校对」（低于 0.75 阈值）
+分开呈现——本卷 19 条诊断 vs 2 题待复核，避免「差 17 条去哪了」的误读。
+
+**状态**：已落库（export-stages + stages/ 前端 + view-server 挂载 + 54/54 测试全绿 +
+六阶段截图审板通过 docs/design/stages-cap/）。

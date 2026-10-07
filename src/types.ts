@@ -98,7 +98,9 @@ export interface Question {
   source: {
     file: string;
     pageIndex: number;
-    /** 参与构成本题的块序号（按文档内顺序） */
+    /** 参与构成本题的块序号。语义：跨页全局序号（segmentWithRules 展平阅读流后
+     * 的连续编号，跨题页累进）——不是页内序号；映射回页内块需按阅读顺序重建，
+     * 见 scripts/export-stages.ts 的 buildStageSnapshot。 */
     blockIndexes: number[];
   };
   confidence: number;

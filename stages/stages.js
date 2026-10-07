@@ -1,0 +1,464 @@
+// stages/stages.js —— 阶段样品展示前端。
+// 解耦红线：本文件不 import 引擎代码，只消费
+//   /data/out/<docId>/stages.json（快照契约，见 scripts/export-stages.ts）
+//   /data/out/<docId>/images/<裸文件名>、/data/out/<docId>/origin.pdf（原卷对照）
+//   /viewer/（最终成品内嵌）。
+
+const DEFAULT_DOC = "23必刷题 2相互作用";
+
+const STAGES = [
+  { key: "origin", t: "原卷", q: "原文长什么样？" },
+  { key: "raw", t: "原料", q: "机器读到了什么？" },
+  { key: "order", t: "阅读顺序", q: "电脑按什么顺序读？" },
+  { key: "seg", t: "切题", q: "题目切对了吗？" },
+  { key: "qa", t: "质检", q: "电脑哪里没把握？" },
+  { key: "final", t: "成品", q: "最终长什么样？" },
+];
+
+const EXPLAIN = {
+  origin: {
+    do: "这是给电脑吃的原始试卷（PDF 原文，双栏排版）。后面每个阶段都是对这份原文的逐步理解，随时回到这一步对照。",
+    look: "看：先记住某页的样子——比如第 1 页的双栏、插图位置、「第二章 相互作用」的居中大标题——再去后面的阶段比对有没有走样。",
+  },
+  raw: {
+    do: "PDF 先由解析程序（MinerU）转成「带坐标的文字块」。它只知道页面上哪里有什么，还不知道哪些是题目。",
+    look: "看：有没有整段文字没被框住（漏识别）？图片框的位置对不对？标题有没有被认成正文？",
+  },
+  order: {
+    do: "引擎把大块拆成一行一行的小块，自动判断这页是单栏还是双栏，再按人眼的阅读习惯给每行编号。",
+    look: "看：红色编号 1→2→3… 是否顺着走（双栏页应先读完整左栏再读右栏）？虚线分栏位置对不对？",
+  },
+  seg: {
+    do: "引擎按「题号 / 选项 / 答案区」的文字特征，把行块归组成一道道题。蓝框=选择题，灰框=主观题，红框=电脑自己没把握的题。跨栏、跨页的题会在每一部分都挂牌子。",
+    look: "看：每个框是否完整套住一道题（题干+选项+图）？有没有把两题并成一题、或一题切两半？灰掉的行块是页眉页脚等不属于任何题的部分，属正常。",
+  },
+  qa: {
+    do: "引擎给自己打分：规则匹配越完整，可信度越高。低于阈值（75%）的题被标记「需人工校对」；另有逐条诊断记录，是规则引擎发现的所有疑点（含已自行兜底的）。",
+    look: "看：被标红的题是不是真有问题？没被标红的题里，能不能肉眼发现电脑没察觉的错误？你的判断直接决定下一步优先修什么。",
+  },
+  final: {
+    do: "全部结构化之后，最终成品是一份可阅读、可开关答案的试卷页（与「最终成品 viewer」同一份数据）。",
+    look: "看：整体是否可用——题目排版、答案开关、公式与图片是否正常。",
+  },
+};
+
+const TYPE_LABEL = {
+  title: "标题", text: "正文", image: "图片", table: "表格", chart: "图表",
+  equation: "公式", interline_equation: "公式", abandon: "弃用",
+};
+const TYPE_LABEL_CN = (t) => TYPE_LABEL[t] ?? t;
+
+const state = { doc: null, effectiveDoc: null, data: null, stage: 0, page: 0, highlight: null };
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+const enc = encodeURIComponent;
+
+/* ── 数据加载（与 viewer 相同的宽容策略：doc 参数非法时回退默认卷一次） ── */
+async function fetchSnapshot(doc) {
+  const res = await fetch(`/data/out/${enc(doc)}/stages.json`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function load() {
+  const params = new URLSearchParams(location.search);
+  const asked = params.get("doc") || DEFAULT_DOC;
+  state.doc = asked;
+  try {
+    state.data = await fetchSnapshot(asked);
+    state.effectiveDoc = asked;
+  } catch {
+    if (asked !== DEFAULT_DOC) {
+      try {
+        state.data = await fetchSnapshot(DEFAULT_DOC);
+        state.effectiveDoc = DEFAULT_DOC;
+        notice(`参数里的「${asked}」没有快照，已回退默认卷「${DEFAULT_DOC}」。`, false);
+      } catch {
+        missingSnapshot(asked);
+        return;
+      }
+    } else {
+      missingSnapshot(asked);
+      return;
+    }
+  }
+  if (state.effectiveDoc !== state.doc) {
+    const url = new URL(location);
+    url.searchParams.set("doc", state.effectiveDoc);
+    history.replaceState(null, "", url);
+  }
+  $("doc-name").textContent = state.effectiveDoc;
+  $("link-viewer").href = `/viewer/?doc=${enc(state.effectiveDoc)}`;
+  buildStepper();
+  buildPager();
+  render();
+}
+
+function missingSnapshot(name) {
+  state.effectiveDoc = null;
+  notice(
+    `没有找到「${name}」的展示快照。先运行 <code>npm run stages</code> 生成快照（并启动服务），再刷新本页。`,
+    true,
+  );
+  $("doc-name").textContent = name;
+}
+
+function notice(html, isError) {
+  const n = $("notice");
+  n.innerHTML = html; // 内容为本页面自身生成的提示，不含用户数据文本
+  n.classList.toggle("error", !!isError);
+  n.hidden = false;
+}
+
+/* ── 步进条 / 工具条 ── */
+function buildStepper() {
+  const nav = $("stepper");
+  nav.replaceChildren();
+  STAGES.forEach((s, i) => {
+    const b = el("button", "step-btn");
+    b.append(
+      el("span", "no", i === 0 ? "原" : String(i)),
+      el("span", "t", s.t),
+      el("span", "q", s.q),
+    );
+    b.addEventListener("click", () => {
+      state.stage = i;
+      state.highlight = null;
+      render();
+    });
+    nav.append(b);
+  });
+}
+
+function buildPager() {
+  const sel = $("page-jump");
+  sel.replaceChildren();
+  state.data.pages.forEach((p) => {
+    const o = el("option", "", `第 ${p.index + 1} 页`);
+    o.value = String(p.index);
+    sel.append(o);
+  });
+  sel.addEventListener("change", () => {
+    state.page = Number(sel.value);
+    render();
+  });
+  $("page-prev").addEventListener("click", () => {
+    if (state.page > 0) { state.page--; render(); }
+  });
+  $("page-next").addEventListener("click", () => {
+    if (state.page < state.data.pages.length - 1) { state.page++; render(); }
+  });
+}
+
+function syncToolbar(p) {
+  const last = state.data.pages.length - 1;
+  $("page-label").textContent = `第 ${p.index + 1} / ${state.data.pages.length} 页`;
+  $("page-prev").disabled = p.index === 0;
+  $("page-next").disabled = p.index === last;
+  $("page-jump").value = String(p.index);
+  const origin = $("origin-link");
+  origin.href = `/data/out/${enc(state.effectiveDoc)}/origin.pdf#page=${p.index + 1}`;
+  origin.hidden = false;
+  $("page-meta").textContent =
+    `判定 ${p.columns} 栏 · ${p.blocks.length} 行块 · ${p.questions.length} 题` +
+    (p.questions.some((q) => q.status === "needs_review") ? " · 含待复核题" : "");
+}
+
+/* ── 画布与阶段渲染 ── */
+function paperCanvas(p) {
+  const c = el("div", "canvas");
+  c.style.aspectRatio = `${p.width} / ${p.height}`;
+  return c;
+}
+
+function posStyle(node, bbox, w, h) {
+  const [x0, y0, x1, y1] = bbox;
+  node.style.left = `${(x0 / w) * 100}%`;
+  node.style.top = `${(y0 / h) * 100}%`;
+  node.style.width = `${((x1 - x0) / w) * 100}%`;
+  node.style.height = `${((y1 - y0) / h) * 100}%`;
+  return node;
+}
+
+const CANVAS_W = 760; // 与 CSS --canvas-w 一致，用于字号换算
+function lineFont(hPx) {
+  return Math.max(8, Math.min(20, Math.round(hPx * 0.72)));
+}
+
+/** 行级块节点（阶段 2/3 共用） */
+function blockNode(b, p) {
+  const node = posStyle(el("div", `blk blk-line kind-${b.kind}`), b.bbox, p.width, p.height);
+  node.title = b.text;
+  if (b.kind === "image" && b.img) {
+    const img = el("img");
+    img.src = `/data/out/${enc(state.effectiveDoc)}/images/${enc(b.img)}`;
+    img.alt = "图片块";
+    node.append(img);
+  } else {
+    const txt = el("span", "txt", b.text);
+    const hPx = ((b.bbox[3] - b.bbox[1]) / p.height) * (CANVAS_W * (p.height / p.width));
+    txt.style.fontSize = `${lineFont(hPx)}px`;
+    node.append(txt);
+  }
+  return node;
+}
+
+function renderOrigin(p) {
+  $("canvas-wrap").replaceChildren();
+  const total = state.data.pages.length;
+  if ((state.data.originPages ?? 0) >= total && total > 0) {
+    // 逐页 PNG（pdftoppm 渲染）：任何浏览器可靠显示
+    const pad = String(total).length;
+    const img = el("img", "origin-img");
+    img.src = `/data/out/${enc(state.effectiveDoc)}/pages/page-${String(p.index + 1).padStart(pad, "0")}.png`;
+    img.alt = `原卷第 ${p.index + 1} 页`;
+    $("canvas-wrap").append(img);
+  } else {
+    // 降级：PDF 内嵌（依赖浏览器 PDF 查看器）
+    const f = el("iframe", "origin-frame");
+    f.src = `/data/out/${enc(state.effectiveDoc)}/origin.pdf#page=${p.index + 1}`;
+    f.title = `原卷第 ${p.index + 1} 页`;
+    $("canvas-wrap").append(f);
+  }
+}
+
+function renderRaw(p) {
+  const c = paperCanvas(p);
+  for (const b of p.raw) {
+    const node = posStyle(el("div", `blk blk-raw type-${b.type}`), b.bbox, p.width, p.height);
+    node.title = `[${TYPE_LABEL_CN(b.type)}] ${b.text}`;
+    const txt = el("span", "txt", b.text || `(${TYPE_LABEL_CN(b.type)})`);
+    const hPx = ((b.bbox[3] - b.bbox[1]) / p.height) * (CANVAS_W * (p.height / p.width));
+    txt.style.fontSize = `${lineFont(hPx * 0.9)}px`;
+    node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
+    c.append(node);
+  }
+  return c;
+}
+
+function renderOrder(p) {
+  const c = paperCanvas(p);
+  if (p.centers.length >= 2) {
+    const mid = ((p.centers[0] + p.centers[1]) / 2 / p.width) * 100;
+    const left = el("div", "col-tint");
+    left.style.left = "0%";
+    left.style.width = `${mid}%`;
+    const right = el("div", "col-tint");
+    right.style.left = `${mid}%`;
+    right.style.width = `${100 - mid}%`;
+    const divider = el("div", "col-divider");
+    divider.style.left = `${mid}%`;
+    c.append(left, right, divider);
+  }
+  for (const b of p.blocks) c.append(blockNode(b, p));
+  p.order.forEach((blockIdx, seq) => {
+    const b = p.blocks[blockIdx];
+    if (!b) return;
+    const badge = el("span", "order-badge", String(seq + 1));
+    badge.style.left = `${(b.bbox[0] / p.width) * 100}%`;
+    badge.style.top = `${(b.bbox[1] / p.height) * 100}%`;
+    badge.style.transform = "translate(-9px, -9px)";
+    c.append(badge);
+  });
+  return c;
+}
+
+function renderSeg(p) {
+  const c = paperCanvas(p);
+  for (const b of p.blocks) c.append(blockNode(b, p));
+
+  const covered = new Set();
+  for (const q of p.questions) for (const i of q.blocks) covered.add(i);
+  const blockNodes = [...c.children].slice(0, p.blocks.length);
+  blockNodes.forEach((n, i) => {
+    if (!covered.has(p.blocks[i].i)) n.classList.add("orphan");
+  });
+
+  // 逐块描边（跨栏/跨页题的并集矩形会罩住整页，改按块着色）+ 首块挂牌
+  for (const q of p.questions) {
+    const colorCls = q.status === "needs_review" ? "needs_review" : q.type;
+    for (const bi of q.blocks) {
+      const b = p.blocks[bi];
+      if (!b) continue;
+      const o = posStyle(el("div", `q-block-outline ${colorCls}`), b.bbox, p.width, p.height);
+      if (state.highlight && q.id === state.highlight) o.classList.add("highlight");
+      c.append(o);
+    }
+    const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);
+    if (first) {
+      const chip = el(
+        "span",
+        `q-chip ${colorCls}`,
+        `第${q.number}题 · ${q.type === "choice" ? "选择" : "主观"} · ${Math.round(q.confidence * 100)}%`,
+      );
+      chip.style.left = `${(first.bbox[0] / p.width) * 100}%`;
+      chip.style.top = `${(first.bbox[1] / p.height) * 100}%`;
+      chip.style.transform = "translate(-2px, -20px)";
+      chip.addEventListener("click", () => showDetail(q, p));
+      c.append(chip);
+    }
+  }
+  return c;
+}
+
+function showDetail(q, p) {
+  const d = $("detail");
+  d.hidden = false;
+  d.replaceChildren();
+  const close = el("button", "close", "关闭 ×");
+  close.addEventListener("click", () => { d.hidden = true; });
+  d.append(close, el("h3", "", `第 ${q.number} 题（${q.section || "未识别大题"}）`));
+  d.append(el("p", "kv", `页码：第 ${p.index + 1} 页 · 题型：${q.type === "choice" ? "选择题" : "主观题"} · 状态：${q.status === "needs_review" ? "需人工校对" : "正常"}`));
+  d.append(el("p", "kv", `可信度：${Math.round(q.confidence * 100)}%（低于 75% 自动标记）`));
+  if (q.reasons.length) {
+    d.append(el("p", "reason", `电脑给出的原因：${q.reasons.join("；")}`));
+  }
+  const texts = q.blocks.map((i) => p.blocks[i]?.text).filter(Boolean);
+  d.append(el("p", "kv", `本页内容预览：${texts.join(" / ").slice(0, 200) || "（无文本）"}`));
+  d.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function renderQA() {
+  const qs = [];
+  // 同一道题可能跨页出现在多页，质检清单按（题号 id）去重
+  const seen = new Set();
+  state.data.pages.forEach((p) =>
+    p.questions.forEach((q) => {
+      if (!seen.has(q.id)) {
+        seen.add(q.id);
+        qs.push({ ...q, page: p.index });
+      }
+    }),
+  );
+  qs.sort((a, b) => a.confidence - b.confidence);
+  const flagged = qs.filter((q) => q.status === "needs_review");
+  const avg = qs.length ? qs.reduce((a, q) => a + q.confidence, 0) / qs.length : 0;
+  const diagTotal = state.data.reviews.length;
+
+  const extra = $("stage-extra");
+  extra.replaceChildren();
+  const sum = el("div", "qa-summary");
+  const chip = (n, l, warn) => {
+    const c = el("div", `qa-chip${warn ? " warn" : ""}`);
+    c.append(el("span", "n", String(n)), el("span", "l", l));
+    return c;
+  };
+  const ansTotal = state.data.answerEntriesTotal ?? 0;
+  sum.append(
+    chip(qs.length, "共切出题目"),
+    chip(flagged.length, "需人工校对", flagged.length > 0),
+    chip(`${Math.round(avg * 100)}%`, "平均可信度"),
+    chip(diagTotal, "诊断记录（含已兜底）"),
+    ansTotal === 0
+      ? chip("—", "本卷无答案区")
+      : chip(`${state.data.stats.answersMatched ?? "—"}/${ansTotal}`, "答案已对号"),
+  );
+  extra.append(sum);
+  extra.append(el("p", "qa-note", `说明：诊断记录是规则引擎发现的所有疑点；只有可信度低于 75% 的题才会被标记「需人工校对」。诊断多而待复核少是正常现象（多数疑点已被规则自行兜底）。`));
+
+  const list = el("div", "qa-list");
+  const why = (q) => (q.reasons.length ? q.reasons.join("；") : "规则匹配完整");
+  for (const q of qs.slice(0, 60)) {
+    const row = el("div", `qa-row${q.status === "needs_review" ? " flag" : ""}`);
+    row.append(
+      el("span", "num", `第${q.number}题`),
+      el("span", "meta", `第 ${q.page + 1} 页 · ${q.type === "choice" ? "选择题" : "主观题"}`),
+      el("span", "why", why(q)),
+      el("span", "conf", `${Math.round(q.confidence * 100)}%`),
+      el("span", "go", "看它在切题页的样子 →"),
+    );
+    row.addEventListener("click", () => {
+      state.stage = 3;
+      state.page = q.page;
+      state.highlight = q.id;
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    list.append(row);
+  }
+  if (qs.length > 60) {
+    list.append(el("p", "kv", `（仅列出可信度最低的 60 题，其余 ${qs.length - 60} 题可信度更高）`));
+  }
+  extra.append(list);
+}
+
+function renderFinal() {
+  $("canvas-wrap").replaceChildren();
+  const extra = $("stage-extra");
+  extra.replaceChildren();
+  const f = el("iframe", "viewer-frame");
+  f.src = `/viewer/?doc=${enc(state.effectiveDoc)}`;
+  f.title = "最终成品 viewer";
+  extra.append(f);
+}
+
+function render() {
+  const p = state.data.pages[state.page];
+  [...$("stepper").children].forEach((b, i) => b.classList.toggle("active", i === state.stage));
+  const ex = EXPLAIN[STAGES[state.stage].key];
+  const explain = $("explain");
+  explain.replaceChildren();
+  const doLine = el("div", "do");
+  doLine.append(el("b", "", "这一步："), document.createTextNode(ex.do));
+  const lookLine = el("div", "look");
+  lookLine.append(el("b", "", "你该看："), document.createTextNode(ex.look));
+  explain.append(doLine, lookLine);
+
+  $("detail").hidden = true;
+  $("toolbar").hidden = state.stage >= 4;
+  $("origin-link").hidden = state.stage >= 4;
+
+  const wrap = $("canvas-wrap");
+  const extra = $("stage-extra");
+  if (state.stage !== 4 && state.stage !== 5) extra.replaceChildren();
+  wrap.replaceChildren();
+
+  if (state.stage === 0) {
+    renderOrigin(p);
+    syncToolbar(p);
+  } else if (state.stage === 1) {
+    wrap.append(renderRaw(p));
+    wrap.append(legend([
+      ["rgba(179,67,43,.14)", "标题"], ["#fff", "正文"],
+      ["rgba(58,107,138,.10)", "图片/表格"], ["rgba(77,124,95,.14)", "公式"],
+    ]));
+    syncToolbar(p);
+    $("page-meta").textContent = `${p.raw.length} 个原始块`;
+  } else if (state.stage === 2) {
+    wrap.append(renderOrder(p));
+    wrap.append(legend([
+      ["rgba(179,67,43,.9)", "阅读顺序编号"], ["rgba(58,107,138,.05)", "栏区着色"], ["rgba(179,67,43,.55)", "分栏界线"],
+    ]));
+    syncToolbar(p);
+  } else if (state.stage === 3) {
+    wrap.append(renderSeg(p));
+    wrap.append(legend([
+      ["#3a6b8a", "选择题"], ["#8a7f66", "主观题"], ["#b3432b", "需人工校对"], ["rgba(43,42,38,.3)", "未归题块"],
+    ]));
+    syncToolbar(p);
+  } else if (state.stage === 4) {
+    renderQA();
+  } else {
+    renderFinal();
+  }
+}
+
+function legend(items) {
+  const l = el("div", "legend");
+  for (const [color, label] of items) {
+    const s = el("span");
+    const sw = el("span", "sw");
+    sw.style.background = color;
+    s.append(sw, document.createTextNode(label));
+    l.append(s);
+  }
+  return l;
+}
+
+load();

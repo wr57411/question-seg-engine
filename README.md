@@ -81,6 +81,29 @@ node --import tsx scripts/real-pipeline.ts sample
 - 真实网络调用不纳入 `npm test`；离线测试见 `tests/mineru-client.test.ts`、`tests/mineru-unpack.test.ts`。
 - 字段事实以 `docs/real-api-notes.md` 为准。
 
+## 阶段样品展示（自反馈环）
+
+六个阶段的网页动线——**原卷 → 原料 → 阅读顺序 → 切题 → 质检 → 成品**，
+每步用白话说明「电脑此刻做到了什么、你该看什么」，非技术背景也能直接审阅：
+
+```bash
+npm run stages               # 导出快照 + 启动服务，然后访问 /stages/
+# 或分步：npm run stages:export && npm run view
+```
+
+- **阶段 0 原卷对照**：本机有 `pdftoppm`（poppler）时自动渲染原卷逐页 PNG
+  （`data/out/<docId>/pages/`），任何浏览器可靠显示；无工具则降级为 PDF 内嵌。
+  每个阶段的工具条都有「对照原卷本页 ↗」链接。
+- **快照即契约**：`stages/` 只消费 `data/out/<docId>/stages.json`（由
+  `scripts/export-stages.ts` 生成，是唯一可 import 引擎代码的展示层上游），
+  不 import 引擎代码——与 viewer/ 同一条解耦红线。
+- **两条数据口径**（单测锁定）：`Question.source.blockIndexes` 是跨页全局序号，
+  快照层映射回页内序号；跨页题按「块的落页」分组，在每一部分都展示。
+- **自反馈环**：主模型 Read 原卷页图 ↔ Read 阶段截图 → 对照发现项 → 修复 → 复拍。
+  首轮发现项与处置记录见 [docs/design/stages-review.md](docs/design/stages-review.md)，
+  截图证据在 [docs/design/stages-cap/](docs/design/stages-cap/)。
+- 命令：`npm run stages:export` 仅重导快照；截图审板的发现项写入 stages-review.md。
+
 ## 展示层（独立模块）
 
 浏览器查看结构化题目（试题区/答题区/答案区、答案开关、按题型留白、公式渲染）：
@@ -121,5 +144,7 @@ tests/           node:test 用例（含 viewer-contract / viewer-logic 适配断
 scripts/demo.ts  演示
 scripts/view-server.ts  演示/预览静态服务器（零依赖，npm run view）
 viewer/          展示层独立模块（viewer.js/css/index.html，解耦红线见 viewer/docs/CONTRACT.md）
+stages/          阶段样品展示模块（六阶段动线：原卷→原料→阅读顺序→切题→质检→成品）
+scripts/export-stages.ts  阶段快照导出（引擎产物 → stages.json + 原卷页图）
 docs/DECISIONS.md  切片决策记录（第二交付物）
 ```

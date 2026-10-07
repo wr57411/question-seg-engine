@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>切分引擎 · 阶段样品展示</title>
+  <link rel="stylesheet" href="stages.css" />
+</head>
+<body>
+  <header class="masthead">
+    <h1>切分引擎 · 阶段样品展示</h1>
+    <p class="masthead-sub">
+      同一份真实试卷（<span id="doc-name">…</span>）在五个处理阶段的中间成果。
+      每一步都告诉你：<b>电脑此刻做到了什么</b>、<b>你该看什么</b>。
+    </p>
+  </header>
+
+  <nav class="stepper" id="stepper" aria-label="处理阶段"></nav>
+
+  <main id="main">
+    <section class="explain" id="explain"></section>
+    <div class="notice" id="notice" hidden></div>
+    <section class="toolbar" id="toolbar">
+      <button id="page-prev" class="btn" aria-label="上一页">‹ 上一页</button>
+      <span id="page-label" class="page-label">第 1 / 1 页</span>
+      <button id="page-next" class="btn" aria-label="下一页">下一页 ›</button>
+      <select id="page-jump" aria-label="跳转到页"></select>
+      <a id="origin-link" class="btn" href="#" target="_blank" rel="noopener" hidden>对照原卷本页 ↗</a>
+      <span class="page-meta" id="page-meta"></span>
+    </section>
+    <section class="canvas-wrap" id="canvas-wrap"></section>
+    <section class="detail" id="detail" hidden></section>
+    <section class="stage-extra" id="stage-extra"></section>
+  </main>
+
+  <footer class="colophon">
+    数据快照：data/out/&lt;docId&gt;/stages.json（npm run stages 生成）·
+    展示层与引擎解耦，仅消费快照 · <a id="link-viewer" href="/">进入最终成品 viewer</a>
+  </footer>
+
+  <script type="module" src="stages.js"></script>
+</body>
+</html>

@@ -33,8 +33,8 @@ const server = createServer(async (req, res) => {
     if (path === "/") path = "/viewer/index.html";
     else if (path.endsWith("/")) path += "index.html";
     const file = join(ROOT, path);
-    // 路径安全：只允许 /viewer 与 /data/out 前缀，且归一化后必须仍落在 ROOT 内
-    if (!file.startsWith(ROOT) || !/^\/?(viewer|data\/out)/.test(path)) {
+    // 路径安全：只允许 /viewer /stages 与 /data/out 前缀，且归一化后必须仍落在 ROOT 内
+    if (!file.startsWith(ROOT) || !/^\/?(viewer|stages|data\/out)/.test(path)) {
       res.writeHead(403).end("forbidden");
       return;
     }
@@ -56,7 +56,10 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   const enc = encodeURIComponent(docId);
-  console.log(`viewer: http://localhost:${PORT}/viewer/?doc=${enc}`);
+  console.log(`viewer:   http://localhost:${PORT}/viewer/?doc=${enc}`);
+  console.log(`stages:   http://localhost:${PORT}/stages/?doc=${enc}`);
+  console.log(`  stages = 五阶段样品展示（原料→阅读顺序→切题→质检→成品）`);
+  console.log(`  stages 无快照时先运行 npm run stages 生成`);
   console.log(`  完整地址（含 doc 参数，可直接复制使用）`);
   console.log(`  默认卷：${docId}`);
   console.log(`  换卷：npm run view <docId> 或用 ?doc=<docId> 查询参数`);

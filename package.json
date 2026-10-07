@@ -8,6 +8,8 @@
     "demo": "tsx scripts/demo.ts",
     "view": "tsx scripts/view-server.ts",
     "view:server": "tsx scripts/view-server.ts",
+    "stages:export": "tsx scripts/export-stages.ts",
+    "stages": "npm run stages:export && npm run view:server",
     "view:cap": "node scripts/view-cap.mjs",
     "view:test": "node scripts/browser-gate.mjs",
     "test": "node --import tsx --test \"tests/*.test.ts\"",

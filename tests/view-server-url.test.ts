@@ -30,7 +30,8 @@ test("view-server 启动日志打印带完整 doc 参数的可点击 URL", () =>
     const err = e as { stdout?: string; stderr?: string };
     out = (err.stdout ?? "") + (err.stderr ?? "");
   }
-  assert.match(out, /viewer: http:\/\/localhost:\d+\/viewer\/\?doc=/);
+  assert.match(out, /viewer:\s+http:\/\/localhost:\d+\/viewer\/\?doc=/);
+  assert.match(out, /stages:\s+http:\/\/localhost:\d+\/stages\/\?doc=/);
   assert.match(out, /23%E5%BF%85%E5%88%B7%E9%A2%98/); // encodeURIComponent("23必刷题") 前缀
   assert.match(out, /%202%E7%9B%B8%E4%BA%92%E4%BD%9C%E7%94%A8/); // " 2相互作用"
 });
