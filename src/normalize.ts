@@ -222,6 +222,9 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
       const rec = asRecord(entry);
       const size = asArray(rec.page_size as unknown);
       const blocks: ParsedBlock[] = [];
+      /** 跨页段泄漏行（见 dropCrossPageLeaks 的归类说明），按页收集后统一迁回 */
+      const leaks: ParsedBlock[] = [];
+      const pageHeight = asNumber(size?.[1]) ?? 2339;
       for (const pbRaw of asArray(rec.para_blocks as unknown)) {
         const pb = asRecord(pbRaw);
         const pbType = String(pb.type ?? "text");
@@ -254,25 +257,88 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
           }
           if (parts.length === 0) continue;
           const text = parts.join("");
-          blocks.push({
+          const block: ParsedBlock = {
             kind: "text",
             bbox: toBBox(line.bbox),
             text,
             firstLine: text,
             lineCount: 1,
             maxFontSize: 0,
-          });
+          };
+          // 跨页段泄漏行：MinerU 偶发把跨页段落的下一页行并进上一页段落
+          // （行坐标是下一页页顶的，物理上压在上一页页眉标题上——2026-10-07 p0 q7 实证，
+          // 行在第 2 页并无副本，直接丢弃会截断第 7 题题干）。此处仅收集，迁回见
+          // dropCrossPageLeaks；与段落框相近的行是正常段内续行（段框偏紧），不在此列。
+          const pbBBox = toBBox(pb.bbox);
+          const lineBBox = toBBox(line.bbox);
+          if (
+            isCrossPageLeakShape(lineBBox, pbBBox, pageHeight)
+          ) {
+            leaks.push(block);
+            continue;
+          }
+          blocks.push(block);
         }
       }
       return {
         index: asInt(rec.page_idx) ?? 0,
         width: asNumber(size?.[0]) ?? 1654,
-        height: asNumber(size?.[1]) ?? 2339,
+        height: pageHeight,
         blocks,
-      } satisfies PageInfo;
+        leaks,
+      } satisfies PageInfo & { leaks: ParsedBlock[] };
     })
     .sort((a, b) => a.index - b.index);
-  return { docId, pages };
+  const withLeaks = pages as (PageInfo & { leaks: ParsedBlock[] })[];
+  return { docId, pages: dropCrossPageLeaks(withLeaks) };
+}
+
+/** 行在页顶带且所属段在页底带、二者框完全不相交 → 跨页段泄漏的形状特征 */
+function isCrossPageLeakShape(lineBBox: BBox, paraBBox: BBox, pageHeight: number): boolean {
+  const noOverlap =
+    lineBBox[2] <= paraBBox[0] ||
+    lineBBox[0] >= paraBBox[2] ||
+    lineBBox[3] <= paraBBox[1] ||
+    lineBBox[1] >= paraBBox[3];
+  const lineTop = lineBBox[3] <= pageHeight * 0.35;
+  const paraBottom = paraBBox[1] >= pageHeight * 0.6;
+  const paraTop = paraBBox[3] <= pageHeight * 0.35;
+  const lineBottom = lineBBox[1] >= pageHeight * 0.6;
+  // 段在页底 + 行在页顶（下一页页顶内容并入本页末段，主形态），
+  // 或段在页顶 + 行在页底（对称形态）。紧贴段框下方的续行不满足「完全不相交」之外
+  // 还需跨带，故不会误伤 p6/p8/p9 那类正常段内续行。
+  return noOverlap && ((lineTop && paraBottom) || (lineBottom && paraTop));
+}
+
+/**
+ * 跨页段泄漏行迁回：泄漏行的坐标即它真实所属页的页顶位置，默认迁回下一页
+ * （段在页底形态）；若下一页已有近似重复文本（页眉注释类，两页各有副本）则丢弃，
+ * 避免重复。对称形态迁回上一页。迁移后由版面层阅读顺序自然归位。
+ */
+function dropCrossPageLeaks(pages: (PageInfo & { leaks: ParsedBlock[] })[]): PageInfo[] {
+  const norm = (t: string) => t.replace(/[\s\\${}]+/g, "");
+  const fuzzyDup = (text: string, blocks: ParsedBlock[]): boolean => {
+    const n = norm(text);
+    if (n.length < 6) return false;
+    return blocks.some((b) => {
+      const nb = norm(b.kind === "text" ? b.text : "");
+      return nb.length >= 6 && (nb.includes(n) || n.includes(nb));
+    });
+  };
+  for (let i = 0; i < pages.length; i++) {
+    const leaks = (pages[i] as PageInfo & { leaks: ParsedBlock[] }).leaks;
+    if (!leaks || leaks.length === 0) continue;
+    for (const block of leaks) {
+      const leakedFromBottom = block.bbox[3] <= (pages[i]?.height ?? 0) * 0.35;
+      const target = leakedFromBottom ? pages[i + 1] : pages[i - 1];
+      if (target && !fuzzyDup(block.kind === "text" ? block.text : "", target.blocks)) {
+        target.blocks.push(block);
+      }
+      // 无目标页或已有副本：丢弃（泄漏行在其坐标所指页顶不可 rendering，
+      // 留在本页则压在页眉上；副本存在时不损失数据）
+    }
+  }
+  return pages.map(({ leaks: _leaks, ...page }) => page);
 }
 
 /**

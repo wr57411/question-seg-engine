@@ -10,6 +10,7 @@
  */
 import { layoutPage } from "./layout.js";
 import {
+  isPageFurniture,
   matchAnswerEntry,
   matchFirstLine,
   nextKey,
@@ -63,6 +64,8 @@ export function segmentWithRules(doc: ParsedDocument): SegmentationResult {
   for (const page of doc.pages.slice().sort((a, b) => a.index - b.index)) {
     const layout = layoutPage(page);
     ctx.stats.columnsPerPage.push(layout.columns);
+    ctx.pageHeight = page.height;
+    ctx.settleAtPageBoundary();
     for (const entry of layout.ordered) {
       entry.index = globalIndex++;
       ctx.process(entry);
@@ -83,6 +86,8 @@ export function segmentWithRules(doc: ParsedDocument): SegmentationResult {
 /** 状态机上下文 */
 class Ctx {
   doc: ParsedDocument;
+  /** 当前处理页的页高（页顶带判定用） */
+  pageHeight = 2339;
   questions: Draft[] = [];
   answers: AnswerDraft[] = [];
   reviews: ReviewNote[] = [];
@@ -120,6 +125,13 @@ class Ctx {
 
     if (this.mode === "answers") {
       this.processAnswerBlock(block, blockIndex);
+      return;
+    }
+
+    // 页面家具跳过：页顶带的页眉装饰行（计划用时/必刷知识/单字"刷"logo）。
+    // MinerU 对它们的去留不稳定，留在正文时会被上一页跨页未关的题吞进
+    // 题干/选项（2026-10-07 p4 假第5题实证）——不归属任何题，也不进题干。
+    if (block.kind === "text" && block.bbox[3] <= this.pageHeight * 0.2 && isPageFurniture(block.text)) {
       return;
     }
 
@@ -329,6 +341,19 @@ class Ctx {
 
   finish(): void {
     this.settleOptions(null);
+  }
+
+  /**
+   * 页界结算：翻页时若上一页残留悬挂选项组，就地定稿并关闭草稿。
+   * 跨页题的「题干期」续行（q7/q6 案例，草稿尚无选项）不受影响；
+   * 但选项已收齐的题若保持打开，会吞掉下一页的页眉/标题块
+   * （2026-10-07 p5 页首标题被上一页第5题吞掉实证）。
+   */
+  settleAtPageBoundary(): void {
+    if (this.pendingOptions.length > 0) {
+      this.settleOptions(this.current);
+      this.current = null;
+    }
   }
 
   result(questions: Question[]): SegmentationResult {

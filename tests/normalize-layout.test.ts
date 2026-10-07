@@ -58,3 +58,107 @@ test("normalizeLayout：image/chart 块挂回为 image ParsedBlock（path/bbox �
     .find((e) => e.block.kind !== "image" && e.block.bbox[1] >= 193);
   assert.ok(nextByY, "阅读顺序中图片后应还有后续文本块");
 });
+test("normalizeLayout：跨页段泄漏行迁回下一页（p0 q7 真实形态）", () => {
+  // 真实案例：MinerU 把 q7 的跨页段整段并入第 1 页段落，行坐标是第 2 页页顶的，
+  // 物理上压在第 1 页页眉标题上；第 2 页并无该行副本，直接丢弃会截断题干。
+  const leaky = {
+    pdf_info: [
+      {
+        page_idx: 0,
+        page_size: [596, 821],
+        para_blocks: [
+          {
+            type: "text",
+            bbox: [300, 668, 545, 776],
+            lines: [
+              { bbox: [310, 680, 540, 700], spans: [{ type: "text", content: "7.题干开头" }] },
+              {
+                bbox: [68, 42, 294, 51],
+                spans: [{ type: "text", content: "动摩擦力相同，滚轮与白纸之间的动摩擦因数" }],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        page_idx: 1,
+        page_size: [596, 821],
+        para_blocks: [
+          {
+            type: "text",
+            bbox: [65, 94, 159, 168],
+            lines: [{ bbox: [65, 94, 159, 110], spans: [{ type: "text", content: "A. 选项一" }] }],
+          },
+        ],
+      },
+    ],
+  };
+  const doc = normalizeLayout(leaky, "leak-test");
+  const p0Texts = doc.pages[0]!.blocks.map((b) => (b.kind === "text" ? b.text : "")).join("|");
+  const p1Texts = doc.pages[1]!.blocks.map((b) => (b.kind === "text" ? b.text : "")).join("|");
+  assert.ok(!p0Texts.includes("动摩擦力相同"), "泄漏行应离开第 1 页");
+  assert.ok(p1Texts.includes("动摩擦力相同"), "泄漏行应迁回第 2 页（题干续行归位）");
+  assert.ok(p0Texts.includes("7.题干开头"), "本页正常行不受影响");
+});
+
+test("normalizeLayout：下一页已有近似副本的泄漏行丢弃（页眉注释类）", () => {
+  const leaky = {
+    pdf_info: [
+      {
+        page_idx: 0,
+        page_size: [596, 821],
+        para_blocks: [
+          {
+            type: "text",
+            bbox: [55, 719, 300, 772],
+            lines: [
+              { bbox: [384, 74, 548, 86], spans: [{ type: "text", content: "必刷知识T1~3、5~6必刷考点T4" }] },
+            ],
+          },
+        ],
+      },
+      {
+        page_idx: 1,
+        page_size: [596, 821],
+        para_blocks: [
+          {
+            type: "text",
+            bbox: [370, 74, 540, 88],
+            lines: [{ bbox: [370, 74, 540, 88], spans: [{ type: "text", content: "必刷知识T1~3、5~6必刷考点T4" }] }],
+          },
+        ],
+      },
+    ],
+  };
+  const doc = normalizeLayout(leaky, "leak-dup-test");
+  const p0Texts = doc.pages[0]!.blocks.map((b) => (b.kind === "text" ? b.text : "")).join("|");
+  const p1Count = doc.pages[1]!.blocks.filter(
+    (b) => b.kind === "text" && b.text.includes("必刷知识"),
+  ).length;
+  assert.ok(!p0Texts.includes("必刷知识"), "泄漏行离开第 1 页");
+  assert.equal(p1Count, 1, "第 2 页已有副本，迁回会造成重复 → 丢弃");
+});
+
+test("normalizeLayout：紧贴段框下方的正常续行不受影响（p8 选项续行形态）", () => {
+  const tight = {
+    pdf_info: [
+      {
+        page_idx: 0,
+        page_size: [596, 821],
+        para_blocks: [
+          {
+            type: "text",
+            bbox: [311, 294, 459, 380],
+            lines: [
+              { bbox: [313, 300, 450, 320], spans: [{ type: "text", content: "C. 选项内容" }] },
+              { bbox: [313, 385, 533, 397], spans: [{ type: "text", content: "大小恒为2mg" }] },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const doc = normalizeLayout(tight, "tight-test");
+  const texts = doc.pages[0]!.blocks.map((b) => (b.kind === "text" ? b.text : "")).join("|");
+  assert.ok(texts.includes("C. 选项内容") && texts.includes("大小恒为2mg"), "段框偏紧的续行保留");
+});

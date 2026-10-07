@@ -53,6 +53,20 @@ const ANSWER_ZONE_GUARD = isAnswerZone;
 const OPTION_LINE = /^([A-Ha-h])\s*[.．、)）:：]/;
 
 /**
+ * 页面家具行：教辅每页页眉的固定装饰行（"刷基础 计划用时【】分钟·答案D11"、
+ * "必刷知识T1~2、必刷考点T6"），以及艺术字 logo 块（单字"刷"）。
+ * MinerU 对它们的去留不稳定（有的页丢进 discarded_blocks，有的页留在正文），
+ * 留在正文时会被上一页跨页未关的题吞进题干/选项（2026-10-07 p4 假第5题实证）。
+ * 判定只用于「页顶带的跳过」，不影响正常题目内容。
+ */
+const FURNITURE_LINE = /计划用时|必刷(?:知识|方法|考点|题型)|答案\s*[A-Z]?\d+/;
+
+export function isPageFurniture(text: string): boolean {
+  const s = text.trim();
+  return s === "刷" || FURNITURE_LINE.test(s);
+}
+
+/**
  * 物体列举守卫：「字母+顿号+字母」是物理题干高频的对象列举
  * （"A、B用两根轻绳连""A、B、C均处于平衡"），不是选项行。
  * 误判后果严重：伪选项 A 占住 expectOptionKey，后续真选项全部
@@ -153,13 +167,15 @@ export function nextKey(key: string): string {
  * 注意三点：
  * 1) 不校验后继字符——原 lookahead 方案（(?=[A-H][.．、)）:：]|$)）在 "B.3:5" / "B.重…"
  *    （标记后直接是选项正文）时拆不动，与测试契约矛盾；是否「整块为选项连排」交给
- *    splitConjoinedOptions 的块首标记守卫 + 调用方的 >=2 门控裁决。
+ *    splitConjoinedOptions 的块首标记守卫 + 调用方的门控裁决。
  * 2) 不带 /g 标志——非全局 exec 无 lastIndex 状态污染，每次都在「截到上一标记之后」的
  *    rest 上从头找首个标记（即下一个选项起点），语义恰好正确。
  * 3) 顿号带守卫：[、](?![A-Ha-h])——「设A、B接触」里的 "A、" 是物体列举不是选项
  *    边界（见 isObjectEnumeration），拆分时必须跳过，否则题干被拆出伪选项段。
+ * 4) 不含右括号 )/）——物理公式 "(F+G)/2"（G=重力）里的 "G)" 是括号配对不是选项
+ *    标记（2026-10-07 实证）；行首 "A) 选项" 形式由 OPTION_LINE 保留。
  */
-const OPTION_SPLIT = /([A-H])\s*(?:[.．)）:：]|[、](?![A-Ha-h]))/;
+const OPTION_SPLIT = /([A-H])\s*(?:[.．:：]|[、](?![A-Ha-h]))/;
 
 /**
  * 粘连选项拆分：块内文本含多个连续选项标记时按标记切分（layout 行级展开缺失时的兜底，

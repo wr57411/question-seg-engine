@@ -188,3 +188,94 @@ test("引擎端到端：选项续行归入选项而非题干（p9 第11题真实
   assert.equal(q11.status, "ok");
   assert.equal(r.reviews.length, 0);
 });
+
+test("引擎端到端：页顶页眉家具行不被跨页未关的题吞掉（p4 假第5题案例）", () => {
+  // 真实案例：p2 第5题是当页最后一题，选项收完后草稿跨页未关闭；
+  // 下一页页顶的「刷」「基础计划用时」页眉行被吞进该题（假第5题+题干污染）。
+  const doc: ParsedDocument = {
+    docId: "reg-furniture",
+    pages: [
+      {
+        index: 0,
+        width: 596,
+        height: 821,
+        blocks: [
+          t("5.北京育才学校2022期末]如图所示，一质量为m的物体"),
+          t("A. 绳的拉力先减小后增大"),
+          t("B. 绳的拉力一直增大"),
+          t("C. 环对小球的弹力不变"),
+          t("D. 环对球的弹力一直减小"),
+        ],
+      },
+      {
+        index: 1,
+        width: 596,
+        height: 821,
+        blocks: [
+          t2("刷", [61, 65, 82, 87]),
+          t2("基础计划用时【】分钟·答案D13", [84, 71, 273, 87]),
+          t2("1.北京二十二中2022月考]关于两个物体间的作用力", [46, 139, 285, 149]),
+        ],
+      },
+    ],
+  };
+  const r = segmentWithRules(doc);
+  const q5 = r.questions.find((q) => q.number === "5");
+  assert.ok(q5);
+  assert.deepEqual(
+    q5.options.map((o) => o.key),
+    ["A", "B", "C", "D"],
+  );
+  // 页眉行不进题干、不进选项、不产生跨页块
+  const allText = [q5.stem, ...q5.options.map((o) => o.text)].join("\n");
+  assert.ok(!allText.includes("刷"), "页眉行不应进入题干或选项");
+  assert.ok(!allText.includes("计划用时"), "页眉行不应进入题干或选项");
+  assert.ok(
+    q5.source.blockIndexes.every((gi) => gi < 5),
+    "q5 的块不应包含下一页的页眉行",
+  );
+  assert.equal(r.reviews.length, 0);
+});
+
+/** 带 bbox 的文本块（页顶带判定用） */
+function t2(text: string, bbox: [number, number, number, number]): ParsedBlock {
+  return { ...t(text), bbox };
+}
+
+test("引擎端到端：页界结算——选项已收齐的跨页题不再吞下一页的标题/页眉", () => {
+  // 真实案例：p4 第5题选项收完后草稿跨页，p5 页首标题「第4节…」被吞进该题
+  const doc: ParsedDocument = {
+    docId: "reg-boundary",
+    pages: [
+      {
+        index: 0,
+        width: 596,
+        height: 821,
+        blocks: [
+          t("5.湖南五市十校2022联考]如图所示，一质量为m的物块"),
+          t("A. (F+G)/2"),
+          t("B. F/2"),
+          t("C. (F+G)/4"),
+          t("D. F/4"),
+        ],
+      },
+      {
+        index: 1,
+        width: 596,
+        height: 821,
+        blocks: [
+          t2("第4节 共点力作用下物体平衡的计算", [181, 41, 434, 56]),
+          t2("1.山东教育联盟2022联考](多选)如图，两个", [60, 100, 299, 111]),
+        ],
+      },
+    ],
+  };
+  const r = segmentWithRules(doc);
+  const q5 = r.questions.find((q) => q.number === "5");
+  assert.ok(q5);
+  assert.ok(!q5.stem.includes("第4节"), "标题不应被上一页的题吞掉");
+  assert.deepEqual(q5.options.map((o) => o.key), ["A", "B", "C", "D"]);
+  const q1 = r.questions.find((q) => q.number === "1");
+  assert.ok(q1, "下一页的题正常切出");
+  assert.equal(r.reviews.length, 0);
+});
