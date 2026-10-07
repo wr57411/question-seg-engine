@@ -37,8 +37,23 @@ test("下标：$B _ { 1 }$ → B₁", () => {
   assert.equal(prettifyLatex("将 b 端从$B _ { 1 }$移到$B _ { 2 }$;绳子"), "将 b 端从B₁移到B₂;绳子");
 });
 
-test("段外文本原样、不成对 $ 不动", () => {
+test("段外文本原样、不成对 $ 视为噪声去掉", () => {
   assert.equal(prettifyLatex("没有公式的普通文本"), "没有公式的普通文本");
-  assert.equal(prettifyLatex("奇数个 $ 定界符保持原样"), "奇数个 $ 定界符保持原样");
+  assert.equal(prettifyLatex("奇数个 $ 定界符视为噪声去掉"), "奇数个 定界符视为噪声去掉");
   assert.equal(prettifyLatex("杆OA竖直"), "杆OA竖直");
+});
+
+test("真实样张第 5 题选项行（\\ 空格命令 + 分组花括号 + 嵌套 \\frac）", () => {
+  assert.equal(
+    prettifyLatex(
+      "A.$\\sin \\ \\theta = { \\frac { k R } { m g } }$B.$\\sin \\ \\theta = \\frac { 2 k R } { m g }$",
+    ),
+    "A.sinθ=(kR/mg)B.sinθ=(2kR/mg)",
+  );
+});
+
+test("无括号 \\frac12、嵌套 \\frac{\\sqrt{2}}{2}、\\overline", () => {
+  assert.equal(prettifyLatex("$\\frac12$"), "(1/2)");
+  assert.equal(prettifyLatex("$\\frac { \\sqrt { 2 } } { 2 }$"), "(√(2)/2)");
+  assert.equal(prettifyLatex("$\\overline { X }$"), "X");
 });

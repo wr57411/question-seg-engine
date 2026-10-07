@@ -85,8 +85,8 @@ export interface StageSnapshot {
   reviews: SegmentationResult["reviews"];
 }
 
-const RAW_TEXT_LIMIT = 80;
-const BLOCK_TEXT_LIMIT = 120;
+const RAW_TEXT_LIMIT = 160;
+const BLOCK_TEXT_LIMIT = 240;
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
 
 /** layout.json 的 para_blocks → 阶段 1 段级块（type 原样保留，文本取 spans 拼接） */

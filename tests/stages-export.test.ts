@@ -116,7 +116,7 @@ const rawPages = extractRawBlocks({
         {
           type: "text",
           bbox: [0, 20, 10, 30],
-          lines: [{ spans: [{ content: "x".repeat(120) }] }],
+          lines: [{ spans: [{ content: "x".repeat(200) }] }],
         },
       ],
     },
@@ -132,7 +132,7 @@ test("extractRawBlocks：段级块保留 MinerU type 并截断长文本", () => 
   assert.equal(p0[0]?.type, "title");
   assert.equal(p0[0]?.text, "一、选择题");
   assert.ok(p0[1]?.text.endsWith("…"), "超长文本应以省略号截断");
-  assert.ok((p0[1]?.text.length ?? 0) <= 81);
+  assert.ok((p0[1]?.text.length ?? 0) <= 161, "RAW_TEXT_LIMIT=160");
 });
 
 test("buildStageSnapshot：全局序号正确映射回页内块，阅读顺序覆盖全块", () => {
