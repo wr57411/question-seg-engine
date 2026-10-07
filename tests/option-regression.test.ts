@@ -148,3 +148,43 @@ test("引擎端到端：前向缺键（A/B 上游漏检）收下 C/D 并降置�
     "应产生缺键评审",
   );
 });
+
+test("引擎端到端：选项续行归入选项而非题干（p9 第11题真实形态）", () => {
+  const doc: ParsedDocument = {
+    docId: "reg-cont",
+    pages: [
+      {
+        index: 0,
+        width: 596,
+        height: 821,
+        blocks: [
+          t("11.[湖北部分重点中学2022联考]如图所示，在"),
+          t("竖直平面内的固定光滑圆环上，套有一质量"),
+          t("为m的小球，使小球缓慢上升，下列说法正确的是()"),
+          t("A. 绳的拉力先减小后增大"),
+          t("B. 设 AP 长度为 L,∆F 表示 F"),
+          t("的变化量，∆L表示L的变"),
+          t("化量，则比值$\\frac { \\Delta F } { \\Delta L }$不变"),
+          t("C. 环对小球的弹力方向是沿半径背离圆心，"),
+          t("大小恒为$\\frac { m g } { 2 }$"),
+          t("D.环对小球的弹力方向是沿半径指向圆心，"),
+          t("大小恒为$2 m g$"),
+          t("12.下一题占位"),
+        ],
+      },
+    ],
+  };
+  const r = segmentWithRules(doc);
+  const q11 = r.questions.find((q) => q.number === "11");
+  assert.ok(q11);
+  assert.deepEqual(
+    q11.options.map((o) => o.key),
+    ["A", "B", "C", "D"],
+  );
+  // B 的续行归入 B 选项文本，而不是碎片化污染题干
+  assert.match(q11.options[1]!.text, /的变化量，∆L表示L的变/);
+  assert.doesNotMatch(q11.stem, /的变化量/);
+  assert.match(q11.options[2]!.text, /大小恒为/);
+  assert.equal(q11.status, "ok");
+  assert.equal(r.reviews.length, 0);
+});

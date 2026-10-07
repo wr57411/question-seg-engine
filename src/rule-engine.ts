@@ -187,7 +187,19 @@ class Ctx {
         return;
       }
       default: {
-        this.appendToCurrent(block.text, blockIndex);
+        // 选项续行：选项组收集中，非选项行是最后一个已收选项的续行
+        // （如 "B. 设 AP 长度为 L" 的下一行 "的变化量，∆L表示L的变"）。
+        // 旧实现一律并进题干 → 选项文本残缺、题干被碎片污染
+        // （2026-10-07 真实回归 p9 第11题）。题干期（无悬挂选项）行为不变。
+        const last = this.pendingOptions[this.pendingOptions.length - 1];
+        if (last) {
+          last.text += `\n${block.text}`;
+          if (this.current) {
+            this.current.blockIndexes = [...this.current.blockIndexes, blockIndex];
+          }
+        } else {
+          this.appendToCurrent(block.text, blockIndex);
+        }
       }
     }
   }

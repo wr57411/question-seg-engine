@@ -3,6 +3,9 @@
 //   /data/out/<docId>/stages.json（快照契约，见 scripts/export-stages.ts）
 //   /data/out/<docId>/images/<裸文件名>、/data/out/<docId>/origin.pdf（原卷对照）
 //   /viewer/（最终成品内嵌）。
+// latex-display.js 为本目录纯函数模块（无引擎依赖），负责公式展示美化。
+
+import { prettifyLatex } from "./latex-display.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -35,7 +38,7 @@ const EXPLAIN = {
   },
   qa: {
     do: "引擎给自己打分：规则匹配越完整，可信度越高。低于阈值（75%）的题被标记「需人工校对」；另有逐条诊断记录，是规则引擎发现的所有疑点（含已自行兜底的）。",
-    look: "看：被标红的题是不是真有问题？没被标红的题里，能不能肉眼发现电脑没察觉的错误？你的判断直接决定下一步优先修什么。",
+    look: "看：被标红的题是不是真有问题？没被标红的题里，能不能肉眼发现电脑没察觉的错误？页面底部的「公式噪声」扫描量化了上游 LaTeX 的可读性问题——它的计数应随算法迭代下降。",
   },
   final: {
     do: "全部结构化之后，最终成品是一份可阅读、可开关答案的试卷页（与「最终成品 viewer」同一份数据）。这是**阅读版**——为答题/检索重新排版；与原卷的排版保真度请切到下一步「对比」检查。",
@@ -52,6 +55,15 @@ const TYPE_LABEL = {
   equation: "公式", interline_equation: "公式", abandon: "弃用",
 };
 const TYPE_LABEL_CN = (t) => TYPE_LABEL[t] ?? t;
+
+const NOISE_KIND_LABEL = {
+  "spaced-digits": "数字间空格",
+  wrapper: "字体包装命令",
+  "left-right": "\\left/\\right 定界",
+  "degree-spelled": "度符号拼写",
+  unbalanced: "花括号失衡",
+  long: "超长公式",
+};
 
 const state = { doc: null, effectiveDoc: null, data: null, stage: 0, page: 0, highlight: null };
 
@@ -217,10 +229,10 @@ function blockNode(b, p, canvasW = CANVAS_W) {
     img.alt = "图片块";
     node.append(img);
   } else {
-    const txt = el("span", "txt", b.text);
+    const txt = el("span", "txt", prettifyLatex(b.text));
     const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * canvasW;
     const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * canvasW;
-    txt.style.fontSize = `${fitFontSize(b.text, boxW, boxH)}px`;
+    txt.style.fontSize = `${fitFontSize(prettifyLatex(b.text), boxW, boxH)}px`;
     node.append(txt);
   }
   return node;
@@ -247,17 +259,41 @@ function renderOrigin(p) {
 
 function renderRaw(p) {
   const c = paperCanvas(p);
+  renderDiscardedInto(c, p);
   for (const b of p.raw) {
     const node = posStyle(el("div", `blk blk-raw type-${b.type}`), b.bbox, p.width, p.height);
+    const shown = prettifyLatex(b.text);
     node.title = `[${TYPE_LABEL_CN(b.type)}] ${b.text}`;
-    const txt = el("span", "txt", b.text || `(${TYPE_LABEL_CN(b.type)})`);
+    const txt = el("span", "txt", shown || `(${TYPE_LABEL_CN(b.type)})`);
     const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * CANVAS_W;
     const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * CANVAS_W;
-    txt.style.fontSize = `${fitFontSize(b.text, boxW, boxH * 0.9)}px`;
+    txt.style.fontSize = `${fitFontSize(shown, boxW, boxH * 0.9)}px`;
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
   return c;
+}
+
+const DISCARDED_LABEL = {
+  header: "页眉", footer: "页脚", page_number: "页码", aside_text: "侧栏",
+};
+
+/** 丢弃块（页眉/页脚/页码/侧栏）：虚线灰块呈现——原卷上有、解析器判为家具的内容 */
+function renderDiscardedInto(c, p) {
+  for (const b of p.discarded ?? []) {
+    const node = posStyle(el("div", "blk blk-discarded"), b.bbox, p.width, p.height);
+    const shown = prettifyLatex(b.text);
+    node.title = `[已被解析器丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}] ${b.text}`;
+    if (shown) {
+      const txt = el("span", "txt", shown);
+      const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * CANVAS_W;
+      const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * CANVAS_W;
+      txt.style.fontSize = `${fitFontSize(shown, boxW, boxH)}px`;
+      node.append(txt);
+    }
+    node.append(el("span", "tag", `丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}`));
+    c.append(node);
+  }
 }
 
 function renderOrder(p) {
@@ -339,7 +375,7 @@ function showDetail(q, p) {
     d.append(el("p", "reason", `电脑给出的原因：${q.reasons.join("；")}`));
   }
   const texts = q.blocks.map((i) => p.blocks[i]?.text).filter(Boolean);
-  d.append(el("p", "kv", `本页内容预览：${texts.join(" / ").slice(0, 200) || "（无文本）"}`));
+  d.append(el("p", "kv", `本页内容预览：${prettifyLatex(texts.join(" / ").slice(0, 200)) || "（无文本）"}`));
   d.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
@@ -380,6 +416,55 @@ function renderQA() {
   );
   extra.append(sum);
   extra.append(el("p", "qa-note", `说明：诊断记录是规则引擎发现的所有疑点；只有可信度低于 75% 的题才会被标记「需人工校对」。诊断多而待复核少是正常现象（多数疑点已被规则自行兜底）。`));
+
+  // 公式噪声检测区（检测不改写）：量化上游 LaTeX 可读性问题，计数随清洗规则迭代下降
+  const noise = state.data.formulaNoise;
+  if (noise && noise.totalFormulas > 0) {
+    const nsum = el("div", "qa-summary");
+    nsum.append(
+      chip(noise.totalFormulas, "公式总数"),
+      chip(noise.noisyFormulas, "含噪声公式", noise.noisyFormulas > 0),
+      chip(noise.questionsAffected, "受影响题目"),
+    );
+    extra.append(nsum);
+    const kinds = Object.entries(noise.kindCounts ?? {}).filter(([, n]) => n > 0);
+    if (kinds.length) {
+      extra.append(
+        el("p", "qa-note", `噪声类型：${kinds.map(([k, n]) => `${NOISE_KIND_LABEL[k] ?? k} ${n} 处`).join("；")}。检测不改写数据——展示层另有美化器让它可读；清洗规则每上线一轮，这里的计数就应下降一轮。`),
+      );
+    }
+    const nlist = el("div", "qa-list");
+    const pageOf = new Map();
+    state.data.pages.forEach((p) => p.questions.forEach((q) => {
+      if (!pageOf.has(q.id)) pageOf.set(q.id, p.index);
+    }));
+    for (const it of noise.items.slice(0, 8)) {
+      const row = el("div", "qa-row noise");
+      const tail = it.questionId.split(":").slice(-2).join(" ");
+      row.append(
+        el("span", "num", "公式噪声"),
+        el("span", "meta", `${it.field === "stem" ? "题干" : "选项"} · ${tail}`),
+        el("span", "why", `${it.kinds.map((k) => NOISE_KIND_LABEL[k] ?? k).join("、")}`),
+      );
+      const code = el("span", "noise-latex", it.latex.slice(0, 40));
+      code.title = it.latex;
+      row.append(code);
+      row.addEventListener("click", () => {
+        const pg = pageOf.get(it.questionId);
+        if (pg === undefined) return;
+        state.stage = 3;
+        state.page = pg;
+        state.highlight = it.questionId;
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+      nlist.append(row);
+    }
+    if (noise.items.length > 8) {
+      nlist.append(el("p", "kv", `（仅列前 8 条，共 ${noise.items.length} 条）`));
+    }
+    extra.append(nlist);
+  }
 
   const list = el("div", "qa-list");
   const why = (q) => (q.reasons.length ? q.reasons.join("；") : "规则匹配完整");
@@ -441,6 +526,7 @@ function renderCompare(p) {
   const c = paperCanvas(p);
   c.style.width = "100%";
   const PANE_W = 460; // 与 CSS .compare-pane 一致，用于字号换算
+  renderDiscardedInto(c, p);
   for (const b of p.blocks) c.append(blockNode(b, p, PANE_W));
   for (const q of p.questions) {
     const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);

@@ -317,6 +317,23 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   margin: 4px 0 14px;
 }
 
+/* 丢弃块（页眉/页脚/页码/侧栏）：原卷有、解析器判为家具的内容 */
+.blk-discarded {
+  border: 1.5px dotted rgba(43, 42, 38, 0.45);
+  background: rgba(43, 42, 38, 0.04);
+  color: #8a8477;
+}
+.qa-row.noise { border-left-color: #a58a3a; cursor: pointer; }
+.noise-latex {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+  max-width: 180px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* ── 对比模式：原卷 | 结构化重建纸面 并排 ─────────────── */
 .compare-wrap {
   display: flex;

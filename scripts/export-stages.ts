@@ -8,19 +8,28 @@
  * 运行：npm run stages:export [-- <docId> <layoutPath>]
  * 默认：docId = 23必刷题 2相互作用，layout = data/smoke/unpacked/layout.json
  */
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { segmentFromLayout } from "../src/index.js";
 import { normalizeLayout } from "../src/normalize.js";
 import { detectColumnCenters, detectColumns, layoutPage } from "../src/layout.js";
+import { scanFormulaNoise, type FormulaNoiseReport } from "../src/formula.js";
 import type { BBox, IndexedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
 
 /** 阶段 1：MinerU 原始段级块（保留 MinerU 自身 type，只截断文本） */
 export interface RawStageBlock {
   i: number;
   type: string;
+  bbox: BBox;
+  text: string;
+}
+
+/** MinerU 丢弃块（页眉/页脚/页码/侧栏等，type 原样保留） */
+export interface DiscardedStageBlock {
+  i: number;
+  dtype: string;
   bbox: BBox;
   text: string;
 }
@@ -53,6 +62,8 @@ export interface StagePage {
   columns: number;
   centers: number[];
   raw: RawStageBlock[];
+  /** MinerU 判定为页眉页脚等而丢弃的块（展示层以虚线灰块呈现，供对照查漏） */
+  discarded: DiscardedStageBlock[];
   blocks: StageBlock[];
   /** 阅读顺序的块 i 序列（数组下标即顺序号） */
   order: number[];
@@ -68,6 +79,8 @@ export interface StageSnapshot {
   answerEntriesTotal: number;
   /** 原卷逐页图数量（data/out/<docId>/pages/page-NN.png；0 = 未渲染，展示层降级为 PDF 内嵌） */
   originPages: number;
+  /** 公式噪声检测报告（检测不改写） */
+  formulaNoise: FormulaNoiseReport;
   pages: StagePage[];
   reviews: SegmentationResult["reviews"];
 }
@@ -101,9 +114,35 @@ export function extractRawBlocks(layoutRaw: unknown): RawStageBlock[][] {
   });
 }
 
+/** layout.json 的 discarded_blocks（页眉/页脚/页码/侧栏）→ 展示用丢弃块 */
+export function extractDiscardedBlocks(layoutRaw: unknown): DiscardedStageBlock[][] {
+  const root = (layoutRaw ?? {}) as Record<string, unknown>;
+  const pages = Array.isArray(root.pdf_info) ? root.pdf_info : [];
+  return pages.map((entry) => {
+    const rec = (entry ?? {}) as Record<string, unknown>;
+    const discarded = Array.isArray(rec.discarded_blocks) ? rec.discarded_blocks : [];
+    return discarded.map((pbRaw, i) => {
+      const pb = (pbRaw ?? {}) as Record<string, unknown>;
+      let text = "";
+      const lines = Array.isArray(pb.lines) ? pb.lines : [];
+      for (const lineRaw of lines) {
+        const line = (lineRaw ?? {}) as Record<string, unknown>;
+        const spans = Array.isArray(line.spans) ? line.spans : [];
+        for (const spanRaw of spans) {
+          const span = (spanRaw ?? {}) as Record<string, unknown>;
+          text += String(span.content ?? "");
+        }
+      }
+      const bbox = Array.isArray(pb.bbox) ? (pb.bbox as BBox) : ([0, 0, 0, 0] as BBox);
+      return { i, dtype: String(pb.type ?? "other"), bbox, text: clip(text.trim(), RAW_TEXT_LIMIT) };
+    });
+  });
+}
+
 /**
  * 纯函数：引擎产物 → 展示快照。
- * rawPages 与 doc.pages 一一对应（extractRawBlocks 的输出）。
+ * rawPages / discardedPages 与 doc.pages 一一对应（extractRawBlocks /
+ * extractDiscardedBlocks 的输出）。
  *
  * 关键口径（两处）：
  * 1. segmentWithRules 会把 IndexedBlock.index 重写为跨页全局序号，
@@ -117,6 +156,7 @@ export function buildStageSnapshot(
   doc: ParsedDocument,
   result: SegmentationResult,
   rawPages: RawStageBlock[][],
+  discardedPages: DiscardedStageBlock[][] = [],
 ): StageSnapshot {
   const sortedPages = [...doc.pages].sort((a, b) => a.index - b.index);
   const pageLayouts = sortedPages.map((page) => ({ page, layout: layoutPage(page) }));
@@ -168,6 +208,7 @@ export function buildStageSnapshot(
       columns: detectColumns(entries, page.width),
       centers: detectColumnCenters(entries, page.width).map((c) => Math.round(c)),
       raw: rawPages[p] ?? [],
+      discarded: discardedPages[p] ?? [],
       blocks: page.blocks.map((b, i) => ({
         i,
         kind: b.kind,
@@ -186,6 +227,8 @@ export function buildStageSnapshot(
     stats: result.stats,
     answerEntriesTotal: result.answerEntries.length,
     originPages: 0,
+    /** 公式噪声检测报告（检测不改写，见 src/formula.ts） */
+    formulaNoise: scanFormulaNoise(result.questions),
     pages,
     reviews: result.reviews,
   };
@@ -198,7 +241,7 @@ function main(): void {
 
   const doc = normalizeLayout(raw, docId);
   const result = segmentFromLayout(raw, docId);
-  const snapshot = buildStageSnapshot(doc, result, extractRawBlocks(raw));
+  const snapshot = buildStageSnapshot(doc, result, extractRawBlocks(raw), extractDiscardedBlocks(raw));
 
   const outDir = join("data", "out", docId);
   mkdirSync(outDir, { recursive: true });
