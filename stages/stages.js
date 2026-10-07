@@ -13,6 +13,7 @@ const STAGES = [
   { key: "seg", t: "切题", q: "题目切对了吗？" },
   { key: "qa", t: "质检", q: "电脑哪里没把握？" },
   { key: "final", t: "成品", q: "最终长什么样？" },
+  { key: "compare", t: "对比", q: "跟原卷像不像？" },
 ];
 
 const EXPLAIN = {
@@ -37,8 +38,12 @@ const EXPLAIN = {
     look: "看：被标红的题是不是真有问题？没被标红的题里，能不能肉眼发现电脑没察觉的错误？你的判断直接决定下一步优先修什么。",
   },
   final: {
-    do: "全部结构化之后，最终成品是一份可阅读、可开关答案的试卷页（与「最终成品 viewer」同一份数据）。",
-    look: "看：整体是否可用——题目排版、答案开关、公式与图片是否正常。",
+    do: "全部结构化之后，最终成品是一份可阅读、可开关答案的试卷页（与「最终成品 viewer」同一份数据）。这是**阅读版**——为答题/检索重新排版；与原卷的排版保真度请切到下一步「对比」检查。",
+    look: "看：阅读版整体是否可用——题目排版、答案开关、公式与图片是否正常。",
+  },
+  compare: {
+    do: "左边是原卷，右边是用结构化数据按原始坐标重建的纸面——引擎读到什么就画什么，不借助原卷图像。排版保真度一目了然。",
+    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。",
   },
 };
 
@@ -191,8 +196,8 @@ function lineFont(hPx) {
   return Math.max(8, Math.min(20, Math.round(hPx * 0.72)));
 }
 
-/** 行级块节点（阶段 2/3 共用） */
-function blockNode(b, p) {
+/** 行级块节点（阶段 2/3 与对比模式共用；canvasW 为画布像素宽，用于字号换算） */
+function blockNode(b, p, canvasW = CANVAS_W) {
   const node = posStyle(el("div", `blk blk-line kind-${b.kind}`), b.bbox, p.width, p.height);
   node.title = b.text;
   if (b.kind === "image" && b.img) {
@@ -202,7 +207,7 @@ function blockNode(b, p) {
     node.append(img);
   } else {
     const txt = el("span", "txt", b.text);
-    const hPx = ((b.bbox[3] - b.bbox[1]) / p.height) * (CANVAS_W * (p.height / p.width));
+    const hPx = ((b.bbox[3] - b.bbox[1]) / p.width) * canvasW;
     txt.style.fontSize = `${lineFont(hPx)}px`;
     node.append(txt);
   }
@@ -398,6 +403,47 @@ function renderFinal() {
   extra.append(f);
 }
 
+/** 对比模式：左 = 原卷页图，右 = 结构化数据按原坐标重建的纸面 */
+function renderCompare(p) {
+  const row = el("div", "compare-wrap");
+
+  const left = el("div", "compare-pane");
+  left.append(el("p", "pane-title", "原卷"));
+  if ((state.data.originPages ?? 0) >= state.data.pages.length && state.data.pages.length > 0) {
+    const pad = String(state.data.pages.length).length;
+    const img = el("img", "origin-page-img");
+    img.src = `/data/out/${enc(state.effectiveDoc)}/pages/page-${String(p.index + 1).padStart(pad, "0")}.png`;
+    img.alt = `原卷第 ${p.index + 1} 页`;
+    left.append(img);
+  } else {
+    const f = el("iframe", "origin-frame");
+    f.src = `/data/out/${enc(state.effectiveDoc)}/origin.pdf#page=${p.index + 1}`;
+    f.title = `原卷第 ${p.index + 1} 页`;
+    left.append(f);
+  }
+
+  const right = el("div", "compare-pane");
+  right.append(el("p", "pane-title", "成品（结构化数据按原坐标重建，非原图）"));
+  const c = paperCanvas(p);
+  c.style.width = "100%";
+  const PANE_W = 460; // 与 CSS .compare-pane 一致，用于字号换算
+  for (const b of p.blocks) c.append(blockNode(b, p, PANE_W));
+  for (const q of p.questions) {
+    const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);
+    if (!first) continue;
+    const chip = el("span", "q-chip plain", `第${q.number}题`);
+    chip.style.left = `${(first.bbox[0] / p.width) * 100}%`;
+    chip.style.top = `${(first.bbox[1] / p.height) * 100}%`;
+    chip.style.transform = "translate(-2px, -18px)";
+    chip.addEventListener("click", () => showDetail(q, p));
+    c.append(chip);
+  }
+  right.append(c);
+
+  row.append(left, right);
+  $("canvas-wrap").append(row);
+}
+
 function render() {
   const p = state.data.pages[state.page];
   [...$("stepper").children].forEach((b, i) => b.classList.toggle("active", i === state.stage));
@@ -411,12 +457,13 @@ function render() {
   explain.append(doLine, lookLine);
 
   $("detail").hidden = true;
-  $("toolbar").hidden = state.stage >= 4;
-  $("origin-link").hidden = state.stage >= 4;
+  const noToolbar = state.stage === 4 || state.stage === 5;
+  $("toolbar").hidden = noToolbar;
+  $("origin-link").hidden = noToolbar;
 
   const wrap = $("canvas-wrap");
   const extra = $("stage-extra");
-  if (state.stage !== 4 && state.stage !== 5) extra.replaceChildren();
+  if (!noToolbar) extra.replaceChildren();
   wrap.replaceChildren();
 
   if (state.stage === 0) {
@@ -444,8 +491,11 @@ function render() {
     syncToolbar(p);
   } else if (state.stage === 4) {
     renderQA();
-  } else {
+  } else if (state.stage === 5) {
     renderFinal();
+  } else {
+    renderCompare(p);
+    syncToolbar(p);
   }
 }
 

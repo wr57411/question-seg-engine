@@ -50,7 +50,7 @@ body {
   flex-wrap: wrap;
 }
 .step-btn {
-  flex: 1 1 150px;
+  flex: 1 1 110px;
   border: 1.5px solid var(--line);
   background: var(--paper);
   padding: 8px 12px;
@@ -315,6 +315,38 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   color: var(--ink-soft);
   font-size: 12.5px;
   margin: 4px 0 14px;
+}
+
+/* ── 对比模式：原卷 | 结构化重建纸面 并排 ─────────────── */
+.compare-wrap {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.compare-pane { width: 460px; max-width: 100%; }
+.compare-pane .pane-title {
+  text-align: center;
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0 0 6px;
+}
+.compare-pane .canvas { width: 100%; }
+.compare-pane .origin-frame { width: 100%; }
+.origin-page-img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
+  box-shadow: 0 3px 14px rgba(60, 50, 30, 0.18);
+}
+.q-chip.plain {
+  background: rgba(43, 42, 38, 0.78);
+  font-size: 10px;
+  padding: 0 6px;
 }
 
 .legend {

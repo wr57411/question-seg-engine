@@ -83,7 +83,7 @@ node --import tsx scripts/real-pipeline.ts sample
 
 ## 阶段样品展示（自反馈环）
 
-六个阶段的网页动线——**原卷 → 原料 → 阅读顺序 → 切题 → 质检 → 成品**，
+七个视图的网页动线——**原卷 → 原料 → 阅读顺序 → 切题 → 质检 → 成品 → 对比**，
 每步用白话说明「电脑此刻做到了什么、你该看什么」，非技术背景也能直接审阅：
 
 ```bash
@@ -102,6 +102,9 @@ npm run stages               # 导出快照 + 启动服务，然后访问 /stage
 - **自反馈环**：主模型 Read 原卷页图 ↔ Read 阶段截图 → 对照发现项 → 修复 → 复拍。
   首轮发现项与处置记录见 [docs/design/stages-review.md](docs/design/stages-review.md)，
   截图证据在 [docs/design/stages-cap/](docs/design/stages-cap/)。
+- **对比模式**（最后一视图）：左原卷页图、右结构化数据按原坐标重建的纸面，
+  同宽并排、翻页同步——排版保真度检查入口。viewer 为阅读版重排版；
+  保真版（按原版面重排的结构化输出）以对比视图为准。
 - 命令：`npm run stages:export` 仅重导快照；截图审板的发现项写入 stages-review.md。
 
 ## 展示层（独立模块）
