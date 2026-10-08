@@ -165,6 +165,11 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   /* 原卷是宋体印刷体，块文本显式用衬线字体（body 默认是 sans） */
   font-family: var(--serif);
 }
+/* 竖排块（R4）：bboxH > 2×bboxW 的侧栏标签等，逐字自上而下竖叠（原卷那种竖排方向）。
+ * 由 JS 按 font-metrics.js 的 isVerticalText 检测结果挂 .blk-vertical，**不是**全局选择器，
+ * 故不波及普通行级块。字号不变（仍 fontFromLineHeight(bboxW 换算)）；
+ * 注意 .blk 的 white-space: nowrap 在竖排下阻止的是**换列**，正好让 7 个字保持单列竖叠。 */
+.blk-vertical .txt { writing-mode: vertical-rl; }
 .blk-raw .txt { border: 1px solid transparent; }
 .blk-raw.type-title { background: rgba(179, 67, 43, 0.14); border: 1px solid rgba(179, 67, 43, 0.5); }
 .blk-raw.type-text .txt { border-color: rgba(43, 42, 38, 0.35); }

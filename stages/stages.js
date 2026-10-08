@@ -7,7 +7,7 @@
 // 分别负责公式展示美化、字号与全角宽度度量（后者的数学与证据见其头注释）。
 
 import { prettifyLatex } from "./latex-display.js";
-import { baseFontOfPage, fontForBlock, fontForRawBlock } from "./font-metrics.js";
+import { baseFontOfPage, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -229,6 +229,8 @@ function blockNode(b, p, canvasW = CANVAS_W, baseFont = null) {
     txt.innerHTML = html;
     txt.style.fontSize = `${fontForBlock(b, p.width, canvasW, baseFont)}px`;
     node.append(txt);
+    // 竖排块（R4）：字号已按 bboxW 定，排布方向也要竖排，否则文字仍横向越出窄框
+    if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");
   }
   return node;
 }
@@ -288,6 +290,8 @@ function renderDiscardedInto(c, p, canvasW = CANVAS_W) {
       txt.innerHTML = shown;
       txt.style.fontSize = `${fontForBlock(b, p.width, canvasW, baseFont)}px`;
       node.append(txt);
+      // 竖排块（R4）：同 blockNode——字号按 bboxW 定，方向也要竖排
+      if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");
     }
     node.append(el("span", "tag", `丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}`));
     c.append(node);
