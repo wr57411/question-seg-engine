@@ -11,6 +11,7 @@ import {
   fontForBlock,
   fontForRawBlock,
   isVerticalText,
+  hasMathSource,
   clampByWidth,
   emWidthOf,
 } from "../stages/font-metrics.js";
@@ -165,4 +166,37 @@ test("clampByWidth：竖排块（R4）与无文本块原样返回（横向宽度
   assert.equal(clampByWidth(17.08, v, PAGE_W, CANVAS_W), 17.08);
   assert.equal(clampByWidth(9, { kind: "image", text: "", bbox: [0, 0, 10, 200] }, PAGE_W, CANVAS_W), 9);
   assert.equal(clampByWidth(9, { kind: "image", bbox: [0, 0, 10, 200] }, PAGE_W, CANVAS_W), 9);
+});
+
+// ── Task 7：公式源码判定 + 公式块豁免夹子（修复 C1 过夹）────────────────────────
+
+test("hasMathSource：反斜杠/美元符/下划线/脱字符任一即命中（逐字用 /[\\\\$]|[_^]/）", () => {
+  assert.equal(hasMathSource("$F_{1}$"), true); // 美元符 + 下划线
+  assert.equal(hasMathSource("\\frac{mg}{k_1+k_2}"), true); // 反斜杠
+  assert.equal(hasMathSource("v_0"), true); // 仅下划线
+  assert.equal(hasMathSource("x^2"), true); // 仅脱字符
+  assert.equal(hasMathSource("重力弹力摩擦力"), false); // 纯 CJK：无公式源码
+  assert.equal(hasMathSource("A.0.20 B.0.30"), false); // 纯 ASCII 标点数字：无公式源码
+  assert.equal(hasMathSource(""), false);
+  assert.equal(hasMathSource(undefined as unknown as string), false); // 容空
+});
+
+test("clampByWidth：含公式源码的块**豁免夹子**（返回未夹字号）—— 修复 C1 过夹", () => {
+  // 原始 LaTeX 源码当量宽远大于渲染文本（3–5×），夹子若生效会把字号压到基准的 0.2–0.75×
+  const frac = { kind: "text", text: "{ \\frac { \\sqrt { 3 } } { 3 } } m g", bbox: [0, 0, 60, 15] };
+  const wPx = (60 / PAGE_W) * CANVAS_W;
+  // 先证明「若无豁免，夹子确实会把它压小」：emWidthOf(raw) 远大于渲染文本 → 上限 < 8.74
+  assert.ok(wPx / emWidthOf(frac.text) < 8.74, "前提：原始 LaTeX 当量宽会触发夹子");
+  // 豁免后：原样返回未夹字号（修复前这里是 ≈6.5px，即基准 8.74px 的 0.74×）
+  assert.equal(clampByWidth(8.74, frac, PAGE_W, CANVAS_W), 8.74);
+  const sub = { kind: "text", text: "$F_{1}$", bbox: [0, 0, 60, 15] };
+  assert.equal(clampByWidth(8.74, sub, PAGE_W, CANVAS_W), 8.74);
+});
+
+test("clampByWidth：豁免只针对公式源码块 —— 同一 bbox/字号的纯 CJK 块仍被夹", () => {
+  const cjk = { kind: "text", text: "重力弹力摩", bbox: [0, 0, 60, 15] };
+  approx(clampByWidth(20, cjk, PAGE_W, CANVAS_W), 15.3, 0.1); // 5 字 → 76.5/5 = 15.3
+  // 含 ASCII 但无公式源码的块同样仍被夹（不受豁免影响）
+  const ascii = { kind: "text", text: "A.0.20", bbox: [0, 0, 100, 15] };
+  approx(clampByWidth(80, ascii, PAGE_W, CANVAS_W), 127.5 / 2.6, 0.01);
 });

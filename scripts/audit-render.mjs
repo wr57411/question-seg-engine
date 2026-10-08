@@ -26,13 +26,18 @@
  *      同一 `emWidthOf` 重算 ⇒ ratio ≡ ≤1，`> 1.05` 数学上不可达（**恒真的死门**，评审裁定）。
  *      故本节改报**真正非恒真的信号**——「宽度上限触发率」（高度模型字号被 bbox 宽压小的块占比），
  *      按行级块 / raw 段级块 / discarded 丢弃块**分组报数**，并附保守模型溢出清单。
+ *   7. **覆盖统计（Task 7）**：第 5、6 节各报一行「覆盖块数 / 排除块数 / 排除原因分桶」。
+ *      G1「不静默失败」同样适用于**门自身**——C1 之所以能被藏住，正是因为第 5 节的「可判块」
+ *      口径静默排除了 `\`/`$`/ASCII 块而不报数。分桶互斥且**相加 = 排除总数**（无未归类残差）。
+ *      第 6 节另把**公式源码块**列入排除桶：C1 修复后渲染层对公式块豁免 `clampByWidth`，
+ *      触发信号对这类块不再适用（修复前它们 100% 命中，抬高整体触发率）。
  *
  * 用法：node scripts/audit-render.mjs [docId]
  * 退出码：0 = 判定项全部归零；1 = 判定项有发现（可接入 CI / npm run check）
  */
 import { readFileSync } from "node:fs";
 import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities } from "../stages/latex-display.js";
-import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText } from "../stages/font-metrics.js";
+import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasMathSource } from "../stages/font-metrics.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
@@ -103,6 +108,34 @@ for (const p of snap.pages) {
   }
 }
 
+// ── 覆盖统计（G1：门自身也不得静默失败）──────────────────────────────────────
+// 审计必须报告自己的**覆盖缺口**：多少块被纳入判定、多少被排除、排除原因分桶。
+// 「字号保真度」与「文字溢出」两节各报一行。分桶**互斥**且**相加 = 排除总数**（无未归类残差）。
+// 前四类为计划钉死的口径：① 含公式源码 ② 含 ASCII 字母数字 ③ 全角字数不足 ④ bbox 异常（比例越界）；
+// 另补 ⑤ 其它非覆盖字符（希腊/数学符号等）⑥ 非文本块（图片/空文本）⑦ 竖排块 ⑧ 无当量宽。
+// 优先级：**公式源码先于 ASCII 字母数字**（`$F_{1}$` 两者都含，归更具体的「公式源码」）。
+// 两节都打印全部桶：某桶为 0 表示**本节不按该原因排除**（即该类块被本节覆盖）——
+// 这本身是信息：例如「文字溢出」节「含 ASCII 字母数字 0」正说明它覆盖了保真度节排除的那类块。
+const COVERAGE_BUCKETS = [
+  "含公式源码",
+  "含 ASCII 字母数字",
+  "全角字数不足",
+  "bbox 异常（比例越界）",
+  "其它非覆盖字符",
+  "非文本块（图片/空文本）",
+  "竖排块（横向非约束）",
+  "无当量宽（emWidthOf=0）",
+];
+const zeroBuckets = () => Object.fromEntries(COVERAGE_BUCKETS.map((b) => [b, 0]));
+function reportCoverage(label, covered, buckets) {
+  const excluded = COVERAGE_BUCKETS.reduce((a, b) => a + buckets[b], 0);
+  const parts = COVERAGE_BUCKETS.map((b) => `${b} ${buckets[b]}`).join(" · ");
+  console.log(
+    `     覆盖统计（${label}）：覆盖 ${covered} 块 / 排除 ${excluded} 块（分桶合计 ${excluded} = 排除总数 ✓）`,
+  );
+  console.log(`       排除原因分桶：${parts}`);
+}
+
 // ── 5. 字号保真度（判定级）──────────────────────────────────────────────
 // 逐块：F_render 由行高反推字号（fontFromLineHeight），F_width 由 bbox 宽 / 全角当量宽
 // （emWidthOf）反推「宽度隐含字号」；ratio = F_width / F_render。二者同源则应 ≈ 1。
@@ -135,18 +168,39 @@ function isCoveredChar(ch) {
 }
 
 const fidelityRows = [];
+const fidBuckets = zeroBuckets();
 for (const p of snap.pages) {
   for (const b of p.blocks ?? []) {
-    if (b.kind === "image") continue;
     const text = b.text;
-    if (typeof text !== "string" || !text.length) continue;
-    if (![...text].every(isCoveredChar)) continue;
+    // 分桶互斥、按序首次命中；排除原因即桶名，故分桶相加 = 排除总数（见 reportCoverage）
+    if (b.kind === "image" || typeof text !== "string" || !text.length) {
+      fidBuckets["非文本块（图片/空文本）"]++;
+      continue;
+    }
+    if (hasMathSource(text)) {
+      fidBuckets["含公式源码"]++;
+      continue;
+    }
+    if (/[0-9A-Za-z]/.test(text)) {
+      fidBuckets["含 ASCII 字母数字"]++;
+      continue;
+    }
+    if (![...text].every(isCoveredChar)) {
+      fidBuckets["其它非覆盖字符"]++;
+      continue;
+    }
     let fw = 0;
     for (const ch of text) if (ch.codePointAt(0) >= FW_MIN) fw++;
-    if (fw < FIDELITY_MIN_FW) continue;
+    if (fw < FIDELITY_MIN_FW) {
+      fidBuckets["全角字数不足"]++;
+      continue;
+    }
     const bboxW = b.bbox[2] - b.bbox[0];
     const bboxH = b.bbox[3] - b.bbox[1];
-    if (bboxW / fw < FIDELITY_PER_FW[0] || bboxW / fw > FIDELITY_PER_FW[1]) continue;
+    if (bboxW / fw < FIDELITY_PER_FW[0] || bboxW / fw > FIDELITY_PER_FW[1]) {
+      fidBuckets["bbox 异常（比例越界）"]++;
+      continue;
+    }
     const fRender = fontFromLineHeight((bboxH / p.width) * 760);
     const fWidth = ((bboxW / p.width) * 760) / emWidthOf(text);
     fidelityRows.push({ p: p.index, i: b.i, ratio: fWidth / fRender, shown: text.slice(0, 80) });
@@ -203,6 +257,7 @@ for (const [name, list, fatal] of sections) {
   console.log(
     `     可判块 ${fidelityRows.length} 个 · 中位 ratio ${fidelityMedian === null ? "N/A" : fidelityMedian.toFixed(4)}`,
   );
+  reportCoverage("字号保真度", fidelityRows.length, fidBuckets);
   if (fidelityRows.length === 0) console.log("     ❌ 可判块为 0：判据被静默架空，判定失败");
   else if (fidelityFail)
     console.log(`     ❌ 中位 ratio ${fidelityMedian.toFixed(4)} 落在 [${FIDELITY_MEDIAN[0]}, ${FIDELITY_MEDIAN[1]}] 之外`);
@@ -235,6 +290,11 @@ for (const [name, list, fatal] of sections) {
 //   · 行级块 / 丢弃块：`fontForBlock(...)`（渲染层随后接 `clampByWidth`），对比模式口径 PANE_W。
 //   · 段级块 raw：`fontFromLineHeight(bboxH 换算)`（`fontForRawBlock` 的宽度项即其上限），CANVAS_W。
 //   竖排块（R4）横向宽度非约束，不纳入。
+//
+// ⚠️ **公式源码块（hasMathSource 命中）不纳入**（Task 7 修复 C1 后）：渲染层对公式块豁免
+//   `clampByWidth`，且 `emWidthOf(原始 LaTeX)` 本就把当量宽算大 3–5× → 触发信号对这类块无意义
+//   （C1 修复前它们 100% 命中「触发」，把触发率整体抬高）。排除并计入「含公式源码」桶 ——
+//   这正是审计要报告的**自身覆盖缺口**（G1 同样适用于门自身）。
 const AUDIT_PANE_W = 460;   // 对比模式单栏
 const AUDIT_CANVAS_W = 760; // 阶段 1 画布
 
@@ -243,18 +303,31 @@ const overflowGroups = [
   { key: "raw", label: "raw 段级块      ", n: 0, hit: [] },
   { key: "discarded", label: "discarded 丢弃块", n: 0, hit: [] },
 ];
+const ovfBuckets = zeroBuckets();
 const gOf = (k) => overflowGroups.find((g) => g.key === k);
 for (const p of snap.pages) {
   const basePane = baseFontOfPage(p.blocks, p.width, AUDIT_PANE_W);
   for (const src of ["blocks", "discarded"]) {
     const g = gOf(src);
     for (const b of p[src] ?? []) {
-      if (b.kind === "image") continue;
       const text = b.text;
-      if (typeof text !== "string" || !text.length) continue;
-      if (isVerticalText(b.bbox, text)) continue; // R4 竖排：横向宽度非约束
+      if (b.kind === "image" || typeof text !== "string" || !text.length) {
+        ovfBuckets["非文本块（图片/空文本）"]++;
+        continue;
+      }
+      if (isVerticalText(b.bbox, text)) {
+        ovfBuckets["竖排块（横向非约束）"]++;
+        continue; // R4 竖排：横向宽度非约束
+      }
+      if (hasMathSource(text)) {
+        ovfBuckets["含公式源码"]++;
+        continue; // 公式块已豁免夹子，触发率不适用
+      }
       const em = emWidthOf(text);
-      if (em <= 0) continue;
+      if (em <= 0) {
+        ovfBuckets["无当量宽（emWidthOf=0）"]++;
+        continue;
+      }
       const preFont = fontForBlock(b, p.width, AUDIT_PANE_W, basePane); // 未接 clampByWidth
       const wPx = ((b.bbox[2] - b.bbox[0]) / p.width) * AUDIT_PANE_W;
       g.n++;
@@ -263,9 +336,23 @@ for (const p of snap.pages) {
   }
   const g = gOf("raw");
   for (const b of p.raw ?? []) {
-    if (!b.text || isVerticalText(b.bbox, b.text)) continue;
+    if (!b.text) {
+      ovfBuckets["非文本块（图片/空文本）"]++;
+      continue;
+    }
+    if (isVerticalText(b.bbox, b.text)) {
+      ovfBuckets["竖排块（横向非约束）"]++;
+      continue;
+    }
+    if (hasMathSource(b.text)) {
+      ovfBuckets["含公式源码"]++;
+      continue;
+    }
     const em = emWidthOf(b.text);
-    if (em <= 0) continue;
+    if (em <= 0) {
+      ovfBuckets["无当量宽（emWidthOf=0）"]++;
+      continue;
+    }
     const preFont = fontFromLineHeight(((b.bbox[3] - b.bbox[1]) / p.width) * AUDIT_CANVAS_W);
     const wPx = ((b.bbox[2] - b.bbox[0]) / p.width) * AUDIT_CANVAS_W;
     g.n++;
@@ -290,6 +377,7 @@ const overflowHit = overflowGroups.reduce((a, g) => a + g.hit.length, 0);
   console.log(
     `     · 合计          ：可判 ${overflowN} 个 · 触发 ${overflowHit} 个（${overflowN ? ((overflowHit / overflowN) * 100).toFixed(2) : "N/A"}%）`,
   );
+  reportCoverage("文字溢出", overflowN, ovfBuckets);
 }
 
 if (bad === 0) {

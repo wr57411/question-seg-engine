@@ -44,9 +44,16 @@
  * ── 行高模型的过冲与宽度安全上限（R3/R5，测量定案）──
  * `fontFromLineHeight` 对**行级水平**块成立，但 bboxH 被行盒/上下延伸撑大的个别行（页眉页脚、
  * `计划用时` 行、短标签）会被高估 → 渲染宽 > bbox 宽 → 压字。`clampByWidth` 把字号夹到
- * `bboxW_px / emWidthOf(text)`（含 ASCII 与纯 CJK 一视同仁；竖排与无文本块除外）。
+ * `bboxW_px / emWidthOf(text)`（含 ASCII 与纯 CJK 一视同仁；竖排、**公式源码块**与无文本块除外）。
  * **R3 的「拉丁字形失配」假设已被测量推翻**（混合组与纯 CJK 对照几乎相等，换拉丁字体栈无效）——
  * 证据见 data/out/latin-metrics.md，改法依据见 clampByWidth 注释。
+ *
+ * ── 公式块豁免夹子（C1 修复，Task 7）──
+ * `clampByWidth` 曾对**含公式的块**用 `emWidthOf(block.text)` 度量，而 `block.text` 是**原始
+ * LaTeX 源码**（如 `\frac{\sqrt3}{3}mg` 记 12.25em），渲染文本只有 3em → 夹子把公式块字号压到
+ * 基准的 **0.20–0.75×**（131/1015 块 <0.8×，最极端 **1.76px**），且审计判定项因排除 `\`/`$`/ASCII
+ * 块而看不见它。**裁定：公式块不参与宽度夹子**（`hasMathSource` 命中即返回未夹字号）——
+ * `emWidthOf` 是线性字符宽度模型，对二维排版（`\frac`/`\sqrt`）不成立，用错误模型夹比不夹更糟。
  */
 
 /** 行高 → 字号（画布 px）。
@@ -81,6 +88,20 @@ export function baseFontOfPage(blocks, pageWidth, canvasW) {
   if (!hs.length) return null;
   hs.sort((a, b) => a - b);
   return fontFromLineHeight((hs[Math.floor(hs.length / 2)] / pageWidth) * canvasW);
+}
+
+/** 公式源码判定（C1 修复，Task 7）：文本含 LaTeX 源码特征即命中 —— **反斜杠、美元符、
+ * 下划线、脱字符任一**。判据逐字采用裁定 `/[\\$]|[_^]/`，不自创更复杂的启发式。
+ *
+ * 为什么需要它：`block.text` 是**原始 LaTeX 源码**（如 `$F_{1}$`、`\frac{mg}{k_1+k_2}`），
+ * 而实际渲染走的是 `prettifyLatex(b.text)`。源码字符数比渲染文本宽 **3–5 倍**，
+ * `emWidthOf(raw)` 会把公式块的当量宽算大几倍 → `clampByWidth` 把字号压到基准的 0.20–0.75×
+ * （131/1015 块 <0.8×，最极端 1.76px）。命中本函数即表示「该块的宽度不能按源码度量」。
+ *
+ * @param {string} text 块的**原始**文本（LaTeX 源码）
+ */
+export function hasMathSource(text) {
+  return /[\\$]|[_^]/.test(text ?? "");
 }
 
 /** 竖排文本判定（R4）：bbox **高 > 2×宽**（严格大于，`bboxH == 2*bboxW` 不算竖排）
@@ -140,6 +161,15 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
  *   （只有本会溢出的块被夹小；未溢出的块 `min()` 不改其字号，故「字号保真度」中位数不受影响）。
  * 竖排块（R4）：横向宽度不是约束（文字沿纵向排布），原样返回。
  *
+ * ── 公式块豁免（C1 修复，Task 7，**Ruling**）──
+ * **公式块（`hasMathSource` 命中）不参与宽度夹子，直接返回未夹字号。**
+ * 理由：`emWidthOf` 是**线性字符宽度模型**，对 `\frac`/`\sqrt` 这类**二维排版**根本不成立
+ *   —— 源码 `\frac{\sqrt{3}}{3}mg` 记 12.25em，实际渲染 `√33mg` 只有 3em；用错误的模型去夹
+ *   比不夹更糟（实测把公式块字号压到基准的 0.20–0.75×，最极端 1.76px，肉眼近乎不可见）。
+ * 公式块已有专属规则（`fontForBlock` 用页面基准字号 `baseFont`），其溢出风险由视觉审板承担。
+ * 代价：公式块的横向溢出不再被结构性防止（审计「文字溢出」节因此把公式块列入排除分桶，
+ *   见 scripts/audit-render.mjs）。
+ *
  * @param {number} fontPx 行高模型给出的字号（画布 px）
  * @param {{text?: string, bbox: number[]}} block
  * @param {number} pageWidth 页面宽（pt）
@@ -147,6 +177,7 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
  */
 export function clampByWidth(fontPx, block, pageWidth, canvasW) {
   if (isVerticalText(block.bbox, block.text ?? "")) return fontPx; // 竖排：横向宽度非约束
+  if (hasMathSource(block.text ?? "")) return fontPx; // 公式块豁免（C1 修复，见上方 Ruling）
   const em = emWidthOf(block.text ?? "");
   if (em <= 0) return fontPx; // 无文字（图片/空块）：无可贴合，不夹
   const wPx = ((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW;

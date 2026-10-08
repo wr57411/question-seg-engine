@@ -33,8 +33,11 @@ export function fontForBlock(
 /** 竖排文本判定：bboxH > 2×bboxW（严格大于）且 emWidthOf(text) ≥ 2。 */
 export function isVerticalText(bbox: number[], text: string): boolean;
 
+/** 公式源码判定（C1 修复）：`/[\\$]|[_^]/` —— 反斜杠、美元符、下划线、脱字符任一即命中。 */
+export function hasMathSource(text: string): boolean;
+
 /** 宽度安全上限（R3/R5）：`min(fontPx, bboxW_px / emWidthOf(text))`。
- *  竖排块或无文本块（emWidthOf=0）原样返回 fontPx。 */
+ *  竖排块、**公式源码块**（hasMathSource 命中）或无文本块（emWidthOf=0）原样返回 fontPx。 */
 export function clampByWidth(
   fontPx: number,
   block: MetricBlock,
