@@ -9,6 +9,8 @@ import {
   fontFromLineHeight,
   baseFontOfPage,
   fontForBlock,
+  fontForRawBlock,
+  isVerticalText,
   emWidthOf,
 } from "../stages/font-metrics.js";
 
@@ -88,4 +90,49 @@ test("fontForBlock：含上下标的块用页面基准字号；baseFont 为 null
 test("fontForBlock：纯文本块始终按自身行高推算（标题自然更大）", () => {
   const plain = { kind: "text", text: "重力", bbox: [0, 0, 60, 15] };
   assert.equal(fontForBlock(plain, PAGE_W, CANVAS_W, 12.3), fontFromLineHeight((15 / PAGE_W) * CANVAS_W));
+});
+
+// ── Task 4：适用边界（R1 段级块 / R2 栏宽口径 / R4 竖排块）────────────────────
+
+test("isVerticalText：bboxH > 2×bboxW 且当量宽 ≥2 命中；bboxH == 2×bboxW 严格不算竖排", () => {
+  assert.equal(isVerticalText([0, 0, 13, 91], "第二章相互作用"), true); // 91 > 26 → 竖排
+  assert.equal(isVerticalText([0, 0, 50, 101], "正文正文正文"), true); // 101 > 100 → 竖排
+  assert.equal(isVerticalText([0, 0, 50, 100], "正文正文正文"), false); // 100 == 2×50 → **不算**（严格 >）
+  assert.equal(isVerticalText([0, 0, 13, 91], "二"), false); // 当量宽 1 < 2 → 不算
+  assert.equal(isVerticalText([0, 0, 100, 14], "横排正文"), false); // 横排
+});
+
+test("竖排块字号：行高取 bboxW（13pt）→ 17.08px（±0.1），而非 bboxH 的 119.5px", () => {
+  // 侧栏「第二章相互作用」实测 bbox 13×91pt：bboxH 是 7 个字的**长度**方向
+  const aside = { kind: "text", text: "第二章相互作用", bbox: [0, 0, 13, 91] };
+  approx(fontForBlock(aside, PAGE_W, CANVAS_W, null), 17.08, 0.1);
+  // 对照：误用 bboxH(91) 会得到 119.5px —— 正是溢出栏外的那个失控值
+  approx(fontFromLineHeight((91 / PAGE_W) * CANVAS_W), 119.5, 0.1);
+  assert.notEqual(fontForBlock(aside, PAGE_W, CANVAS_W, null), fontFromLineHeight((91 / PAGE_W) * CANVAS_W));
+  // 对比栏口径（PANE_W=460）：同一竖排块 → 17.08 × 460/760 ≈ 10.34px
+  approx(fontForBlock(aside, PAGE_W, PANE_W, null), 10.34, 0.1);
+});
+
+test("fontForRawBlock：段级块取 min(行高推算, 框宽当量) —— 高而窄的整段被框宽压回", () => {
+  // bboxH=300pt（整段高）→ 行高推算 ≈ 394px（失控）；框宽当量 = (100/596*760)/6 ≈ 21.25px
+  const para = { kind: "text", text: "重力弹力摩擦", bbox: [0, 0, 100, 300] };
+  approx(fontForRawBlock(para, PAGE_W, CANVAS_W), 21.25, 0.1);
+  assert.ok(fontForRawBlock(para, PAGE_W, CANVAS_W) < fontFromLineHeight((300 / PAGE_W) * CANVAS_W));
+});
+
+test("fontForRawBlock：框宽当量 > 行高推算时取行高推算（短文本不因宽框被放大）", () => {
+  const head = { kind: "text", text: "重力弹", bbox: [0, 0, 300, 60] };
+  assert.equal(fontForRawBlock(head, PAGE_W, CANVAS_W), fontFromLineHeight((60 / PAGE_W) * CANVAS_W));
+});
+
+test("fontForRawBlock：下限 8px、且**无 20px 上限**（上限是上一轮移除的保真夹子，不恢复）", () => {
+  const dense = { kind: "text", text: "很长很长的整段文字".repeat(10), bbox: [0, 0, 120, 240] };
+  assert.equal(fontForRawBlock(dense, PAGE_W, CANVAS_W), 8); // 框宽当量 < 8 → 夹到下限
+  const big = { kind: "text", text: "重力", bbox: [0, 0, 300, 300] };
+  assert.ok(fontForRawBlock(big, PAGE_W, CANVAS_W) > 30); // 无上限：> 30 也不夹
+});
+
+test("fontForRawBlock：无文本块（图片/空 text）宽度项退化 → 取下限 8px", () => {
+  assert.equal(fontForRawBlock({ kind: "image", text: "", bbox: [0, 0, 100, 200] }, PAGE_W, CANVAS_W), 8);
+  assert.equal(fontForRawBlock({ kind: "image", bbox: [0, 0, 100, 200] }, PAGE_W, CANVAS_W), 8);
 });

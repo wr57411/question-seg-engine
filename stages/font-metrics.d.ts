@@ -21,12 +21,24 @@ export function baseFontOfPage(
   canvasW: number,
 ): number | null;
 
-/** 块的渲染字号：含 \frac/\sqrt/_/^ 用 baseFont（null 时回退行高推算），否则按自身行高推算。 */
+/** 块的渲染字号：含 \frac/\sqrt/_/^ 用 baseFont（null 时回退行高推算），否则按自身行高推算。
+ *  竖排块（bboxH > 2×bboxW 且当量宽 ≥2）改取 bboxW 当行高。 */
 export function fontForBlock(
   block: MetricBlock,
   pageWidth: number,
   canvasW: number,
   baseFont: number | null,
+): number;
+
+/** 竖排文本判定：bboxH > 2×bboxW（严格大于）且 emWidthOf(text) ≥ 2。 */
+export function isVerticalText(bbox: number[], text: string): boolean;
+
+/** 阶段 1 段级块字号（R1）：min(行高推算, bboxW_px/emWidthOf(text))，下限 8px，无上限；
+ *  无文本（emWidthOf=0）时返回 8。 */
+export function fontForRawBlock(
+  block: MetricBlock,
+  pageWidth: number,
+  canvasW: number,
 ): number;
 
 /** 全角当量宽度和：全角/CJK 1.0、ASCII 字母数字 0.5、空格 0.25、其余可见标点 0.3、\n\t 0。 */

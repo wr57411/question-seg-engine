@@ -7,7 +7,7 @@
 // 分别负责公式展示美化、字号与全角宽度度量（后者的数学与证据见其头注释）。
 
 import { prettifyLatex } from "./latex-display.js";
-import { baseFontOfPage, fontForBlock } from "./font-metrics.js";
+import { baseFontOfPage, fontForBlock, fontForRawBlock } from "./font-metrics.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -254,8 +254,8 @@ function renderOrigin(p) {
 
 function renderRaw(p) {
   const c = paperCanvas(p);
-  const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
-  renderDiscardedInto(c, p);
+  // 阶段 1 是**段级块**（整段多行）：行高模型不成立，改用「按框宽适配」（R1，见 font-metrics.js）
+  renderDiscardedInto(c, p, CANVAS_W);
   for (const b of p.raw) {
     const node = posStyle(el("div", `blk blk-raw type-${b.type}`), b.bbox, p.width, p.height);
     const shown = prettifyLatex(b.text);
@@ -263,7 +263,7 @@ function renderRaw(p) {
     const txt = el("span", "txt");
     if (shown) txt.innerHTML = shown;
     else txt.textContent = `(${TYPE_LABEL_CN(b.type)})`;
-    txt.style.fontSize = `${fontForBlock(b, p.width, CANVAS_W, baseFont) * 0.9}px`;
+    txt.style.fontSize = `${fontForRawBlock(b, p.width, CANVAS_W)}px`;
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
@@ -274,9 +274,11 @@ const DISCARDED_LABEL = {
   header: "页眉", footer: "页脚", page_number: "页码", aside_text: "侧栏",
 };
 
-/** 丢弃块（页眉/页脚/页码/侧栏）：虚线灰块呈现——原卷上有、解析器判为家具的内容 */
-function renderDiscardedInto(c, p) {
-  const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
+/** 丢弃块（页眉/页脚/页码/侧栏）：虚线灰块呈现——原卷上有、解析器判为家具的内容。
+ * canvasW 为**该视图**的画布像素宽：阶段 1–5 传 CANVAS_W(760)、对比模式传 PANE_W(460)；
+ * 曾硬编码 CANVAS_W → 对比栏内丢弃块字号偏大 760/460 = 1.65×（R2）。 */
+function renderDiscardedInto(c, p, canvasW = CANVAS_W) {
+  const baseFont = baseFontOfPage(p.blocks, p.width, canvasW);
   for (const b of p.discarded ?? []) {
     const node = posStyle(el("div", "blk blk-discarded"), b.bbox, p.width, p.height);
     const shown = prettifyLatex(b.text);
@@ -284,7 +286,7 @@ function renderDiscardedInto(c, p) {
     if (shown) {
       const txt = el("span", "txt");
       txt.innerHTML = shown;
-      txt.style.fontSize = `${fontForBlock(b, p.width, CANVAS_W, baseFont)}px`;
+      txt.style.fontSize = `${fontForBlock(b, p.width, canvasW, baseFont)}px`;
       node.append(txt);
     }
     node.append(el("span", "tag", `丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}`));
@@ -526,7 +528,7 @@ function renderCompare(p) {
   const c = paperCanvas(p);
   c.style.width = "100%";
   const PANE_W = 460; // 与 CSS .compare-pane 一致，用于字号换算
-  renderDiscardedInto(c, p);
+  renderDiscardedInto(c, p, PANE_W); // 对比栏宽口径：丢弃块也必须用 PANE_W（R2）
   const baseFont = baseFontOfPage(p.blocks, p.width, PANE_W);
   for (const b of p.blocks) c.append(blockNode(b, p, PANE_W, baseFont));
   for (const q of p.questions) {

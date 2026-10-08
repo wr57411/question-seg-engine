@@ -32,6 +32,14 @@
  * 尺度常量有两个口径，勿混用（F10）：CANVAS_W = 760（阶段 1–5 画布）、
  * PANE_W = 460（对比模式单栏）。本模块对两者一视同仁，由调用方传 canvasW；
  * 系数 c 与 canvasW 无关（c = S_ink/bboxH），故 760 与 460 共用同一常数。
+ *
+ * ── 行高模型的**适用边界**（Task 4，R1/R2/R4）──
+ * `fontFromLineHeight` 只对**行级、水平**块成立。越界的三类块各有专法：
+ *   R4 竖排块：bboxH 是文字**长度**方向而非行高 → 用 bboxW 当行高（`isVerticalText`）。
+ *   R1 段级块：阶段 1 的 MinerU 块是整段多行，bboxH 是整段高 → 按框宽适配
+ *      （`fontForRawBlock`：取 min(行高推算, 框宽当量)，下限 8px，**无 20px 上限**）。
+ *   R2 栏宽口径：对比模式单栏是 PANE_W=460，凡在对比栏内渲染的字号换算都必须传 460
+ *      （`renderDiscardedInto` 曾硬编码 760 → 丢弃块偏大 760/460 = 1.65×）。
  */
 
 /** 行高 → 字号（画布 px）。
@@ -68,9 +76,24 @@ export function baseFontOfPage(blocks, pageWidth, canvasW) {
   return fontFromLineHeight((hs[Math.floor(hs.length / 2)] / pageWidth) * canvasW);
 }
 
+/** 竖排文本判定（R4）：bbox **高 > 2×宽**（严格大于，`bboxH == 2*bboxW` 不算竖排）
+ * 且文本当量宽 ≥ 2em（1 个字的窄块不算，避免误判）。
+ *
+ * 为什么需要：竖排文字的「行高」是**横向宽度**，而 bboxH 是文字**长度**方向
+ * （侧栏「第二章相互作用」bbox 13×91pt，bboxH=91 是 7 个字的长度）。若仍按 bboxH 推字号，
+ * 会把文字长度当行高 → 字号 119.5px，溢出栏外。
+ *
+ * @param {number[]} bbox [x0, y0, x1, y1]（pt）
+ * @param {string} text
+ */
+export function isVerticalText(bbox, text) {
+  return bbox[3] - bbox[1] > 2 * (bbox[2] - bbox[0]) && emWidthOf(text) >= 2;
+}
+
 /** 块的渲染字号：纯文本行按自身行高推算（标题自然更大，层级自动复现 F7）；
  * 含公式/上下标的行用页面基准字号（避免分式撑高 bbox 导致字号翻倍）。
  * baseFont 为 null 时回退到自身行高推算。
+ * 竖排块（R4）改取 bboxW 当行高——见 isVerticalText。
  *
  * @param {{text?: string, bbox: number[]}} block
  * @param {number} pageWidth 页面宽度（pt）
@@ -78,8 +101,36 @@ export function baseFontOfPage(blocks, pageWidth, canvasW) {
  * @param {number|null} baseFont 页面基准字号（画布 px），可空
  */
 export function fontForBlock(block, pageWidth, canvasW, baseFont) {
+  if (isVerticalText(block.bbox, block.text ?? "")) {
+    // 竖排：行高取 bboxW（横轴），否则用 bboxH 会把「文字长度」当行高 → 字号失控
+    return fontFromLineHeight(((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW);
+  }
   if (baseFont && /\\frac|\\sqrt|[_^]/.test(block.text ?? "")) return baseFont;
   return fontFromLineHeight(((block.bbox[3] - block.bbox[1]) / pageWidth) * canvasW);
+}
+
+/** 阶段 1（原料视图）**段级块**的字号（R1）：按**框宽适配**。
+ *
+ * 为什么不能用行高模型：阶段 1 的块是 MinerU **段级**块（整段多行），bboxH 是整段高度
+ * 而非行高（第 1 页整段 bboxH 达 163pt → 行高推算 172.6px，远超页面）。
+ * 该视图的定位是「看**框**对不对」（整段有没有被框住、图片框位置、标题有没有被认成正文），
+ * **不是看文字保真** —— 故让文字宽度去贴合框宽，字号取两者较小：
+ *   min(fontFromLineHeight(bboxH 换算), bboxW_px / emWidthOf(text))
+ * 下限 8px；**不加 20px 上限**（上限是上一轮被移除的保真夹子，不恢复）。
+ *
+ * 边界：`emWidthOf(text) === 0`（图片块 / 空文本块）时宽度项退化（÷0），
+ * 无文字可贴合 → 直接取下限 8px。
+ *
+ * @param {{text?: string, bbox: number[]}} block
+ * @param {number} pageWidth 页面宽度（pt）
+ * @param {number} canvasW 画布像素宽
+ */
+export function fontForRawBlock(block, pageWidth, canvasW) {
+  const em = emWidthOf(block.text ?? "");
+  if (em <= 0) return 8; // 无文本：宽度项退化，取下限
+  const hPx = ((block.bbox[3] - block.bbox[1]) / pageWidth) * canvasW;
+  const wPx = ((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW;
+  return Math.max(8, Math.min(fontFromLineHeight(hPx), wPx / em));
 }
 
 /**
