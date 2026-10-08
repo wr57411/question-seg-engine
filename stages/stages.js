@@ -306,7 +306,8 @@ function renderOrder(p) {
     divider.style.left = `${mid}%`;
     c.append(left, right, divider);
   }
-  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFontOfPage(p.blocks, p.width, CANVAS_W)));
+  const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
+  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFont));
   p.order.forEach((blockIdx, seq) => {
     const b = p.blocks[blockIdx];
     if (!b) return;
@@ -321,7 +322,8 @@ function renderOrder(p) {
 
 function renderSeg(p) {
   const c = paperCanvas(p);
-  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFontOfPage(p.blocks, p.width, CANVAS_W)));
+  const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
+  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFont));
 
   const covered = new Set();
   for (const q of p.questions) for (const i of q.blocks) covered.add(i);

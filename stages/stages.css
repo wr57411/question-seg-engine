@@ -151,9 +151,12 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 .canvas .col-tint { position: absolute; top: 0; bottom: 0; background: rgba(58, 107, 138, 0.05); }
 
 /* 阶段 1：原料块（段级，按 MinerU 类型着色） */
-/* 高保真复刻：字号按行高推算后，浏览器字体（宋体）比原卷印刷体宽，
- * 文本会超出 bbox —— 这里选择**让文字可见**而不是裁掉。
- * 字号与字宽不可能同时与原卷一致（字体不同是硬约束），优先保字号。 */
+/* 高保真复刻：字号按行高推算（font-metrics.js，定案系数 1.03）。
+ * 这里让文字**可见**而不裁切，理由是**避免裁切造成静默内容丢失**（G1），
+ * 不是「字体更宽所以溢出」——该旧前提已被推翻：实测 CJK 全角在印刷体与 Songti SC 中
+ * 都精确 1em（度量误差为 0），且按定案系数渲染宽恒 < bbox 宽，**不会溢出**；
+ * 真实缺陷是字号偏小 30%、文字填不满 bbox，宽高可同时对齐（垂直仅差 2.3%）。
+ * 依据：data/out/ink-groundtruth.md（F1–F6）。 */
 .blk { position: absolute; overflow: visible; white-space: nowrap; }
 .blk .txt {
   display: block;
