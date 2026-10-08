@@ -389,3 +389,33 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   color: var(--ink-soft);
   font-family: var(--serif);
 }
+
+/* ── 公式的二维结构 ──────────────────────────────────────────────
+   prettifyLatex 输出 HTML 片段（见 latex-display.js）：原卷的数学排版是二维的
+   —— 分式上下叠放、根号带上划线 —— 纯文本字符流表达不了。
+   字号用 em，自动跟随 fitFontSize 给 .txt 设的字号。 */
+.blk .frac {
+  display: inline-block;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 0.9em;
+  margin: 0 0.15em;
+  line-height: 1.05;
+}
+.blk .frac .fn {
+  display: block;
+  border-bottom: 1px solid currentColor;
+  padding: 0 0.2em;
+}
+.blk .frac .fd {
+  display: block;
+  padding: 0 0.2em;
+}
+.blk .sqrt .rad {
+  border-top: 1px solid currentColor;
+  padding: 0 0.1em;
+}
+.blk .txt sup,
+.blk .txt sub {
+  font-size: 0.7em;
+}

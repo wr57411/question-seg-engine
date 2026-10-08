@@ -1,5 +1,5 @@
 /**
- * latex-display.js —— 展示层专用 LaTeX→Unicode 轻量渲染（纯函数，无 DOM）。
+ * latex-display.js —— 展示层专用 LaTeX 渲染（纯函数，无 DOM）。
  *
  * 定位：引擎结构化文本保留上游 LaTeX 原样（红线：不静默改写数据）；
  * 但展示时 "$\theta \left( \theta < 9 0 ^ { \circ } \right)$" 这类源码不可读。
@@ -7,6 +7,12 @@
  * （\frac/\sqrt 嵌套参数、^/_ 嵌套上下标、{ } 分组、希腊字母/关系符表、
  * \left\right 与字体包装剥除、空白噪声折叠），语义改写（清洗数据本身）
  * 是引擎侧独立任务，不在此处。
+ *
+ * 输出是 **HTML 片段**（不是纯文本）：\frac 渲染成竖排分式、\sqrt 渲染成带上划线的
+ * 根号、上下标用 <sup>/<sub>。原卷是二维排版，一维字符流表达不了它
+ * （2026-10-08 用户指出"怎么都是一排的"）。⇒ 调用方必须用 **innerHTML** 挂载，
+ * 不能用 textContent；所有字面文本都经 escapeHtml，避免 < > & 破坏结构。
+ *
  * 供 stages.js 使用；tests/latex-display.test.ts 回归锁定
  * （测试用例全部取自真实样张噪声公式）。
  */
@@ -80,20 +86,9 @@ export const KNOWN_COMMANDS = new Set([
  */
 export const STRUCTURAL_COMMANDS = new Set([...DROP_CMD, ...DROP_WITH_ARG]);
 
-const SUP = {
-  "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
-  "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
-  "+": "⁺", "-": "⁻", "−": "⁻", "n": "ⁿ", "i": "ⁱ",
-};
-
-const SUB = {
-  "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
-  "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉",
-  "+": "₊", "-": "₋", "a": "ₐ", "e": "ₑ", "o": "ₒ", "x": "ₓ",
-};
-
-const allMapped = (str, table) => [...str].every((ch) => ch in table);
-const mapAll = (str, table) => [...str].map((ch) => table[ch] ?? ch).join("");
+/** HTML 转义：输出片段由调用方 innerHTML 挂载，字面文本必须转义。 */
+const escapeHtml = (s) =>
+  s.replace(/[&<>]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"));
 
 const isSpace = (ch) => ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
 
@@ -162,32 +157,33 @@ function parseCommand(s, i) {
 }
 
 /**
- * 递归渲染：{ } 分组不显示；\frac/\sqrt 嵌套解析；^/_ 上下标
- * （内容可映射时用 Unicode 上下标，否则保留 ^()/_() 形态）。
- * 空白不在此处折叠——由调用方决定（公式内折叠、段外保留）。
+ * 递归渲染成 HTML 片段。
+ * - { } 分组不显示；\frac → 竖排分式；\sqrt → 带上划线的根号；^/_ → <sup>/<sub>
+ * - 空白在公式内无语义，**一律跳过**（在 HTML 阶段折叠会破坏标签属性里的空格）
+ * - 字面字符逐个 escapeHtml
  */
 function desugar(s) {
   let out = "";
   let i = 0;
   while (i < s.length) {
     const ch = s[i];
+    if (isSpace(ch)) { i++; continue; } // 公式内空白无语义
     if (ch === "\\") {
       const cmd = parseCommand(s, i);
       const { name } = cmd;
       if (name === " ") {
-        out += " ";
         i = cmd.end;
         // 真实数据常见 "\ :" —— 空格命令后吞掉多余空格与标点短命令
         while (i < s.length && isSpace(s[i])) i++;
         if ([",", ";", ":", "!"].includes(s[i] ?? "")) i++;
         continue;
       }
-      if ([",", ";", ":", "!"].includes(name)) { out += " "; i = cmd.end; continue; }
+      if ([",", ";", ":", "!"].includes(name)) { i = cmd.end; continue; }
       if (name === "frac" || name === "dfrac" || name === "tfrac") {
         const a = parseArg(s, cmd.end);
         const b = a ? parseArg(s, a.end) : null;
         if (a && b) {
-          out += `(${desugar(a.text)}/${desugar(b.text)})`;
+          out += `<span class="frac"><span class="fn">${desugar(a.text)}</span><span class="fd">${desugar(b.text)}</span></span>`;
           i = b.end;
           continue;
         }
@@ -198,7 +194,7 @@ function desugar(s) {
       }
       if (name === "sqrt") {
         const a = parseArg(s, cmd.end);
-        if (a) { out += `√(${desugar(a.text)})`; i = a.end; continue; }
+        if (a) { out += `<span class="sqrt">√<span class="rad">${desugar(a.text)}</span></span>`; i = a.end; continue; }
       }
       if (UNWRAP.has(name)) {
         const a = parseArg(s, cmd.end);
@@ -214,7 +210,7 @@ function desugar(s) {
         continue;
       }
       // 未知命令：丢弃命令名本身，保留其参数内容——宁可少显示一处排版命令，
-      // 也绝不让 "\varepsilon" 这类命令名裸奔给用户看（旧实现的兜底就是裸名字）。
+      // 也绝不让 "\varepsilon" 这类命令名裸奔给用户看。
       i = cmd.end;
       continue;
     }
@@ -222,33 +218,24 @@ function desugar(s) {
       const a = parseArg(s, i + 1);
       if (a) {
         const inner = desugar(a.text).trim();
-        if (inner === "°") { out += "°"; i = a.end; continue; } // ^ { \circ } 特例
+        // ^ { \circ } → 度数符号直出（原卷就是 °，不是上标圆圈）
+        if (ch === "^" && inner === "°") { out += "°"; i = a.end; continue; }
         // MinerU 把上标数字 2 误认成正体冒号：原卷第 4 页第 1 题实为 Fsin²θ，
-        // 数据里却是 F \mathrm { s i n } ^ { \mathrm { : } } \theta → 还原为 ²。
+        // 数据里却是 F \mathrm { s i n } ^ { \mathrm { : } } \theta → 还原为 2。
         // ⚠️ 曾把这类「纯标点上标」整体丢弃，导致平方消失（静默内容丢失）。
         // 纠正原则：宁可还原一个高概率候选，也不静默丢掉信息。
-        if (ch === "^" && inner === ":") { out += "²"; i = a.end; continue; }
-        const table = ch === "^" ? SUP : SUB;
-        if (allMapped(inner, table)) {
-          out += mapAll(inner, table);
-        } else if (inner.length > 0 && inner.length <= 2 && !/[A-Za-z0-9]/.test(inner)) {
-          // 其余符号型上/下标（′ ∘ ∗ 等）直出；去掉包裹括号，其余字符**保留可见**
-          // ——不静默丢弃（丢了用户就再也看不到"这里原本有个上标"）
-          out += inner.replace(/[()\[\]{}]/g, "");
-        } else if (ch === "^") {
-          out += `^(${inner})`;
-        } else {
-          out += `_${inner.replace(/_/g, "")}`; // 嵌套下标（F_{_{Na}}）不再叠出双下划线
-        }
+        if (ch === "^" && inner === ":") { out += "<sup>2</sup>"; i = a.end; continue; }
+        const tag = ch === "^" ? "sup" : "sub";
+        if (inner) out += `<${tag}>${inner}</${tag}>`;
         i = a.end;
         continue;
       }
-      out += ch;
+      out += escapeHtml(ch);
       i++;
       continue;
     }
     if (ch === "{" || ch === "}") { i++; continue; } // 分组括号本身不显示
-    out += ch;
+    out += escapeHtml(ch);
     i++;
   }
   return out;
@@ -270,6 +257,10 @@ const LOOKS_LATEX = /\\[A-Za-z]+|[A-Za-z0-9]\s*[_^]/;
  * 分隔用 EM SPACE（U+2003）而非普通空格：原卷的 A/B 是分列排版、间距约等于选项
  * 文本宽度（第 2 页第 10 题原卷 300dpi 裁剪实测），普通空格视觉上仍"靠得近"；
  * 且 HTML 会把连续普通空格折叠成一个。
+ *
+ * ⚠️ 必须在**渲染成 HTML 之后**调用：desugar 会吃掉公式内空白（含选项之间的分隔
+ * 空格，"方向 D." → "方向D."），若在渲染前做，那些被吃掉的空格会让相邻选项又粘在一起
+ * （2026-10-08 实测 p3 raw[10] 回归）。放在最后则天然避开该问题。
  */
 export function separateOptionMarks(text) {
   const marks = text.match(/[A-D][.．]/g);
@@ -277,44 +268,36 @@ export function separateOptionMarks(text) {
   return text.replace(/([^\s])(?=[A-D][.．])/g, "$1\u2003");
 }
 
-/** 收尾统一整理：选项分隔 + LaTeX 不换行空格 "~" 还原为普通空格（10~kg → 10 kg）。
- * 必须放在公式内空白折叠之后，否则 "~" 会被折叠掉导致数值与单位粘连。
+/**
+ * 展示用美化（返回 HTML 片段）：
+ * - 先在纯文本上做选项标记分隔；
+ * - $...$ 段内按 LaTeX 子集渲染成 HTML；段外文本原样保留（仅转义）；
+ * - 无 $ 但含 LaTeX 的整块（裸公式块）也按公式渲染；
+ * - 不成对的 $ 视为噪声字符去掉（避免源码漏出）；
+ * - LaTeX 不换行空格 "~" 还原为普通空格（10~kg → 10 kg）。
  *
  * ⚠️ 不要动段外文本的空格：原卷的数学排版本身就有空格（原卷第 4 页第 1 题实测
  * "B. F sin θcos θ" 带空格）。2026-10-08 曾加过「收紧数学符号间空格」，
- * 回原卷核对后发现与原卷不符，已回滚——**没有回原卷核对过的"美化"不要做**。 */
-function finalize(text) {
-  return separateOptionMarks(text).replace(/~/g, " ");
-}
-
-/**
- * 展示用美化：$...$ 段内按 LaTeX 子集渲染并折叠空白（LaTeX 内空格无语义）；
- * 段外文本原样保留；无 $ 但含 LaTeX 的整块（裸公式块）也按公式渲染；
- * 不成对的 $ 视为噪声字符直接去掉（避免源码漏出）；
- * 末了统一做选项标记分隔（粘连可读性）。
+ * 回原卷核对后发现与原卷不符，已回滚——**没有回原卷核对过的"美化"不要做**。
  */
 export function prettifyLatex(text) {
   if (!text) return text;
-  if (!text.includes("$")) {
-    const shown = LOOKS_LATEX.test(text) ? desugar(text).replace(/\s+/g, "") : text;
-    return finalize(shown);
-  }
   let out = "";
-  let i = 0;
-  let inFormula = false;
-  while (i < text.length) {
-    const ch = text[i];
-    if (ch === "$") { inFormula = !inFormula; i++; continue; }
-    let j = text.indexOf("$", i);
-    if (j === -1) j = text.length;
-    if (inFormula) {
-      out += desugar(text.slice(i, j)).replace(/\s+/g, "");
-    } else {
-      out += text.slice(i, j); // 段外原样
+  if (!text.includes("$")) {
+    out = LOOKS_LATEX.test(text) ? desugar(text) : escapeHtml(text);
+  } else {
+    let i = 0;
+    let inFormula = false;
+    while (i < text.length) {
+      const ch = text[i];
+      if (ch === "$") { inFormula = !inFormula; i++; continue; }
+      let j = text.indexOf("$", i);
+      if (j === -1) j = text.length;
+      out += inFormula ? desugar(text.slice(i, j)) : escapeHtml(text.slice(i, j));
+      i = j;
     }
-    i = j;
   }
-  return finalize(out);
+  return separateOptionMarks(out.replace(/~/g, " "));
 }
 
 /**

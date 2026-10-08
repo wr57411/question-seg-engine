@@ -216,6 +216,9 @@ function lineFont(hPx) {
 /* 字号同时适配框宽与框高：CJK 记 1em、其他记 0.55em 估宽，
  * 超宽则缩字号——「出现的东西大小要匹配」，避免文字溢出边框的别扭感 */
 const CJK_RE = /[\u2E80-\u9FFF\uF900-\uFFFD\u3000-\u303F\uFF00-\uFFEF]/;
+/** 剥掉 HTML 标签：prettifyLatex 返回 HTML 片段（分式/根号需要二维结构），
+ * 按纯文本估算字号时不能把标签字符算进宽度。 */
+const stripTags = (html) => html.replace(/<[^>]*>/g, "");
 function fitFontSize(text, boxWpx, boxHpx) {
   const hFit = lineFont(boxHpx);
   let ems = 0;
@@ -234,10 +237,13 @@ function blockNode(b, p, canvasW = CANVAS_W) {
     img.alt = "图片块";
     node.append(img);
   } else {
-    const txt = el("span", "txt", prettifyLatex(b.text));
+    // prettifyLatex 返回 HTML 片段（\frac 竖排分式 / \sqrt 带上划线根号），必须 innerHTML
+    const html = prettifyLatex(b.text);
+    const txt = el("span", "txt");
+    txt.innerHTML = html;
     const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * canvasW;
     const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * canvasW;
-    txt.style.fontSize = `${fitFontSize(prettifyLatex(b.text), boxW, boxH)}px`;
+    txt.style.fontSize = `${fitFontSize(stripTags(html), boxW, boxH)}px`;
     node.append(txt);
   }
   return node;
@@ -269,10 +275,12 @@ function renderRaw(p) {
     const node = posStyle(el("div", `blk blk-raw type-${b.type}`), b.bbox, p.width, p.height);
     const shown = prettifyLatex(b.text);
     node.title = `[${TYPE_LABEL_CN(b.type)}] ${b.text}`;
-    const txt = el("span", "txt", shown || `(${TYPE_LABEL_CN(b.type)})`);
+    const txt = el("span", "txt");
+    if (shown) txt.innerHTML = shown;
+    else txt.textContent = `(${TYPE_LABEL_CN(b.type)})`;
     const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * CANVAS_W;
     const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * CANVAS_W;
-    txt.style.fontSize = `${fitFontSize(shown, boxW, boxH * 0.9)}px`;
+    txt.style.fontSize = `${fitFontSize(stripTags(shown) || `(${TYPE_LABEL_CN(b.type)})`, boxW, boxH * 0.9)}px`;
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
@@ -290,10 +298,11 @@ function renderDiscardedInto(c, p) {
     const shown = prettifyLatex(b.text);
     node.title = `[已被解析器丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}] ${b.text}`;
     if (shown) {
-      const txt = el("span", "txt", shown);
+      const txt = el("span", "txt");
+      txt.innerHTML = shown;
       const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * CANVAS_W;
       const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * CANVAS_W;
-      txt.style.fontSize = `${fitFontSize(shown, boxW, boxH)}px`;
+      txt.style.fontSize = `${fitFontSize(stripTags(shown), boxW, boxH)}px`;
       node.append(txt);
     }
     node.append(el("span", "tag", `丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}`));
@@ -380,7 +389,9 @@ function showDetail(q, p) {
     d.append(el("p", "reason", `电脑给出的原因：${q.reasons.join("；")}`));
   }
   const texts = q.blocks.map((i) => p.blocks[i]?.text).filter(Boolean);
-  d.append(el("p", "kv", `本页内容预览：${prettifyLatex(texts.join(" / ").slice(0, 200)) || "（无文本）"}`));
+  const preview = el("p", "kv");
+  preview.innerHTML = `本页内容预览：${prettifyLatex(texts.join(" / ").slice(0, 200)) || "（无文本）"}`;
+  d.append(preview);
   d.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
