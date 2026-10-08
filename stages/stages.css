@@ -151,12 +151,16 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 .canvas .col-tint { position: absolute; top: 0; bottom: 0; background: rgba(58, 107, 138, 0.05); }
 
 /* 阶段 1：原料块（段级，按 MinerU 类型着色） */
-.blk { position: absolute; overflow: hidden; white-space: nowrap; }
+/* 高保真复刻：字号按行高推算后，浏览器字体（宋体）比原卷印刷体宽，
+ * 文本会超出 bbox —— 这里选择**让文字可见**而不是裁掉。
+ * 字号与字宽不可能同时与原卷一致（字体不同是硬约束），优先保字号。 */
+.blk { position: absolute; overflow: visible; white-space: nowrap; }
 .blk .txt {
   display: block;
-  overflow: hidden;
-  width: 100%;
+  width: auto;
   line-height: 1.15;
+  /* 原卷是宋体印刷体，块文本显式用衬线字体（body 默认是 sans） */
+  font-family: var(--serif);
 }
 .blk-raw .txt { border: 1px solid transparent; }
 .blk-raw.type-title { background: rgba(179, 67, 43, 0.14); border: 1px solid rgba(179, 67, 43, 0.5); }

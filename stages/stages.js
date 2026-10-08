@@ -3,9 +3,11 @@
 //   /data/out/<docId>/stages.json（快照契约，见 scripts/export-stages.ts）
 //   /data/out/<docId>/images/<裸文件名>、/data/out/<docId>/origin.pdf（原卷对照）
 //   /viewer/（最终成品内嵌）。
-// latex-display.js 为本目录纯函数模块（无引擎依赖），负责公式展示美化。
+// latex-display.js / font-metrics.js 为本目录纯函数模块（无引擎依赖），
+// 分别负责公式展示美化、字号与全角宽度度量（后者的数学与证据见其头注释）。
 
 import { prettifyLatex } from "./latex-display.js";
+import { baseFontOfPage, fontForBlock } from "./font-metrics.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -209,26 +211,10 @@ function posStyle(node, bbox, w, h) {
 }
 
 const CANVAS_W = 760; // 与 CSS --canvas-w 一致，用于字号换算
-function lineFont(hPx) {
-  return Math.max(8, Math.min(20, Math.round(hPx * 0.72)));
-}
-
-/* 字号同时适配框宽与框高：CJK 记 1em、其他记 0.55em 估宽，
- * 超宽则缩字号——「出现的东西大小要匹配」，避免文字溢出边框的别扭感 */
-const CJK_RE = /[\u2E80-\u9FFF\uF900-\uFFFD\u3000-\u303F\uFF00-\uFFEF]/;
-/** 剥掉 HTML 标签：prettifyLatex 返回 HTML 片段（分式/根号需要二维结构），
- * 按纯文本估算字号时不能把标签字符算进宽度。 */
-const stripTags = (html) => html.replace(/<[^>]*>/g, "");
-function fitFontSize(text, boxWpx, boxHpx) {
-  const hFit = lineFont(boxHpx);
-  let ems = 0;
-  for (const ch of text) ems += CJK_RE.test(ch) ? 1 : 0.55;
-  if (ems <= 0) return hFit;
-  return Math.max(7, Math.min(hFit, (boxWpx / ems) * 0.98));
-}
+// 字号与全角宽度度量见 ./font-metrics.js（纯函数模块，有测试锁定；证据见其头注释）。
 
 /** 行级块节点（阶段 2/3 与对比模式共用；canvasW 为画布像素宽，用于字号换算） */
-function blockNode(b, p, canvasW = CANVAS_W) {
+function blockNode(b, p, canvasW = CANVAS_W, baseFont = null) {
   const node = posStyle(el("div", `blk blk-line kind-${b.kind}`), b.bbox, p.width, p.height);
   node.title = b.text;
   if (b.kind === "image" && b.img) {
@@ -241,9 +227,7 @@ function blockNode(b, p, canvasW = CANVAS_W) {
     const html = prettifyLatex(b.text);
     const txt = el("span", "txt");
     txt.innerHTML = html;
-    const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * canvasW;
-    const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * canvasW;
-    txt.style.fontSize = `${fitFontSize(stripTags(html), boxW, boxH)}px`;
+    txt.style.fontSize = `${fontForBlock(b, p.width, canvasW, baseFont)}px`;
     node.append(txt);
   }
   return node;
@@ -270,6 +254,7 @@ function renderOrigin(p) {
 
 function renderRaw(p) {
   const c = paperCanvas(p);
+  const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
   renderDiscardedInto(c, p);
   for (const b of p.raw) {
     const node = posStyle(el("div", `blk blk-raw type-${b.type}`), b.bbox, p.width, p.height);
@@ -278,9 +263,7 @@ function renderRaw(p) {
     const txt = el("span", "txt");
     if (shown) txt.innerHTML = shown;
     else txt.textContent = `(${TYPE_LABEL_CN(b.type)})`;
-    const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * CANVAS_W;
-    const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * CANVAS_W;
-    txt.style.fontSize = `${fitFontSize(stripTags(shown) || `(${TYPE_LABEL_CN(b.type)})`, boxW, boxH * 0.9)}px`;
+    txt.style.fontSize = `${fontForBlock(b, p.width, CANVAS_W, baseFont) * 0.9}px`;
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
@@ -293,6 +276,7 @@ const DISCARDED_LABEL = {
 
 /** 丢弃块（页眉/页脚/页码/侧栏）：虚线灰块呈现——原卷上有、解析器判为家具的内容 */
 function renderDiscardedInto(c, p) {
+  const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
   for (const b of p.discarded ?? []) {
     const node = posStyle(el("div", "blk blk-discarded"), b.bbox, p.width, p.height);
     const shown = prettifyLatex(b.text);
@@ -300,9 +284,7 @@ function renderDiscardedInto(c, p) {
     if (shown) {
       const txt = el("span", "txt");
       txt.innerHTML = shown;
-      const boxW = ((b.bbox[2] - b.bbox[0]) / p.width) * CANVAS_W;
-      const boxH = ((b.bbox[3] - b.bbox[1]) / p.width) * CANVAS_W;
-      txt.style.fontSize = `${fitFontSize(stripTags(shown), boxW, boxH)}px`;
+      txt.style.fontSize = `${fontForBlock(b, p.width, CANVAS_W, baseFont)}px`;
       node.append(txt);
     }
     node.append(el("span", "tag", `丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}`));
@@ -324,7 +306,7 @@ function renderOrder(p) {
     divider.style.left = `${mid}%`;
     c.append(left, right, divider);
   }
-  for (const b of p.blocks) c.append(blockNode(b, p));
+  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFontOfPage(p.blocks, p.width, CANVAS_W)));
   p.order.forEach((blockIdx, seq) => {
     const b = p.blocks[blockIdx];
     if (!b) return;
@@ -339,7 +321,7 @@ function renderOrder(p) {
 
 function renderSeg(p) {
   const c = paperCanvas(p);
-  for (const b of p.blocks) c.append(blockNode(b, p));
+  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFontOfPage(p.blocks, p.width, CANVAS_W)));
 
   const covered = new Set();
   for (const q of p.questions) for (const i of q.blocks) covered.add(i);
@@ -543,7 +525,8 @@ function renderCompare(p) {
   c.style.width = "100%";
   const PANE_W = 460; // 与 CSS .compare-pane 一致，用于字号换算
   renderDiscardedInto(c, p);
-  for (const b of p.blocks) c.append(blockNode(b, p, PANE_W));
+  const baseFont = baseFontOfPage(p.blocks, p.width, PANE_W);
+  for (const b of p.blocks) c.append(blockNode(b, p, PANE_W, baseFont));
   for (const q of p.questions) {
     const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);
     if (!first) continue;
