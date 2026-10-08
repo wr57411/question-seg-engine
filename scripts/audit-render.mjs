@@ -104,9 +104,11 @@ for (const p of snap.pages) {
 // 取样收窄为「可判块」，排除度量表覆盖不到的字符带来的偏差（emWidthOf 把非 ASCII 窄字符
 // 按 1.0em 计，希腊字母/数学符号会让 F_width 偏小、污染中位数）：
 //   1. kind 非 image 且有 text
-//   2. 每个字符都属度量表覆盖类别：全角/CJK（含全角标点，码位 ≥ U+2E80）、ASCII 字母数字、
-//      ASCII 空格、其余可见 ASCII 标点；出现任何其它字符（希腊字母 θ Δ、数学符号 ° × ≈、
-//      \ $ { }、控制字符等）即排除该块
+//   2. 每个字符都属度量表覆盖类别：全角/CJK（含全角标点，码位 ≥ U+2E80 且为 BMP）、
+//      ASCII 空格、其余可见 ASCII 标点；出现任何其它字符（**ASCII 字母数字 [0-9A-Za-z]**、
+//      希腊字母 θ Δ、数学符号 ° × ≈、\ $ { }、控制字符、代理区/非 BMP 等）即排除该块。
+//      排除 ASCII 字母数字：emWidthOf 对其用 0.5em 近似权重，纳入会把近似误差注入中位数；
+//      纯全角样本下度量精确（CJK 恰 1.0em）。
 //   3. 全角字符数 ≥ 6
 //   4. bboxW_pt / 全角字符数 ∈ [6, 22]（排除短行与坏 bbox）
 const FW_MIN = 0x2e80; // 「全角/CJK（含全角标点）」码位下界；希腊字母(0x3xx)/数学符号(0x22xx)据此排除
@@ -116,12 +118,13 @@ const FIDELITY_MEDIAN = [0.93, 1.07]; // 判定项
 const FIDELITY_OUTLIER = [0.85, 1.15]; // 提示项
 
 function isCoveredChar(ch) {
-  const c = ch.charCodeAt(0);
-  if (c >= FW_MIN) return true; // 全角/CJK（含全角标点）
+  const c = ch.codePointAt(0);
+  if (c >= 0xd800 && c <= 0xdfff) return false; // 代理区（孤立代理）：非覆盖
+  if (c > 0xffff) return false; // 非 BMP（代理对，如 emoji）：非覆盖，避免高码位误入全角分支
+  if (c >= FW_MIN) return true; // 全角/CJK（含全角标点，BMP 内 U+2E80–U+FFFF）
   if (ch === " ") return true; // ASCII 空格
-  if (/[0-9A-Za-z]/.test(ch)) return true; // ASCII 字母数字
-  if (c >= 0x21 && c <= 0x7e && !"\\${}".includes(ch)) return true; // 其余可见 ASCII 标点
-  return false; // 控制字符 / \ $ { } / 其它非覆盖字符
+  if (c >= 0x21 && c <= 0x7e && !/[0-9A-Za-z]/.test(ch) && !"\\${}".includes(ch)) return true; // 其余可见 ASCII 标点
+  return false; // ASCII 字母数字 / 控制字符 / \ $ { } / 其它非覆盖字符
 }
 
 const fidelityRows = [];
@@ -132,7 +135,7 @@ for (const p of snap.pages) {
     if (typeof text !== "string" || !text.length) continue;
     if (![...text].every(isCoveredChar)) continue;
     let fw = 0;
-    for (const ch of text) if (ch.charCodeAt(0) >= FW_MIN) fw++;
+    for (const ch of text) if (ch.codePointAt(0) >= FW_MIN) fw++;
     if (fw < FIDELITY_MIN_FW) continue;
     const bboxW = b.bbox[2] - b.bbox[0];
     const bboxH = b.bbox[3] - b.bbox[1];
