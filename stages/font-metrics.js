@@ -40,6 +40,13 @@
  *      （`fontForRawBlock`：取 min(行高推算, 框宽当量)，下限 8px，**无 20px 上限**）。
  *   R2 栏宽口径：对比模式单栏是 PANE_W=460，凡在对比栏内渲染的字号换算都必须传 460
  *      （`renderDiscardedInto` 曾硬编码 760 → 丢弃块偏大 760/460 = 1.65×）。
+ *
+ * ── 行高模型的过冲与宽度安全上限（R3/R5，测量定案）──
+ * `fontFromLineHeight` 对**行级水平**块成立，但 bboxH 被行盒/上下延伸撑大的个别行（页眉页脚、
+ * `计划用时` 行、短标签）会被高估 → 渲染宽 > bbox 宽 → 压字。`clampByWidth` 把字号夹到
+ * `bboxW_px / emWidthOf(text)`（含 ASCII 与纯 CJK 一视同仁；竖排与无文本块除外）。
+ * **R3 的「拉丁字形失配」假设已被测量推翻**（混合组与纯 CJK 对照几乎相等，换拉丁字体栈无效）——
+ * 证据见 data/out/latin-metrics.md，改法依据见 clampByWidth 注释。
  */
 
 /** 行高 → 字号（画布 px）。
@@ -107,6 +114,35 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
   }
   if (baseFont && /\\frac|\\sqrt|[_^]/.test(block.text ?? "")) return baseFont;
   return fontFromLineHeight(((block.bbox[3] - block.bbox[1]) / pageWidth) * canvasW);
+}
+
+/** 宽度安全上限（R3/R5）：把行高模型给出的字号夹到「文字当量宽 × 字号 ≤ bbox 宽」，
+ * 即 `emWidthOf(text) * F ≤ bboxW_px`。仅在字号会让文字**横向溢出 bbox** 时生效。
+ *
+ * 为什么需要（测量定案，见 data/out/latin-metrics.md）：
+ *   R3 曾假设「含 ASCII 的行溢出，因为浏览器拉丁字形取自 Songti SC、advance 与原卷印刷体不同」。
+ *   **测量推翻该假设**：分三组量「渲染宽 / 原卷墨迹宽」——纯 CJK 对照 0.968、CJK+ASCII 混合 0.963，
+ *   二者几乎相等（无拉丁特异性）；把 `"Times New Roman"` 提到 `"Songti SC"` 之前，混合组中位仅
+ *   0.9629→0.9650（+0.2%），**换字体栈不能显著改善**。真实原因是**行高模型在个别行上过冲**：
+ *   bboxH 被行盒/上下延伸撑大的行（页眉页脚、`计划用时` 行、短标签），`1.03×bboxH` 大于真实字号，
+ *   渲染宽 > bbox 宽 → 压到相邻块。**纯 CJK 块同样溢出**（丢弃页脚实测溢出 83px），故不能只夹 ASCII。
+ *   逐块夹到 bbox 宽是唯一能同时压住两类溢出的改法。
+ *
+ * 纯 CJK 块：`emWidthOf` 恰 = 字数，夹后 `F = bboxW/字数` → 渲染宽恰填满 bbox，**不削保真**
+ *   （只有本会溢出的块被夹小；未溢出的块 `min()` 不改其字号，故「字号保真度」中位数不受影响）。
+ * 竖排块（R4）：横向宽度不是约束（文字沿纵向排布），原样返回。
+ *
+ * @param {number} fontPx 行高模型给出的字号（画布 px）
+ * @param {{text?: string, bbox: number[]}} block
+ * @param {number} pageWidth 页面宽（pt）
+ * @param {number} canvasW 画布像素宽
+ */
+export function clampByWidth(fontPx, block, pageWidth, canvasW) {
+  if (isVerticalText(block.bbox, block.text ?? "")) return fontPx; // 竖排：横向宽度非约束
+  const em = emWidthOf(block.text ?? "");
+  if (em <= 0) return fontPx; // 无文字（图片/空块）：无可贴合，不夹
+  const wPx = ((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW;
+  return Math.min(fontPx, wPx / em);
 }
 
 /** 阶段 1（原料视图）**段级块**的字号（R1）：按**框宽适配**。

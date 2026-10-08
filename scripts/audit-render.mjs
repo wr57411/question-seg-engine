@@ -19,13 +19,18 @@
  *      「语法零残留」，看不到「字号错 30%」。本节对快照逐块，用「行高隐含字号」与
  *      「bbox 宽隐含字号」互相印证：可判块 ratio 中位数必须落在 [0.93, 1.07]。
  *      系数若被写小（如 0.72），ratio 会整体抬到 ~1.49，本节即报红——判据真的能抓 bug。
+ *   6. 文字溢出 bbox（判定级）：R5 的**可见性缺口**——第 5 节的可判块口径排除了含 ASCII
+ *      字母数字的块，而横向溢出恰发生在这类行 → 「审计全绿」与「肉眼可见的压字」可以同时
+ *      成立（§17 判据粒度决定漏检粒度）。本节对**行级块 + 丢弃块**逐块估算「渲染宽 vs bboxW」，
+ *      溢出（> 1.05）占比 > 2% 即报红；并用**同一套 emWidthOf** 度量（不另立标准）。
+ *      阶段 1 段级块（raw）按 R1 是「按框宽适配」，量纲不同，只展示不判定（见节内裁定）。
  *
  * 用法：node scripts/audit-render.mjs [docId]
  * 退出码：0 = 判定项全部归零；1 = 判定项有发现（可接入 CI / npm run check）
  */
 import { readFileSync } from "node:fs";
 import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities } from "../stages/latex-display.js";
-import { emWidthOf, fontFromLineHeight } from "../stages/font-metrics.js";
+import { emWidthOf, fontFromLineHeight, fontForBlock, fontForRawBlock, baseFontOfPage, isVerticalText, clampByWidth } from "../stages/font-metrics.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
@@ -207,6 +212,79 @@ for (const [name, list, fatal] of sections) {
   }
   if (fidelityOutliers.length > 10) console.log(`        …另有 ${fidelityOutliers.length - 10} 条`);
   if (fidelityFail) bad++;
+}
+
+// ── 6. 文字溢出 bbox（判定级）──────────────────────────────────────────────
+// R5：与「字号保真度」分工——后者判**系统偏差**（可判块 ratio 中位数），前者判**个体溢出**
+// （单块渲染宽 > bbox 宽 → 压到相邻块）。此前的「可判块」口径排除了含 ASCII 字母数字的块，
+// 而溢出恰发生在这类行 → 审计全绿与肉眼可见的压字可以同时成立（§17 判据粒度决定漏检粒度）。
+//
+// 估算：渲染宽 = emWidthOf(text) × F（**与「字号保真度」同一套度量**，不另立标准）。
+//   · 行级块（blocks）/ 丢弃块（discarded）：F = clampByWidth(fontForBlock(...))，对比模式口径 PANE_W。
+//   · 段级块（raw）：F = fontForRawBlock(...)，阶段 1 口径 CANVAS_W（R1 按框宽适配）。
+//   竖排块（R4）横向宽度非约束，不纳入。
+//
+// 口径裁定（测量驱动，见 data/out/latin-metrics.md）：**判定项只取行级块 + 丢弃块**。
+//   阶段 1 的 raw 是 MinerU **段级**块，字号规则本就是「按框宽适配」（R1），文字在整段框内铺开——
+//   `emWidthOf(整段文本)` 与「一行框宽」不同量纲，且 8px 下限（R1 明确保留）使密集整段必然 > 1.05。
+//   把 raw 计入判定会让本判据被阶段 1 的另一种（已裁定的）现象淹没，同属 §17 的判据粒度问题。
+//   故 raw 的溢出**只展示、不判定**。
+const OVERFLOW_LIMIT = 1.05;   // 单块 ratio 超过即算溢出
+const OVERFLOW_MAX_PCT = 0.02; // 判定项：溢出块占比 > 2% 即失败
+const AUDIT_PANE_W = 460;      // 对比模式单栏
+const AUDIT_CANVAS_W = 760;    // 阶段 1 画布
+
+let overflowTotal = 0;
+const overflowJudge = []; // 行级 + 丢弃（判定对象）
+const overflowRaw = [];   // 阶段 1 段级块（仅展示，不判定）
+for (const p of snap.pages) {
+  const basePane = baseFontOfPage(p.blocks, p.width, AUDIT_PANE_W);
+  for (const src of ["blocks", "discarded"]) {
+    for (const b of p[src] ?? []) {
+      if (b.kind === "image") continue;
+      const text = b.text;
+      if (typeof text !== "string" || !text.length) continue;
+      if (isVerticalText(b.bbox, text)) continue; // R4 竖排：横向宽度非约束
+      const em = emWidthOf(text);
+      if (em <= 0) continue;
+      const F = clampByWidth(fontForBlock(b, p.width, AUDIT_PANE_W, basePane), b, p.width, AUDIT_PANE_W);
+      const wPx = ((b.bbox[2] - b.bbox[0]) / p.width) * AUDIT_PANE_W;
+      overflowTotal++;
+      const ratio = (em * F) / wPx;
+      if (ratio > OVERFLOW_LIMIT) overflowJudge.push({ p: p.index, src, i: b.i, ratio, shown: text.slice(0, 60) });
+    }
+  }
+  for (const b of p.raw ?? []) {
+    if (!b.text || isVerticalText(b.bbox, b.text)) continue;
+    const em = emWidthOf(b.text);
+    if (em <= 0) continue;
+    const F = fontForRawBlock(b, p.width, AUDIT_CANVAS_W);
+    const wPx = ((b.bbox[2] - b.bbox[0]) / p.width) * AUDIT_CANVAS_W;
+    const ratio = (em * F) / wPx;
+    if (ratio > OVERFLOW_LIMIT) overflowRaw.push({ p: p.index, i: b.i, ratio, shown: b.text.slice(0, 60) });
+  }
+}
+const overflowPct = overflowTotal ? overflowJudge.length / overflowTotal : 1;
+const overflowFail = overflowTotal === 0 || overflowPct > OVERFLOW_MAX_PCT;
+
+{
+  const flag = overflowFail ? "❌" : "✅";
+  console.log(
+    `\n${flag} 文字溢出 bbox（判定项：行级/丢弃块 渲染宽/bboxW > ${OVERFLOW_LIMIT} 的占比 ≤ ${OVERFLOW_MAX_PCT * 100}%）`,
+  );
+  console.log(
+    `     可判块 ${overflowTotal} 个 · 溢出 ${overflowJudge.length} 个（${overflowTotal ? (overflowPct * 100).toFixed(2) : "N/A"}%）`,
+  );
+  if (overflowTotal === 0) console.log("     ❌ 可判块为 0：判据被静默架空，判定失败");
+  else if (overflowFail) console.log(`     ❌ 溢出占比 ${(overflowPct * 100).toFixed(2)}% 超过 ${OVERFLOW_MAX_PCT * 100}%`);
+  for (const x of [...overflowJudge].sort((a, b) => b.ratio - a.ratio).slice(0, 10)) {
+    console.log(`        p${x.p} ${x.src}[${x.i}] ratio=${x.ratio.toFixed(3)} ${JSON.stringify(x.shown)}`);
+  }
+  if (overflowJudge.length > 10) console.log(`        …另有 ${overflowJudge.length - 10} 条`);
+  console.log(
+    `     ⚠️ 阶段 1 段级块溢出 ${overflowRaw.length} 个（R1 按框宽适配，不纳入判定，仅展示）`,
+  );
+  if (overflowFail) bad++;
 }
 
 if (bad === 0) {

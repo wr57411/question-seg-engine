@@ -11,6 +11,7 @@ import {
   fontForBlock,
   fontForRawBlock,
   isVerticalText,
+  clampByWidth,
   emWidthOf,
 } from "../stages/font-metrics.js";
 
@@ -135,4 +136,33 @@ test("fontForRawBlock：下限 8px、且**无 20px 上限**（上限是上一轮
 test("fontForRawBlock：无文本块（图片/空 text）宽度项退化 → 取下限 8px", () => {
   assert.equal(fontForRawBlock({ kind: "image", text: "", bbox: [0, 0, 100, 200] }, PAGE_W, CANVAS_W), 8);
   assert.equal(fontForRawBlock({ kind: "image", bbox: [0, 0, 100, 200] }, PAGE_W, CANVAS_W), 8);
+});
+
+// ── Task 5：宽度安全上限（R3/R5）─────────────────────────────────────────────
+
+test("clampByWidth：文字未溢出 bbox 时原样返回（不削保真）", () => {
+  // bbox 宽 200pt → 画布 255px；2 字全角 em=2 → 上限 127.5px，字号 15 < 127.5 → 不变
+  const b = { kind: "text", text: "重力", bbox: [0, 0, 200, 15] };
+  assert.equal(clampByWidth(15, b, PAGE_W, CANVAS_W), 15);
+});
+
+test("clampByWidth：会横向溢出的块被夹到 bboxW_px / emWidthOf（纯 CJK 恰填满）", () => {
+  // bbox 宽 60pt → 画布 76.5px；5 字全角 em=5 → 上限 15.3px；行高推算 20 > 15.3 → 夹到 15.3
+  const b = { kind: "text", text: "重力弹力摩", bbox: [0, 0, 60, 15] };
+  approx(clampByWidth(20, b, PAGE_W, CANVAS_W), 15.3, 0.1);
+  // 夹后 5 字 × 15.3 = 76.5 = bbox 宽（画布 px）——恰填满，不溢出也不留白
+  approx(emWidthOf("重力弹力摩") * clampByWidth(20, b, PAGE_W, CANVAS_W), (60 / PAGE_W) * CANVAS_W, 0.1);
+});
+
+test("clampByWidth：含 ASCII 的块按同一 emWidthOf 夹（与字号保真度节同源度量）", () => {
+  // bbox 宽 100pt → 127.5px；"A.0.20" em = 0.5+0.3+0.5+0.3+0.5+0.5 = 2.6 → 上限 49.04px
+  const b = { kind: "text", text: "A.0.20", bbox: [0, 0, 100, 15] };
+  approx(clampByWidth(80, b, PAGE_W, CANVAS_W), 127.5 / 2.6, 0.01);
+});
+
+test("clampByWidth：竖排块（R4）与无文本块原样返回（横向宽度非约束）", () => {
+  const v = { kind: "text", text: "第二章相互作用", bbox: [0, 0, 13, 91] };
+  assert.equal(clampByWidth(17.08, v, PAGE_W, CANVAS_W), 17.08);
+  assert.equal(clampByWidth(9, { kind: "image", text: "", bbox: [0, 0, 10, 200] }, PAGE_W, CANVAS_W), 9);
+  assert.equal(clampByWidth(9, { kind: "image", bbox: [0, 0, 10, 200] }, PAGE_W, CANVAS_W), 9);
 });

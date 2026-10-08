@@ -7,7 +7,7 @@
 // 分别负责公式展示美化、字号与全角宽度度量（后者的数学与证据见其头注释）。
 
 import { prettifyLatex } from "./latex-display.js";
-import { baseFontOfPage, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
+import { baseFontOfPage, clampByWidth, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -227,7 +227,9 @@ function blockNode(b, p, canvasW = CANVAS_W, baseFont = null) {
     const html = prettifyLatex(b.text);
     const txt = el("span", "txt");
     txt.innerHTML = html;
-    txt.style.fontSize = `${fontForBlock(b, p.width, canvasW, baseFont)}px`;
+    // 宽度安全上限（R3/R5）：行高模型对个别行（页眉页脚/计划用时/短标签）会过冲，
+    // 夹到 bbox 宽以免压到相邻块；纯 CJK 未溢出的块不受影响（见 font-metrics.js clampByWidth）。
+    txt.style.fontSize = `${clampByWidth(fontForBlock(b, p.width, canvasW, baseFont), b, p.width, canvasW)}px`;
     node.append(txt);
     // 竖排块（R4）：字号已按 bboxW 定，排布方向也要竖排，否则文字仍横向越出窄框
     if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");
@@ -288,7 +290,8 @@ function renderDiscardedInto(c, p, canvasW = CANVAS_W) {
     if (shown) {
       const txt = el("span", "txt");
       txt.innerHTML = shown;
-      txt.style.fontSize = `${fontForBlock(b, p.width, canvasW, baseFont)}px`;
+      // 宽度安全上限（R3/R5）：同 blockNode——丢弃块（页脚等）也会因 bboxH 过冲而压字
+      txt.style.fontSize = `${clampByWidth(fontForBlock(b, p.width, canvasW, baseFont), b, p.width, canvasW)}px`;
       node.append(txt);
       // 竖排块（R4）：同 blockNode——字号按 bboxW 定，方向也要竖排
       if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");

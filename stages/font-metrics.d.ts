@@ -33,6 +33,15 @@ export function fontForBlock(
 /** 竖排文本判定：bboxH > 2×bboxW（严格大于）且 emWidthOf(text) ≥ 2。 */
 export function isVerticalText(bbox: number[], text: string): boolean;
 
+/** 宽度安全上限（R3/R5）：`min(fontPx, bboxW_px / emWidthOf(text))`。
+ *  竖排块或无文本块（emWidthOf=0）原样返回 fontPx。 */
+export function clampByWidth(
+  fontPx: number,
+  block: MetricBlock,
+  pageWidth: number,
+  canvasW: number,
+): number;
+
 /** 阶段 1 段级块字号（R1）：min(行高推算, bboxW_px/emWidthOf(text))，下限 8px，无上限；
  *  无文本（emWidthOf=0）时返回 8。 */
 export function fontForRawBlock(
