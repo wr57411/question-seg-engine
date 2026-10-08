@@ -5,3 +5,5 @@
 export function prettifyLatex(text: string): string;
 export function separateOptionMarks(text: string): string;
 export const KNOWN_COMMANDS: Set<string>;
+export const STRUCTURAL_COMMANDS: Set<string>;
+export function findCommandAmbiguities(text: string): { command: string; alternative: string; index: number }[];

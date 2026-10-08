@@ -36,7 +36,7 @@ const SYMBOL = {
   partial: "∂", nabla: "∇", sum: "∑", prod: "∏", int: "∫",
   cup: "∪", cap: "∩", subset: "⊂", in: "∈", notin: "∉",
   ast: "∗", star: "⋆", bullet: "•", longrightarrow: "⟶", ll: "≪", gg: "≫",
-  oplus: "⊕", ominus: "⊖", otimes: "⊗",
+  oplus: "⊕", ominus: "⊖", otimes: "⊗", top: "⊤", bot: "⊥",
   sin: "sin", cos: "cos", tan: "tan", cot: "cot", log: "log", ln: "ln",
   max: "max", min: "min", circ: "°", square: "□", triangle: "△",
 };
@@ -72,6 +72,13 @@ export const KNOWN_COMMANDS = new Set([
   ...Object.keys(GREEK), ...Object.keys(SYMBOL), ...UNWRAP, ...DROP_CMD, ...DROP_WITH_ARG,
   "frac", "dfrac", "tfrac", "sqrt",
 ]);
+
+/**
+ * 纯排版指令（不产生可见内容，位置受 LaTeX 语法约束）。
+ * 它们的「字面歧义」无害：如 \left 虽可切成 \le + "ft"，但 \left 本身不显示任何符号，
+ * 后面必然跟定界符——切错也看不出来，故歧义检测豁免这一类。
+ */
+export const STRUCTURAL_COMMANDS = new Set([...DROP_CMD, ...DROP_WITH_ARG]);
 
 const SUP = {
   "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
@@ -296,4 +303,31 @@ export function prettifyLatex(text) {
     i = j;
   }
   return finalize(out);
+}
+
+/**
+ * 命令切分歧义检测（审计用纯函数）。
+ *
+ * 背景：MinerU 常把 "\theta B" 写成 "\thetaB"。渲染器用「整串优先，不认识才回退前缀」
+ * 处理——但有一类坎是机器跨不过去的：**整串是已知命令、其前缀也是已知命令**时，
+ * 两种切法都合法，而原意只能从原卷图像得知。如 "\top" 既可能是 ⊤，也可能是 "\to" + "p"。
+ *
+ * 这不能靠「猜」解决，只能**报出来**交人确认（报出来只产生"待确认项"，
+ * 猜错则产生"无人察觉的错误内容"）。纯排版指令（\left 等）豁免——
+ * 它们不产生可见内容，切错也看不出来。
+ */
+export function findCommandAmbiguities(text) {
+  const found = [];
+  for (const m of text.matchAll(/\\([A-Za-z]+)/g)) {
+    const cmd = m[1];
+    if (!KNOWN_COMMANDS.has(cmd) || STRUCTURAL_COMMANDS.has(cmd)) continue;
+    for (let k = cmd.length - 1; k >= 1; k--) {
+      const prefix = cmd.slice(0, k);
+      if (KNOWN_COMMANDS.has(prefix)) {
+        found.push({ command: cmd, alternative: `${prefix} + "${cmd.slice(k)}"`, index: m.index });
+        break;
+      }
+    }
+  }
+  return found;
 }

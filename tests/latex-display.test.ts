@@ -2,7 +2,7 @@
 // 用例文本全部取自真实样张的噪声公式。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { prettifyLatex } from "../stages/latex-display.js";
+import { prettifyLatex, findCommandAmbiguities } from "../stages/latex-display.js";
 
 test("西塔：$\\theta \\left( \\theta < 9 0 ^ { \\circ } \\right)$ → θ(θ<90°)", () => {
   assert.equal(
@@ -106,4 +106,31 @@ test("LaTeX 不换行空格 ~ 还原为空格：10~kg → 10 kg", () => {
 test("放宽判据不误伤中文普通文本", () => {
   assert.equal(prettifyLatex("两球对容器的压力大小"), "两球对容器的压力大小");
   assert.equal(prettifyLatex("如图甲所示，物块沿斜面下滑"), "如图甲所示，物块沿斜面下滑");
+});
+
+// —— 命令切分歧义检测（提示级：机器无法从字面判断，只能报出来）——
+
+test("歧义检测：\\top 会报出——整串是 ⊤，也可能是 \\to + \"p\"", () => {
+  const hits = findCommandAmbiguities("$x \\top y$");
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0]!.command, "top");
+  assert.equal(hits[0]!.alternative, 'to + "p"');
+});
+
+test("歧义检测：\\int 会报出（也可能是 \\in + \"t\"）", () => {
+  const hits = findCommandAmbiguities("$\\int_0^1 f$");
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0]!.command, "int");
+});
+
+test("歧义检测：纯排版指令 \\left 豁免——不产生可见内容，切错也看不出", () => {
+  assert.equal(findCommandAmbiguities("$R \\left( R \\right)$").length, 0);
+});
+
+test("歧义检测：普通命令与真实样张文本不误报", () => {
+  assert.equal(findCommandAmbiguities("$\\theta + \\alpha = \\sin \\theta$").length, 0);
+  assert.equal(
+    findCommandAmbiguities("A.$\\sin \\ \\theta = { \\frac { k R } { m g } }$B.$\\cos \\theta$").length,
+    0,
+  );
 });

@@ -7,16 +7,20 @@
  * 即输出里没有反斜杠/花括号。但 \varepsilon 会被渲染成裸名字 "varepsilon"、
  * ^{:} 会被渲染成 "(:)"：语法干净、语义是错的，判据漏掉了一整类缺陷。
  *
- * 本工具把判据升级为**语义级**，并在**输入端**补一道覆盖率检测：
- *   1. 输出端可疑模式：^(标点)、_(标点)、残留 \ 与 {}、命令名裸奔
+ * 本工具把判据升级为**语义级**，并在**输入端**补两道检测：
+ *   1. 输出端可疑模式：^(标点)、_(标点)、残留 \ 与 {}、行尾裸上下标
  *   2. 输入端覆盖率：输入文本里的 \命令 是否都在渲染器已知集内
  *   3. 选项粘连：同一文本 ≥2 个选项标记却仍无分隔
+ *   4. 命令切分歧义（提示级）：整串是命令、其前缀也是命令——两种切法都合法，
+ *      原意只能从原卷图像得知（如 \top 可能是 ⊤，也可能是 \to + "p"）。
+ *      这一节**不计入退出码**：它报的是"机器无法判断、需人扫一眼"的信息，
+ *      不是确定的错误。报出来只产生"待确认项"，猜错才产生"无人察觉的错误"。
  *
  * 用法：node scripts/audit-render.mjs [docId]
- * 退出码：0 = 全部归零；1 = 有发现（可接入 CI / npm run check）
+ * 退出码：0 = 判定项全部归零；1 = 判定项有发现（可接入 CI / npm run check）
  */
 import { readFileSync } from "node:fs";
-import { prettifyLatex, KNOWN_COMMANDS } from "../stages/latex-display.js";
+import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities } from "../stages/latex-display.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
@@ -43,6 +47,7 @@ const OUT_PATTERNS = [
 
 const outHits = Object.fromEntries(OUT_PATTERNS.map(([n]) => [n, []]));
 const unknownCmds = new Map(); // 命令名 → 出现次数
+const ambiguityMap = new Map(); // "命令 → 另一种切法" → { n, sample }
 const stuckOptions = [];
 let total = 0;
 
@@ -69,6 +74,14 @@ for (const p of snap.pages) {
         }
         if (!covered) unknownCmds.set(name, (unknownCmds.get(name) ?? 0) + 1);
       }
+      // 命令切分歧义（提示级，见文件头说明）
+      for (const a of findCommandAmbiguities(raw)) {
+        const key = `\\${a.command} 也可能切成 \\${a.alternative}`;
+        if (!ambiguityMap.has(key)) {
+          ambiguityMap.set(key, { n: 0, sample: raw.slice(Math.max(0, a.index - 18), a.index + a.command.length + 12) });
+        }
+        ambiguityMap.get(key).n++;
+      }
       // 选项粘连：≥2 标记但标记间无空白
       const marks = shown.match(/[A-D][.．]/g);
       if (marks && marks.length >= 2 && /[^\s][A-D][.．]/.test(shown)) {
@@ -78,25 +91,37 @@ for (const p of snap.pages) {
   }
 }
 
+// 每节带 fatal 标志：false = 提示级，只展示不计入退出码
 const sections = [];
 for (const [name] of OUT_PATTERNS) {
-  sections.push([name, outHits[name]]);
+  sections.push([name, outHits[name], true]);
 }
-sections.push(["选项粘连未分隔", stuckOptions]);
-sections.push(["未覆盖的 LaTeX 命令", [...unknownCmds.entries()].map(([c, n]) => ({ shown: `\\${c} ×${n}` }))]);
+sections.push(["选项粘连未分隔", stuckOptions, true]);
+sections.push(["未覆盖的 LaTeX 命令", [...unknownCmds.entries()].map(([c, n]) => ({ shown: `\\${c} ×${n}` })), true]);
+sections.push([
+  "命令切分歧义（提示·需人工扫一眼）",
+  [...ambiguityMap.entries()].map(([k, v]) => ({ shown: `${k}  ×${v.n}`, sample: v.sample })),
+  false,
+]);
 
 console.log(`渲染审计 · ${docId}`);
 console.log(`扫描文本块 ${total} 个\n`);
 let bad = 0;
-for (const [name, list] of sections) {
-  const flag = list.length === 0 ? "✅" : "❌";
+let hints = 0;
+for (const [name, list, fatal] of sections) {
+  const flag = list.length === 0 ? "✅" : fatal ? "❌" : "⚠️";
   console.log(`${flag} ${name}：${list.length}`);
-  if (list.length > 0) bad += list.length;
+  if (list.length > 0) fatal ? (bad += list.length) : (hints += list.length);
   for (const x of list.slice(0, 6)) {
     const loc = x.p === undefined ? "" : `p${x.p} ${x.src}[${x.i}] `;
     console.log(`     ${loc}${JSON.stringify(x.shown)}`);
+    if (x.sample) console.log(`        …${JSON.stringify(x.sample)}`);
   }
   if (list.length > 6) console.log(`     …另有 ${list.length - 6} 条`);
 }
-console.log(bad === 0 ? "\n全部归零 ✅" : `\n合计 ${bad} 条待处理 ❌`);
+if (bad === 0) {
+  console.log(hints > 0 ? `\n判定项全部归零 ✅（另有 ${hints} 条提示，不影响退出码）` : "\n全部归零 ✅");
+} else {
+  console.log(`\n合计 ${bad} 条待处理 ❌`);
+}
 process.exit(bad === 0 ? 0 : 1);
