@@ -223,14 +223,18 @@ function desugar(s) {
       if (a) {
         const inner = desugar(a.text).trim();
         if (inner === "°") { out += "°"; i = a.end; continue; } // ^ { \circ } 特例
+        // MinerU 把上标数字 2 误认成正体冒号：原卷第 4 页第 1 题实为 Fsin²θ，
+        // 数据里却是 F \mathrm { s i n } ^ { \mathrm { : } } \theta → 还原为 ²。
+        // ⚠️ 曾把这类「纯标点上标」整体丢弃，导致平方消失（静默内容丢失）。
+        // 纠正原则：宁可还原一个高概率候选，也不静默丢掉信息。
+        if (ch === "^" && inner === ":") { out += "²"; i = a.end; continue; }
         const table = ch === "^" ? SUP : SUB;
         if (allMapped(inner, table)) {
           out += mapAll(inner, table);
         } else if (inner.length > 0 && inner.length <= 2 && !/[A-Za-z0-9]/.test(inner)) {
-          // 符号型上/下标：数学合法符号（′ ∘ ∗）直出；纯标点（: . , ; ( )）是上游 OCR
-          // 噪声——如 F\sin\theta 被 MinerU 误读成 F \mathrm{s i n} ^ { \mathrm{:} } \theta
-          // （原卷无上标），故丢弃而非渲染成 ^(:)
-          out += inner.replace(/[:.,;()\[\]{}'"]/g, "");
+          // 其余符号型上/下标（′ ∘ ∗ 等）直出；去掉包裹括号，其余字符**保留可见**
+          // ——不静默丢弃（丢了用户就再也看不到"这里原本有个上标"）
+          out += inner.replace(/[()\[\]{}]/g, "");
         } else if (ch === "^") {
           out += `^(${inner})`;
         } else {
@@ -270,7 +274,11 @@ export function separateOptionMarks(text) {
 }
 
 /** 收尾统一整理：选项分隔 + LaTeX 不换行空格 "~" 还原为普通空格（10~kg → 10 kg）。
- * 必须放在公式内空白折叠之后，否则 "~" 会被折叠掉导致数值与单位粘连。 */
+ * 必须放在公式内空白折叠之后，否则 "~" 会被折叠掉导致数值与单位粘连。
+ *
+ * ⚠️ 不要动段外文本的空格：原卷的数学排版本身就有空格（原卷第 4 页第 1 题实测
+ * "B. F sin θcos θ" 带空格）。2026-10-08 曾加过「收紧数学符号间空格」，
+ * 回原卷核对后发现与原卷不符，已回滚——**没有回原卷核对过的"美化"不要做**。 */
 function finalize(text) {
   return separateOptionMarks(text).replace(/~/g, " ");
 }

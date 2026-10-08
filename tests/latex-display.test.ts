@@ -60,10 +60,10 @@ test("无括号 \\frac12、嵌套 \\frac{\\sqrt{2}}{2}、\\overline", () => {
 
 // —— 以下用例来自 2026-10-08 全量渲染审计发现的真实缺陷（用户对比模式截图报出）——
 
-test("上标 OCR 噪声丢弃：$F \\mathrm{s i n} ^ { \\mathrm{:} } \\theta$ → Fsinθ（原卷无上标）", () => {
+test("上标 2 被 OCR 认成冒号 → 还原为 ²（原卷第 4 页第 1 题 Fsin²θ 实证）", () => {
   assert.equal(
     prettifyLatex("A.$F \\mathrm { s i n } ^ { \\mathrm { : } } \\theta$B. Fsin θcos θ"),
-    "A.Fsinθ B. Fsin θcos θ",
+    "A.Fsin²θ B. Fsin θcos θ", // 段外空格原样保留——原卷本身就有空格
   );
 });
 
