@@ -3,3 +3,5 @@
  * 实现见同目录 latex-display.js；红线：本目录不 import 引擎代码。
  */
 export function prettifyLatex(text: string): string;
+export function separateOptionMarks(text: string): string;
+export const KNOWN_COMMANDS: Set<string>;

@@ -18,7 +18,11 @@ const GREEK = {
   nu: "ν", xi: "ξ", pi: "π", Pi: "Π", rho: "ρ", sigma: "σ",
   Sigma: "Σ", tau: "τ", phi: "φ", Phi: "Φ", varphi: "φ",
   chi: "χ", psi: "ψ", omega: "ω", Omega: "Ω",
-  Gamma: "Γ", vartheta: "ϑ",
+  Gamma: "Γ", vartheta: "ϑ", varepsilon: "ε", varsigma: "ς", varkappa: "ϰ", varrho: "ϱ",
+  Xi: "Ξ", Upsilon: "Υ",
+  varGamma: "Γ", varDelta: "Δ", varTheta: "Θ", varLambda: "Λ",
+  varXi: "Ξ", varPi: "Π", varSigma: "Σ", varUpsilon: "Υ",
+  varPhi: "Φ", varPsi: "Ψ", varOmega: "Ω",
 };
 
 const SYMBOL = {
@@ -28,14 +32,45 @@ const SYMBOL = {
   to: "→", rightarrow: "→", leftarrow: "←", Rightarrow: "⇒",
   infty: "∞", prime: "′", degree: "°", angle: "∠",
   perp: "⊥", parallel: "∥", setminus: "∖", ldots: "…", dots: "…",
+  vdots: "⋮", ddots: "⋱", cdots: "⋯", colon: ":", therefore: "∴", because: "∵",
+  partial: "∂", nabla: "∇", sum: "∑", prod: "∏", int: "∫",
+  cup: "∪", cap: "∩", subset: "⊂", in: "∈", notin: "∉",
+  ast: "∗", star: "⋆", bullet: "•", longrightarrow: "⟶", ll: "≪", gg: "≫",
+  oplus: "⊕", ominus: "⊖", otimes: "⊗",
   sin: "sin", cos: "cos", tan: "tan", cot: "cot", log: "log", ln: "ln",
-  max: "max", min: "min", circ: "°",
+  max: "max", min: "min", circ: "°", square: "□", triangle: "△",
 };
 
 /** 命令后紧跟的花括号参数按内容展开、本身不显示（字体包装/上划线等） */
 const UNWRAP = new Set([
   "mathrm", "boldsymbol", "mathbf", "text", "it", "mathit", "mathcal",
-  "overline", "bar", "underline", "vec", "hat", "widetilde",
+  "overline", "bar", "underline", "vec", "hat", "widetilde", "widehat",
+  "overrightarrow", "overleftarrow", "operatorname", "textrm", "textbf",
+  "textit", "mathsf", "texttt", "mbox", "textnormal",
+]);
+
+/** 无参数、直接丢弃的命令（纯排版指令，非内容） */
+const DROP_CMD = new Set([
+  "displaystyle", "textstyle", "scriptstyle", "limits", "nolimits",
+  "quad", "qquad", "thinspace", "enspace", "mathstrut", "strut",
+  "left", "right", "big", "Big", "bigg", "Bigg",
+]);
+
+/** 参数非内容、需连参数一并丢弃的命令（否则 "red" 之类会裸奔） */
+const DROP_WITH_ARG = new Set([
+  "color", "textcolor", "hspace", "vspace", "kern", "mkern", "label", "tag",
+  "phantom", "hphantom", "vphantom",
+]);
+
+/**
+ * 渲染器已知命令集。两个用途：
+ * ① parseCommand 用它做「最长已知前缀」回退（MinerU 常把 "\theta B" 写成 "\thetaB"）；
+ * ② 导出给 scripts/audit-render.mjs 做输入端覆盖率检测——输出端查不到未知命令，
+ *    因为它们已被丢弃、不留痕迹，所以必须在输入端查。
+ */
+export const KNOWN_COMMANDS = new Set([
+  ...Object.keys(GREEK), ...Object.keys(SYMBOL), ...UNWRAP, ...DROP_CMD, ...DROP_WITH_ARG,
+  "frac", "dfrac", "tfrac", "sqrt",
 ]);
 
 const SUP = {
@@ -104,7 +139,19 @@ function parseCommand(s, i) {
     if (i < s.length && /[,;:!]/.test(s[i])) return { raw: s.slice(start, i + 1), end: i + 1, name: s[i] };
     return { raw: s[start] ?? "\\", end: start + 1, name: "" };
   }
-  return { raw: s.slice(start, i), end: i, name: s.slice(start + 1, i) };
+  const full = s.slice(start + 1, i);
+  if (KNOWN_COMMANDS.has(full)) return { raw: s.slice(start, i), end: i, name: full };
+  // MinerU 常把 "\theta B" 写成 "\thetaB"（无空格）。若贪婪读到的名字未知，
+  // 回退到「最长已知前缀」，余下字母留给正文——否则 "\thetaB" 会被整体当未知命令丢弃，
+  // 连真实存在的字符 "B"（选项标记）也一起消失。
+  for (let k = full.length - 1; k >= 1; k--) {
+    const cand = full.slice(0, k);
+    if (KNOWN_COMMANDS.has(cand)) {
+      const end = start + 1 + k;
+      return { raw: s.slice(start, end), end, name: cand };
+    }
+  }
+  return { raw: s.slice(start, i), end: i, name: full };
 }
 
 /**
@@ -152,9 +199,15 @@ function desugar(s) {
       }
       if (GREEK[name]) { out += GREEK[name]; i = cmd.end; continue; }
       if (SYMBOL[name]) { out += SYMBOL[name]; i = cmd.end; continue; }
-      if (name === "left" || name === "right") { i = cmd.end; continue; }
-      if (name === "circ") { out += "°"; i = cmd.end; continue; }
-      out += name; // 未知命令 → 裸名字（\sin 已在 SYMBOL，此处兜底）
+      if (DROP_CMD.has(name)) { i = cmd.end; continue; }
+      if (DROP_WITH_ARG.has(name)) {
+        let end = skipSpaces(s, cmd.end);
+        if (s[end] === "{") { const g = parseGroup(s, end); if (g) end = g.end; }
+        i = end;
+        continue;
+      }
+      // 未知命令：丢弃命令名本身，保留其参数内容——宁可少显示一处排版命令，
+      // 也绝不让 "\varepsilon" 这类命令名裸奔给用户看（旧实现的兜底就是裸名字）。
       i = cmd.end;
       continue;
     }
@@ -166,6 +219,11 @@ function desugar(s) {
         const table = ch === "^" ? SUP : SUB;
         if (allMapped(inner, table)) {
           out += mapAll(inner, table);
+        } else if (inner.length > 0 && inner.length <= 2 && !/[A-Za-z0-9]/.test(inner)) {
+          // 符号型上/下标：数学合法符号（′ ∘ ∗）直出；纯标点（: . , ; ( )）是上游 OCR
+          // 噪声——如 F\sin\theta 被 MinerU 误读成 F \mathrm{s i n} ^ { \mathrm{:} } \theta
+          // （原卷无上标），故丢弃而非渲染成 ^(:)
+          out += inner.replace(/[:.,;()\[\]{}'"]/g, "");
         } else if (ch === "^") {
           out += `^(${inner})`;
         } else {
@@ -185,18 +243,42 @@ function desugar(s) {
   return out;
 }
 
-/** 无 $ 定界但明显是公式（含 LaTeX 命令）的整块文本——如 MinerU 的裸 interline 公式块 */
-const LOOKS_LATEX = /\\(?:frac|sqrt|theta|mu|Delta|left|right|mathrm|boldsymbol|overline|setminus|vartheta|cdot|times|circ|alpha|beta|gamma|sin|cos|tan)\b/;
+/**
+ * 无 $ 定界但明显是公式的整块文本——如 MinerU 的裸 interline 公式块。
+ * 判据要宽：含任意 \命令，或「字母数字 + 上下标」（F _ { 1 }、x^2、m_a）。
+ * 旧判据是枚举命令名的窄表，导致含 \angle/\prime/\colon 或无命令的 F_{1}
+ * 这类文本原样输出、LaTeX 源码漏给用户（阶段 1 raw 层曾命中 12+ 处）。
+ */
+const LOOKS_LATEX = /\\[A-Za-z]+|[A-Za-z0-9]\s*[_^]/;
+
+/**
+ * 选项标记分隔：MinerU 丢失列间距后选项粘连成 "A.0.20B.0.30C.0.35D.0.45"。
+ * 仅当同一文本出现 ≥2 个选项标记时才在每个标记前补空格——单个 "A." 多为正文引用，
+ * 不动它，降低误伤。
+ */
+export function separateOptionMarks(text) {
+  const marks = text.match(/[A-D][.．]/g);
+  if (!marks || marks.length < 2) return text;
+  return text.replace(/([^\s])(?=[A-D][.．])/g, "$1 ");
+}
+
+/** 收尾统一整理：选项分隔 + LaTeX 不换行空格 "~" 还原为普通空格（10~kg → 10 kg）。
+ * 必须放在公式内空白折叠之后，否则 "~" 会被折叠掉导致数值与单位粘连。 */
+function finalize(text) {
+  return separateOptionMarks(text).replace(/~/g, " ");
+}
 
 /**
  * 展示用美化：$...$ 段内按 LaTeX 子集渲染并折叠空白（LaTeX 内空格无语义）；
- * 段外文本原样保留；无 $ 但含 LaTeX 命令的整块（裸公式块）也按公式渲染；
- * 不成对的 $ 视为噪声字符直接去掉（避免源码漏出）。
+ * 段外文本原样保留；无 $ 但含 LaTeX 的整块（裸公式块）也按公式渲染；
+ * 不成对的 $ 视为噪声字符直接去掉（避免源码漏出）；
+ * 末了统一做选项标记分隔（粘连可读性）。
  */
 export function prettifyLatex(text) {
   if (!text) return text;
   if (!text.includes("$")) {
-    return LOOKS_LATEX.test(text) ? desugar(text).replace(/\s+/g, "") : text;
+    const shown = LOOKS_LATEX.test(text) ? desugar(text).replace(/\s+/g, "") : text;
+    return finalize(shown);
   }
   let out = "";
   let i = 0;
@@ -213,5 +295,5 @@ export function prettifyLatex(text) {
     }
     i = j;
   }
-  return out;
+  return finalize(out);
 }

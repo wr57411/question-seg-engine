@@ -6,3 +6,7 @@ sample/*
 .DS_Store
 # SDD workspace（不入库）
 .superpowers/
+# 本地 Agent 工作区（记忆/日志，不入库）
+.workbuddy-ai/
+# 用户提供的资料 PDF（大文件，不入库）
+*.pdf

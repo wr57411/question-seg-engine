@@ -111,6 +111,11 @@ async function load() {
     history.replaceState(null, "", url);
   }
   $("doc-name").textContent = state.effectiveDoc;
+  // 直达阶段/页码：?stage=6&page=1（便于分享链接，也供截图审计免交互取图）
+  const wantStage = Number(params.get("stage"));
+  const wantPage = Number(params.get("page"));
+  if (Number.isInteger(wantStage) && wantStage >= 0 && wantStage < STAGES.length) state.stage = wantStage;
+  if (Number.isInteger(wantPage) && wantPage >= 0 && wantPage < state.data.pages.length) state.page = wantPage;
   $("link-viewer").href = `/viewer/?doc=${enc(state.effectiveDoc)}`;
   buildStepper();
   buildPager();
