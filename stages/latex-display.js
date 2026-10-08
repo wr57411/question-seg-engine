@@ -264,13 +264,17 @@ const LOOKS_LATEX = /\\[A-Za-z]+|[A-Za-z0-9]\s*[_^]/;
 
 /**
  * 选项标记分隔：MinerU 丢失列间距后选项粘连成 "A.0.20B.0.30C.0.35D.0.45"。
- * 仅当同一文本出现 ≥2 个选项标记时才在每个标记前补空格——单个 "A." 多为正文引用，
+ * 仅当同一文本出现 ≥2 个选项标记时才在每个标记前补分隔——单个 "A." 多为正文引用，
  * 不动它，降低误伤。
+ *
+ * 分隔用 EM SPACE（U+2003）而非普通空格：原卷的 A/B 是分列排版、间距约等于选项
+ * 文本宽度（第 2 页第 10 题原卷 300dpi 裁剪实测），普通空格视觉上仍"靠得近"；
+ * 且 HTML 会把连续普通空格折叠成一个。
  */
 export function separateOptionMarks(text) {
   const marks = text.match(/[A-D][.．]/g);
   if (!marks || marks.length < 2) return text;
-  return text.replace(/([^\s])(?=[A-D][.．])/g, "$1 ");
+  return text.replace(/([^\s])(?=[A-D][.．])/g, "$1\u2003");
 }
 
 /** 收尾统一整理：选项分隔 + LaTeX 不换行空格 "~" 还原为普通空格（10~kg → 10 kg）。

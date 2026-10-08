@@ -14,7 +14,7 @@ test("西塔：$\\theta \\left( \\theta < 9 0 ^ { \\circ } \\right)$ → θ(θ<9
 test("度数与数字空格噪声：A.$6 0 ^ { \\circ }$B.45°C.$3 7 ^ { \\circ }$ → A.60°…", () => {
   assert.equal(
     prettifyLatex("A.$6 0 ^ { \\circ }$B.45°C.$3 7 ^ { \\circ }$D.$3 0 ^ { \\circ }$"),
-    "A.60° B.45° C.37° D.30°", // 选项标记分隔：≥2 个标记时补空格
+    "A.60°\u2003B.45°\u2003C.37°\u2003D.30°", // 选项标记分隔：≥2 个标记时补 EM SPACE
   );
 });
 
@@ -48,7 +48,7 @@ test("真实样张第 5 题选项行（\\ 空格命令 + 分组花括号 + 嵌�
     prettifyLatex(
       "A.$\\sin \\ \\theta = { \\frac { k R } { m g } }$B.$\\sin \\ \\theta = \\frac { 2 k R } { m g }$",
     ),
-    "A.sinθ=(kR/mg) B.sinθ=(2kR/mg)",
+    "A.sinθ=(kR/mg)\u2003B.sinθ=(2kR/mg)",
   );
 });
 
@@ -63,7 +63,7 @@ test("无括号 \\frac12、嵌套 \\frac{\\sqrt{2}}{2}、\\overline", () => {
 test("上标 2 被 OCR 认成冒号 → 还原为 ²（原卷第 4 页第 1 题 Fsin²θ 实证）", () => {
   assert.equal(
     prettifyLatex("A.$F \\mathrm { s i n } ^ { \\mathrm { : } } \\theta$B. Fsin θcos θ"),
-    "A.Fsin²θ B. Fsin θcos θ", // 段外空格原样保留——原卷本身就有空格
+    "A.Fsin²θ\u2003B. Fsin θcos θ", // 段外空格原样保留——原卷本身就有空格
   );
 });
 
@@ -90,10 +90,10 @@ test("非内容参数的命令连参数丢弃：\\color { red } x → x", () => 
   assert.equal(prettifyLatex("$\\color { red } x$"), "x");
 });
 
-test("选项粘连分隔：A.0.20B.0.30C.0.35D.0.45 → 补空格", () => {
+test("选项粘连分隔：A.0.20B.0.30C.0.35D.0.45 → 补 EM SPACE（原卷为分列排版）", () => {
   assert.equal(
     prettifyLatex("A.0.20B.0.30C.0.35D.0.45"),
-    "A.0.20 B.0.30 C.0.35 D.0.45",
+    "A.0.20\u2003B.0.30\u2003C.0.35\u2003D.0.45",
   );
   // 单个标记（正文引用）不动
   assert.equal(prettifyLatex("如图A.所示"), "如图A.所示");
