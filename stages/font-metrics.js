@@ -67,10 +67,13 @@ export function fontFromLineHeight(hPx) {
 }
 
 /**
- * 页面基准字号（画布 px）：由该页**不含公式/上下标**的文本行 bbox 高推算（取中位数）。
+ * 页面基准字号（画布 px）：由该页**不含 LaTeX 源码**（`hasMathSource` 未命中）的文本行
+ * bbox 高推算（取中位数）。
  *
  * 为什么需要它：含 \frac 的行，bbox 高包含分式分子/分母的上下延伸，**远大于字号**
  * （第 2 页实测 22pt vs 正文 11pt）——直接按它推字号会让这些行字号翻倍。
+ * 判据统一到 `hasMathSource`（Task 10）：凡含 LaTeX 源码的行都不作样本，与
+ * `fontForBlock` 的「含 LaTeX 源码即用基准字号」口径一致。
  * 用中位数而非均值，是为了不被标题（字号本来就大）拉偏。
  *
  * @param {Array<{kind?: string, text?: string, bbox: number[]}>|undefined} blocks 页面块（pt 坐标）
@@ -82,7 +85,7 @@ export function baseFontOfPage(blocks, pageWidth, canvasW) {
   const hs = [];
   for (const b of blocks ?? []) {
     if (b.kind !== "text" || !b.text) continue;
-    if (/\\frac|\\sqrt|[_^]/.test(b.text)) continue;
+    if (hasMathSource(b.text)) continue; // 含 LaTeX 源码的行（bbox 高可能被二维结构撑高）不作样本
     hs.push(b.bbox[3] - b.bbox[1]);
   }
   if (!hs.length) return null;
@@ -119,9 +122,15 @@ export function isVerticalText(bbox, text) {
 }
 
 /** 块的渲染字号：纯文本行按自身行高推算（标题自然更大，层级自动复现 F7）；
- * 含公式/上下标的行用页面基准字号（避免分式撑高 bbox 导致字号翻倍）。
+ * 含 LaTeX 源码的行用页面基准字号（避免分式撑高 bbox 导致字号翻倍）。
  * baseFont 为 null 时回退到自身行高推算。
  * 竖排块（R4）改取 bboxW 当行高——见 isVerticalText。
+ *
+ * 判据统一到 `hasMathSource`（Task 10）：此前此处用一条**只认 \frac/\sqrt/下标 的窄正则**，
+ * 比 `clampByWidth` 的 `hasMathSource`（更宽，含 `\`/`$`）窄 —— 含 `\angle A O B` 这类
+ * 「有 `\` 无 `_^`」的块**一边走高度模型（字号偏大）、一边被豁免宽度夹子（无宽度兜底）**
+ * → 第 9 页溢出叠字。
+ * 现两处判据同源：含 LaTeX 源码的块一律用页面基准字号，且不参与宽度夹子。
  *
  * @param {{text?: string, bbox: number[]}} block
  * @param {number} pageWidth 页面宽度（pt）
@@ -133,7 +142,7 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
     // 竖排：行高取 bboxW（横轴），否则用 bboxH 会把「文字长度」当行高 → 字号失控
     return fontFromLineHeight(((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW);
   }
-  if (baseFont && /\\frac|\\sqrt|[_^]/.test(block.text ?? "")) return baseFont;
+  if (baseFont && hasMathSource(block.text ?? "")) return baseFont;
   return fontFromLineHeight(((block.bbox[3] - block.bbox[1]) / pageWidth) * canvasW);
 }
 

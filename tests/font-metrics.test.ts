@@ -94,6 +94,46 @@ test("fontForBlock：纯文本块始终按自身行高推算（标题自然更�
   assert.equal(fontForBlock(plain, PAGE_W, CANVAS_W, 12.3), fontFromLineHeight((15 / PAGE_W) * CANVAS_W));
 });
 
+// ── Task 10：判据统一（含 LaTeX 源码一律用 baseFont，与 clampByWidth 同源）──────────
+
+test("fontForBlock：含 \\angle（有反斜杠、无 _^）的块返回 baseFont —— 判据统一到 hasMathSource", () => {
+  // 此前用窄正则（只认 \frac/\sqrt/下标），`\angle A O B` 不命中 → 走行高模型。
+  // bboxH=30pt 被二维结构撑高，行高推算会给出偏大的字号（正是第 9 页溢出的来源）。
+  const angle = { kind: "text", text: "\\angle A O B", bbox: [0, 0, 80, 30] };
+  assert.equal(hasMathSource(angle.text), true, "前提：\\angle 含反斜杠 → 命中 hasMathSource");
+  assert.equal(fontForBlock(angle, PAGE_W, CANVAS_W, 12.3), 12.3); // 现用页面基准字号
+  // 对照：旧窄判据不命中 → 会走行高模型，字号 ≠ baseFont（且更大）
+  const byLineHeight = fontFromLineHeight((30 / PAGE_W) * CANVAS_W);
+  assert.notEqual(fontForBlock(angle, PAGE_W, CANVAS_W, 12.3), byLineHeight);
+  assert.ok(byLineHeight > 12.3, "行高模型确实会给出更大的字号（故统一判据是缩小方向）");
+});
+
+test("fontForBlock：含 $（美元符、无 _^）的块返回 baseFont —— 判据统一到 hasMathSource", () => {
+  const dollar = { kind: "text", text: "$v$", bbox: [0, 0, 40, 40] };
+  assert.equal(hasMathSource(dollar.text), true);
+  assert.equal(fontForBlock(dollar, PAGE_W, CANVAS_W, 12.3), 12.3);
+});
+
+test("fontForBlock：纯文本块仍按自身行高推算（不含 LaTeX 源码不受本条裁定影响）", () => {
+  const plain = { kind: "text", text: "重力弹力", bbox: [0, 0, 60, 15] };
+  assert.equal(hasMathSource(plain.text), false);
+  assert.equal(fontForBlock(plain, PAGE_W, CANVAS_W, 12.3), fontFromLineHeight((15 / PAGE_W) * CANVAS_W));
+});
+
+test("baseFontOfPage：含 \\angle（有反斜杠、无 _^）的行同样被排除出样本 —— 判据同源", () => {
+  // 统一前该行不被排除（旧窄正则不命中）→ 会参与中位数；统一后与 \frac 行同等待遇
+  const blocks = [
+    { kind: "text", text: "正文甲", bbox: [0, 0, 100, 14] },
+    { kind: "text", text: "正文乙", bbox: [0, 0, 100, 15] },
+    { kind: "text", text: "正文丙", bbox: [0, 0, 100, 16] },
+    { kind: "text", text: "\\angle A O B", bbox: [0, 0, 100, 40] }, // 含 \ → 须排除
+  ];
+  const base = baseFontOfPage(blocks, PAGE_W, CANVAS_W);
+  assert.equal(base, fontFromLineHeight((15 / PAGE_W) * CANVAS_W)); // 中位仍为 15（4 块排序后取 index 2 会是 16 若未排除）
+  assert.notEqual(base, fontFromLineHeight((16 / PAGE_W) * CANVAS_W));
+});
+
+
 // ── Task 4：适用边界（R1 段级块 / R2 栏宽口径 / R4 竖排块）────────────────────
 
 test("isVerticalText：bboxH > 2×bboxW 且当量宽 ≥2 命中；bboxH == 2×bboxW 严格不算竖排", () => {
