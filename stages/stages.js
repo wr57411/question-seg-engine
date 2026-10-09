@@ -9,7 +9,7 @@
 import { prettifyLatex } from "./latex-display.js";
 import { baseFontOfPage, clampByWidth, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
 import { contentLabelPlacements } from "./uncovered-layout.js";
-import { crossBlockMerges } from "./block-dedup.js";
+import { mergePlan } from "./block-dedup.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -247,16 +247,10 @@ function blockNode(b, p, canvasW = CANVAS_W, baseFont = null, mergeCtx = null) {
   return node;
 }
 
-/** 本页并集合并上下文：{ drop:Set<i>, keep:Map<i, {text,bbox}> }（block-dedup.js）。 */
+/** 本页并集合并上下文：{ drop:Set<i>, keep:Map<i, {text,bbox}> }（block-dedup.js）。
+ *  派生逻辑（含「不可合并则不丢弃」不变式）在 `mergePlan` 内，只此一处实现、有测试锁定。 */
 function mergeContext(p) {
-  const drop = new Set();
-  const keep = new Map();
-  for (const m of crossBlockMerges(p.blocks)) {
-    drop.add(m.dropI);
-    if (m.merged) keep.set(m.keepI, { text: m.text, bbox: m.bbox });
-    // merged === null（命中但无法合并）→ 两块都原样渲染，不处理
-  }
-  return { drop, keep };
+  return mergePlan(p.blocks);
 }
 
 /** 追加本页行级块节点（跳过被合并掉的块；返回与 p.blocks 对齐的节点数组，null = 未渲染）。 */

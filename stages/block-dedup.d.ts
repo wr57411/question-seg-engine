@@ -44,3 +44,12 @@ export function unionBbox(ba: number[], bb: number[]): number[];
 
 /** 本页同页块级重复的合并计划（块内折叠先做、跨块合并后做）。 */
 export function crossBlockMerges(blocks: DedupBlock[] | undefined): MergeRecord[];
+
+/**
+ * 由合并计划派生渲染上下文。**不变式**：只有 `merged !== null`（真的合并成功）
+ * 才把 `dropI` 计入 `drop`；命中但无法合并时两块都原样渲染（`drop` 不含任何一方）。
+ */
+export function mergePlan(blocks: DedupBlock[] | undefined): {
+  drop: Set<number>;
+  keep: Map<number, { text: string; bbox: number[] }>;
+};

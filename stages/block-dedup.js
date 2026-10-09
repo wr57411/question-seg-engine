@@ -196,3 +196,24 @@ export function crossBlockMerges(blocks) {
   }
   return out;
 }
+
+/**
+ * 由合并计划派生**渲染上下文**（`drop` 集 / `keep` 映射），供 `stages.js` 直接消费。
+ *
+ * ⚠️ 关键不变式（G1：不静默失败）：**只有真的合并成功（`merged !== null`）才丢弃 `dropI`**。
+ * 命中但无法合并（`merged === null`）时**两块都必须原样渲染** —— 若无条件 `drop.add(dropI)`，
+ * 该块**没有对应的 keep 条目**，会被静默丢弃（丢内容）。修复轮 2 的 Critical 即此。
+ * 把「丢弃」与「保留」**绑定在同一分支**，使这条不变式只有一处实现、可被测试锁定。
+ * @param {{i:number,kind?:string,text?:string,bbox:number[]}[]|undefined} blocks
+ * @returns {{drop:Set<number>, keep:Map<number,{text:string,bbox:number[]}>}}
+ */
+export function mergePlan(blocks) {
+  const drop = new Set();
+  const keep = new Map();
+  for (const m of crossBlockMerges(blocks)) {
+    if (!m.merged) continue; // 命中但无法合并 → 两块都原样渲染，不丢弃、不保留
+    drop.add(m.dropI);
+    keep.set(m.keepI, { text: m.text, bbox: m.bbox });
+  }
+  return { drop, keep };
+}

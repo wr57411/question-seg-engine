@@ -16,6 +16,7 @@ import {
   dedupPlainText,
   isCrossBlockDuplicate,
   longestCommonSubstring,
+  mergePlan,
   mergeTexts,
   unionBbox,
 } from "../stages/block-dedup.js";
@@ -153,6 +154,35 @@ test("crossBlockMerges：命中但无法合并 → merged=null（保留原样不
   assert.equal(ms.length, 1);
   assert.ok(ms[0]);
   assert.equal(ms[0].merged, null);
+});
+
+// ── 渲染上下文 mergePlan（修复轮 2 的 Critical：不可合并时**不得丢弃**）──────────────
+test("mergePlan：可合并的命中 → 并入块进 drop、承载块进 keep", () => {
+  const plan = mergePlan([BLK23, BLK25]);
+  assert.deepEqual([...plan.drop], [25]);
+  assert.equal(plan.keep.size, 1);
+  assert.equal(plan.keep.get(23)?.text, TARGET_MERGED);
+  assert.deepEqual(plan.keep.get(23)?.bbox, [49, 448, 272, 462]);
+});
+
+test("mergePlan【Critical 回归】不可合并的命中 → 两块都不被丢弃（drop 为空）", () => {
+  // 结构判据命中（同一行 + 横向相交 + 公共子串「甲乙丙」=3），但文本无法拼接 → merged=null
+  const a = { i: 1, kind: "text", bbox: [10, 100, 90, 114], text: "前言甲乙丙丁" };
+  const b = { i: 2, kind: "text", bbox: [40, 100, 120, 114], text: "甲乙丙戊" };
+  assert.equal(isCrossBlockDuplicate(a, b), true); // 命中
+  assert.equal(crossBlockMerges([a, b])[0]?.merged, null); // 但不可合并
+  const plan = mergePlan([a, b]);
+  // 不可合并 ⇒ 两块都原样渲染：drop 不得包含任一方（无条件 drop.add 会在此静默丢块）
+  assert.equal(plan.drop.size, 0);
+  assert.equal(plan.keep.size, 0);
+  assert.equal(plan.drop.has(1), false);
+  assert.equal(plan.drop.has(2), false);
+});
+
+test("mergePlan：无命中 / undefined → 空上下文", () => {
+  assert.equal(mergePlan([BLK23]).drop.size, 0);
+  assert.equal(mergePlan(undefined).drop.size, 0);
+  assert.equal(mergePlan(undefined).keep.size, 0);
 });
 
 test("dedupPlainText：去 LaTeX 命令/定界符/空白（`_`/`^` 保留）", () => {
