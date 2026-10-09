@@ -53,6 +53,11 @@
  *      基线+容忍」；区域先分类为内容级/家具级（判据见 export-stages.ts classifyUncovered）。
  *      动机：第 5 页滑轮题 C 续行在三层 MinerU 输出里全都不存在，而选项键齐全 ⇒ 既有检查
  *      看不见（静默）。详见脚本内第 10 节注释。
+ *  11. **同页块级重复（Task 15，提示级）**：上游把**同一物理行**读成两个 bbox 重叠的块
+ *      （p8 第 8 题 D），渲染后文字互相压叠（叠字）。展示层只渲染「信息更全（文本更长）」的那块，
+ *      另一块画淡虚线框 + title（G1：保留可见优于静默删除）。判据只此一处定义在
+ *      `stages/block-dedup.js`。本节把**每一处命中与处置**（保留谁 / 丢弃谁及其原文）全量列出，
+ *      使这条「不渲染」可见而非静默。提示级，不计退出码。
  *
  * 用法：node scripts/audit-render.mjs [docId]
  * 退出码：0 = 判定项全部归零；1 = 判定项有发现（可接入 CI / npm run check）
@@ -60,6 +65,7 @@
 import { readFileSync } from "node:fs";
 import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediateRepeat, spaceEmptyParens } from "../stages/latex-display.js";
 import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasTwoDimensionalMath, renderedTextOf, clampByWidth } from "../stages/font-metrics.js";
+import { droppedDuplicateIndices, isCrossBlockDuplicate } from "../stages/block-dedup.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
@@ -473,6 +479,39 @@ const REPEAT_MAX = 12;
     console.log(`     p${x.p} ${x.src}[${x.i}] ${JSON.stringify(x.shown)}`);
   }
   hints += emptyParenSpaced.length; // 提示项：计入提示总数（不影响退出码）
+}
+
+// ── 11. 同页块级重复（Task 15；**提示级**：全量列出，不计退出码）──────────────────
+// 背景：上游把**同一物理行**读成两个 bbox 重叠的块（p8 第 8 题 D：
+//   blocks[23] "D. 绳a的拉力D. 绳a的拉力$F_{a}$增大.杆的压" bbox=[49,448,204,462]
+//   blocks[25] "增大，杆的压力F大小不变"                    bbox=[136,449,272,462]），
+//   两块 y 区间几乎完全重合 ⇒ 渲染后文字互相压叠（叠字）。
+// 处置：展示层（stages.js）只渲染「信息更全（文本更长）」的那块，另一块**不渲染文字**，
+//   改画极淡虚线框 + title（G1：保留可见优于静默删除）。判据只此一处定义在 `stages/block-dedup.js`。
+// 本节把**每一处命中与处置**（保留谁 / 丢弃谁及其原文）全量列出，使这条「不渲染」可见而非静默。
+// 提示级，不计退出码：判据保守（全卷仅 1 处命中），且每一处都必须回原卷核对「原卷只有一份」
+//   （核不到的「原卷确有两份」不处理，见 Task 15 报告）。本审计只读快照、不读 PDF。
+{
+  const rows = [];
+  for (const p of snap.pages) {
+    const blocks = p.blocks ?? [];
+    const drop = droppedDuplicateIndices(blocks);
+    for (const di of drop) {
+      const dropped = blocks.find((b) => b.i === di);
+      if (!dropped) continue;
+      const kept = blocks.find((b) => b.i !== di && isCrossBlockDuplicate(b, dropped));
+      rows.push({ p: p.index, kept, dropped });
+    }
+  }
+  console.log(`\n⚠️ 同页块级重复（提示项，不计退出码）：命中 ${rows.length} 处（丢弃 ${rows.length} 块）`);
+  console.log("     判据（stages/block-dedup.js，只此一处定义）：同页 + 同一行（y 重叠比 ≥ 0.6）");
+  console.log("     + 横向相交 + 纯文本最长公共子串 ≥ 3。处置：保留文本更长者，另一块不渲染");
+  console.log("     （淡虚线框 + title，G1：保留可见优于静默删除）。每处均须回原卷核对「原卷只有一份」。");
+  for (const r of rows) {
+    console.log(`     p${r.p} 保留 blocks[${r.kept?.i}] ${JSON.stringify((r.kept?.text ?? "").slice(0, 60))}`);
+    console.log(`         丢弃 blocks[${r.dropped.i}] ${JSON.stringify(r.dropped.text.slice(0, 60))}`);
+  }
+  hints += rows.length; // 提示项：计入提示总数（不影响退出码）
 }
 
 // ── 9. 画布边界裁切估算（**提示项**，不计退出码）────────────────────────────────

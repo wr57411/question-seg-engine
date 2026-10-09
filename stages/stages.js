@@ -9,6 +9,7 @@
 import { prettifyLatex } from "./latex-display.js";
 import { baseFontOfPage, clampByWidth, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
 import { contentLabelPlacements } from "./uncovered-layout.js";
+import { droppedDuplicateIndices } from "./block-dedup.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -49,7 +50,7 @@ const EXPLAIN = {
   },
   compare: {
     do: "左边是原卷，右边是用结构化数据按原始坐标重建的纸面——引擎读到什么就画什么，不借助原卷图像。排版保真度一目了然。",
-    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。**洋红标记框=「解析遗漏·内容级」**（原卷有墨迹、解析块没覆盖到，含上游漏识别的整行/整段）；**灰色细虚线=「解析遗漏·家具级」**（页眉装饰/栏间竖线/页边标等版式墨迹，非内容丢失，悬停看详情）。",
+    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。**洋红标记框=「解析遗漏·内容级」**（原卷有墨迹、解析块没覆盖到，含上游漏识别的整行/整段）；**灰色细虚线=「解析遗漏·家具级」**（页眉装饰/栏间竖线/页边标等版式墨迹，非内容丢失，悬停看详情）；**淡虚线小框=「重复块·未渲染」**（上游把同一行读成两个重叠块，只渲染信息更全的那块，悬停看被丢弃块的原文）。",
   },
 };
 
@@ -214,9 +215,17 @@ function posStyle(node, bbox, w, h) {
 const CANVAS_W = 760; // 与 CSS --canvas-w 一致，用于字号换算
 // 字号与全角宽度度量见 ./font-metrics.js（纯函数模块，有测试锁定；证据见其头注释）。
 
-/** 行级块节点（阶段 2/3 与对比模式共用；canvasW 为画布像素宽，用于字号换算） */
-function blockNode(b, p, canvasW = CANVAS_W, baseFont = null) {
+/** 行级块节点（阶段 2/3 与对比模式共用；canvasW 为画布像素宽，用于字号换算）
+ *  dupSet：本页「同页块级重复」中**应丢弃渲染**的块下标（block-dedup.js 判据，只此一处定义）。
+ *  命中的块不渲染文字，改画极淡虚线框 + title（G1：保留可见优于静默删除）。 */
+function blockNode(b, p, canvasW = CANVAS_W, baseFont = null, dupSet = null) {
   const node = posStyle(el("div", `blk blk-line kind-${b.kind}`), b.bbox, p.width, p.height);
+  // 同页块级重复：上游把同一行读成两个 bbox 重叠的块 → 只渲染信息更全（文本更长）的那块。
+  if (dupSet && dupSet.has(b.i)) {
+    node.classList.add("blk-dup");
+    node.title = `与相邻块重复（上游把同一行读成两块），未渲染；原文：${b.text}`;
+    return node;
+  }
   node.title = b.text;
   if (b.kind === "image" && b.img) {
     const img = el("img");
@@ -361,7 +370,8 @@ function renderOrder(p) {
     c.append(left, right, divider);
   }
   const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
-  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFont));
+  const dup = droppedDuplicateIndices(p.blocks); // 同页块级重复（Task 15）
+  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFont, dup));
   p.order.forEach((blockIdx, seq) => {
     const b = p.blocks[blockIdx];
     if (!b) return;
@@ -377,7 +387,8 @@ function renderOrder(p) {
 function renderSeg(p) {
   const c = paperCanvas(p);
   const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
-  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFont));
+  const dup = droppedDuplicateIndices(p.blocks); // 同页块级重复（Task 15）
+  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFont, dup));
 
   const covered = new Set();
   for (const q of p.questions) for (const i of q.blocks) covered.add(i);
@@ -583,7 +594,8 @@ function renderCompare(p) {
   const PANE_W = 460; // 与 CSS .compare-pane 一致，用于字号换算
   renderDiscardedInto(c, p, PANE_W); // 对比栏宽口径：丢弃块也必须用 PANE_W（R2）
   const baseFont = baseFontOfPage(p.blocks, p.width, PANE_W);
-  for (const b of p.blocks) c.append(blockNode(b, p, PANE_W, baseFont));
+  const dup = droppedDuplicateIndices(p.blocks); // 同页块级重复（Task 15）
+  for (const b of p.blocks) c.append(blockNode(b, p, PANE_W, baseFont, dup));
   for (const q of p.questions) {
     const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);
     if (!first) continue;
@@ -604,6 +616,7 @@ function renderCompare(p) {
     legend([
       ["rgba(216,27,96,.85)", "解析遗漏·内容级：原卷有墨迹、解析块未覆盖（疑似漏识别正文）"],
       ["transparent", "解析遗漏·家具级：页眉装饰/栏间竖线/页边标等版式墨迹（灰细虚线，悬停看详情）"],
+      ["rgba(43,42,38,.10)", "重复块·未渲染：上游把同一行读成两个重叠块，仅渲染信息更全者（淡虚线框，悬停看原文）"],
     ]),
   );
 }
