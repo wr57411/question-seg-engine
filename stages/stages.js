@@ -48,7 +48,7 @@ const EXPLAIN = {
   },
   compare: {
     do: "左边是原卷，右边是用结构化数据按原始坐标重建的纸面——引擎读到什么就画什么，不借助原卷图像。排版保真度一目了然。",
-    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。",
+    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。**粉红标记框=「解析遗漏」**：该处原卷有墨迹、但解析块没覆盖到（含上游漏识别的整行/整段）。",
   },
 };
 
@@ -272,12 +272,28 @@ function renderRaw(p) {
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
+  uncoveredInto(c, p, CANVAS_W); // 阶段 1 也标出解析遗漏（Task 16）
   return c;
 }
 
 const DISCARDED_LABEL = {
   header: "页眉", footer: "页脚", page_number: "页码", aside_text: "侧栏",
 };
+
+/**
+ * 未覆盖墨迹（Task 16）：解析漏掉的墨迹区域 —— 醒目标记框 + 「解析遗漏」标签。
+ * 这是「不静默失败」红线的**地面真值呈现**：区域来自原卷页图与全部解析块的差集
+ * （见 scripts/export-stages.ts 的 computeInkCoverage），上游漏识别必须肉眼可见。
+ * 标签放在框内左上角：该处本就没有渲染内容，标签不会遮住任何东西。
+ */
+function uncoveredInto(c, p, canvasW = CANVAS_W) {
+  for (const r of p.uncovered ?? []) {
+    const node = posStyle(el("div", "uncovered-mark"), r.bbox, p.width, p.height);
+    node.title = `解析遗漏：该区域在原卷页图上是墨迹，却不在本页任何解析块内（未覆盖 ${r.area}px）`;
+    node.append(el("span", "uncovered-tag", "解析遗漏"));
+    c.append(node);
+  }
+}
 
 /** 丢弃块（页眉/页脚/页码/侧栏）：虚线灰块呈现——原卷上有、解析器判为家具的内容。
  * canvasW 为**该视图**的画布像素宽：阶段 1–5 传 CANVAS_W(760)、对比模式传 PANE_W(460)；
@@ -369,6 +385,7 @@ function renderSeg(p) {
       c.append(chip);
     }
   }
+  uncoveredInto(c, p, CANVAS_W); // 阶段 3 也标出解析遗漏（Task 16）
   return c;
 }
 
@@ -552,10 +569,14 @@ function renderCompare(p) {
     chip.addEventListener("click", () => showDetail(q, p));
     c.append(chip);
   }
+  uncoveredInto(c, p, PANE_W); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
   right.append(c);
 
   row.append(left, right);
   $("canvas-wrap").append(row);
+  $("canvas-wrap").append(
+    legend([["rgba(216,27,96,.85)", "解析遗漏：原卷有墨迹、解析块未覆盖的区域"]]),
+  );
 }
 
 function render() {

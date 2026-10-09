@@ -378,6 +378,38 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   padding: 0 6px;
 }
 
+/* ── 解析遗漏标记（Task 16）────────────────────────────────────
+   未覆盖墨迹：原卷页图上是墨迹、却不在本页任何解析块内的区域。
+   这是「不静默失败」红线的地面真值呈现 —— 上游漏识别必须肉眼可见。
+   用洋红（区别于题框的石青/朱砂/灰）以免与既有语义色混淆。 */
+.uncovered-mark {
+  position: absolute;
+  border: 2px solid #d81b60;
+  background: rgba(216, 27, 96, 0.1);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85), 0 0 7px rgba(216, 27, 96, 0.55);
+  z-index: 7;
+  pointer-events: none;
+  animation: uncovered-pulse 1.6s ease-in-out infinite;
+}
+.uncovered-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font-family: var(--sans);
+  font-size: 10px;
+  line-height: 14px;
+  padding: 0 5px;
+  border-radius: 0 0 2px 0;
+  background: #d81b60;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+@keyframes uncovered-pulse {
+  0%, 100% { background: rgba(216, 27, 96, 0.07); }
+  50% { background: rgba(216, 27, 96, 0.22); }
+}
+
 .legend {
   display: flex; gap: 14px; flex-wrap: wrap;
   font-size: 12px; color: var(--ink-soft);

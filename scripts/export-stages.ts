@@ -8,8 +8,9 @@
  * 运行：npm run stages:export [-- <docId> <layoutPath>]
  * 默认：docId = 23必刷题 2相互作用，layout = data/smoke/unpacked/layout.json
  */
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { segmentFromLayout } from "../src/index.js";
@@ -44,6 +45,39 @@ export interface StageBlock {
   img?: string;
 }
 
+/**
+ * 未覆盖墨迹区域（Task 16）：页图上是墨迹、但不在该页**任何** bbox
+ * （blocks + raw + discarded，含图片块）内的连通区域。
+ * `bbox` 用 **PDF 点**（与既有字段同口径）；`area` 为区域内的未覆盖墨迹像素数。
+ * 这是「上游漏识别」的地面真值信号 —— 展示层据此画「解析遗漏」标记。
+ */
+export interface UncoveredRegion {
+  bbox: BBox;
+  area: number;
+}
+
+/** 逐页墨迹覆盖统计（Task 16；供审计在不读 PDF 的前提下算占比） */
+export interface InkCoverage {
+  /** 渲染 DPI（scale = dpi/72） */
+  dpi: number;
+  /** 二值化阈值（灰度 < threshold 判为墨） */
+  threshold: number;
+  /** bbox 外扩像素 */
+  expandPx: number;
+  /** 聚类膨胀半径像素 */
+  dilatePx: number;
+  /** 区域面积下限像素 */
+  minAreaPx: number;
+  /** 全卷墨迹像素总数 */
+  totalInkPx: number;
+  /** 全卷未覆盖墨迹像素总数（未过面积下限） */
+  uncoveredPx: number;
+  /** 全卷未覆盖占比 = uncoveredPx / totalInkPx */
+  ratio: number;
+  /** 逐页数字 */
+  pages: { index: number; inkPx: number; uncoveredPx: number; ratio: number }[];
+}
+
 export interface StageQuestion {
   id: string;
   number: string;
@@ -68,6 +102,11 @@ export interface StagePage {
   /** 阅读顺序的块 i 序列（数组下标即顺序号） */
   order: number[];
   questions: StageQuestion[];
+  /**
+   * 未覆盖墨迹区域（Task 16，PDF 点）：页图上是墨迹但不在该页任何 bbox 内的连通区域。
+   * 空数组 = 无发现；旧快照或未跑墨迹分析时也缺省为空。**仅新增字段，不改既有字段语义。**
+   */
+  uncovered: UncoveredRegion[];
 }
 
 export interface StageSnapshot {
@@ -81,6 +120,11 @@ export interface StageSnapshot {
   originPages: number;
   /** 公式噪声检测报告（检测不改写） */
   formulaNoise: FormulaNoiseReport;
+  /**
+   * 墨迹覆盖率统计（Task 16）。null = 未做（pdftoppm 不可用 / 无原卷 PDF）——
+   * 审计据此**优雅降级**（跳过该节，不报错）。
+   */
+  inkCoverage: InkCoverage | null;
   pages: StagePage[];
   reviews: SegmentationResult["reviews"];
 }
@@ -157,6 +201,7 @@ export function buildStageSnapshot(
   result: SegmentationResult,
   rawPages: RawStageBlock[][],
   discardedPages: DiscardedStageBlock[][] = [],
+  uncoveredPages: UncoveredRegion[][] = [],
 ): StageSnapshot {
   const sortedPages = [...doc.pages].sort((a, b) => a.index - b.index);
   const pageLayouts = sortedPages.map((page) => ({ page, layout: layoutPage(page) }));
@@ -218,6 +263,7 @@ export function buildStageSnapshot(
       })),
       order: layout.ordered.map((e) => e.index),
       questions: questionsByPage.get(page.index) ?? [],
+      uncovered: uncoveredPages[p] ?? [],
     };
   });
   return {
@@ -229,8 +275,269 @@ export function buildStageSnapshot(
     originPages: 0,
     /** 公式噪声检测报告（检测不改写，见 src/formula.ts） */
     formulaNoise: scanFormulaNoise(result.questions),
+    /** 墨迹覆盖率：由 main() 在能渲染页图时回填（见 computeInkCoverage） */
+    inkCoverage: null,
     pages,
     reviews: result.reviews,
+  };
+}
+
+/* ── 墨迹覆盖率检查（Task 16）───────────────────────────────────────────────
+ * 目的：用**原卷页图**当地面真值，发现「解析漏掉了哪些墨迹」——这是唯一能系统性
+ * 发现「上游漏识别」的办法。动机：第 5 页滑轮题 C 选项第二行在原卷可见，却在
+ * MinerU 的 para_blocks / preproc_blocks / discarded_blocks **三层里全都不存在**；
+ * 而该题选项键齐全 ⇒ 引擎既有的「选项缺键」检查通过 ⇒ 这处丢失**没有任何标记**。
+ *
+ * 方法（不依赖任何图像库）：pdftoppm -gray 输出 PGM（P5：文本头 + 二进制灰度字节，
+ * node 手写十几行即可解析）；二值化分墨/纸；把该页**全部** bbox（blocks + raw +
+ * discarded，含图片块）按 scale=dpi/72 换算像素并外扩；统计「是墨迹但不在任何
+ * bbox 内」的像素，膨胀后按连通域聚成矩形区域，过面积下限的落库。
+ *
+ * ⚠️ 已知局限（如实呈现，勿当噪声抹掉）：原卷是**双栏**排版，栏间有一条印刷竖线、
+ * 页眉有色块/横线装饰——它们不是内容、也不在任何 bbox 内，会稳定出现在未覆盖区域里。
+ * 故「占比」这个数字被**版式家具**抬高（本卷基线 ~3.8%），它是**粗护栏**；
+ * 精确定位漏识别靠逐区域清单（提示项）。
+ */
+
+/** 渲染 DPI：页宽 596pt → ~1243px；正文行高 ~11.3pt → ~23px，足够分辨单行。
+ *  100–150 是精度/速度平衡点；再高只线性增内存、收益递减（全卷 15 页 ~0.9s）。 */
+export const INK_DPI = 150;
+/** 二值化阈值：灰度 < 160 判为墨。原卷是扫描件，直方图在 160 处出现拐点
+ *  （≤160 覆盖 8.85% 像素，多为笔画的抗锯齿边；152→160 仅 +0.8pp，
+ *  而 160→176 跳 +1.1pp 起就开始把纸张纹理当墨）⇒ 取 160 为墨的上界。 */
+export const INK_THRESHOLD = 160;
+/** bbox 外扩像素：吸收 bbox 与墨迹的亚像素/紧贴差（bbox 通常略小于墨迹）。
+ *  上限受已知漏行约束：raw 列表块底边 348pt 与漏行墨迹顶 351.3pt 仅差 ~8px，
+ *  外扩须 < 8px 才不吞掉该漏行 ⇒ 取 4px（≈1.9pt，留 4px 余量）。 */
+export const INK_EXPAND_PX = 4;
+/** 聚类膨胀半径像素：把同一行内的字间/词间缝隙连成一体，避免一行碎成多块。
+ *  6px ≈ 2.9pt；行距 ~19pt（≈40px）远大于 2×6px，故不会把相邻行粘在一起。 */
+export const INK_DILATE_PX = 6;
+/** 区域面积下限像素：丢弃极小碎屑（bbox 边缘亚像素残差、扫描噪点）。
+ *  40px 在 150dpi 下 ≈ 2.6pt×2.6pt；已知漏行面积 800–1700px，远高于此。 */
+export const INK_MIN_AREA_PX = 40;
+
+/** P5 二进制灰度图（PGM） */
+export interface GrayImage {
+  width: number;
+  height: number;
+  /** 行优先灰度字节（长度 = width×height） */
+  data: Uint8Array;
+}
+
+const isPgmSpace = (b: number) => b === 0x20 || b === 0x09 || b === 0x0a || b === 0x0d;
+
+/**
+ * 解析 PGM（P5）：文本头（magic / 宽 / 高 / maxval，空白分隔，# 起注释）+ 原始灰度字节。
+ * 纯函数、无依赖（不引入任何图像库）。
+ */
+export function parsePgm(buf: Uint8Array): GrayImage {
+  let i = 0;
+  const token = (): string => {
+    while (i < buf.length && isPgmSpace(buf[i]!)) i++;
+    if (buf[i] === 0x23) {
+      while (i < buf.length && buf[i] !== 0x0a) i++;
+      return token();
+    }
+    let s = "";
+    while (i < buf.length && !isPgmSpace(buf[i]!)) {
+      s += String.fromCharCode(buf[i]!);
+      i++;
+    }
+    return s;
+  };
+  const magic = token();
+  if (magic !== "P5") throw new Error(`PGM 头不是 P5：${magic || "(空)"}`);
+  const width = Number(token());
+  const height = Number(token());
+  const max = Number(token());
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0 || !(max > 0 && max <= 255)) {
+    throw new Error("PGM 头非法（宽/高/maxval）");
+  }
+  i++; // maxval 后恰好一个空白（不可跳过多个：灰度值本身可能是空白字节）
+  return { width, height, data: buf.subarray(i, i + width * height) };
+}
+
+/**
+ * 纯函数：页图 + 该页全部 bbox → 未覆盖墨迹矩形区域（PDF 点）+ 像素统计。
+ * 聚类用「膨胀 + 8 邻域连通域」（不用复杂的形态学库）：够用、可测。
+ */
+export function findUncoveredInk(
+  image: GrayImage,
+  page: { width: number; height: number; boxes: BBox[] },
+  opts: { threshold: number; expandPx: number; dilatePx: number; minAreaPx: number },
+): { regions: UncoveredRegion[]; inkPx: number; uncoveredPx: number } {
+  const { width: W, height: H, data } = image;
+  const N = W * H;
+  const sx = W / page.width;
+  const sy = H / page.height;
+
+  // 1) 二值化：墨迹掩码
+  const ink = new Uint8Array(N);
+  let inkPx = 0;
+  for (let k = 0; k < N; k++) {
+    if (data[k]! < opts.threshold) {
+      ink[k] = 1;
+      inkPx++;
+    }
+  }
+
+  // 2) 覆盖掩码：全部 bbox 换算像素并外扩
+  const cov = new Uint8Array(N);
+  for (const [x0, y0, x1, y1] of page.boxes) {
+    const ax0 = Math.max(0, Math.floor(x0 * sx) - opts.expandPx);
+    const ay0 = Math.max(0, Math.floor(y0 * sy) - opts.expandPx);
+    const ax1 = Math.min(W - 1, Math.ceil(x1 * sx) + opts.expandPx);
+    const ay1 = Math.min(H - 1, Math.ceil(y1 * sy) + opts.expandPx);
+    for (let y = ay0; y <= ay1; y++) {
+      const base = y * W;
+      for (let x = ax0; x <= ax1; x++) cov[base + x] = 1;
+    }
+  }
+
+  // 3) 未覆盖墨迹 = 是墨迹 ∧ 不在任何覆盖框内
+  const un = new Uint8Array(N);
+  let uncoveredPx = 0;
+  for (let k = 0; k < N; k++) {
+    if (ink[k] === 1 && cov[k] === 0) {
+      un[k] = 1;
+      uncoveredPx++;
+    }
+  }
+
+  // 4) 膨胀（连接同行内的窄缝）
+  const r = opts.dilatePx;
+  const dil = new Uint8Array(N);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (un[y * W + x] === 0) continue;
+      const y0 = Math.max(0, y - r);
+      const y1 = Math.min(H - 1, y + r);
+      const x0 = Math.max(0, x - r);
+      const x1 = Math.min(W - 1, x + r);
+      for (let yy = y0; yy <= y1; yy++) {
+        const base = yy * W;
+        for (let xx = x0; xx <= x1; xx++) dil[base + xx] = 1;
+      }
+    }
+  }
+
+  // 5) 8 邻域连通域（BFS，显式栈）→ 精确 bbox + 真实未覆盖墨迹像素数
+  const seen = new Uint8Array(N);
+  const stack = new Int32Array(N);
+  const regions: UncoveredRegion[] = [];
+  for (let s = 0; s < N; s++) {
+    if (dil[s] === 0 || seen[s] === 1) continue;
+    let sp = 0;
+    stack[sp++] = s;
+    seen[s] = 1;
+    let minX = W;
+    let maxX = -1;
+    let minY = H;
+    let maxY = -1;
+    let area = 0;
+    while (sp > 0) {
+      const c = stack[--sp]!;
+      const cy = (c / W) | 0;
+      const cx = c - cy * W;
+      if (un[c] === 1) {
+        area++;
+        if (cx < minX) minX = cx;
+        if (cx > maxX) maxX = cx;
+        if (cy < minY) minY = cy;
+        if (cy > maxY) maxY = cy;
+      }
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = cy + dy;
+        if (ny < 0 || ny >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = cx + dx;
+          if (nx < 0 || nx >= W) continue;
+          const ns = ny * W + nx;
+          if (dil[ns] === 1 && seen[ns] === 0) {
+            seen[ns] = 1;
+            stack[sp++] = ns;
+          }
+        }
+      }
+    }
+    if (area < opts.minAreaPx) continue;
+    regions.push({ bbox: [minX / sx, minY / sy, (maxX + 1) / sx, (maxY + 1) / sy], area });
+  }
+  regions.sort((a, b) => b.area - a.area);
+  return { regions, inkPx, uncoveredPx };
+}
+
+/** 用 pdftoppm 把原卷渲染成逐页灰度图（PGM）。任何失败都抛异常，由调用方降级。 */
+export function renderGrayPages(pdfPath: string, dpi: number): GrayImage[] {
+  const dir = mkdtempSync(join(tmpdir(), "ink-"));
+  try {
+    execFileSync("pdftoppm", ["-gray", "-r", String(dpi), pdfPath, join(dir, "pg")], {
+      timeout: 180_000,
+    });
+    return readdirSync(dir)
+      .filter((f) => f.endsWith(".pgm"))
+      .sort()
+      .map((f) => parsePgm(new Uint8Array(readFileSync(join(dir, f)))));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * 全卷墨迹覆盖率：渲染灰度页 → 逐页找未覆盖墨迹 → 汇总。
+ * 页序与 snapshot.pages 一一对应（都按 index 升序）。
+ */
+export function computeInkCoverage(
+  pdfPath: string,
+  pages: StagePage[],
+  dpi = INK_DPI,
+): { byPage: UncoveredRegion[][]; coverage: InkCoverage } {
+  const images = renderGrayPages(pdfPath, dpi);
+  const opts = {
+    threshold: INK_THRESHOLD,
+    expandPx: INK_EXPAND_PX,
+    dilatePx: INK_DILATE_PX,
+    minAreaPx: INK_MIN_AREA_PX,
+  };
+  const byPage: UncoveredRegion[][] = [];
+  const stats: InkCoverage["pages"] = [];
+  let totalInkPx = 0;
+  let uncoveredPx = 0;
+  pages.forEach((p, i) => {
+    const img = images[i];
+    if (!img) {
+      byPage.push([]);
+      stats.push({ index: p.index, inkPx: 0, uncoveredPx: 0, ratio: 0 });
+      return;
+    }
+    const boxes: BBox[] = [];
+    for (const src of [p.blocks, p.raw, p.discarded]) {
+      for (const b of src ?? []) if (Array.isArray(b.bbox)) boxes.push(b.bbox);
+    }
+    const { regions, inkPx, uncoveredPx: unPx } = findUncoveredInk(
+      img,
+      { width: p.width, height: p.height, boxes },
+      opts,
+    );
+    byPage.push(regions);
+    stats.push({ index: p.index, inkPx, uncoveredPx: unPx, ratio: inkPx ? unPx / inkPx : 0 });
+    totalInkPx += inkPx;
+    uncoveredPx += unPx;
+  });
+  return {
+    byPage,
+    coverage: {
+      dpi,
+      threshold: opts.threshold,
+      expandPx: opts.expandPx,
+      dilatePx: opts.dilatePx,
+      minAreaPx: opts.minAreaPx,
+      totalInkPx,
+      uncoveredPx,
+      ratio: totalInkPx ? uncoveredPx / totalInkPx : 0,
+      pages: stats,
+    },
   };
 }
 
@@ -270,6 +577,25 @@ function main(): void {
     }
   }
 
+  // 墨迹覆盖率检查（Task 16）：用原卷页图当地面真值，找「解析漏掉的墨迹」。
+  // pdftoppm 不可用时**优雅降级**（inkCoverage 保持 null、uncovered 全空），不报错。
+  let inkNote = "";
+  if (originPdf) {
+    try {
+      const { byPage, coverage } = computeInkCoverage(join(outDir, "origin.pdf"), snapshot.pages);
+      snapshot.pages.forEach((p, i) => {
+        p.uncovered = byPage[i] ?? [];
+      });
+      snapshot.inkCoverage = coverage;
+      const n = byPage.reduce((a, r) => a + r.length, 0);
+      inkNote =
+        `  墨迹覆盖率：全卷未覆盖占比 ${(coverage.ratio * 100).toFixed(2)}%` +
+        `（${coverage.uncoveredPx}/${coverage.totalInkPx}px）· 区域 ${n} 个`;
+    } catch {
+      console.log("  pdftoppm 不可用或墨迹分析失败，墨迹覆盖率检查降级跳过（inkCoverage=null）");
+    }
+  }
+
   const totalBlocks = snapshot.pages.reduce((a, p) => a + p.blocks.length, 0);
   const flagged = result.questions.filter((q) => q.status === "needs_review").length;
   snapshot.originPages = originPages;
@@ -277,6 +603,7 @@ function main(): void {
   console.log(`阶段快照已写入 ${join(outDir, "stages.json")}`);
   if (originPdf) console.log(`原卷 PDF 已复制 ${join(outDir, "origin.pdf")}`);
   if (originPages > 0) console.log(`原卷页图 ${originPages} 张 → ${join(outDir, "pages")}`);
+  if (inkNote) console.log(inkNote);
   console.log(
     `  ${snapshot.pages.length} 页 · ${totalBlocks} 行级块 · ${result.questions.length} 题 · ` +
       `质检诊断 ${result.reviews.length} 条（需人工校对 ${flagged} 题）`,

@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildStageSnapshot, extractRawBlocks } from "../scripts/export-stages.js";
-import type { ParsedDocument, SegmentationResult } from "../src/types.js";
+import type { BBox, ParsedDocument, SegmentationResult } from "../src/types.js";
 
 // 全局序号口径：第 0 页 3 块 → 全局 0/1/2；第 1 页 2 块 → 全局 3/4。
 const doc: ParsedDocument = {
@@ -180,4 +180,15 @@ test("buildStageSnapshot：质检原因回填对应题，答案区计数透传",
   assert.equal(snap.reviews.length, 2, "全局质检记录原样保留");
   assert.equal(snap.answerEntriesTotal, 1);
   assert.equal(snap.stats.questions, 3);
+});
+
+test("buildStageSnapshot：未覆盖墨迹区域按页透传，缺省为空（Task 16）", () => {
+  const snap0 = buildStageSnapshot(doc, result, rawPages);
+  assert.deepEqual(snap0.pages[0]?.uncovered, [], "未传参时缺省为空数组");
+  assert.equal(snap0.inkCoverage, null, "墨迹覆盖率缺省为 null（未做分析）");
+
+  const uncoveredPages = [[{ bbox: [10, 10, 40, 20] as BBox, area: 123 }], []];
+  const snap1 = buildStageSnapshot(doc, result, rawPages, [], uncoveredPages);
+  assert.deepEqual(snap1.pages[0]?.uncovered, [{ bbox: [10, 10, 40, 20], area: 123 }]);
+  assert.deepEqual(snap1.pages[1]?.uncovered, []);
 });
