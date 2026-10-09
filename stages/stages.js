@@ -9,7 +9,7 @@
 import { prettifyLatex } from "./latex-display.js";
 import { baseFontOfPage, clampByWidth, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
 import { contentLabelPlacements } from "./uncovered-layout.js";
-import { droppedDuplicateIndices } from "./block-dedup.js";
+import { crossBlockMerges } from "./block-dedup.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -50,7 +50,7 @@ const EXPLAIN = {
   },
   compare: {
     do: "左边是原卷，右边是用结构化数据按原始坐标重建的纸面——引擎读到什么就画什么，不借助原卷图像。排版保真度一目了然。",
-    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。**洋红标记框=「解析遗漏·内容级」**（原卷有墨迹、解析块没覆盖到，含上游漏识别的整行/整段）；**灰色细虚线=「解析遗漏·家具级」**（页眉装饰/栏间竖线/页边标等版式墨迹，非内容丢失，悬停看详情）；**淡虚线小框=「重复块·未渲染」**（上游把同一行读成两个重叠块，只渲染信息更全的那块，悬停看被丢弃块的原文）。",
+    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。**洋红标记框=「解析遗漏·内容级」**（原卷有墨迹、解析块没覆盖到，含上游漏识别的整行/整段）；**灰色细虚线=「解析遗漏·家具级」**（页眉装饰/栏间竖线/页边标等版式墨迹，非内容丢失，悬停看详情）。另外：上游偶发把**同一行**读成两个重叠的块，展示层会把它们**合并成一行**（悬停该行可见「已合并」说明），不丢内容、也不叠字。",
   },
 };
 
@@ -216,36 +216,54 @@ const CANVAS_W = 760; // 与 CSS --canvas-w 一致，用于字号换算
 // 字号与全角宽度度量见 ./font-metrics.js（纯函数模块，有测试锁定；证据见其头注释）。
 
 /** 行级块节点（阶段 2/3 与对比模式共用；canvasW 为画布像素宽，用于字号换算）
- *  dupSet：本页「同页块级重复」中**应丢弃渲染**的块下标（block-dedup.js 判据，只此一处定义）。
- *  命中的块不渲染文字，改画极淡虚线框 + title（G1：保留可见优于静默删除）。 */
-function blockNode(b, p, canvasW = CANVAS_W, baseFont = null, dupSet = null) {
-  const node = posStyle(el("div", `blk blk-line kind-${b.kind}`), b.bbox, p.width, p.height);
-  // 同页块级重复：上游把同一行读成两个 bbox 重叠的块 → 只渲染信息更全（文本更长）的那块。
-  if (dupSet && dupSet.has(b.i)) {
-    node.classList.add("blk-dup");
-    node.title = `与相邻块重复（上游把同一行读成两块），未渲染；原文：${b.text}`;
-    return node;
-  }
-  node.title = b.text;
-  if (b.kind === "image" && b.img) {
+ *  mergeCtx：本页「同页块级重复」的**并集合并**上下文（block-dedup.js，判据只此一处定义）：
+ *   - `drop`：被合并掉的块（其内容已进合并文本）→ 返回 null，调用方跳过（**不丢内容**）；
+ *   - `keep`：承载块 → 用**合并文本**与两块 **bbox 并集**渲染（更接近原卷该行真实范围）。
+ *  返回 null 表示该块不渲染。 */
+function blockNode(b, p, canvasW = CANVAS_W, baseFont = null, mergeCtx = null) {
+  if (mergeCtx?.drop.has(b.i)) return null;
+  const m = mergeCtx?.keep.get(b.i);
+  const blk = m ? { ...b, text: m.text, bbox: m.bbox } : b;
+  const node = posStyle(el("div", `blk blk-line kind-${blk.kind}`), blk.bbox, p.width, p.height);
+  node.title = m ? `${blk.text} ｜（上游把本行读成两个重叠块，已合并）` : blk.text;
+  if (blk.kind === "image" && blk.img) {
     const img = el("img");
-    img.src = `/data/out/${enc(state.effectiveDoc)}/images/${enc(b.img)}`;
+    img.src = `/data/out/${enc(state.effectiveDoc)}/images/${enc(blk.img)}`;
     img.alt = "图片块";
     node.append(img);
   } else {
     // prettifyLatex 返回 HTML 片段（\frac 竖排分式 / \sqrt 带上划线根号），必须 innerHTML
-    const html = prettifyLatex(b.text);
+    const html = prettifyLatex(blk.text);
     const txt = el("span", "txt");
     txt.innerHTML = html;
     // 宽度安全上限（R3/R5）：行高模型对个别行（页眉页脚/计划用时/短标签）会过冲，
     // 夹到 bbox 宽以免压到相邻块；纯 CJK 未溢出的块不受影响（见 font-metrics.js clampByWidth）。
     // Task 14：传入同页块池，供「同栏挤压」结构判据（框被撑大的碎尾退回基准字号）。
-    txt.style.fontSize = `${clampByWidth(fontForBlock(b, p.width, canvasW, baseFont, p.blocks), b, p.width, canvasW)}px`;
+    txt.style.fontSize = `${clampByWidth(fontForBlock(blk, p.width, canvasW, baseFont, p.blocks), blk, p.width, canvasW)}px`;
     node.append(txt);
     // 竖排块（R4）：字号已按 bboxW 定，排布方向也要竖排，否则文字仍横向越出窄框
-    if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");
+    if (isVerticalText(blk.bbox, blk.text ?? "")) node.classList.add("blk-vertical");
   }
   return node;
+}
+
+/** 本页并集合并上下文：{ drop:Set<i>, keep:Map<i, {text,bbox}> }（block-dedup.js）。 */
+function mergeContext(p) {
+  const drop = new Set();
+  const keep = new Map();
+  for (const m of crossBlockMerges(p.blocks)) {
+    drop.add(m.dropI);
+    if (m.merged) keep.set(m.keepI, { text: m.text, bbox: m.bbox });
+    // merged === null（命中但无法合并）→ 两块都原样渲染，不处理
+  }
+  return { drop, keep };
+}
+
+/** 追加本页行级块节点（跳过被合并掉的块；返回与 p.blocks 对齐的节点数组，null = 未渲染）。 */
+function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx) {
+  const nodes = p.blocks.map((b) => blockNode(b, p, canvasW, baseFont, mergeCtx));
+  for (const n of nodes) if (n) c.append(n);
+  return nodes;
 }
 
 function renderOrigin(p) {
@@ -370,8 +388,7 @@ function renderOrder(p) {
     c.append(left, right, divider);
   }
   const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
-  const dup = droppedDuplicateIndices(p.blocks); // 同页块级重复（Task 15）
-  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFont, dup));
+  appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
   p.order.forEach((blockIdx, seq) => {
     const b = p.blocks[blockIdx];
     if (!b) return;
@@ -387,14 +404,13 @@ function renderOrder(p) {
 function renderSeg(p) {
   const c = paperCanvas(p);
   const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
-  const dup = droppedDuplicateIndices(p.blocks); // 同页块级重复（Task 15）
-  for (const b of p.blocks) c.append(blockNode(b, p, CANVAS_W, baseFont, dup));
+  // 同页块级重复并集合并（Task 15）：被合并掉的块不渲染 → 节点数组与 p.blocks 按位对齐（null = 未渲染）
+  const blockNodes = appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p));
 
   const covered = new Set();
   for (const q of p.questions) for (const i of q.blocks) covered.add(i);
-  const blockNodes = [...c.children].slice(0, p.blocks.length);
   blockNodes.forEach((n, i) => {
-    if (!covered.has(p.blocks[i].i)) n.classList.add("orphan");
+    if (n && !covered.has(p.blocks[i].i)) n.classList.add("orphan");
   });
 
   // 逐块描边（跨栏/跨页题的并集矩形会罩住整页，改按块着色）+ 首块挂牌
@@ -594,8 +610,7 @@ function renderCompare(p) {
   const PANE_W = 460; // 与 CSS .compare-pane 一致，用于字号换算
   renderDiscardedInto(c, p, PANE_W); // 对比栏宽口径：丢弃块也必须用 PANE_W（R2）
   const baseFont = baseFontOfPage(p.blocks, p.width, PANE_W);
-  const dup = droppedDuplicateIndices(p.blocks); // 同页块级重复（Task 15）
-  for (const b of p.blocks) c.append(blockNode(b, p, PANE_W, baseFont, dup));
+  appendBlockNodes(c, p, PANE_W, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
   for (const q of p.questions) {
     const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);
     if (!first) continue;
@@ -616,7 +631,6 @@ function renderCompare(p) {
     legend([
       ["rgba(216,27,96,.85)", "解析遗漏·内容级：原卷有墨迹、解析块未覆盖（疑似漏识别正文）"],
       ["transparent", "解析遗漏·家具级：页眉装饰/栏间竖线/页边标等版式墨迹（灰细虚线，悬停看详情）"],
-      ["rgba(43,42,38,.10)", "重复块·未渲染：上游把同一行读成两个重叠块，仅渲染信息更全者（淡虚线框，悬停看原文）"],
     ]),
   );
 }

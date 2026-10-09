@@ -198,14 +198,6 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 .blk-line.kind-image { border: 1.5px dashed var(--azurite); background: rgba(58,107,138,.08); }
 .blk-line.kind-image img { width: 100%; height: 100%; object-fit: contain; }
 .blk-line.orphan { opacity: 0.3; }
-/* 同页块级重复（Task 15）：上游把同一物理行读成两个 bbox 重叠的块（如 p8 第8题 D）。
- * 展示层只渲染「信息更全（文本更长）」的那块；另一块**不渲染文字**，但保留**极淡的虚线框**，
- * title 说明「与相邻块重复，未渲染」并附原文 —— G1：保留可见优于静默删除。
- * 判据与处置只此一处定义，见 stages/block-dedup.js。 */
-.blk-dup {
-  border: 1px dashed rgba(43, 42, 38, 0.22);
-  background: rgba(43, 42, 38, 0.035);
-}
 .order-badge {
   position: absolute;
   min-width: 16px; height: 16px;

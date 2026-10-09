@@ -53,11 +53,12 @@
  *      基线+容忍」；区域先分类为内容级/家具级（判据见 export-stages.ts classifyUncovered）。
  *      动机：第 5 页滑轮题 C 续行在三层 MinerU 输出里全都不存在，而选项键齐全 ⇒ 既有检查
  *      看不见（静默）。详见脚本内第 10 节注释。
- *  11. **同页块级重复（Task 15，提示级）**：上游把**同一物理行**读成两个 bbox 重叠的块
- *      （p8 第 8 题 D），渲染后文字互相压叠（叠字）。展示层只渲染「信息更全（文本更长）」的那块，
- *      另一块画淡虚线框 + title（G1：保留可见优于静默删除）。判据只此一处定义在
- *      `stages/block-dedup.js`。本节把**每一处命中与处置**（保留谁 / 丢弃谁及其原文）全量列出，
- *      使这条「不渲染」可见而非静默。提示级，不计退出码。
+ *  11. **同页块级重复·并集合并（Task 15，提示级）**：上游把**同一物理行**读成两个 bbox 重叠的块
+ *      （p8 第 8 题 D），渲染后文字互相压叠（叠字）。两块是这一行的**两段读数**（较长者缺尾、
+ *      较短者缺头），故展示层把两块文本**合并成并集**（重叠只出现一次）、渲染位置取两块 bbox 的
+ *      **并集** —— 不丢内容、也不叠字。判据与合并算法只此一处定义在 `stages/block-dedup.js`。
+ *      本节把**每一处命中与处置**（保留谁 / 合并文本 / 重叠长度 / 无法合并者）全量列出。
+ *      提示级，不计退出码。
  *
  * 用法：node scripts/audit-render.mjs [docId]
  * 退出码：0 = 判定项全部归零；1 = 判定项有发现（可接入 CI / npm run check）
@@ -65,7 +66,7 @@
 import { readFileSync } from "node:fs";
 import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediateRepeat, spaceEmptyParens } from "../stages/latex-display.js";
 import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasTwoDimensionalMath, renderedTextOf, clampByWidth } from "../stages/font-metrics.js";
-import { droppedDuplicateIndices, isCrossBlockDuplicate } from "../stages/block-dedup.js";
+import { crossBlockMerges } from "../stages/block-dedup.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
@@ -481,37 +482,42 @@ const REPEAT_MAX = 12;
   hints += emptyParenSpaced.length; // 提示项：计入提示总数（不影响退出码）
 }
 
-// ── 11. 同页块级重复（Task 15；**提示级**：全量列出，不计退出码）──────────────────
+// ── 11. 同页块级重复·并集合并（Task 15；**提示级**：全量列出，不计退出码）────────────
 // 背景：上游把**同一物理行**读成两个 bbox 重叠的块（p8 第 8 题 D：
 //   blocks[23] "D. 绳a的拉力D. 绳a的拉力$F_{a}$增大.杆的压" bbox=[49,448,204,462]
 //   blocks[25] "增大，杆的压力F大小不变"                    bbox=[136,449,272,462]），
 //   两块 y 区间几乎完全重合 ⇒ 渲染后文字互相压叠（叠字）。
-// 处置：展示层（stages.js）只渲染「信息更全（文本更长）」的那块，另一块**不渲染文字**，
-//   改画极淡虚线框 + title（G1：保留可见优于静默删除）。判据只此一处定义在 `stages/block-dedup.js`。
-// 本节把**每一处命中与处置**（保留谁 / 丢弃谁及其原文）全量列出，使这条「不渲染」可见而非静默。
-// 提示级，不计退出码：判据保守（全卷仅 1 处命中），且每一处都必须回原卷核对「原卷只有一份」
-//   （核不到的「原卷确有两份」不处理，见 Task 15 报告）。本审计只读快照、不读 PDF。
+//   原卷（600dpi 裁图核对）该处是**完整一行**，两块是这一行的**两段读数**（较长者缺尾、较短者缺头）。
+// 处置（修复轮 1 裁定更正）：把两块文本**合并成并集**（重叠只出现一次）、渲染位置取两块 bbox 的
+//   **并集** —— 不丢内容、也不叠字；被合并掉的块不渲染（其内容已在合并文本里）。
+//   顺序固定：**块内即时重复折叠（Task 12）先做、跨块合并后做**。
+// 本节把**每一处命中与处置**（保留谁 / 合并文本 / 重叠长度 / 无法合并者）全量列出，
+//   使这条「合并」可见而非静默（G1）。提示级，不计退出码：判据保守（全卷仅 1 处命中），
+//   且每一处都必须回原卷核对「并集文本与原卷逐字一致」（核不到的保留原样不处理）。
+// 本审计只读快照、不读 PDF。
 {
   const rows = [];
+  const unmergeable = [];
   for (const p of snap.pages) {
-    const blocks = p.blocks ?? [];
-    const drop = droppedDuplicateIndices(blocks);
-    for (const di of drop) {
-      const dropped = blocks.find((b) => b.i === di);
-      if (!dropped) continue;
-      const kept = blocks.find((b) => b.i !== di && isCrossBlockDuplicate(b, dropped));
-      rows.push({ p: p.index, kept, dropped });
+    for (const m of crossBlockMerges(p.blocks)) {
+      if (m.merged) rows.push({ p: p.index, ...m });
+      else unmergeable.push({ p: p.index, ...m });
     }
   }
-  console.log(`\n⚠️ 同页块级重复（提示项，不计退出码）：命中 ${rows.length} 处（丢弃 ${rows.length} 块）`);
+  console.log(`\n⚠️ 同页块级重复·并集合并（提示项，不计退出码）：命中 ${rows.length + unmergeable.length} 处（已合并 ${rows.length} / 无法合并保留原样 ${unmergeable.length}）`);
   console.log("     判据（stages/block-dedup.js，只此一处定义）：同页 + 同一行（y 重叠比 ≥ 0.6）");
-  console.log("     + 横向相交 + 纯文本最长公共子串 ≥ 3。处置：保留文本更长者，另一块不渲染");
-  console.log("     （淡虚线框 + title，G1：保留可见优于静默删除）。每处均须回原卷核对「原卷只有一份」。");
+  console.log("     + 横向相交 + 纯文本最长公共子串 ≥ 3；合并：块内折叠先做、跨块合并后做，");
+  console.log("     重叠只保留一次、渲染位置取两块 bbox 并集。每处均须回原卷核对并集文本逐字一致。");
   for (const r of rows) {
-    console.log(`     p${r.p} 保留 blocks[${r.kept?.i}] ${JSON.stringify((r.kept?.text ?? "").slice(0, 60))}`);
-    console.log(`         丢弃 blocks[${r.dropped.i}] ${JSON.stringify(r.dropped.text.slice(0, 60))}`);
+    console.log(`     p${r.p} 承载 blocks[${r.keepI}] + 并入 blocks[${r.dropI}]（重叠 ${r.merged.overlap} 字符，方向 ${r.merged.dir}）`);
+    console.log(`         合并文本 ${JSON.stringify(r.text.slice(0, 80))}`);
+    console.log(`         bbox 并集 [${r.bbox.map((v) => Number(v).toFixed(1)).join(",")}]`);
   }
-  hints += rows.length; // 提示项：计入提示总数（不影响退出码）
+  for (const r of unmergeable) {
+    console.log(`     p${r.p} ⚠️ 命中但**无法合并**（保留原样不处理）blocks[${r.keepI}] / blocks[${r.dropI}]`);
+    console.log(`         ${JSON.stringify(String(r.a.text ?? "").slice(0, 60))} ｜ ${JSON.stringify(String(r.b.text ?? "").slice(0, 60))}`);
+  }
+  hints += rows.length + unmergeable.length; // 提示项：计入提示总数（不影响退出码）
 }
 
 // ── 9. 画布边界裁切估算（**提示项**，不计退出码）────────────────────────────────
