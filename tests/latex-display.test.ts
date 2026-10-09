@@ -4,7 +4,7 @@
 // 所以期望值是 HTML —— 一维字符流表达不了原卷的数学排版。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { prettifyLatex, findCommandAmbiguities } from "../stages/latex-display.js";
+import { prettifyLatex, findCommandAmbiguities, collapseImmediateRepeat } from "../stages/latex-display.js";
 
 /** 竖排分式的期望片段 */
 const frac = (num: string, den: string) =>
@@ -151,4 +151,62 @@ test("歧义检测：普通命令与真实样张文本不误报", () => {
     findCommandAmbiguities("A.$\\sin \\ \\theta = { \\frac { k R } { m g } }$B.$\\cos \\theta$").length,
     0,
   );
+});
+
+// —— 即时精确重复前缀折叠（Task 12；改写类变换，判据最保守 + 每处回原卷核对）——
+// 文本全部取自 stages.json 的真实命中块；每处已从 origin.pdf 裁局部核对「原卷只有一份」。
+
+test("真实实例：p8 第 8 题 D 选项前缀重复两遍 → 折叠（原卷仅一份，已核对）", () => {
+  assert.equal(
+    collapseImmediateRepeat("D. 绳a的拉力D. 绳a的拉力$F _ { a }$增大.杆的压"),
+    "D. 绳a的拉力$F _ { a }$增大.杆的压",
+  );
+});
+
+test("真实实例：p8「静止，则在此过程中」重复 → 折叠（原卷仅一份，已核对）", () => {
+  assert.equal(
+    collapseImmediateRepeat("静止，则在此过程中静止，则在此过程中()"),
+    "静止，则在此过程中()",
+  );
+});
+
+test("真实实例：p14 第 C 选项「C.M所受斜面的摩擦力大」重复 → 折叠（原卷仅一份，已核对）", () => {
+  assert.equal(
+    collapseImmediateRepeat("C.M所受斜面的摩擦力大C.M所受斜面的摩擦力大小一定一直增加"),
+    "C.M所受斜面的摩擦力大小一定一直增加",
+  );
+});
+
+test("接入渲染管线：折叠后再渲染 LaTeX，选项分隔不受影响", () => {
+  assert.equal(
+    prettifyLatex("D. 绳a的拉力D. 绳a的拉力$F _ { a }$增大.杆的压"),
+    "D. 绳a的拉力F<sub>a</sub>增大.杆的压",
+  );
+});
+
+test("反例：正常中文叠词（<6 字符重复）不得折叠", () => {
+  assert.equal(collapseImmediateRepeat("讨论讨论"), "讨论讨论");
+  assert.equal(collapseImmediateRepeat("研究研究"), "研究研究");
+  assert.equal(collapseImmediateRepeat("收拾收拾"), "收拾收拾");
+  // 「增加增加」是 2 字重复，与「讨论讨论」同形——按最保守判据（单元 <6）不折叠。
+  // （全卷中它是独立的跨块伪影，跨块匹配明确不做。）
+  assert.equal(collapseImmediateRepeat("增加增加"), "增加增加");
+});
+
+test("反例：非即时重复（X…Y…X）不得折叠", () => {
+  assert.equal(
+    collapseImmediateRepeat("静止，则在此过程中物体运动，静止，则在此过程中"),
+    "静止，则在此过程中物体运动，静止，则在此过程中",
+  );
+  assert.equal(collapseImmediateRepeat("ABCABCXYZABC"), "ABCABCXYZABC");
+});
+
+test("边界：重复单元正好 5 字符不折叠、正好 6 字符折叠", () => {
+  assert.equal(collapseImmediateRepeat("一二三四五一二三四五"), "一二三四五一二三四五"); // 5 → 不动
+  assert.equal(collapseImmediateRepeat("一二三四五六一二三四五六"), "一二三四五六"); // 6 → 折叠
+});
+
+test("不递归折叠：折叠一次即返回，结果不再折", () => {
+  // 4 份单元 → 只折掉 1 份得到 3 份；若递归会继续折到 1 份。
+  assert.equal(collapseImmediateRepeat("一二三四五六一二三四五六一二三四五六一二三四五六"), "一二三四五六一二三四五六一二三四五六");
 });

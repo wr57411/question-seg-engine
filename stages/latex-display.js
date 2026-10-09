@@ -269,8 +269,37 @@ export function separateOptionMarks(text) {
 }
 
 /**
+ * 即时精确重复前缀折叠（展示层）：上游 MinerU 偶发把一段文本前缀连续复制两遍
+ * （形如 `X + X + 其余`）。本函数仅当 `X` **逐字符相等**且 `X.length >= 6` 时
+ * 折叠掉其中一份，恢复原貌。
+ *
+ * ⚠️ 这是**改写**类变换，必须最保守（lessons.md L2）：
+ * - **不模糊匹配**（不做相似度 / 归一化后比较）；
+ * - **不跨块匹配**（只在单块文本内折叠）；
+ * - **不递归折叠**（折叠一次即返回，不在结果上再折）。
+ * 阈值取 6：正常中文叠词「讨论讨论」「研究研究」「收拾收拾」的重复单元是 2 字，
+ * 远小于 6，绝不会被误折。曾有一次臆想的「清洗」丢掉真实内容（2026-10-08 平方消失
+ * 事故），故每一处折叠都**回原卷核对**过（见 Task 12 报告）。
+ *
+ * @param {string} text 上游原始文本（可含 LaTeX 源码）
+ * @returns {string} 折叠掉一份即时重复前缀后的文本；无命中则原样返回
+ */
+const MIN_REPEAT = 6;
+export function collapseImmediateRepeat(text) {
+  if (typeof text !== "string") return text;
+  const maxK = Math.floor(text.length / 2);
+  for (let k = MIN_REPEAT; k <= maxK; k++) {
+    if (text.slice(0, k) === text.slice(k, 2 * k)) {
+      return text.slice(0, k) + text.slice(2 * k);
+    }
+  }
+  return text;
+}
+
+/**
  * 展示用美化（返回 HTML 片段）：
- * - 先在纯文本上做选项标记分隔；
+ * - 先在纯文本上折叠上游「即时精确重复前缀」（collapseImmediateRepeat）；
+ * - 再在纯文本上做选项标记分隔；
  * - $...$ 段内按 LaTeX 子集渲染成 HTML；段外文本原样保留（仅转义）；
  * - 无 $ 但含 LaTeX 的整块（裸公式块）也按公式渲染；
  * - 不成对的 $ 视为噪声字符去掉（避免源码漏出）；
@@ -282,6 +311,7 @@ export function separateOptionMarks(text) {
  */
 export function prettifyLatex(text) {
   if (!text) return text;
+  text = collapseImmediateRepeat(text);
   let out = "";
   if (!text.includes("$")) {
     out = LOOKS_LATEX.test(text) ? desugar(text) : escapeHtml(text);

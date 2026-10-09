@@ -31,12 +31,16 @@
  *      口径静默排除了 `\`/`$`/ASCII 块而不报数。分桶互斥且**相加 = 排除总数**（无未归类残差）。
  *      第 6 节另把**公式源码块**列入排除桶：C1 修复后渲染层对公式块豁免 `clampByWidth`，
  *      触发信号对这类块不再适用（修复前它们 100% 命中，抬高整体触发率）。
+ *   8. **上游即时重复前缀（Task 12，提示级）**：MinerU 偶发把一段文本前缀连续复制两遍
+ *      （形如 `X + X + 其余`）。展示层 `collapseImmediateRepeat` 会折叠一份（判据保守：
+ *      即时、精确、`X.length >= 6`）。本节把**每一次折叠**连同折叠前后文本全量列出，
+ *      使这条「改写」可见而非静默（G1）。提示项，不计退出码；命中为 0 时显示 ✅。
  *
  * 用法：node scripts/audit-render.mjs [docId]
  * 退出码：0 = 判定项全部归零；1 = 判定项有发现（可接入 CI / npm run check）
  */
 import { readFileSync } from "node:fs";
-import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities } from "../stages/latex-display.js";
+import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediateRepeat } from "../stages/latex-display.js";
 import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasMathSource } from "../stages/font-metrics.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
@@ -66,6 +70,7 @@ const outHits = Object.fromEntries(OUT_PATTERNS.map(([n]) => [n, []]));
 const unknownCmds = new Map(); // 命令名 → 出现次数
 const ambiguityMap = new Map(); // "命令 → 另一种切法" → { n, sample }
 const stuckOptions = [];
+const repeatCollapsed = []; // 上游即时重复前缀命中块（展示层折叠；G1：变换可见而非静默）
 let total = 0;
 
 for (const p of snap.pages) {
@@ -103,6 +108,18 @@ for (const p of snap.pages) {
       const marks = shown.match(/[A-D][.．]/g);
       if (marks && marks.length >= 2 && /[^\s][A-D][.．]/.test(shown)) {
         stuckOptions.push({ p: p.index, src, i: b.i, shown: shown.slice(0, 80) });
+      }
+      // 上游「即时精确重复前缀」（展示层折叠；提示级）：变换必须可见而非静默（G1）。
+      // 判据与 stages/latex-display.js 的 collapseImmediateRepeat 同源，直接调用同一函数。
+      const collapsed = collapseImmediateRepeat(raw);
+      if (collapsed !== raw) {
+        repeatCollapsed.push({
+          p: p.index,
+          src,
+          i: b.i,
+          shown: raw.slice(0, 60),
+          sample: `折叠后：${collapsed.slice(0, 60)}`,
+        });
       }
     }
   }
@@ -231,21 +248,27 @@ sections.push([
   [...ambiguityMap.entries()].map(([k, v]) => ({ shown: `${k}  ×${v.n}`, sample: v.sample })),
   false,
 ]);
+sections.push([
+  "上游即时重复前缀（提示·展示层已折叠）",
+  repeatCollapsed,
+  false,
+  Infinity, // 全量列出：本节的目的是让每一次「改写」都可见（G1）
+]);
 
 console.log(`渲染审计 · ${docId}`);
 console.log(`扫描文本块 ${total} 个\n`);
 let bad = 0;
 let hints = 0;
-for (const [name, list, fatal] of sections) {
+for (const [name, list, fatal, max = 6] of sections) {
   const flag = list.length === 0 ? "✅" : fatal ? "❌" : "⚠️";
   console.log(`${flag} ${name}：${list.length}`);
   if (list.length > 0) fatal ? (bad += list.length) : (hints += list.length);
-  for (const x of list.slice(0, 6)) {
+  for (const x of list.slice(0, max)) {
     const loc = x.p === undefined ? "" : `p${x.p} ${x.src}[${x.i}] `;
     console.log(`     ${loc}${JSON.stringify(x.shown)}`);
     if (x.sample) console.log(`        …${JSON.stringify(x.sample)}`);
   }
-  if (list.length > 6) console.log(`     …另有 ${list.length - 6} 条`);
+  if (list.length > max) console.log(`     …另有 ${list.length - max} 条`);
 }
 
 // ── 5. 字号保真度（判定项：可判块 ratio 中位数；提示项：单块 ratio 超界）──
