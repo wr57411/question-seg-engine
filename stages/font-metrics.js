@@ -127,6 +127,24 @@ export function isVerticalText(bbox, text) {
  * 全章综合测试 1.09），而被撑大的框比值 ≥ 1.34（见 reconcileFont）。 */
 const FONT_ESTIMATOR_MAX_RATIO = 1.3;
 
+/** 交叉验证生效所需的最小**全角字数**（Task 13 修复轮 1）。
+ *
+ * 为什么需要这道前置条件：`fontW = bboxW_px / emWidthOf(text)` 只有在文本**足够长**时才可信
+ * ——2–3 个字的块，`bboxW / emWidthOf` 的噪声极大（一个字的 bbox 边界误差就能把 fontW 拉动
+ * 30%+），拿它去否定 `fontH` 不成立。实测：`刷易错`/`刷基础`/`刷提分`/`刷真题`（均 3 字）
+ * 被 1.3 阈值误判为「框被撑大」而压到基准，与验收「真标题/横幅标签必须保留」冲突。
+ * 故：全角字数 < 6 的块**不比较**，直接用 `fontH`。
+ * 取 6 与审计「字号保真度」节的可判块门槛（`FIDELITY_MIN_FW = 6`）一致。 */
+const FONT_ESTIMATOR_MIN_FW = 6;
+
+/** 全角/CJK 字数：码位 ≥ U+2E80 的字符计数（与 `emWidthOf` 的「全角/CJK」口径、
+ * 审计 `FW_MIN = 0x2e80` 一致）。供交叉验证的「全角字数 ≥ 6」前置条件使用。 */
+export function fullWidthCount(text) {
+  let n = 0;
+  for (const ch of text ?? "") if (ch.codePointAt(0) >= 0x2e80) n++;
+  return n;
+}
+
 /** 两个独立估计量的交叉验证（Task 13，**判据只此一处定义**）。
  *
  * 背景：块 `p10[18]` 文本 `"弹力先变大后变小E"` bbox `[68,367,212,391]`（宽 144pt / 高 24pt）
@@ -135,17 +153,19 @@ const FONT_ESTIMATOR_MAX_RATIO = 1.3;
  * `clampByWidth` 只把它压到 1.47×（宽度也是错的，宽度上限救不了）→ 渲染成 2 倍字号。
  * 同一页 `p10[20]` 同样 8 个字，bbox `[67,406,160,419]`（宽 93pt / 高 13pt）→ 正常字号。
  *
- * 判据：宽、高是**两条独立路径**。一致 ⇒ 块确实更大（真标题，保留 fontH）；
- * 不一致 ⇒ 框被撑大（用 baseFont 兜底）。baseFont 为 null 时无法兜底 → 退回 fontH。
- *
- * **已知代价**：极少数「真的大号短文本」会被压到基准（如 `刷易错` 等小节标签，
- * 比值 1.34–1.40 落在阈值之上）——见 Task 13 报告的清单对照与逐处回原卷核对。
+ * 判据（**两段**）：
+ *   ① 前置条件：全角字数 ≥ `FONT_ESTIMATOR_MIN_FW`(6) —— 短块的 `fontW` 噪声大，不可用于否定
+ *      `fontH`（修复轮 1）；不满足则**不比较**，直接返回 `fontH`。
+ *   ② 交叉验证：宽、高是两条独立路径。一致 ⇒ 块确实更大（真标题，保留 fontH）；
+ *      不一致（比值 > 1.3）⇒ 框被撑大（用 baseFont 兜底）。baseFont 为 null 时退回 fontH。
  *
  * @param {number} fontH 行高模型给出的字号（画布 px）
  * @param {number} fontW 宽度模型给出的字号（画布 px）＝ bboxW_px / emWidthOf(text)
  * @param {number|null} baseFont 页面基准字号（画布 px），可空
+ * @param {number} fwCount 该块文本的**全角字数**（见 fullWidthCount）
  */
-export function reconcileFont(fontH, fontW, baseFont) {
+export function reconcileFont(fontH, fontW, baseFont, fwCount) {
+  if (fwCount < FONT_ESTIMATOR_MIN_FW) return fontH; // 短块：fontW 噪声大，不比较
   const hi = Math.max(fontH, fontW);
   const lo = Math.min(fontH, fontW);
   if (lo > 0 && hi / lo > FONT_ESTIMATOR_MAX_RATIO) return baseFont ?? fontH;
@@ -163,8 +183,9 @@ export function reconcileFont(fontH, fontW, baseFont) {
  * → 第 9 页溢出叠字。
  * 现两处判据同源：含 LaTeX 源码的块一律用页面基准字号，且不参与宽度夹子。
  *
- * 两估计量交叉验证（Task 13）：非公式文本块在返回前过 `reconcileFont(fontH, fontW, baseFont)`
- * —— bbox 被撑大（宽高两路不一致）时退回页面基准字号，修掉 `p10[18]` 的 2 倍字号。
+ * 两估计量交叉验证（Task 13）：非公式文本块在返回前过
+ * `reconcileFont(fontH, fontW, baseFont, fullWidthCount(text))` —— **全角字数 ≥ 6** 且宽高两路
+ * 不一致（比值 > 1.3）时退回页面基准字号，修掉 `p10[18]` 的 2 倍字号；短块（< 6 字）不比较。
  *
  * @param {{text?: string, bbox: number[]}} block
  * @param {number} pageWidth 页面宽度（pt）
@@ -181,7 +202,7 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
   const em = emWidthOf(block.text ?? "");
   if (em <= 0) return fontH; // 无文本：没有宽度估计量可交叉验证，退回行高模型
   const fontW = (((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW) / em;
-  return reconcileFont(fontH, fontW, baseFont);
+  return reconcileFont(fontH, fontW, baseFont, fullWidthCount(block.text ?? ""));
 }
 
 /** 宽度安全上限（R3/R5）：把行高模型给出的字号夹到「文字当量宽 × 字号 ≤ bbox 宽」，

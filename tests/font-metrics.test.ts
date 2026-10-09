@@ -15,6 +15,7 @@ import {
   clampByWidth,
   emWidthOf,
   reconcileFont,
+  fullWidthCount,
 } from "../stages/font-metrics.js";
 
 /** 近似断言：期望 expected ± tol */
@@ -245,29 +246,51 @@ test("clampByWidth：豁免只针对公式源码块 —— 同一 bbox/字号的
 });
 
 // ── Task 13：两估计量交叉验证（reconcileFont）—— 修 p10[18] 的 2 倍字号 ──────────────
+// 修复轮 1：交叉验证加前置条件「全角字数 ≥ 6」（短块 fontW 噪声大，不可用于否定 fontH）。
 
-test("reconcileFont：宽高一致（比值 ≤ 1.3）→ 用 fontH（真标题保留）", () => {
-  // 实测比值：第二章 相互作用 1.03 / 第3节 力的合成与分解 1.10 / 专题 连接体动态平衡问题 1.03
-  //          全章综合测试 1.09 —— 全部 ≤ 1.3，真标题必须保留行高模型字号
-  assert.equal(reconcileFont(15.90, 15.44, 8.74), 15.90);
-  assert.equal(reconcileFont(14.31, 13.06, 8.74), 14.31);
-  assert.equal(reconcileFont(13.51, 13.10, 8.74), 13.51);
-  assert.equal(reconcileFont(13.51, 12.35, 8.74), 13.51);
-  // 边界：恰好 1.3 不算（判据是严格 >）
-  assert.equal(reconcileFont(13, 10, 8), 13);
+test("fullWidthCount：码位 ≥ U+2E80 计数（与 emWidthOf 全角口径一致）", () => {
+  assert.equal(fullWidthCount("刷易错"), 3);
+  assert.equal(fullWidthCount("弹力先变大后变小E"), 8); // 8 全角 + ASCII "E"
+  assert.equal(fullWidthCount("第二章 相互作用"), 7); // 7 全角 + 半角空格
+  assert.equal(fullWidthCount("A.0.20"), 0);
+  assert.equal(fullWidthCount(""), 0);
 });
 
-test("reconcileFont：宽高不一致（比值 > 1.3）→ 退回 baseFont（框被撑大）", () => {
-  // p10[18]「弹力先变大后变小E」fontH=19.08 / fontW=13.08，比值 1.459 > 1.3 → 用基准
-  assert.equal(reconcileFont(19.08, 13.08, 8.74), 8.74);
+test("reconcileFont：全角字数 < 6 → 不比较、直接用 fontH（短块 fontW 噪声大）—— 修复轮 1", () => {
+  // 刷易错（3 字）：fontH=14.31 / fontW=10.29，比值 1.39 > 1.3 —— 修复轮 0 会被误压到基准；
+  // 现因全角字数 < 6 不比较 → 保留 fontH（真标题/横幅标签必须保留）
+  assert.equal(reconcileFont(14.31, 10.29, 8.74, 3), 14.31);
+  // 刷基础/刷提分/刷真题（discarded，均 3 字）：fontH 18.28–19.08 / fontW 13.38–13.64，比值 1.34–1.40
+  assert.equal(reconcileFont(18.28, 13.64, 8.74, 3), 18.28); // 刷基础 p2 / 刷提分 p4
+  assert.equal(reconcileFont(19.08, 13.64, 8.74, 3), 19.08); // 刷提分 p6
+  assert.equal(reconcileFont(18.28, 13.38, 9.54, 3), 18.28); // 刷真题 p13
+  // 边界：恰好 5 字仍不比较；6 字才开始比较
+  assert.equal(reconcileFont(13.01, 10, 8, 5), 13.01);
+  assert.equal(reconcileFont(13.01, 10, 8, 6), 8);
+});
+
+test("reconcileFont：全角字数 ≥ 6 且宽高一致（比值 ≤ 1.3）→ 用 fontH（真标题保留）", () => {
+  // 实测比值：第二章 相互作用 1.03 / 第3节 力的合成与分解 1.10 / 专题 连接体动态平衡问题 1.03
+  //          全章综合测试 1.09 —— 全部 ≤ 1.3，真标题必须保留行高模型字号
+  assert.equal(reconcileFont(15.90, 15.44, 8.74, 7), 15.90);
+  assert.equal(reconcileFont(14.31, 13.06, 8.74, 9), 14.31);
+  assert.equal(reconcileFont(13.51, 13.10, 8.74, 11), 13.51);
+  assert.equal(reconcileFont(13.51, 12.35, 8.74, 6), 13.51);
+  // 边界：恰好 1.3 不算（判据是严格 >）
+  assert.equal(reconcileFont(13, 10, 8, 6), 13);
+});
+
+test("reconcileFont：全角字数 ≥ 6 且宽高不一致（比值 > 1.3）→ 退回 baseFont（框被撑大）", () => {
+  // p10[18]「弹力先变大后变小E」fontH=19.08 / fontW=13.08，比值 1.459 > 1.3（8 全角）→ 用基准
+  assert.equal(reconcileFont(19.08, 13.08, 8.74, 8), 8.74);
   // 边界：略超 1.3 → 退回基准
-  assert.equal(reconcileFont(13.01, 10, 8), 8);
-  // 方向无关：fontW > fontH 同样命中（宽而短的「()」碎片块）
-  assert.equal(reconcileFont(11.92, 31.98, 8.74), 8.74);
+  assert.equal(reconcileFont(13.01, 10, 8, 6), 8);
+  // 方向无关：fontW > fontH 同样命中（宽而长的块，≥6 全角）
+  assert.equal(reconcileFont(11, 30, 8, 6), 8);
 });
 
 test("reconcileFont：baseFont 为 null 时无法兜底 → 退回 fontH", () => {
-  assert.equal(reconcileFont(19.08, 13.08, null), 19.08);
+  assert.equal(reconcileFont(19.08, 13.08, null, 8), 19.08);
 });
 
 test("fontForBlock：被撑大的块（p10[18]）退回页面基准字号 —— 修 2 倍字号（对比模式 PANE_W 口径）", () => {
@@ -275,7 +298,13 @@ test("fontForBlock：被撑大的块（p10[18]）退回页面基准字号 ——
   // 修复前：fontForBlock 直接给行高模型 19.08px（= 2.18× 页面基准 8.74px）
   const byLineHeight = fontFromLineHeight(((391 - 367) / PAGE_W) * PANE_W);
   approx(byLineHeight, 19.08, 0.05);
-  // 修复后：宽高比值 1.459 > 1.3 → 退回基准 8.74px（与同页邻行 p10[20] 同量级）
+  // 修复后：8 全角（≥6）+ 宽高比值 1.459 > 1.3 → 退回基准 8.74px（与同页邻行 p10[20] 同量级）
   assert.equal(fontForBlock(b, PAGE_W, PANE_W, 8.74), 8.74);
   assert.notEqual(fontForBlock(b, PAGE_W, PANE_W, 8.74), byLineHeight);
+});
+
+test("fontForBlock：短块（< 6 全角）不触发交叉验证 —— 刷易错 保留行高模型字号（修复轮 1）", () => {
+  const b = { kind: "text", text: "刷易错", bbox: [155, 662, 195, 680] };
+  // 修复轮 0：比值 1.39 > 1.3 → 被压到基准 9.54px；修复轮 1：3 全角 < 6 → 不比较，保留 fontH
+  assert.equal(fontForBlock(b, PAGE_W, PANE_W, 9.54), fontFromLineHeight(((680 - 662) / PAGE_W) * PANE_W));
 });

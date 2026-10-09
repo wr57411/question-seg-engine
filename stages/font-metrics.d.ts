@@ -23,7 +23,7 @@ export function baseFontOfPage(
 
 /** 块的渲染字号：`hasMathSource` 命中（含 `\`/`$`/`_`/`^`）用 baseFont（null 时回退行高推算），
  *  否则按自身行高推算。竖排块（bboxH > 2×bboxW 且当量宽 ≥2）改取 bboxW 当行高。
- *  非公式文本块再过 `reconcileFont`：宽高两路估计量比值 > 1.3（bbox 被撑大）时退回 baseFont。 */
+ *  非公式文本块再过 `reconcileFont`：**全角字数 ≥ 6** 且宽高两路比值 > 1.3（bbox 被撑大）时退回 baseFont。 */
 export function fontForBlock(
   block: MetricBlock,
   pageWidth: number,
@@ -31,9 +31,18 @@ export function fontForBlock(
   baseFont: number | null,
 ): number;
 
-/** 两估计量交叉验证（Task 13）：`max(fontH, fontW) / min(fontH, fontW) > 1.3` 时返回 baseFont
- *  （baseFont 为 null 时退回 fontH），否则返回 fontH。判据只此一处定义。 */
-export function reconcileFont(fontH: number, fontW: number, baseFont: number | null): number;
+/** 两估计量交叉验证（Task 13）：全角字数 `fwCount < 6` 时**不比较**、直接返回 fontH（短块 fontW 噪声大）；
+ *  否则 `max(fontH, fontW) / min(fontH, fontW) > 1.3` 时返回 baseFont（baseFont 为 null 时退回 fontH）。
+ *  判据只此一处定义。 */
+export function reconcileFont(
+  fontH: number,
+  fontW: number,
+  baseFont: number | null,
+  fwCount: number,
+): number;
+
+/** 全角/CJK 字数：码位 ≥ U+2E80 的字符计数（与 emWidthOf 的「全角/CJK」口径一致）。 */
+export function fullWidthCount(text: string): number;
 
 /** 竖排文本判定：bboxH > 2×bboxW（严格大于）且 emWidthOf(text) ≥ 2。 */
 export function isVerticalText(bbox: number[], text: string): boolean;
