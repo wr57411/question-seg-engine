@@ -21,8 +21,8 @@ export function baseFontOfPage(
   canvasW: number,
 ): number | null;
 
-/** 块的渲染字号：含 \frac/\sqrt/_/^ 用 baseFont（null 时回退行高推算），否则按自身行高推算。
- *  竖排块（bboxH > 2×bboxW 且当量宽 ≥2）改取 bboxW 当行高。 */
+/** 块的渲染字号：`hasMathSource` 命中（含 `\`/`$`/`_`/`^`）用 baseFont（null 时回退行高推算），
+ *  否则按自身行高推算。竖排块（bboxH > 2×bboxW 且当量宽 ≥2）改取 bboxW 当行高。 */
 export function fontForBlock(
   block: MetricBlock,
   pageWidth: number,
