@@ -349,6 +349,9 @@ function compareReadingOrder(a: [number, number], b: [number, number]): number {
  * 跨页段泄漏行迁回：泄漏行的坐标即它真实所属页的页顶位置，默认迁回下一页
  * （段在页底形态）；若下一页已有近似重复文本（页眉注释类，两页各有副本）则丢弃，
  * 避免重复。对称形态迁回上一页。迁移后由版面层阅读顺序自然归位。
+ *
+ * 无相邻页可迁时（末页「段在页底 + 行在页顶」/ 首页「段在页顶 + 行在页底」对称形态）
+ * **保留在本页**而非丢弃——G1「不静默丢内容」：保留可见（可能压页眉/页脚）优于无声丢弃。
  */
 function dropCrossPageLeaks(pages: (PageInfo & { leaks: ParsedBlock[] })[]): PageInfo[] {
   const norm = (t: string) => t.replace(/[\s\\${}]+/g, "");
@@ -366,11 +369,17 @@ function dropCrossPageLeaks(pages: (PageInfo & { leaks: ParsedBlock[] })[]): Pag
     for (const block of leaks) {
       const leakedFromBottom = block.bbox[3] <= (pages[i]?.height ?? 0) * 0.35;
       const target = leakedFromBottom ? pages[i + 1] : pages[i - 1];
-      if (target && !fuzzyDup(block.kind === "text" ? block.text : "", target.blocks)) {
+      if (!target) {
+        // 末页「段在页底 + 行在页顶」/ 首页「段在页顶 + 行在页底」对称形态：无下一页/上一页可迁。
+        // 旧实现直接丢弃且**无任何记录** = 静默丢内容（违反 G1）。修法取「保留可见优于丢弃」：
+        // 留在本页（其坐标在页顶/页底，可能压住页眉/页脚，但内容可见、可回溯），而非丢弃。
+        // 另一选项「丢弃 + 产出 ReviewNote」需把 note 从 normalize 层穿透到 SegmentationResult
+        // （当前无此通道，ReviewNote 由 rule-engine 层产出），改动面大，故不取。
+        pages[i]!.blocks.push(block);
+      } else if (!fuzzyDup(block.kind === "text" ? block.text : "", target.blocks)) {
         target.blocks.push(block);
       }
-      // 无目标页或已有副本：丢弃（泄漏行在其坐标所指页顶不可 rendering，
-      // 留在本页则压在页眉上；副本存在时不损失数据）
+      // 有目标页且已有副本：丢弃（副本存在时不损失数据）
     }
   }
   return pages.map(({ leaks: _leaks, ...page }) => page);

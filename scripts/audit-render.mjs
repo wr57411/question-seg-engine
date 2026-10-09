@@ -31,17 +31,24 @@
  *      口径静默排除了 `\`/`$`/ASCII 块而不报数。分桶互斥且**相加 = 排除总数**（无未归类残差）。
  *      第 6 节另把**公式源码块**列入排除桶：C1 修复后渲染层对公式块豁免 `clampByWidth`，
  *      触发信号对这类块不再适用（修复前它们 100% 命中，抬高整体触发率）。
- *   8. **上游即时重复前缀（Task 12，提示级）**：MinerU 偶发把一段文本前缀连续复制两遍
- *      （形如 `X + X + 其余`）。展示层 `collapseImmediateRepeat` 会折叠一份（判据保守：
+ *   8. **上游即时重复前缀（Task 12 / 最终修复波，判定级）**：MinerU 偶发把一段文本前缀连续复制
+ *      两遍（形如 `X + X + 其余`）。展示层 `collapseImmediateRepeat` 会折叠一份（判据保守：
  *      即时、精确、`X.length >= 6`）。本节把**每一次折叠**连同折叠前后文本全量列出，
- *      使这条「改写」可见而非静默（G1）。提示项，不计退出码；命中为 0 时显示 ✅。
+ *      使这条「改写」可见而非静默（G1）。**折叠处数纳入判定**（阈值 12，基线 7）：
+ *      判据一旦被放宽（去即时/去精确/递归）会大面积误折叠，计数即越界报红；
+ *      逐块清单仍为提示信息（全量列出，不计退出码）。
+ *   9. **画布边界裁切估算（最终修复波，提示级）**：公式块豁免 `clampByWidth` 后不再受 bbox 宽
+ *      约束，文字右缘可能越过画布右边界、被 `.canvas{overflow:hidden}` 裁掉（裁切 = 静默丢内容，G1）。
+ *      本节用既有 `emWidthOf` 口径 × 渲染字号估算「会被裁切」的块并列出清单，把该未闭合风险显性化。
+ *      ⚠️ 对公式块，`emWidthOf(原始 LaTeX)` 是**保守上界**（线性模型对二维排版偏大 3–5×）→ 会高估；
+ *      真实是否裁切以视觉审板/DOM 为准。提示项，不计退出码。
  *
  * 用法：node scripts/audit-render.mjs [docId]
  * 退出码：0 = 判定项全部归零；1 = 判定项有发现（可接入 CI / npm run check）
  */
 import { readFileSync } from "node:fs";
 import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediateRepeat } from "../stages/latex-display.js";
-import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasMathSource } from "../stages/font-metrics.js";
+import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasMathSource, clampByWidth } from "../stages/font-metrics.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
@@ -248,12 +255,8 @@ sections.push([
   [...ambiguityMap.entries()].map(([k, v]) => ({ shown: `${k}  ×${v.n}`, sample: v.sample })),
   false,
 ]);
-sections.push([
-  "上游即时重复前缀（提示·展示层已折叠）",
-  repeatCollapsed,
-  false,
-  Infinity, // 全量列出：本节的目的是让每一次「改写」都可见（G1）
-]);
+// 上游即时重复前缀折叠：**折叠处数是判定项**（阈值见下），逐块清单是提示信息。
+// 故不走上面的通用 sections（它只支持「非空即失败」或「纯提示」两种），而在下方单独成节。
 
 console.log(`渲染审计 · ${docId}`);
 console.log(`扫描文本块 ${total} 个\n`);
@@ -401,6 +404,83 @@ const overflowHit = overflowGroups.reduce((a, g) => a + g.hit.length, 0);
     `     · 合计          ：可判 ${overflowN} 个 · 触发 ${overflowHit} 个（${overflowN ? ((overflowHit / overflowN) * 100).toFixed(2) : "N/A"}%）`,
   );
   reportCoverage("文字溢出", overflowN, ovfBuckets);
+}
+
+// ── 8. 上游即时重复前缀折叠处数（**判定项**，阈值 12；逐块清单为提示信息）──────────
+// 为什么把折叠处数纳入退出码：collapseImmediateRepeat 作用于**渲染路径的全部块**，是「改写」类
+// 变换。判据虽保守（即时 / 精确 / ≥6 字符），但判据一旦被放宽（去「即时」/ 去「精确」/ 递归折叠），
+// 会**大面积误折叠合法重复**且无人察觉。把折叠处数做成判定项，即给判据上一道数量护栏。
+// 阈值取 12（基线实测 7）：留 ~1.7× 余量容纳文档演进带来的零星新增，同时拦得住结构性放宽——
+// 实测把「即时」要求去掉（块内任意重复 6-gram）会从 7 跳到 **175**，远超 12；
+// 而仅把 MIN_REPEAT 从 6 降到 2 只从 7 增到 8（微调不触发），故本阈值瞄准的是「判据被放宽」而非微调。
+// 逐块清单仍**全量列出**（G1：每一次改写都可见），但不计入退出码。
+const REPEAT_BASELINE = 7;
+const REPEAT_MAX = 12;
+{
+  const over = repeatCollapsed.length > REPEAT_MAX;
+  console.log(
+    `\n${over ? "❌" : "✅"} 上游即时重复前缀折叠（判定项：折叠处数 ≤ ${REPEAT_MAX}，基线 ${REPEAT_BASELINE}）`,
+  );
+  console.log(
+    `     折叠处数 ${repeatCollapsed.length} 处 · 基线 ${REPEAT_BASELINE} · 阈值 ${REPEAT_MAX}（超出即判定失败）`,
+  );
+  console.log("     判据：collapseImmediateRepeat（即时 / 精确 / ≥6 字符）；数量异常升高 = 判据可能被放宽。");
+  if (over) console.log(`     ❌ 折叠处数 ${repeatCollapsed.length} > ${REPEAT_MAX}：判据可能被放宽，逐块回原卷核对`);
+  // 逐块清单：提示信息，全量列出（每一次「改写」都可见，G1）
+  for (const x of repeatCollapsed) {
+    console.log(`     p${x.p} ${x.src}[${x.i}] ${JSON.stringify(x.shown)}`);
+    if (x.sample) console.log(`        …${JSON.stringify(x.sample)}`);
+  }
+  if (over) bad++;
+}
+
+// ── 9. 画布边界裁切估算（**提示项**，不计退出码）────────────────────────────────
+// 成因：公式块（hasMathSource）豁免 clampByWidth（C1 修复）→ 渲染字号取页面基准字号，不再受
+//   bbox 宽约束 → 文字右缘可能越过画布右边界，被 `.canvas{overflow:hidden}` 裁掉
+//   （裁切 = 静默丢内容，G1）。本节点把「会被裁切」的块报出来，使这处**未闭合风险**可见。
+// 口径（沿用既有 emWidthOf，不另立度量）：块左缘 = bbox.x0 换算；右缘 = 左缘 + emWidthOf(text) × F，
+//   其中 F 为行级 render path 的实际渲染字号 clampByWidth(fontForBlock(...))；右缘 > canvasW 即会被裁。
+//   ⚠️ 对公式块，emWidthOf 作用在**原始 LaTeX 源码**上是**保守上界**（线性模型对二维排版不成立，
+//      源码当量宽偏大 3–5×）→ 本估算会**高估**公式块；真实是否裁切以视觉审板/DOM 为准。
+// 范围：仅行级 render path（blocks）——公式块豁免正发生在 clampByWidth；raw 段级块走
+//   fontForRawBlock（无豁免，属另一路径），不计入本节。
+const clipEstimate = [];
+for (const p of snap.pages) {
+  const basePane = baseFontOfPage(p.blocks, p.width, AUDIT_CANVAS_W);
+  for (const b of p.blocks ?? []) {
+    const text = b.text;
+    if (b.kind === "image" || typeof text !== "string" || !text.length) continue;
+    if (isVerticalText(b.bbox, text)) continue;
+    const em = emWidthOf(text);
+    if (em <= 0) continue;
+    const F = clampByWidth(fontForBlock(b, p.width, AUDIT_CANVAS_W, basePane), b, p.width, AUDIT_CANVAS_W);
+    const right = (b.bbox[0] / p.width) * AUDIT_CANVAS_W + em * F;
+    if (right > AUDIT_CANVAS_W + 1e-6) {
+      clipEstimate.push({
+        p: p.index,
+        i: b.i,
+        over: right - AUDIT_CANVAS_W,
+        math: hasMathSource(text),
+        shown: text.slice(0, 56),
+      });
+    }
+  }
+}
+{
+  const mathN = clipEstimate.filter((x) => x.math).length;
+  console.log("\n⚠️ 画布边界裁切估算（提示项，不计退出码）");
+  console.log("     成因：公式块豁免 clampByWidth（C1）→ 字号取基准、不受 bbox 宽约束 → 文字右缘");
+  console.log("     可能越过画布右边界，被 .canvas{overflow:hidden} 裁掉（裁切 = 静默丢内容，G1）。");
+  console.log(
+    `     估算「右缘 > 画布宽(${AUDIT_CANVAS_W})」的块：${clipEstimate.length} 个（其中含公式源码 ${mathN} 个）`,
+  );
+  console.log("     ⚠️ 公式块用 emWidthOf(原始 LaTeX) 是保守上界（线性模型对二维排版偏大 3–5×）→ 会高估；");
+  console.log("        真实是否裁切以视觉审板/DOM 为准，本清单只用于把风险显性化。");
+  for (const x of [...clipEstimate].sort((a, b) => b.over - a.over).slice(0, 10)) {
+    console.log(`        p${x.p} blocks[${x.i}] 右缘超出 ${x.over.toFixed(1)}px math=${x.math} ${JSON.stringify(x.shown)}`);
+  }
+  if (clipEstimate.length > 10) console.log(`        …另有 ${clipEstimate.length - 10} 条`);
+  hints += clipEstimate.length; // 提示项：计入提示总数（不影响退出码）
 }
 
 if (bad === 0) {

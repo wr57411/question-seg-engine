@@ -355,3 +355,67 @@ test("normalizeLayout：对称形态——段在页顶 + 行在页底迁回上�
   assert.ok(p0.includes("上一页末段泄漏行"), "对称形态泄漏行应迁回上一页");
   assert.ok(p1.includes("1.本页顶部段"), "本页正常段不受影响");
 });
+
+// —— 最终修复波：无相邻页可迁的泄漏行不得被静默丢弃（G1）——
+
+test("normalizeLayout：末页「段在页底 + 行在页顶」无下一页可迁——行不得被静默丢弃（G1）", () => {
+  // 单页（末页）出现主形态泄漏形状：段在页底、行在页顶，但**没有下一页**可迁。
+  // 旧实现 target 为 undefined → 直接丢弃，且无 ReviewNote、无任何记录 = 静默丢内容（违反 G1）。
+  // 修法取「保留可见优于丢弃」：该行留在本页（坐标在页顶，可能压页眉，但内容可见、可回溯）。
+  const lastPage = {
+    pdf_info: [
+      {
+        page_idx: 0,
+        page_size: [596, 821],
+        para_blocks: [
+          {
+            type: "text",
+            bbox: [68, 720, 281, 776],
+            lines: [
+              { bbox: [70, 730, 279, 750], spans: [{ type: "text", content: "9.本页末段正文" }] },
+              { bbox: [70, 42, 200, 52], spans: [{ type: "text", content: "末页无下一页可迁的泄漏行" }] },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const doc = normalizeLayout(lastPage, "last-page-leak-test");
+  assert.equal(doc.pages.length, 1);
+  const texts = doc.pages[0]!.blocks.map((b) => (b.kind === "text" ? b.text : "")).join("|");
+  assert.ok(
+    texts.includes("末页无下一页可迁的泄漏行"),
+    "末页无下一页可迁的泄漏行不得被静默丢弃（应保留在本页，G1）",
+  );
+  assert.ok(texts.includes("9.本页末段正文"), "本页正常行不受影响");
+});
+
+test("normalizeLayout：首页「段在页顶 + 行在页底」无上一页可迁——行不得被静默丢弃（G1，对称形态）", () => {
+  // 单页（首页）出现对称形态泄漏形状：段在页顶、行在页底，但没有上一页可迁 → 保留在本页。
+  const firstPage = {
+    pdf_info: [
+      {
+        page_idx: 0,
+        page_size: [596, 821],
+        para_blocks: [
+          {
+            type: "text",
+            bbox: [65, 94, 280, 160],
+            lines: [
+              { bbox: [65, 94, 279, 110], spans: [{ type: "text", content: "1.本页顶部段" }] },
+              { bbox: [40, 760, 280, 775], spans: [{ type: "text", content: "首页无上一页可迁的泄漏行" }] },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const doc = normalizeLayout(firstPage, "first-page-leak-test");
+  assert.equal(doc.pages.length, 1);
+  const texts = doc.pages[0]!.blocks.map((b) => (b.kind === "text" ? b.text : "")).join("|");
+  assert.ok(
+    texts.includes("首页无上一页可迁的泄漏行"),
+    "首页无上一页可迁的泄漏行不得被静默丢弃（应保留在本页，G1）",
+  );
+  assert.ok(texts.includes("1.本页顶部段"), "本页正常行不受影响");
+});
