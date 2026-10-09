@@ -224,6 +224,7 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
       const blocks: ParsedBlock[] = [];
       /** 跨页段泄漏行（见 dropCrossPageLeaks 的归类说明），按页收集后统一迁回 */
       const leaks: ParsedBlock[] = [];
+      const pageWidth = asNumber(size?.[0]) ?? 1654;
       const pageHeight = asNumber(size?.[1]) ?? 2339;
       for (const pbRaw of asArray(rec.para_blocks as unknown)) {
         const pb = asRecord(pbRaw);
@@ -272,7 +273,7 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
           const pbBBox = toBBox(pb.bbox);
           const lineBBox = toBBox(line.bbox);
           if (
-            isCrossPageLeakShape(lineBBox, pbBBox, pageHeight)
+            isCrossPageLeakShape(lineBBox, pbBBox, pageWidth, pageHeight)
           ) {
             leaks.push(block);
             continue;
@@ -293,8 +294,22 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
   return { docId, pages: dropCrossPageLeaks(withLeaks) };
 }
 
-/** 行在页顶带且所属段在页底带、二者框完全不相交 → 跨页段泄漏的形状特征 */
-function isCrossPageLeakShape(lineBBox: BBox, paraBBox: BBox, pageHeight: number): boolean {
+/**
+ * 行在页顶带且所属段在页底带、二者框完全不相交 → 跨页段泄漏的形状特征。
+ *
+ * 双栏版面下「左栏底部的段 + 右栏顶部的行」天然 x 不相交，会被 noOverlap 的 OR 命中；
+ * 但二者同属本页、行只是段在右栏的续行（阅读顺序上**晚于**段），不是跨页泄漏。
+ * 因此仅凭 noOverlap 不足以定案，必须叠加**阅读顺序守卫**：泄漏行的真实位置在所属段的
+ * 相邻页上——主形态（段在页底、行在页顶）中行属下一页页顶，在本页阅读顺序里**早于**段；
+ * 对称形态（段在页顶、行在页底）中行属上一页页底，在本页阅读顺序里**晚于**段。
+ * 2 栏以「列桶 + y」作阅读键（x < 页宽/2 为桶 0，否则桶 1），逐项比较 (桶, y0)。
+ */
+function isCrossPageLeakShape(
+  lineBBox: BBox,
+  paraBBox: BBox,
+  pageWidth: number,
+  pageHeight: number,
+): boolean {
   const noOverlap =
     lineBBox[2] <= paraBBox[0] ||
     lineBBox[0] >= paraBBox[2] ||
@@ -307,7 +322,27 @@ function isCrossPageLeakShape(lineBBox: BBox, paraBBox: BBox, pageHeight: number
   // 段在页底 + 行在页顶（下一页页顶内容并入本页末段，主形态），
   // 或段在页顶 + 行在页底（对称形态）。紧贴段框下方的续行不满足「完全不相交」之外
   // 还需跨带，故不会误伤 p6/p8/p9 那类正常段内续行。
-  return noOverlap && ((lineTop && paraBottom) || (lineBottom && paraTop));
+  const mainForm = lineTop && paraBottom;
+  const symmetricForm = lineBottom && paraTop;
+  if (!noOverlap || (!mainForm && !symmetricForm)) return false;
+
+  const lineKey = readingOrderKey(lineBBox, pageWidth);
+  const paraKey = readingOrderKey(paraBBox, pageWidth);
+  const lineBeforePara = compareReadingOrder(lineKey, paraKey) < 0;
+  // 主形态要求行早于段（行属下一页页顶）；对称形态相反（行属上一页页底）。
+  return mainForm ? lineBeforePara : !lineBeforePara;
+}
+
+/** 双栏阅读键：(列桶, y0)；列桶 = x0 < 页宽/2 ? 0 : 1 */
+function readingOrderKey(b: BBox, pageWidth: number): [number, number] {
+  return [b[0] < pageWidth / 2 ? 0 : 1, b[1]];
+}
+
+/** 阅读键字典序比较：(桶, y0) 逐项比较，返回 -1/0/1 */
+function compareReadingOrder(a: [number, number], b: [number, number]): number {
+  if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
+  if (a[1] !== b[1]) return a[1] < b[1] ? -1 : 1;
+  return 0;
 }
 
 /**
