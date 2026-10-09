@@ -14,6 +14,7 @@ import {
   hasMathSource,
   clampByWidth,
   emWidthOf,
+  reconcileFont,
 } from "../stages/font-metrics.js";
 
 /** 近似断言：期望 expected ± tol */
@@ -89,9 +90,11 @@ test("fontForBlock：含上下标的块用页面基准字号；baseFont 为 null
   );
 });
 
-test("fontForBlock：纯文本块始终按自身行高推算（标题自然更大）", () => {
-  const plain = { kind: "text", text: "重力", bbox: [0, 0, 60, 15] };
-  assert.equal(fontForBlock(plain, PAGE_W, CANVAS_W, 12.3), fontFromLineHeight((15 / PAGE_W) * CANVAS_W));
+test("fontForBlock：纯文本块宽高一致时按自身行高推算（标题自然更大）", () => {
+  // Task 13 起 fontForBlock 会做两估计量交叉验证：bbox 宽 116pt / 高 18pt / 6.25em
+  // → 宽度隐含字号 23.66px ≈ 行高模型 23.64px（比值 1.001 ≤ 1.3）→ 保留行高模型字号。
+  const title = { kind: "text", text: "第二章 相互作用", bbox: [0, 0, 116, 18] };
+  assert.equal(fontForBlock(title, PAGE_W, CANVAS_W, 12.3), fontFromLineHeight((18 / PAGE_W) * CANVAS_W));
 });
 
 // ── Task 10：判据统一（含 LaTeX 源码一律用 baseFont，与 clampByWidth 同源）──────────
@@ -239,4 +242,40 @@ test("clampByWidth：豁免只针对公式源码块 —— 同一 bbox/字号的
   // 含 ASCII 但无公式源码的块同样仍被夹（不受豁免影响）
   const ascii = { kind: "text", text: "A.0.20", bbox: [0, 0, 100, 15] };
   approx(clampByWidth(80, ascii, PAGE_W, CANVAS_W), 127.5 / 2.6, 0.01);
+});
+
+// ── Task 13：两估计量交叉验证（reconcileFont）—— 修 p10[18] 的 2 倍字号 ──────────────
+
+test("reconcileFont：宽高一致（比值 ≤ 1.3）→ 用 fontH（真标题保留）", () => {
+  // 实测比值：第二章 相互作用 1.03 / 第3节 力的合成与分解 1.10 / 专题 连接体动态平衡问题 1.03
+  //          全章综合测试 1.09 —— 全部 ≤ 1.3，真标题必须保留行高模型字号
+  assert.equal(reconcileFont(15.90, 15.44, 8.74), 15.90);
+  assert.equal(reconcileFont(14.31, 13.06, 8.74), 14.31);
+  assert.equal(reconcileFont(13.51, 13.10, 8.74), 13.51);
+  assert.equal(reconcileFont(13.51, 12.35, 8.74), 13.51);
+  // 边界：恰好 1.3 不算（判据是严格 >）
+  assert.equal(reconcileFont(13, 10, 8), 13);
+});
+
+test("reconcileFont：宽高不一致（比值 > 1.3）→ 退回 baseFont（框被撑大）", () => {
+  // p10[18]「弹力先变大后变小E」fontH=19.08 / fontW=13.08，比值 1.459 > 1.3 → 用基准
+  assert.equal(reconcileFont(19.08, 13.08, 8.74), 8.74);
+  // 边界：略超 1.3 → 退回基准
+  assert.equal(reconcileFont(13.01, 10, 8), 8);
+  // 方向无关：fontW > fontH 同样命中（宽而短的「()」碎片块）
+  assert.equal(reconcileFont(11.92, 31.98, 8.74), 8.74);
+});
+
+test("reconcileFont：baseFont 为 null 时无法兜底 → 退回 fontH", () => {
+  assert.equal(reconcileFont(19.08, 13.08, null), 19.08);
+});
+
+test("fontForBlock：被撑大的块（p10[18]）退回页面基准字号 —— 修 2 倍字号（对比模式 PANE_W 口径）", () => {
+  const b = { kind: "text", text: "弹力先变大后变小E", bbox: [68, 367, 212, 391] };
+  // 修复前：fontForBlock 直接给行高模型 19.08px（= 2.18× 页面基准 8.74px）
+  const byLineHeight = fontFromLineHeight(((391 - 367) / PAGE_W) * PANE_W);
+  approx(byLineHeight, 19.08, 0.05);
+  // 修复后：宽高比值 1.459 > 1.3 → 退回基准 8.74px（与同页邻行 p10[20] 同量级）
+  assert.equal(fontForBlock(b, PAGE_W, PANE_W, 8.74), 8.74);
+  assert.notEqual(fontForBlock(b, PAGE_W, PANE_W, 8.74), byLineHeight);
 });

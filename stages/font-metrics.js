@@ -121,6 +121,37 @@ export function isVerticalText(bbox, text) {
   return bbox[3] - bbox[1] > 2 * (bbox[2] - bbox[0]) && emWidthOf(text) >= 2;
 }
 
+/** 两估计量不一致的判定阈值（Task 13）：`max(fontH, fontW) / min(fontH, fontW) > 1.3`
+ * 即认为该块 bbox 至少一个维度不可信 → 退回页面基准字号。
+ * 1.3 的由来：真标题（宽高一致）实测比值 ≤ 1.10（第二章 1.03 / 第3节 1.10 / 专题 1.03 /
+ * 全章综合测试 1.09），而被撑大的框比值 ≥ 1.34（见 reconcileFont）。 */
+const FONT_ESTIMATOR_MAX_RATIO = 1.3;
+
+/** 两个独立估计量的交叉验证（Task 13，**判据只此一处定义**）。
+ *
+ * 背景：块 `p10[18]` 文本 `"弹力先变大后变小E"` bbox `[68,367,212,391]`（宽 144pt / 高 24pt）
+ * ——MinerU 把它和旁边图片块并到一起、还带进游离字符 `E`，**两个方向都被撑大**：
+ *   fontH = 19.08px（2.18× 页面基准），fontW = 13.08px（1.50× 基准）；
+ * `clampByWidth` 只把它压到 1.47×（宽度也是错的，宽度上限救不了）→ 渲染成 2 倍字号。
+ * 同一页 `p10[20]` 同样 8 个字，bbox `[67,406,160,419]`（宽 93pt / 高 13pt）→ 正常字号。
+ *
+ * 判据：宽、高是**两条独立路径**。一致 ⇒ 块确实更大（真标题，保留 fontH）；
+ * 不一致 ⇒ 框被撑大（用 baseFont 兜底）。baseFont 为 null 时无法兜底 → 退回 fontH。
+ *
+ * **已知代价**：极少数「真的大号短文本」会被压到基准（如 `刷易错` 等小节标签，
+ * 比值 1.34–1.40 落在阈值之上）——见 Task 13 报告的清单对照与逐处回原卷核对。
+ *
+ * @param {number} fontH 行高模型给出的字号（画布 px）
+ * @param {number} fontW 宽度模型给出的字号（画布 px）＝ bboxW_px / emWidthOf(text)
+ * @param {number|null} baseFont 页面基准字号（画布 px），可空
+ */
+export function reconcileFont(fontH, fontW, baseFont) {
+  const hi = Math.max(fontH, fontW);
+  const lo = Math.min(fontH, fontW);
+  if (lo > 0 && hi / lo > FONT_ESTIMATOR_MAX_RATIO) return baseFont ?? fontH;
+  return fontH;
+}
+
 /** 块的渲染字号：纯文本行按自身行高推算（标题自然更大，层级自动复现 F7）；
  * 含 LaTeX 源码的行用页面基准字号（避免分式撑高 bbox 导致字号翻倍）。
  * baseFont 为 null 时回退到自身行高推算。
@@ -131,6 +162,9 @@ export function isVerticalText(bbox, text) {
  * 「有 `\` 无 `_^`」的块**一边走高度模型（字号偏大）、一边被豁免宽度夹子（无宽度兜底）**
  * → 第 9 页溢出叠字。
  * 现两处判据同源：含 LaTeX 源码的块一律用页面基准字号，且不参与宽度夹子。
+ *
+ * 两估计量交叉验证（Task 13）：非公式文本块在返回前过 `reconcileFont(fontH, fontW, baseFont)`
+ * —— bbox 被撑大（宽高两路不一致）时退回页面基准字号，修掉 `p10[18]` 的 2 倍字号。
  *
  * @param {{text?: string, bbox: number[]}} block
  * @param {number} pageWidth 页面宽度（pt）
@@ -143,7 +177,11 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
     return fontFromLineHeight(((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW);
   }
   if (baseFont && hasMathSource(block.text ?? "")) return baseFont;
-  return fontFromLineHeight(((block.bbox[3] - block.bbox[1]) / pageWidth) * canvasW);
+  const fontH = fontFromLineHeight(((block.bbox[3] - block.bbox[1]) / pageWidth) * canvasW);
+  const em = emWidthOf(block.text ?? "");
+  if (em <= 0) return fontH; // 无文本：没有宽度估计量可交叉验证，退回行高模型
+  const fontW = (((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW) / em;
+  return reconcileFont(fontH, fontW, baseFont);
 }
 
 /** 宽度安全上限（R3/R5）：把行高模型给出的字号夹到「文字当量宽 × 字号 ≤ bbox 宽」，

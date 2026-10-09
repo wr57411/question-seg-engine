@@ -269,6 +269,35 @@ export function separateOptionMarks(text) {
 }
 
 /**
+ * 空括号补间距（Task 13）：选择题末尾的作答括号在原卷是 `（　　）`（两个全角括号之间留出
+ * 作答空隙），上游 MinerU 把空隙丢了 —— 快照里只剩半角 `()`，两个括号几乎贴成 `0`。
+ * 展示层补回间距（与 `separateOptionMarks` 同类的**显式**展示层变换）。
+ *
+ * ── G4 原卷实测（600dpi 裁 origin.pdf，墨迹口径：左括号墨迹右缘 → 右括号墨迹左缘）──
+ *   p0 blocks[12] `"…下列说法中正确的是()"`：间隙 **27.0pt**
+ *   p0 blocks[21] `"弹力的是()"`：间隙 **27.0pt**
+ *   p5 blocks[8]  `"()"`（整块就是空括号）：间隙 **27.2pt**
+ *   p13 blocks[3] `"()"`：间隙 **27.1pt**
+ *   同页正文 CJK 字距（= 1em）实测 **11.52pt** ⇒ 间隙 = 27.0 / 11.52 ≈ **2.34em**
+ *   ⇒ 补 **2 个 EM SPACE**（U+2003，1em each）—— 即原卷 `（　　）` 的两个全角空格。
+ *   （实测脚本：data/out/_t13-pgm.mjs；裁剪图见 Task 13 报告。）
+ *
+ * ── 判据（保守，lessons.md L2：改写类变换取最严）──
+ * - 只处理「**成对、内部为空或仅空白**（半角空格 / 全角空格 / 制表）」的括号；
+ *   半角 `()`、全角 `（）`、混合 `（)` 都算。
+ * - **不碰**内部有内容的括号（如 `(多选)`）。
+ * - **不跨块**：本函数只作用于单块文本，不做任何跨块匹配。
+ * - **幂等**：EM SPACE（U+2003）不在空白字符类 `[ \t\u3000]` 内 ⇒ 已补过间距的括号
+ *   不再命中，不会越补越宽。
+ *
+ * @param {string} text 已渲染成 HTML 片段的文本（括号为字面文本，不受标签影响）
+ * @returns {string} 空括号内补 2 个 EM SPACE 后的文本；无命中则原样返回
+ */
+export function spaceEmptyParens(text) {
+  return text.replace(/([（(])[ \t\u3000]*([）)])/g, "$1\u2003\u2003$2");
+}
+
+/**
  * 即时精确重复前缀折叠（展示层）：上游 MinerU 偶发把一段文本前缀连续复制两遍
  * （形如 `X + X + 其余`）。本函数仅当 `X` **逐字符相等**且 `X.length >= 6` 时
  * 折叠掉其中一份，恢复原貌。
@@ -303,7 +332,8 @@ export function collapseImmediateRepeat(text) {
  * - $...$ 段内按 LaTeX 子集渲染成 HTML；段外文本原样保留（仅转义）；
  * - 无 $ 但含 LaTeX 的整块（裸公式块）也按公式渲染；
  * - 不成对的 $ 视为噪声字符去掉（避免源码漏出）；
- * - LaTeX 不换行空格 "~" 还原为普通空格（10~kg → 10 kg）。
+ * - LaTeX 不换行空格 "~" 还原为普通空格（10~kg → 10 kg）；
+ * - 空括号补间距（spaceEmptyParens）：恢复原卷 `（　　）` 的作答空隙。
  *
  * ⚠️ 不要动段外文本的空格：原卷的数学排版本身就有空格（原卷第 4 页第 1 题实测
  * "B. F sin θcos θ" 带空格）。2026-10-08 曾加过「收紧数学符号间空格」，
@@ -327,7 +357,7 @@ export function prettifyLatex(text) {
       i = j;
     }
   }
-  return separateOptionMarks(out.replace(/~/g, " "));
+  return spaceEmptyParens(separateOptionMarks(out.replace(/~/g, " ")));
 }
 
 /**

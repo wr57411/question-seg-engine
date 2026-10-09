@@ -37,6 +37,8 @@
  *      使这条「改写」可见而非静默（G1）。**折叠处数纳入判定**（阈值 12，基线 7）：
  *      判据一旦被放宽（去即时/去精确/递归）会大面积误折叠，计数即越界报红；
  *      逐块清单仍为提示信息（全量列出，不计退出码）。
+ *   8b. **空括号补间距命中块（Task 13，提示级）**：展示层 `spaceEmptyParens` 把选择题末尾的空括号
+ *      `()` 补 2 个 EM SPACE（恢复原卷 `（　　）` 的作答空隙）。本节全量列出命中块（G1 可见而非静默）。
  *   9. **画布边界裁切估算（最终修复波，提示级）**：公式块豁免 `clampByWidth` 后不再受 bbox 宽
  *      约束，文字右缘可能越过画布右边界、被 `.canvas{overflow:hidden}` 裁掉（裁切 = 静默丢内容，G1）。
  *      本节用既有 `emWidthOf` 口径 × 渲染字号估算「会被裁切」的块并列出清单，把该未闭合风险显性化。
@@ -47,7 +49,7 @@
  * 退出码：0 = 判定项全部归零；1 = 判定项有发现（可接入 CI / npm run check）
  */
 import { readFileSync } from "node:fs";
-import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediateRepeat } from "../stages/latex-display.js";
+import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediateRepeat, spaceEmptyParens } from "../stages/latex-display.js";
 import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasMathSource, clampByWidth } from "../stages/font-metrics.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
@@ -78,6 +80,7 @@ const unknownCmds = new Map(); // 命令名 → 出现次数
 const ambiguityMap = new Map(); // "命令 → 另一种切法" → { n, sample }
 const stuckOptions = [];
 const repeatCollapsed = []; // 上游即时重复前缀命中块（展示层折叠；G1：变换可见而非静默）
+const emptyParenSpaced = []; // 空括号补间距命中块（展示层补间距；G1：变换可见而非静默）
 let total = 0;
 
 for (const p of snap.pages) {
@@ -127,6 +130,12 @@ for (const p of snap.pages) {
           shown: raw.slice(0, 60),
           sample: `折叠后：${collapsed.slice(0, 60)}`,
         });
+      }
+      // 空括号补间距（Task 13；提示级）：展示层把「成对、内部空/仅空白」的括号补 2 个 EM SPACE
+      // （恢复原卷 `（　　）` 的作答空隙）。每次补间距都列出，使变换可见而非静默（G1）。
+      // 判据与 stages/latex-display.js 的 spaceEmptyParens 同源（同一正则）。
+      if (/[（(][ \t\u3000]*[）)]/.test(raw)) {
+        emptyParenSpaced.push({ p: p.index, src, i: b.i, shown: raw.slice(0, 60) });
       }
     }
   }
@@ -432,6 +441,22 @@ const REPEAT_MAX = 12;
     if (x.sample) console.log(`        …${JSON.stringify(x.sample)}`);
   }
   if (over) bad++;
+}
+
+// ── 8b. 空括号补间距命中块（**提示级**：全量列出，不计退出码）────────────────────
+// 背景（Task 13）：选择题末尾的作答括号在原卷是 `（　　）`（两括号间留作答空隙），上游 MinerU
+// 把空隙丢了，快照里只剩半角 `()`，两个括号几乎贴成 `0`。展示层 `spaceEmptyParens` 补回 2 个
+// EM SPACE（G4 原卷实测间隙 27.0–27.2pt ÷ 正文 CJK 字距 11.52pt ≈ 2.34em ⇒ 2 个）。
+// 本节把**每一处补间距**连同块位置全量列出，使这条「改写」可见而非静默（G1）。
+// 提示项，不计退出码：判据保守（仅成对、内部空/仅空白的括号），(多选) 这类不命中。
+{
+  console.log(`\n⚠️ 空括号补间距（提示项，不计退出码）：命中 ${emptyParenSpaced.length} 个块`);
+  console.log("     判据：spaceEmptyParens —— 成对、内部为空或仅空白（半角/全角括号都算）；");
+  console.log("     内部有内容的括号（如 (多选)）不命中；补 2 个 EM SPACE（U+2003）。");
+  for (const x of emptyParenSpaced) {
+    console.log(`     p${x.p} ${x.src}[${x.i}] ${JSON.stringify(x.shown)}`);
+  }
+  hints += emptyParenSpaced.length; // 提示项：计入提示总数（不影响退出码）
 }
 
 // ── 9. 画布边界裁切估算（**提示项**，不计退出码）────────────────────────────────

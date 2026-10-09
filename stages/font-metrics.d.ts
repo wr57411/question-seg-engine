@@ -22,13 +22,18 @@ export function baseFontOfPage(
 ): number | null;
 
 /** 块的渲染字号：`hasMathSource` 命中（含 `\`/`$`/`_`/`^`）用 baseFont（null 时回退行高推算），
- *  否则按自身行高推算。竖排块（bboxH > 2×bboxW 且当量宽 ≥2）改取 bboxW 当行高。 */
+ *  否则按自身行高推算。竖排块（bboxH > 2×bboxW 且当量宽 ≥2）改取 bboxW 当行高。
+ *  非公式文本块再过 `reconcileFont`：宽高两路估计量比值 > 1.3（bbox 被撑大）时退回 baseFont。 */
 export function fontForBlock(
   block: MetricBlock,
   pageWidth: number,
   canvasW: number,
   baseFont: number | null,
 ): number;
+
+/** 两估计量交叉验证（Task 13）：`max(fontH, fontW) / min(fontH, fontW) > 1.3` 时返回 baseFont
+ *  （baseFont 为 null 时退回 fontH），否则返回 fontH。判据只此一处定义。 */
+export function reconcileFont(fontH: number, fontW: number, baseFont: number | null): number;
 
 /** 竖排文本判定：bboxH > 2×bboxW（严格大于）且 emWidthOf(text) ≥ 2。 */
 export function isVerticalText(bbox: number[], text: string): boolean;

@@ -4,6 +4,7 @@
  */
 export function prettifyLatex(text: string): string;
 export function separateOptionMarks(text: string): string;
+export function spaceEmptyParens(text: string): string;
 export function collapseImmediateRepeat(text: string): string;
 export const KNOWN_COMMANDS: Set<string>;
 export const STRUCTURAL_COMMANDS: Set<string>;

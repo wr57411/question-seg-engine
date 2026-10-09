@@ -4,7 +4,7 @@
 // 所以期望值是 HTML —— 一维字符流表达不了原卷的数学排版。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { prettifyLatex, findCommandAmbiguities, collapseImmediateRepeat } from "../stages/latex-display.js";
+import { prettifyLatex, findCommandAmbiguities, collapseImmediateRepeat, spaceEmptyParens } from "../stages/latex-display.js";
 
 /** 竖排分式的期望片段 */
 const frac = (num: string, den: string) =>
@@ -209,4 +209,46 @@ test("边界：重复单元正好 5 字符不折叠、正好 6 字符折叠", ()
 test("不递归折叠：折叠一次即返回，结果不再折", () => {
   // 4 份单元 → 只折掉 1 份得到 3 份；若递归会继续折到 1 份。
   assert.equal(collapseImmediateRepeat("一二三四五六一二三四五六一二三四五六一二三四五六"), "一二三四五六一二三四五六一二三四五六");
+});
+
+// —— 空括号补间距（Task 13；改写类变换，判据最保守 + G4 回原卷量间隙）——
+// 原卷实测（600dpi 裁 origin.pdf，墨迹口径）：两括号墨迹间隙 27.0–27.2pt；
+// 同页正文 CJK 字距 11.52pt ⇒ 27.0 / 11.52 ≈ 2.34em ⇒ 补 2 个 EM SPACE（原卷 `（　　）`）。
+
+test("spaceEmptyParens：半角空括号补 2 个 EM SPACE（原卷间隙实测 ≈27pt ≈2.34em）", () => {
+  assert.equal(spaceEmptyParens("下列说法中正确的是()"), "下列说法中正确的是(\u2003\u2003)");
+  assert.equal(spaceEmptyParens("弹力的是()"), "弹力的是(\u2003\u2003)");
+  assert.equal(spaceEmptyParens("()"), "(\u2003\u2003)");
+});
+
+test("spaceEmptyParens：全角 / 混合空括号同样补间距", () => {
+  assert.equal(spaceEmptyParens("正确的是（）"), "正确的是（\u2003\u2003）");
+  assert.equal(spaceEmptyParens("正确的是（)"), "正确的是（\u2003\u2003)");
+  assert.equal(spaceEmptyParens("正确的是(）"), "正确的是(\u2003\u2003）");
+});
+
+test("spaceEmptyParens：内部已有空白（半角/全角空格/制表）→ 归一到 2 个 EM SPACE", () => {
+  assert.equal(spaceEmptyParens("正确的是( )"), "正确的是(\u2003\u2003)");
+  assert.equal(spaceEmptyParens("正确的是（　）"), "正确的是（\u2003\u2003）");
+  assert.equal(spaceEmptyParens("正确的是(\t)"), "正确的是(\u2003\u2003)");
+});
+
+test("spaceEmptyParens：内部有内容的括号不动（(多选) 等，判据保守）", () => {
+  assert.equal(spaceEmptyParens("(多选)现代的"), "(多选)现代的");
+  assert.equal(spaceEmptyParens("7.「黑龙江佳木斯一中2022月考](多选)现代"), "7.「黑龙江佳木斯一中2022月考](多选)现代");
+  assert.equal(spaceEmptyParens("如图(R)所示"), "如图(R)所示");
+  assert.equal(spaceEmptyParens("A.(甲)B.(乙)"), "A.(甲)B.(乙)");
+});
+
+test("spaceEmptyParens：幂等 —— 已补过的括号不会越补越宽", () => {
+  const once = spaceEmptyParens("下列说法中正确的是()");
+  assert.equal(spaceEmptyParens(once), once);
+  assert.equal(spaceEmptyParens("正确的是(\u2003\u2003)"), "正确的是(\u2003\u2003)");
+});
+
+test("接入渲染管线：prettifyLatex 对空括号补间距、(多选) 不被动", () => {
+  assert.equal(prettifyLatex("下列说法中正确的是()"), "下列说法中正确的是(\u2003\u2003)");
+  assert.equal(prettifyLatex("7.「黑龙江」(多选)现代的"), "7.「黑龙江」(多选)现代的");
+  // 空括号与选项分隔互不干扰（选项分隔照旧在 A./B. 前补 EM SPACE）
+  assert.equal(prettifyLatex("正确的是()A.甲B.乙"), "正确的是(\u2003\u2003)\u2003A.甲\u2003B.乙");
 });
