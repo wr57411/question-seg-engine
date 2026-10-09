@@ -241,7 +241,7 @@ test("clampByWidth：\\frac/\\sqrt 块**豁免夹子**（返回未夹字号）�
   assert.equal(clampByWidth(8.74, sqrt, PAGE_W, CANVAS_W), 8.74);
 });
 
-test("clampByWidth：豁免只针对公式源码块 —— 同一 bbox/字号的纯 CJK 块仍被夹", () => {
+test("clampByWidth：豁免只针对**二维构造**（\\frac/\\sqrt），其余块（纯 CJK / 含 ASCII / 非二维 LaTeX）仍被夹", () => {
   const cjk = { kind: "text", text: "重力弹力摩", bbox: [0, 0, 60, 15] };
   approx(clampByWidth(20, cjk, PAGE_W, CANVAS_W), 15.3, 0.1); // 5 字 → 76.5/5 = 15.3
   // 含 ASCII 但无公式源码的块同样仍被夹（不受豁免影响）
@@ -330,6 +330,19 @@ test("hasTwoDimensionalMath：仅 \\frac/\\dfrac/\\tfrac/\\sqrt 命中（真正�
   assert.equal(hasTwoDimensionalMath(undefined as unknown as string), false);
 });
 
+test("hasTwoDimensionalMath：**命令名边界** —— \\fraction/\\dfracx/\\fracx 不误命中（修复轮 1 发现 2）", () => {
+  // 原正则 `\\[dt]?frac|\\sqrt` 无边界 → `\fraction` 被当成 `\frac`（误豁免夹子）
+  assert.equal(hasTwoDimensionalMath("\\fraction"), false);
+  assert.equal(hasTwoDimensionalMath("\\dfracx"), false);
+  assert.equal(hasTwoDimensionalMath("\\fracx"), false);
+  assert.equal(hasTwoDimensionalMath("\\sqrtx"), false);
+  // 合法「命令后紧跟数字」写法仍命中（用负向前瞻字母而非 `\b`：`\b` 会连它们一起排除）
+  assert.equal(hasTwoDimensionalMath("\\frac12"), true);
+  assert.equal(hasTwoDimensionalMath("\\sqrt3"), true);
+  assert.equal(hasTwoDimensionalMath("\\frac { a } { b }"), true);
+  assert.equal(hasTwoDimensionalMath("x=\\dfrac{1}{2}"), true);
+});
+
 test("renderedTextOf：stripTags(prettifyLatex(text)) —— 源码 → 真正渲染出的字符", () => {
   assert.equal(renderedTextOf("$\\angle AOB$"), "∠AOB"); // \angle → ∠
   assert.equal(renderedTextOf("$F_{1}$"), "F1"); // 下标 1 保留（剥 <sub>）
@@ -355,23 +368,27 @@ test("clampByWidth：Task 14 收窄 —— 非二维的 LaTeX 块（$F_{1}$ / $\
   assert.equal(clampByWidth(8.74, { kind: "text", text: "$F_{1}$", bbox: [0, 0, 60, 15] }, PAGE_W, CANVAS_W), 8.74);
 });
 
-// ── Task 14：短块碎片的结构判据（isCrampedLine，A 部分）──────────────────────────
-// 回原卷量墨迹：被 MinerU 撑大的块（声明高 15–19pt，墨迹高仅 10.1–10.8pt）**挤在同栏邻行上**
-// （间隙实测 3–7pt）；真标题/横幅（墨迹 12.7–15.1pt）有正常行距（间隙 ≥9pt）。判据用**结构证据**
-// （框与谁相邻）而非再收紧比值阈值。阈值：横向重叠 ≥0.4×min宽；纵向间隙 ≤7pt。
+// ── Task 14：短块碎片的结构判据（isCrampedLine + 量级闸，A 部分）──────────────────
+// 回原卷量墨迹：被 MinerU 撑大的块（声明高 15–19pt，墨迹高仅 10.1–10.8pt）**挤在同栏邻行上**；
+// 真标题/横幅（墨迹 12.7–15.1pt）有正常行距（间隙 ≥9pt）。判据用**结构证据**（框与谁相邻）而非
+// 再收紧比值阈值。**修复轮 1 两道独立条件**：条件一 `isCrampedLine` 阈值收紧到 **6pt**（全卷间隙
+// 直方图在 7→8 有 3.6× 陡降的真实空档；加条件二后生效域内 31@≤6 / 0@7–8 / 18@≥9）；条件二量级闸
+// `fontH ≥ 1.4 × baseFont`（行高必须显著高于基准，独立于间距）。
 
-test("isCrampedLine：同栏（横向重叠 ≥0.4×min宽）且纵向间隙 ≤7pt → 命中（框被撑大）", () => {
+test("isCrampedLine：同栏（横向重叠 ≥0.4×min宽）且纵向间隙 ≤6pt → 命中（框被撑大）", () => {
   const frag = { kind: "text", text: "确的是()", bbox: [48, 314, 281, 331] }; // 声明高 17pt（墨迹仅 ~10.3）
   const next = { kind: "text", text: "下列说", bbox: [50, 335, 275, 350] }; // 间隙 4pt
   assert.equal(isCrampedLine(frag, [frag, next]), true);
 });
 
-test("isCrampedLine：纵向间隙 ≥9pt（真标题的正常行距）→ 不命中（保留）；边界 7pt 命中 / 8pt 不命中", () => {
+test("isCrampedLine：纵向间隙 ≥9pt（真标题的正常行距）→ 不命中（保留）；边界 6pt 命中 / 7pt 不命中", () => {
   const title = { kind: "text", text: "第二章 相互作用", bbox: [0, 0, 116, 18] };
   const g9 = { kind: "text", text: "正文", bbox: [0, 27, 116, 42] }; // 27-18 = 9
   assert.equal(isCrampedLine(title, [title, g9]), false);
-  const g7 = { kind: "text", text: "正文", bbox: [0, 25, 116, 40] }; // 25-18 = 7（判据 ≤7 → 命中）
-  assert.equal(isCrampedLine(title, [title, g7]), true);
+  const g6 = { kind: "text", text: "正文", bbox: [0, 24, 116, 39] }; // 24-18 = 6（判据 ≤6 → 命中）
+  assert.equal(isCrampedLine(title, [title, g6]), true);
+  const g7 = { kind: "text", text: "正文", bbox: [0, 25, 116, 40] }; // 25-18 = 7 → 不命中（修复轮 1 收紧）
+  assert.equal(isCrampedLine(title, [title, g7]), false);
   const g8 = { kind: "text", text: "正文", bbox: [0, 26, 116, 41] }; // 26-18 = 8 → 不命中
   assert.equal(isCrampedLine(title, [title, g8]), false);
 });
@@ -394,14 +411,34 @@ test("isCrampedLine：图片块与空文本块不作邻块；无 pageBlocks → 
   assert.equal(isCrampedLine(b, undefined), false);
 });
 
-test("fontForBlock：给同页块池且块被同栏邻行挤住 → 退回基准（Task 14，短块也生效）", () => {
+test("fontForBlock：给同页块池且块被同栏邻行挤住 + 量级达标 → 退回基准（Task 14，短块也生效）", () => {
   // p8[16]「确的是()」声明高 17pt（墨迹仅 ~10.3）—— Task 13 因 3 全角 < 6 前置条件跳过，短块漏网
   const frag = { kind: "text", text: "确的是()", bbox: [48, 314, 281, 331] };
   const next = { kind: "text", text: "下列说", bbox: [50, 335, 275, 350] };
   const byH = fontFromLineHeight(((331 - 314) / PAGE_W) * PANE_W);
-  approx(byH, 13.51, 0.05); // 1.55× 页面基准（8.74px）
+  approx(byH, 13.51, 0.05); // 1.55× 页面基准（8.74px）≥ 1.4 → 量级闸达标
   assert.equal(fontForBlock(frag, PAGE_W, PANE_W, 8.74), byH); // 不给块池 → 保留（漏网）
-  assert.equal(fontForBlock(frag, PAGE_W, PANE_W, 8.74, [frag, next]), 8.74); // 给块池 → 退回基准
+  assert.equal(fontForBlock(frag, PAGE_W, PANE_W, 8.74, [frag, next]), 8.74); // 两道条件都满足 → 退回基准
+});
+
+test("fontForBlock：**量级闸**独立生效 —— 同栏挤住但行高未达 1.4× 基准 → 不压（修复轮 1 条件二）", () => {
+  // 「增大」声明高 14pt → fontH 11.13px，1.273× 基准（< 1.4）；间隙 2pt（条件一命中）
+  const low = { kind: "text", text: "增大", bbox: [48, 314, 281, 328] };
+  const next = { kind: "text", text: "下列说", bbox: [50, 330, 275, 345] }; // 间隙 2pt
+  const byH = fontFromLineHeight(((328 - 314) / PAGE_W) * PANE_W);
+  approx(byH, 11.13, 0.05);
+  assert.ok(byH < 1.4 * 8.74, "前提：行高未达量级闸");
+  assert.equal(isCrampedLine(low, [low, next]), true, "前提：条件一命中");
+  assert.equal(fontForBlock(low, PAGE_W, PANE_W, 8.74, [low, next]), byH); // 条件二不达标 → 不压
+});
+
+test("fontForBlock：**两道条件都要满足** —— 量级达标但间隙 ≥7pt（真标题情形）→ 不压", () => {
+  const big = { kind: "text", text: "刷易错", bbox: [155, 662, 195, 680] }; // 高 18pt → 1.64× 基准
+  const next = { kind: "text", text: "下列说", bbox: [155, 687, 275, 700] }; // 间隙 7pt（> 6）
+  const byH = fontFromLineHeight(((680 - 662) / PAGE_W) * PANE_W);
+  assert.ok(byH >= 1.4 * 9.54, "前提：量级闸达标");
+  assert.equal(isCrampedLine(big, [big, next]), false, "前提：条件一不命中（间隙 7 > 6）");
+  assert.equal(fontForBlock(big, PAGE_W, PANE_W, 9.54, [big, next]), byH); // 不压
 });
 
 test("fontForBlock：真标题有正常行距（间隙 9pt）→ 结构判据不命中，字号不被压平", () => {

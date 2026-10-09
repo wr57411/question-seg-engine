@@ -339,8 +339,9 @@ for (const [name, list, fatal, max = 6] of sections) {
 //
 // 度量：`emWidthOf`（与「字号保真度」同一套，不另立标准）。preFont = **未接宽度上限**时的字号：
 //   · 行级块 / 丢弃块：`fontForBlock(...)`（渲染层随后接 `clampByWidth`），对比模式口径 PANE_W。
-//     ⚠️ 本节**不传同页块池**（Task 14 的 `isCrampedLine`）：该判据把「框被撑大」的块直接压回基准，
-//     传了就会把本节要报的信号本身抹掉 → 本节报的是**保守（偏大）**的触发率。
+//     ⚠️ 本节**不传同页块池**（Task 14 结构判据 `isCrampedLine` + 量级闸）：该判据把「框被撑大」
+//     的块直接压回基准，传了就会把本节要报的信号本身抹掉 → 本节报的是**保守（偏大）**的触发率。
+//     **与渲染器不同源**（渲染器传块池）——此差异在下方输出里**明写**（G1：口径差异不得静默）。
 //   · 段级块 raw：`fontFromLineHeight(bboxH 换算)`（`fontForRawBlock` 的宽度项即其上限），CANVAS_W。
 //   竖排块（R4）横向宽度非约束，不纳入。
 //
@@ -425,6 +426,9 @@ const overflowHit = overflowGroups.reduce((a, g) => a + g.hit.length, 0);
   console.log("     本节为提示项：clampByWidth 使 emWidthOf 口径下「渲染宽 > bboxW」在构造上不可能");
   console.log("     发生（em·F ≤ bboxW），对其判定是恒真的死门；改报非恒真的「宽度上限触发率」——");
   console.log("     高度模型字号被 bbox 宽压小的块占比（只依赖 bbox/em，不依赖夹子本身）。");
+  console.log("     ⚠️ 口径差异（明写，非静默）：本节 preFont **不传同页块池**，故与渲染器**不同源**");
+  console.log("        —— 渲染器传块池（Task 14 结构判据会把「框被撑大」的块压回基准、移出触发集），");
+  console.log("        本节刻意不传以保留该信号 ⇒ 本节数值是**保守上界**（≥ 渲染器实际触发）。");
   for (const g of overflowGroups) {
     const pct = g.n ? (g.hit.length / g.n) * 100 : 0;
     console.log(`     · ${g.label}：可判 ${g.n} 个 · 触发 ${g.hit.length} 个（${pct.toFixed(2)}%）`);
