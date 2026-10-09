@@ -378,23 +378,34 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   padding: 0 6px;
 }
 
-/* ── 解析遗漏标记（Task 16）────────────────────────────────────
+/* ── 解析遗漏标记（Task 16；修复轮 1 分级）──────────────────────
    未覆盖墨迹：原卷页图上是墨迹、却不在本页任何解析块内的区域。
-   这是「不静默失败」红线的地面真值呈现 —— 上游漏识别必须肉眼可见。
-   用洋红（区别于题框的石青/朱砂/灰）以免与既有语义色混淆。 */
+   这是「不静默失败」红线的地面真值呈现 —— 上游漏识别必须肉眼可见（G1）。
+   分级（避免「洋红墙」但仍可见）：
+     · 内容级 .content   → 洋红醒目框 + 脉冲
+     · 家具级 .furniture → 灰色细虚线框（页眉装饰/栏间竖线/页边标），不挂可见标签，靠 title
+   洋红区别于题框的石青/朱砂/灰，以免与既有语义色混淆。 */
 .uncovered-mark {
   position: absolute;
+  z-index: 7;
+  pointer-events: none;
+  /* 兜底：标记框自身绝不外溢（窄到 1pt 的竖线区域也如此）。标签已改为**独立绝对定位**元素
+     （.uncovered-tag，见 stages.js uncoveredInto），不再嵌套于框内，故不会随框外溢；此处再
+     加 overflow:hidden 双保险，杜绝任何子元素越界遮住正文（修复轮 1 发现 2）。 */
+  overflow: hidden;
+}
+.uncovered-mark.content {
   border: 2px solid #d81b60;
   background: rgba(216, 27, 96, 0.1);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85), 0 0 7px rgba(216, 27, 96, 0.55);
-  z-index: 7;
-  pointer-events: none;
   animation: uncovered-pulse 1.6s ease-in-out infinite;
+}
+.uncovered-mark.furniture {
+  border: 1px dashed rgba(43, 42, 38, 0.4);
+  background: transparent;
 }
 .uncovered-tag {
   position: absolute;
-  left: 0;
-  top: 0;
   white-space: nowrap;
   font-family: var(--sans);
   font-size: 10px;
@@ -403,6 +414,8 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   border-radius: 0 0 2px 0;
   background: #d81b60;
   color: #fff;
+  z-index: 8;
+  pointer-events: none;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 @keyframes uncovered-pulse {

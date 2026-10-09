@@ -3,11 +3,12 @@
 //   /data/out/<docId>/stages.json（快照契约，见 scripts/export-stages.ts）
 //   /data/out/<docId>/images/<裸文件名>、/data/out/<docId>/origin.pdf（原卷对照）
 //   /viewer/（最终成品内嵌）。
-// latex-display.js / font-metrics.js 为本目录纯函数模块（无引擎依赖），
-// 分别负责公式展示美化、字号与全角宽度度量（后者的数学与证据见其头注释）。
+// latex-display.js / font-metrics.js / uncovered-layout.js 为本目录纯函数模块（无引擎依赖），
+// 分别负责公式展示美化、字号与全角宽度度量、解析遗漏标签落位（后两者的数学与证据见其头注释）。
 
 import { prettifyLatex } from "./latex-display.js";
 import { baseFontOfPage, clampByWidth, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
+import { contentLabelPlacements } from "./uncovered-layout.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -48,7 +49,7 @@ const EXPLAIN = {
   },
   compare: {
     do: "左边是原卷，右边是用结构化数据按原始坐标重建的纸面——引擎读到什么就画什么，不借助原卷图像。排版保真度一目了然。",
-    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。**粉红标记框=「解析遗漏」**：该处原卷有墨迹、但解析块没覆盖到（含上游漏识别的整行/整段）。",
+    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。**洋红标记框=「解析遗漏·内容级」**（原卷有墨迹、解析块没覆盖到，含上游漏识别的整行/整段）；**灰色细虚线=「解析遗漏·家具级」**（页眉装饰/栏间竖线/页边标等版式墨迹，非内容丢失，悬停看详情）。",
   },
 };
 
@@ -281,17 +282,42 @@ const DISCARDED_LABEL = {
 };
 
 /**
- * 未覆盖墨迹（Task 16）：解析漏掉的墨迹区域 —— 醒目标记框 + 「解析遗漏」标签。
- * 这是「不静默失败」红线的**地面真值呈现**：区域来自原卷页图与全部解析块的差集
- * （见 scripts/export-stages.ts 的 computeInkCoverage），上游漏识别必须肉眼可见。
- * 标签放在框内左上角：该处本就没有渲染内容，标签不会遮住任何东西。
+ * 未覆盖墨迹（Task 16；修复轮 1 分级 + 聚合 + 不遮正文）：
+ * 解析漏掉的墨迹区域 —— 这是「不静默失败」红线的**地面真值呈现**（G1：丢失必须可见）。
+ * - **内容级**：洋红标记框 + 「解析遗漏」标签（醒目）；
+ * - **家具级**（页眉装饰/栏间竖线/页边标）：灰色细虚线框 + title 提示（仍可见，不抢眼，
+ *   避免「洋红墙」）；
+ * - **标签聚合**：相邻内容级区域合并为一个标签（避免热狗区那种标签堆叠）；
+ * - **不遮正文**：标签矩形从候选位里取首个不与任何解析块 bbox 相交者；若框宽不足、或所有
+ *   候选位都压正文，则不挂可见标签（改 title）—— 这是硬保证（验收：任何标记都不得盖住正文）。
  */
 function uncoveredInto(c, p, canvasW = CANVAS_W) {
-  for (const r of p.uncovered ?? []) {
-    const node = posStyle(el("div", "uncovered-mark"), r.bbox, p.width, p.height);
-    node.title = `解析遗漏：该区域在原卷页图上是墨迹，却不在本页任何解析块内（未覆盖 ${r.area}px）`;
-    node.append(el("span", "uncovered-tag", "解析遗漏"));
+  const all = p.uncovered ?? [];
+  if (!all.length) return;
+  const content = all.filter((r) => r.kind !== "furniture");
+  const furniture = all.filter((r) => r.kind === "furniture");
+
+  // 家具级：灰色细虚线框 + title（不挂可见标签）
+  for (const r of furniture) {
+    const node = posStyle(el("div", "uncovered-mark furniture"), r.bbox, p.width, p.height);
+    node.title = `版式家具级未覆盖：原卷页图上是墨迹（页眉装饰/栏间竖线/页边标等），不在任何解析块内（${r.area}px）`;
     c.append(node);
+  }
+
+  // 内容级：洋红标记框
+  for (const r of content) {
+    const node = posStyle(el("div", "uncovered-mark content"), r.bbox, p.width, p.height);
+    node.title = `解析遗漏（内容级）：原卷页图上是墨迹，却不在本页任何解析块内（${r.area}px）`;
+    c.append(node);
+  }
+
+  // 内容级标签：按组挂一个，落位由 uncovered-layout.js 的 contentLabelPlacements 算好
+  // （它保证每个标签都不与任何解析块 bbox 相交、且在页内；放不下/必压正文的组不产出）。
+  for (const { rect, count } of contentLabelPlacements(content, p.blocks, p.width, p.height, canvasW)) {
+    const tag = el("span", "uncovered-tag", count > 1 ? `解析遗漏 ×${count}` : "解析遗漏");
+    tag.style.left = `${(rect[0] / p.width) * 100}%`;
+    tag.style.top = `${(rect[1] / p.height) * 100}%`;
+    c.append(tag);
   }
 }
 
@@ -575,7 +601,10 @@ function renderCompare(p) {
   row.append(left, right);
   $("canvas-wrap").append(row);
   $("canvas-wrap").append(
-    legend([["rgba(216,27,96,.85)", "解析遗漏：原卷有墨迹、解析块未覆盖的区域"]]),
+    legend([
+      ["rgba(216,27,96,.85)", "解析遗漏·内容级：原卷有墨迹、解析块未覆盖（疑似漏识别正文）"],
+      ["transparent", "解析遗漏·家具级：页眉装饰/栏间竖线/页边标等版式墨迹（灰细虚线，悬停看详情）"],
+    ]),
   );
 }
 

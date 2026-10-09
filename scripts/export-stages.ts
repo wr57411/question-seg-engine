@@ -46,17 +46,26 @@ export interface StageBlock {
 }
 
 /**
+ * 未覆盖墨迹区域的级别（修复轮 1 引入的分类，判据见 `classifyUncovered`）：
+ * - `content`：**内容级** —— 疑似被解析漏掉的正文（整行/整段/选项）。**判据宁可宽松**。
+ * - `furniture`：**家具级** —— 页眉色块/横线、栏间竖线、页边章节标、页脚页码等版式装饰。
+ */
+export type UncoveredKind = "content" | "furniture";
+
+/**
  * 未覆盖墨迹区域（Task 16）：页图上是墨迹、但不在该页**任何** bbox
  * （blocks + raw + discarded，含图片块）内的连通区域。
- * `bbox` 用 **PDF 点**（与既有字段同口径）；`area` 为区域内的未覆盖墨迹像素数。
+ * `bbox` 用 **PDF 点**（与既有字段同口径）；`area` 为区域内的未覆盖墨迹像素数；
+ * `kind` 为内容级/家具级分类（展示层与审计据此分级）。
  * 这是「上游漏识别」的地面真值信号 —— 展示层据此画「解析遗漏」标记。
  */
 export interface UncoveredRegion {
   bbox: BBox;
   area: number;
+  kind: UncoveredKind;
 }
 
-/** 逐页墨迹覆盖统计（Task 16；供审计在不读 PDF 的前提下算占比） */
+/** 逐页墨迹覆盖统计（Task 16；供审计在不读 PDF 的前提下算占比与条数） */
 export interface InkCoverage {
   /** 渲染 DPI（scale = dpi/72） */
   dpi: number;
@@ -74,8 +83,19 @@ export interface InkCoverage {
   uncoveredPx: number;
   /** 全卷未覆盖占比 = uncoveredPx / totalInkPx */
   ratio: number;
+  /** 全卷内容级未覆盖区域条数（判定项基线） */
+  contentCount: number;
+  /** 全卷家具级未覆盖区域条数 */
+  furnitureCount: number;
   /** 逐页数字 */
-  pages: { index: number; inkPx: number; uncoveredPx: number; ratio: number }[];
+  pages: {
+    index: number;
+    inkPx: number;
+    uncoveredPx: number;
+    ratio: number;
+    contentCount: number;
+    furnitureCount: number;
+  }[];
 }
 
 export interface StageQuestion {
@@ -121,10 +141,16 @@ export interface StageSnapshot {
   /** 公式噪声检测报告（检测不改写） */
   formulaNoise: FormulaNoiseReport;
   /**
-   * 墨迹覆盖率统计（Task 16）。null = 未做（pdftoppm 不可用 / 无原卷 PDF）——
+   * 墨迹覆盖率统计（Task 16）。null = 未做（pdftoppm 缺失 / 无原卷 PDF）——
    * 审计据此**优雅降级**（跳过该节，不报错）。
    */
   inkCoverage: InkCoverage | null;
+  /**
+   * 墨迹分析的**非预期异常**（修复轮 1）：非 null 表示 PGM 解析/尺寸/逻辑出错
+   * （**不是** pdftoppm 缺失那种可降级情形）。审计见到它就判**失败**——
+   * 让「检查自身出 bug」不再静默假绿（G1 同样适用于门自身）。
+   */
+  inkCoverageError: string | null;
   pages: StagePage[];
   reviews: SegmentationResult["reviews"];
 }
@@ -277,6 +303,8 @@ export function buildStageSnapshot(
     formulaNoise: scanFormulaNoise(result.questions),
     /** 墨迹覆盖率：由 main() 在能渲染页图时回填（见 computeInkCoverage） */
     inkCoverage: null,
+    /** 墨迹分析异常：由 main() 在非 ENOENT 失败时回填（见下方 catch） */
+    inkCoverageError: null,
     pages,
     reviews: result.reviews,
   };
@@ -316,6 +344,76 @@ export const INK_DILATE_PX = 6;
 /** 区域面积下限像素：丢弃极小碎屑（bbox 边缘亚像素残差、扫描噪点）。
  *  40px 在 150dpi 下 ≈ 2.6pt×2.6pt；已知漏行面积 800–1700px，远高于此。 */
 export const INK_MIN_AREA_PX = 40;
+
+/* ── 区域分类：内容级 vs 家具级（修复轮 1）───────────────────────────────────
+ * 为什么要分类：不分类时，「未覆盖占比」被稳定的版式家具（页眉色块/横线、栏间竖线、
+ * 页边章节标）抬高到基线 3.84%，而本任务要防的失效模式（单行/整组选项漏识别，4 处）
+ * 仅占 0.66% —— 占比判据对该模式**实质恒绿**。故改为按**内容级条数**判回归。
+ * 判据**宁可把可疑的判成内容级**（漏报比误报危险）：只有确证是装饰才判家具级。
+ * 命中任一即家具级：
+ *   1. **细长线**：long/short ≥ 12 且 short ≤ 4pt —— 印刷栏线/装饰横线；真实文本行高 ~11pt
+ *      不可能命中（最细的整行也 ≥ 8pt），故不会把漏识别误判成装饰。
+ *   2. **落在页边带**：区域 bbox 完全落在「页眉/页脚/左右页边」带内（带 = 页面尺寸的固定
+ *      比例，见下方 *_BAND_FRAC）—— 页眉 logo/横线、页脚页码、装订边章节标。
+ *   3. **过半在内容矩形外**：区域 bbox 与该页 `blocks` 并集（内容矩形）的重叠面积 < 50%。
+ *      内容矩形由**数据推导**（非魔法常数），换卷自适配；补判据 2 漏掉的「跨带」区域。
+ * 风险与边界（如实说明）：判据 2 是**位置启发式** —— 版心顶部的真实标题若被漏识别，会被
+ *   判成家具级。实测本卷版心顶部的内容块（章节/节标题）**均已被覆盖**，未触发该风险；
+ *   且带比例取得偏小（页眉 15%），正是为压低这个风险。
+ * 未采用「墨迹密度」信号：实测正文行密度 ~0.22–0.26、页眉 logo 实心块 ~0.54、
+ *   页眉 logo+横线区域 ~0.09、栏间竖线 ~1.0 —— 密度把「实心 logo」与「稀疏横线」推向
+ *   两端，无单侧阈值可用；且粗体标题密度接近 logo，会误伤真内容 ⇒ 不引入该信号。 */
+export const UNCOVERED_RULE_MIN_ASPECT = 12;
+export const UNCOVERED_RULE_MAX_SHORT_PT = 4;
+export const UNCOVERED_CONTENT_OVERLAP_MIN = 0.5;
+export const UNCOVERED_HEADER_BAND_FRAC = 0.15;
+export const UNCOVERED_FOOTER_BAND_FRAC = 0.06;
+export const UNCOVERED_LEFT_BAND_FRAC = 0.05;
+export const UNCOVERED_RIGHT_BAND_FRAC = 0.08;
+
+/** 把未覆盖区域判为内容级 / 家具级（判据与理由见上方注释）。纯函数、可测。 */
+export function classifyUncovered(bbox: BBox, contentRect: BBox, pageW: number, pageH: number): UncoveredKind {
+  const w = bbox[2] - bbox[0];
+  const h = bbox[3] - bbox[1];
+  const long = Math.max(w, h);
+  const short = Math.min(w, h);
+  // 1) 细长线
+  if (short > 0 && long / short >= UNCOVERED_RULE_MIN_ASPECT && short <= UNCOVERED_RULE_MAX_SHORT_PT) {
+    return "furniture";
+  }
+  // 2) 完全落在页边带内
+  const inHeader = bbox[3] <= pageH * UNCOVERED_HEADER_BAND_FRAC;
+  const inFooter = bbox[1] >= pageH * (1 - UNCOVERED_FOOTER_BAND_FRAC);
+  const inLeft = bbox[2] <= pageW * UNCOVERED_LEFT_BAND_FRAC;
+  const inRight = bbox[0] >= pageW * (1 - UNCOVERED_RIGHT_BAND_FRAC);
+  if (inHeader || inFooter || inLeft || inRight) return "furniture";
+  // 3) 过半落在内容矩形外
+  const ix = Math.max(0, Math.min(bbox[2], contentRect[2]) - Math.max(bbox[0], contentRect[0]));
+  const iy = Math.max(0, Math.min(bbox[3], contentRect[3]) - Math.max(bbox[1], contentRect[1]));
+  const area = w * h;
+  if (area > 0 && (ix * iy) / area < UNCOVERED_CONTENT_OVERLAP_MIN) return "furniture";
+  return "content";
+}
+
+/** 该页「内容矩形」= 全部行级块（blocks，含图片块）bbox 的并集。无块时退化为整页
+ *  （⇒ 什么都不算页边带，全部保守判内容级）。 */
+export function contentRectOf(page: StagePage): BBox {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const b of page.blocks ?? []) {
+    const bb = b.bbox;
+    if (!Array.isArray(bb)) continue;
+    x0 = Math.min(x0, bb[0]);
+    y0 = Math.min(y0, bb[1]);
+    x1 = Math.max(x1, bb[2]);
+    y1 = Math.max(y1, bb[3]);
+  }
+  if (!Number.isFinite(x0)) return [0, 0, page.width, page.height];
+  return [x0, y0, x1, y1];
+}
+
 
 /** P5 二进制灰度图（PGM） */
 export interface GrayImage {
@@ -361,16 +459,18 @@ export function parsePgm(buf: Uint8Array): GrayImage {
 /**
  * 纯函数：页图 + 该页全部 bbox → 未覆盖墨迹矩形区域（PDF 点）+ 像素统计。
  * 聚类用「膨胀 + 8 邻域连通域」（不用复杂的形态学库）：够用、可测。
+ * `page.contentRect` 用于区域分类（内容级/家具级，见 classifyUncovered）；缺省整页。
  */
 export function findUncoveredInk(
   image: GrayImage,
-  page: { width: number; height: number; boxes: BBox[] },
+  page: { width: number; height: number; boxes: BBox[]; contentRect?: BBox },
   opts: { threshold: number; expandPx: number; dilatePx: number; minAreaPx: number },
 ): { regions: UncoveredRegion[]; inkPx: number; uncoveredPx: number } {
   const { width: W, height: H, data } = image;
   const N = W * H;
   const sx = W / page.width;
   const sy = H / page.height;
+  const contentRect: BBox = page.contentRect ?? [0, 0, page.width, page.height];
 
   // 1) 二值化：墨迹掩码
   const ink = new Uint8Array(N);
@@ -462,7 +562,8 @@ export function findUncoveredInk(
       }
     }
     if (area < opts.minAreaPx) continue;
-    regions.push({ bbox: [minX / sx, minY / sy, (maxX + 1) / sx, (maxY + 1) / sy], area });
+    const bbox: BBox = [minX / sx, minY / sy, (maxX + 1) / sx, (maxY + 1) / sy];
+    regions.push({ bbox, area, kind: classifyUncovered(bbox, contentRect, page.width, page.height) });
   }
   regions.sort((a, b) => b.area - a.area);
   return { regions, inkPx, uncoveredPx };
@@ -504,11 +605,13 @@ export function computeInkCoverage(
   const stats: InkCoverage["pages"] = [];
   let totalInkPx = 0;
   let uncoveredPx = 0;
+  let contentCount = 0;
+  let furnitureCount = 0;
   pages.forEach((p, i) => {
     const img = images[i];
     if (!img) {
       byPage.push([]);
-      stats.push({ index: p.index, inkPx: 0, uncoveredPx: 0, ratio: 0 });
+      stats.push({ index: p.index, inkPx: 0, uncoveredPx: 0, ratio: 0, contentCount: 0, furnitureCount: 0 });
       return;
     }
     const boxes: BBox[] = [];
@@ -517,13 +620,24 @@ export function computeInkCoverage(
     }
     const { regions, inkPx, uncoveredPx: unPx } = findUncoveredInk(
       img,
-      { width: p.width, height: p.height, boxes },
+      { width: p.width, height: p.height, boxes, contentRect: contentRectOf(p) },
       opts,
     );
+    const content = regions.filter((r) => r.kind === "content").length;
+    const furniture = regions.length - content;
     byPage.push(regions);
-    stats.push({ index: p.index, inkPx, uncoveredPx: unPx, ratio: inkPx ? unPx / inkPx : 0 });
+    stats.push({
+      index: p.index,
+      inkPx,
+      uncoveredPx: unPx,
+      ratio: inkPx ? unPx / inkPx : 0,
+      contentCount: content,
+      furnitureCount: furniture,
+    });
     totalInkPx += inkPx;
     uncoveredPx += unPx;
+    contentCount += content;
+    furnitureCount += furniture;
   });
   return {
     byPage,
@@ -536,6 +650,8 @@ export function computeInkCoverage(
       totalInkPx,
       uncoveredPx,
       ratio: totalInkPx ? uncoveredPx / totalInkPx : 0,
+      contentCount,
+      furnitureCount,
       pages: stats,
     },
   };
@@ -578,7 +694,13 @@ function main(): void {
   }
 
   // 墨迹覆盖率检查（Task 16）：用原卷页图当地面真值，找「解析漏掉的墨迹」。
-  // pdftoppm 不可用时**优雅降级**（inkCoverage 保持 null、uncovered 全空），不报错。
+  //
+  // 异常分两类（修复轮 1，勿再合并成 `catch {}`）：
+  //   · **ENOENT**（pdftoppm 不存在 / PDF 缺失）→ **优雅降级**：inkCoverage=null，继续，exit 0。
+  //     `npm run check` 要能在无 PDF 的环境跑。
+  //   · **其它异常**（PGM 解析失败、尺寸不符、逻辑错）→ **绝不吞**：记入 `inkCoverageError`
+  //     落库（审计据此判失败 → check 红）**并**抛出（export 自身也红）。
+  //     理由：门自身出 bug 若被静默降级，检查会**假绿**——违背 G1「不静默失败」。
   let inkNote = "";
   if (originPdf) {
     try {
@@ -587,12 +709,18 @@ function main(): void {
         p.uncovered = byPage[i] ?? [];
       });
       snapshot.inkCoverage = coverage;
-      const n = byPage.reduce((a, r) => a + r.length, 0);
       inkNote =
         `  墨迹覆盖率：全卷未覆盖占比 ${(coverage.ratio * 100).toFixed(2)}%` +
-        `（${coverage.uncoveredPx}/${coverage.totalInkPx}px）· 区域 ${n} 个`;
-    } catch {
-      console.log("  pdftoppm 不可用或墨迹分析失败，墨迹覆盖率检查降级跳过（inkCoverage=null）");
+        `（${coverage.uncoveredPx}/${coverage.totalInkPx}px）· 内容级 ${coverage.contentCount} / 家具级 ${coverage.furnitureCount}`;
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException;
+      if (err?.code === "ENOENT") {
+        console.log("  pdftoppm 不存在（或 PDF 缺失），墨迹覆盖率检查优雅降级跳过（inkCoverage=null）");
+      } else {
+        snapshot.inkCoverageError = `墨迹分析失败：${err?.stack ?? String(e)}`;
+        console.error(`  ❌ 墨迹分析出现非预期异常（非 pdftoppm 缺失）：${err?.message ?? e}`);
+        console.error("     → 记入快照 inkCoverageError（审计将判失败），并终止导出。");
+      }
     }
   }
 
@@ -608,6 +736,12 @@ function main(): void {
     `  ${snapshot.pages.length} 页 · ${totalBlocks} 行级块 · ${result.questions.length} 题 · ` +
       `质检诊断 ${result.reviews.length} 条（需人工校对 ${flagged} 题）`,
   );
+
+  // 墨迹分析出了非预期异常：快照已落库（审计据此判失败），这里再抛一次让导出自身也红 ——
+  // 绝不静默（修复轮 1 发现 1）。
+  if (snapshot.inkCoverageError) {
+    throw new Error(snapshot.inkCoverageError);
+  }
 }
 
 const isMain =

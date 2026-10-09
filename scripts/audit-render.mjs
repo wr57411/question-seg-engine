@@ -46,9 +46,11 @@
  *      口径 × 实际渲染字号估算「会被裁切」的块并列出清单，把该未闭合风险显性化。
  *      ⚠️ 对 `\frac/\sqrt` 块，渲染文本是分子分母的**拼接**（二维排版的一维投影），仍是**上界**；
  *      真实是否裁切以视觉审板/DOM 为准。提示项，不计退出码。
- *  10. **墨迹覆盖率（Task 16，判定级：占比；提示级：区域清单）**：用原卷页图当地面真值，
+ *  10. **墨迹覆盖率（Task 16，判定级：内容级条数回归；提示级：区域清单）**：用原卷页图当地面真值，
  *      找「是墨迹但不在任何 bbox 内」的区域 —— 唯一能系统性发现「上游漏识别」的判据。
  *      数据来自快照 `inkCoverage`（构建期算好），**本审计不读 PDF**；无数据时优雅降级跳过。
+ *      修复轮 1：判据从「未覆盖占比」（对单行/整组漏识别**实质恒绿**）改为「**内容级条数** >
+ *      基线+容忍」；区域先分类为内容级/家具级（判据见 export-stages.ts classifyUncovered）。
  *      动机：第 5 页滑轮题 C 续行在三层 MinerU 输出里全都不存在，而选项键齐全 ⇒ 既有检查
  *      看不见（静默）。详见脚本内第 10 节注释。
  *
@@ -524,58 +526,79 @@ for (const p of snap.pages) {
   hints += clipEstimate.length; // 提示项：计入提示总数（不影响退出码）
 }
 
-// ── 10. 墨迹覆盖率（Task 16；判定项：未覆盖占比；提示项：区域清单）──────────────
+// ── 10. 墨迹覆盖率（Task 16；判定项：**内容级条数**的回归；提示项：区域清单）──────
 // 目的：用**原卷页图**当地面真值，发现「解析漏掉了哪些墨迹」——这是唯一能系统性发现
 //   「上游漏识别」的办法。动机：第 5 页滑轮题 C 选项第二行在原卷可见，却在 MinerU 的
 //   para_blocks / preproc_blocks / discarded_blocks **三层里全都不存在**；而该题选项键齐全
 //   ⇒ 既有的「选项缺键」检查通过 ⇒ 这处丢失**没有任何标记**（违反 G1）。
-// 数据来源：快照的 `inkCoverage`（构建期由 scripts/export-stages.ts 用 pdftoppm -gray 算好）。
-//   **本审计不读 PDF** —— pdftoppm 不可用时 export 会留 `inkCoverage=null`，本节即**优雅降级**
-//   跳过（打印说明、不报错），故 `npm run check` 能在无 PDF 的环境跑。
-// 判定项：全卷未覆盖占比 > 阈值 → 失败。阈值由**实测基线**定（见 INK_RATIO_MAX 注释）。
-// 提示项：逐区域清单（页 + bbox + 面积），全量列出（G1：发现必须可见）。
+// 数据来源：快照的 `inkCoverage` / `pages[].uncovered`（构建期由 scripts/export-stages.ts
+//   用 pdftoppm -gray 算好）。**本审计不读 PDF**。
 //
-// ⚠️ 判据的**已知局限**（如实呈现，勿当噪声抹掉）：原卷是双栏排版，栏间有印刷竖线、
-//   页眉有色块/横线装饰——它们不是内容、也不在任何 bbox 内，会稳定抬高「占比」。
-//   故本判定是**粗护栏**（拦结构性回归，如整页块丢失），精确定位漏识别靠下面的区域清单。
-const INK_RATIO_BASELINE = 0.0384; // 实测全卷基线：83628/2178077 = 3.84%
-const INK_RATIO_MAX = 0.08; // 阈值 = 基线 ~2.1×：拦「整页/整段块丢失」这类结构性回归，容忍文档演进
+// ⚠️ 修复轮 1 的两处改动（评审：原判据「实质恒绿」）：
+//   ① **判据从「占比」换成「内容级条数」**。原占比判据对失效模式恒绿：基线 3.84%、阈值 8%，
+//      而本任务要防的「单行/整组选项漏识别」（实测 4 处 = 13 个内容级区域）只占 0.66%，
+//      需约 13 处才触阈。占比被**版式家具**（页眉色块/横线、栏间竖线、页边章节标）抬高，
+//      故它只拦得住「整页块全丢」。
+//   ② **区域分类**（内容级 / 家具级，判据见 export-stages.ts 的 classifyUncovered）。
+//      判定项 = 「内容级条数 > 基线 + 容忍量」→ 失败。
+//
+// 判定项语义（写死在这里，也是给读者的说明）：**单行漏识别靠提示项清单发现（人看），
+//   成批回归靠判定项拦住**。
+//   容忍量 5 的依据（实测全卷内容级条数 = 31，逐页最多 8 条）：
+//     · 「单点」= 单行漏识别（+1 区域）或单组选项漏识别（本题实测最多 +5 区域，如第 5 页
+//       热狗题 A/B 组共 5 条）——这类正是提示项清单要人逐条看的对象，不该让判定项因它翻红；
+//     · 「成批」= 同一页整块丢失（该页内容级 ≥6 条）或多页各丢一组（合计 ≥6 条）；
+//   取 5 恰好容下「单组选项」这一档（≤5 条不触发），再多 1 条（≥6）即视为成批而翻红。
+const INK_CONTENT_BASELINE = 31; // 实测全卷内容级条数基线（分类判据见 export-stages.ts）
+const INK_CONTENT_TOLERANCE = 5; // 容忍量：容下单组（≤5 条），成批（≥6 条）即拦
 {
-  const ic = snap.inkCoverage;
-  if (!ic) {
-    console.log("\n⏭️ 墨迹覆盖率（Task 16）：跳过（快照无 inkCoverage —— pdftoppm 不可用或未跑墨迹分析）");
+  // 门自身的失败（非 ENOENT 的异常）优先：见 export-stages.ts 的 catch 分类。
+  if (snap.inkCoverageError) {
+    console.log("\n❌ 墨迹覆盖率（Task 16）：分析自身出错，判定失败（不静默假绿）");
+    console.log(`     ${String(snap.inkCoverageError).split("\n")[0]}`);
+    bad++;
+  } else if (!snap.inkCoverage) {
+    console.log("\n⏭️ 墨迹覆盖率（Task 16）：跳过（快照无 inkCoverage —— pdftoppm 缺失或未跑墨迹分析）");
     console.log("     优雅降级：本节点不报错、不计入退出码；重跑 `npm run stages:export`（需 pdftoppm）即可启用。");
   } else {
-    const over = ic.ratio > INK_RATIO_MAX;
+    const ic = snap.inkCoverage;
+    const over = ic.contentCount > INK_CONTENT_BASELINE + INK_CONTENT_TOLERANCE;
     console.log(
-      `\n${over ? "❌" : "✅"} 墨迹覆盖率（Task 16，判定项：全卷未覆盖占比 ≤ ${(INK_RATIO_MAX * 100).toFixed(1)}%）`,
+      `\n${over ? "❌" : "✅"} 墨迹覆盖率（Task 16，判定项：内容级条数 ≤ 基线 ${INK_CONTENT_BASELINE} + 容忍 ${INK_CONTENT_TOLERANCE} = ${INK_CONTENT_BASELINE + INK_CONTENT_TOLERANCE}）`,
     );
     console.log(
       `     参数：dpi=${ic.dpi} 阈值=${ic.threshold} 外扩=${ic.expandPx}px 膨胀=${ic.dilatePx}px 面积下限=${ic.minAreaPx}px`,
     );
     console.log(
-      `     全卷未覆盖占比 ${(ic.ratio * 100).toFixed(2)}%（${ic.uncoveredPx}/${ic.totalInkPx}px）· 基线 ${(INK_RATIO_BASELINE * 100).toFixed(2)}%`,
+      `     内容级 ${ic.contentCount} 条 / 家具级 ${ic.furnitureCount} 条 · 未覆盖占比 ${(ic.ratio * 100).toFixed(2)}%（${ic.uncoveredPx}/${ic.totalInkPx}px）`,
     );
-    console.log("     逐页：");
+    console.log(
+      "     说明：单行漏识别靠下面**提示项清单**发现（人看）；**成批回归**靠本判定项拦住（内容级条数越界）。",
+    );
+    console.log("     逐页（内容级/家具级）：");
     for (const pg of ic.pages) {
       console.log(
-        `       第 ${String(pg.index + 1).padStart(2)} 页 未覆盖 ${(pg.ratio * 100).toFixed(2)}%（${pg.uncoveredPx}/${pg.inkPx}px）`,
+        `       第 ${String(pg.index + 1).padStart(2)} 页 内容 ${String(pg.contentCount).padStart(2)} / 家具 ${String(pg.furnitureCount).padStart(2)} · 未覆盖 ${(pg.ratio * 100).toFixed(2)}%`,
       );
     }
     if (over)
-      console.log(`     ❌ 未覆盖占比 ${(ic.ratio * 100).toFixed(2)}% > ${(INK_RATIO_MAX * 100).toFixed(1)}%：解析可能漏掉了成片内容，逐区域回原卷核对`);
-    // 提示项：未覆盖区域清单（全量列出，G1）
+      console.log(
+        `     ❌ 内容级条数 ${ic.contentCount} > ${INK_CONTENT_BASELINE + INK_CONTENT_TOLERANCE}：疑似成批新增漏识别，逐区域回原卷核对`,
+      );
+    // 提示项：未覆盖区域清单（内容级在前，全量列出，G1）
     const regions = [];
     for (const p of snap.pages) {
-      for (const r of p.uncovered ?? []) regions.push({ p: p.index, bbox: r.bbox, area: r.area });
+      for (const r of p.uncovered ?? []) regions.push({ p: p.index, kind: r.kind, bbox: r.bbox, area: r.area });
     }
-    regions.sort((a, b) => b.area - a.area);
-    console.log(`     ⚠️ 未覆盖区域清单（提示项，全量 ${regions.length} 个，按面积降序）：`);
-    for (const r of regions) {
-      console.log(
-        `        p${r.p} bbox=[${r.bbox.map((v) => Number(v).toFixed(1)).join(",")}] area=${r.area}px`,
-      );
-    }
+    const contentRegions = regions.filter((r) => r.kind === "content").sort((a, b) => b.area - a.area);
+    const furnitureRegions = regions.filter((r) => r.kind !== "content").sort((a, b) => b.area - a.area);
+    const fmt = (r) =>
+      `        p${r.p} bbox=[${r.bbox.map((v) => Number(v).toFixed(1)).join(",")}] area=${r.area}px`;
+    console.log(`     ⚠️ 内容级未覆盖区域（提示项，${contentRegions.length} 个，按面积降序）：`);
+    for (const r of contentRegions) console.log(fmt(r));
+    console.log(`     ⚠️ 家具级未覆盖区域（提示项，${furnitureRegions.length} 个，版式装饰，仅备查）：`);
+    for (const r of furnitureRegions.slice(0, 10)) console.log(fmt(r));
+    if (furnitureRegions.length > 10) console.log(`        …另有 ${furnitureRegions.length - 10} 条`);
     hints += regions.length; // 提示项：计入提示总数（不影响退出码）
     if (over) bad++;
   }

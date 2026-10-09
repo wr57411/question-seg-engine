@@ -187,8 +187,8 @@ test("buildStageSnapshot：未覆盖墨迹区域按页透传，缺省为空（Ta
   assert.deepEqual(snap0.pages[0]?.uncovered, [], "未传参时缺省为空数组");
   assert.equal(snap0.inkCoverage, null, "墨迹覆盖率缺省为 null（未做分析）");
 
-  const uncoveredPages = [[{ bbox: [10, 10, 40, 20] as BBox, area: 123 }], []];
+  const uncoveredPages = [[{ bbox: [10, 10, 40, 20] as BBox, area: 123, kind: "content" as const }], []];
   const snap1 = buildStageSnapshot(doc, result, rawPages, [], uncoveredPages);
-  assert.deepEqual(snap1.pages[0]?.uncovered, [{ bbox: [10, 10, 40, 20], area: 123 }]);
+  assert.deepEqual(snap1.pages[0]?.uncovered, [{ bbox: [10, 10, 40, 20], area: 123, kind: "content" }]);
   assert.deepEqual(snap1.pages[1]?.uncovered, []);
 });
