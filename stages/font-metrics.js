@@ -1,10 +1,13 @@
 /**
- * font-metrics.js —— 重建纸面的字号/全角宽度度量（纯函数，无 DOM、无依赖）。
+ * font-metrics.js —— 重建纸面的字号/全角宽度度量（纯函数，无 DOM；唯一依赖 latex-display 的纯函数）。
  *
  * 定位：stage 6「对比模式」用结构化数据按原坐标重建纸面，但 MinerU 的 layout.json
  * **没有字号字段**（F9）——字号真值不存在，只能由行高反推。本模块把这套数学抽成
  * 纯函数，好让 tests/font-metrics.test.ts 把它钉死；此前它藏在无构建的 stages.js 里、
  * 没有任何测试，一次系数写错就整体偏小 30%（F3）而无人察觉。
+ *
+ * ⚠️ 唯一依赖：Task 14 起 `clampByWidth` 需按**渲染后的纯文本**度量宽度（见下），
+ * 故 import `prettifyLatex`（`./latex-display.js`，同为无 DOM 纯函数，无循环依赖）。
  *
  * ── 数值权威：data/out/ink-groundtruth.md（对**原卷页图墨迹**的直接测量）──
  * 测量方法：原卷页图 PNG → 逐块 bbox 外扩 6px 后二值化（灰度<128 为墨）→ 扫出真实
@@ -48,13 +51,29 @@
  * **R3 的「拉丁字形失配」假设已被测量推翻**（混合组与纯 CJK 对照几乎相等，换拉丁字体栈无效）——
  * 证据见 data/out/latin-metrics.md，改法依据见 clampByWidth 注释。
  *
- * ── 公式块豁免夹子（C1 修复，Task 7）──
+ * ── 公式块豁免夹子（C1 修复，Task 7；Task 14 收窄）──
  * `clampByWidth` 曾对**含公式的块**用 `emWidthOf(block.text)` 度量，而 `block.text` 是**原始
  * LaTeX 源码**（如 `\frac{\sqrt3}{3}mg` 记 12.25em），渲染文本只有 3em → 夹子把公式块字号压到
  * 基准的 **0.20–0.75×**（131/1015 块 <0.8×，最极端 **1.76px**），且审计判定项因排除 `\`/`$`/ASCII
  * 块而看不见它。**裁定：公式块不参与宽度夹子**（`hasMathSource` 命中即返回未夹字号）——
  * `emWidthOf` 是线性字符宽度模型，对二维排版（`\frac`/`\sqrt`）不成立，用错误模型夹比不夹更糟。
+ * **Task 14 收窄**：豁免只留给**真正二维**的构造（含 `\frac`/`\sqrt`）；其余含 LaTeX 的块
+ * （`$\angle AOB$`、`$F_{a}$`）改按**渲染后的纯文本**度量宽度、参与夹子（见 `renderedTextOf`）。
+ *
+ * ── 短块碎片：bbox 被撑大的结构判据（Task 14）──
+ * Task 13 的交叉验证（`reconcileFont`）只在**全角字数 ≥ 6** 时生效，且要求宽、高两估计量**不一致**
+ * 才退回基准。它抓不住两类残留（全卷 60 条 `fontForBlock > 1.35× 基准`）：
+ *   ① 短块（< 6 全角）—— 判据前置条件直接跳过（`变大`/`增大`/`为零`/`确的是()`…）；
+ *   ② **两估计量同时被撑大**的块（`舱的阻力，则下列说法正确的是()`，比值仅 1.04）—— 宽高一致，
+ *      但**两者都错**（原卷墨迹高仅 10.6pt、声明 bbox 高 16pt）。
+ * 回原卷逐块量墨迹（`pdftoppm -r 300` + 二值化取包围盒，脚本 data/out/_t14-ink.mjs）发现真因：
+ * **这些块的声明 bbox 高被 MinerU 撑大**（行续接/并入邻块/并图片），声明高 15–19pt 而真实墨迹
+ * 高仅 **10.1–10.8pt**（正文量级）；而真标题的墨迹高 **12.7–15.1pt**（真的大）。二者在
+ * **「到同栏相邻行的垂直间隙」**上干净可分：被撑大的块**挤在邻行上**（间隙 ≤ 7pt），
+ * 真标题有正常行距（间隙 ≥ 9pt）。⇒ 结构判据 `isCrampedLine`（见下），不引入新的比值阈值。
  */
+
+import { prettifyLatex } from "./latex-display.js";
 
 /** 行高 → 字号（画布 px）。
  *
@@ -105,6 +124,48 @@ export function baseFontOfPage(blocks, pageWidth, canvasW) {
  */
 export function hasMathSource(text) {
   return /[\\$]|[_^]/.test(text ?? "");
+}
+
+/** 二维排版构造判定（Task 14）：文本含 `\frac`/`\dfrac`/`\tfrac`/`\sqrt` 任一。
+ *
+ * 为什么单独摘出：`emWidthOf` 是**线性字符宽度模型**，对 `\frac`（上下叠放）与 `\sqrt`
+ * （被开方数在根号内）**根本不成立** —— 源码 `\frac{\sqrt{3}}{3}mg` 记 12.25em，渲染文本
+ * `√33mg` 只有 3em。Task 14 收窄 C1 的豁免范围：**只有这两类块**继续豁免 `clampByWidth`，
+ * 其余含 LaTeX 的块（`$\angle AOB$`、`$F_{a}$`）改按**渲染后的纯文本**度量宽度、参与夹子。
+ *
+ * @param {string} text 块的**原始**文本（LaTeX 源码）
+ */
+export function hasTwoDimensionalMath(text) {
+  return /\\[dt]?frac|\\sqrt/.test(text ?? "");
+}
+
+/** HTML 片段 → 纯文本：剥掉标签、还原 `escapeHtml` 转义的三字符。
+ * 供 `renderedTextOf` 使用（标签只由 latex-display 生成，属性值不含 `>`）。 */
+function stripTags(html) {
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+/** 块的**渲染后纯文本**（Task 14）：`stripTags(prettifyLatex(text))`。
+ *
+ * 为什么需要：`clampByWidth` 的目标是「**渲染出来的**文字不横向溢出 bbox」，
+ * 故宽度度量必须用渲染文本，而不是原始 LaTeX 源码（后者宽 3–5×）——
+ * 这正是 C1 过夹（字号压到基准 0.20–0.75×、最极端 1.76px）的根因。
+ *
+ * ⚠️ 渲染文本与源码的差异（都由 prettifyLatex 的展示层变换引入，且**都是原卷就有**的）：
+ *   - `()` → `(　　)`：空括号补 2 个 EM SPACE（原卷作答空隙）；
+ *   - 选项粘连 → 补 EM SPACE 分隔；
+ *   - 即时重复前缀 → 折叠一份（原卷只有一份）；
+ *   - LaTeX 命令 → 渲染字符（`\frac`→竖排、`\sqrt`→`√`、`\theta`→`θ`、`^{2}`→`2`）。
+ *   EM SPACE（U+2003）在 `emWidthOf` 里按 1.0em 计（全角档），与实际宽度相符。
+ *
+ * @param {string} text 块的**原始**文本
+ */
+export function renderedTextOf(text) {
+  return stripTags(prettifyLatex(text ?? ""));
 }
 
 /** 竖排文本判定（R4）：bbox **高 > 2×宽**（严格大于，`bboxH == 2*bboxW` 不算竖排）
@@ -172,6 +233,54 @@ export function reconcileFont(fontH, fontW, baseFont, fwCount) {
   return fontH;
 }
 
+/** 同栏相邻行的最小垂直间隙（pt）—— 结构判据「框被撑大」的阈值（Task 14）。
+ *
+ * 由来（**回原卷逐块量墨迹**，脚本 data/out/_t14-ink.mjs / _t14-gap-dist.mjs）：
+ * MinerU 偶发把**行续接的碎尾**、**并入邻块**或**并入图片**的块给一个被撑大的 bbox
+ * （声明高 15–19pt，真实墨迹高仅 10.1–10.8pt = 正文量级）。被撑大的框**挤在相邻行上**：
+ * 与同栏邻行的垂直间隙实测 **3–7pt**；而真标题/横幅（墨迹 12.7–15.1pt，真的大）有正常行距，
+ * 间隙实测 **≥ 9pt**（刷提分 p6 / 刷真题 p13 = 9、刷易错 p1 = 10、其余 12–50）。
+ * 取 **7pt**：碎片（≤7）全部命中，保留块（≥9）全部安全 —— 保留侧余量 **2pt**。
+ * （对比 `reconcileFont` 的比值阈值：真标题最大 1.10 vs 1.3，余量 0.20。）
+ *
+ * 用**结构证据**（框与谁相邻）而非再收紧比值阈值：比值是「拿一个噪声量卡另一个噪声量」，
+ * 而「挤在邻行上」直接反映 bbox 被撑大的成因。
+ */
+const LINE_CLEARANCE_MIN_PT = 7;
+
+/** 「同栏」判据：横向重叠 ≥ 该比例 × 较小块宽（Task 14）。
+ * 取 0.4：行续接的碎尾与原行横向高度重合（实测 ≥ 90%）；而页边标签/另一栏的块只与
+ * 本块**擦边**重叠（p0[1]「第1节…」与右栏标签 `必刷知识T1~2…` 仅重叠 15/194 = 7.7%）——
+ * 用 0.4 把「擦边」排除，避免把标题旁边的栏外标签当成同栏邻行。 */
+const LINE_OVERLAP_MIN = 0.4;
+
+/** 块 bbox 被撑大的**结构判据**（Task 14）：同页存在一个「同栏、纵向挤在一起」的文本块。
+ *
+ * 定义：存在另一文本块 A（非图片、有文本），使
+ *   ① 同栏：A 与本块的横向重叠 ≥ `LINE_OVERLAP_MIN` × min(两块宽)；
+ *   ② 纵向挤：两块的垂直间隙 ≤ `LINE_CLEARANCE_MIN_PT`（重叠时间隙记 0）。
+ *
+ * 命中 ⇒ 本块的 bbox 高不可信（被 MinerU 撑大，见文件头「短块碎片」节）→ 调用方退回页面基准字号。
+ * **只在会缩小字号时使用**（调用方判 `F > baseFont`）——绝不把块放大。
+ *
+ * @param {{bbox: number[], text?: string, kind?: string}} block 待判块
+ * @param {Array<{bbox: number[], text?: string, kind?: string}>|undefined} pageBlocks 同页候选邻块
+ */
+export function isCrampedLine(block, pageBlocks) {
+  if (!pageBlocks) return false;
+  const w = (b) => b.bbox[2] - b.bbox[0];
+  const bw = w(block);
+  if (bw <= 0) return false;
+  for (const a of pageBlocks) {
+    if (a === block || a.kind === "image" || !a.text) continue;
+    const ov = Math.min(block.bbox[2], a.bbox[2]) - Math.max(block.bbox[0], a.bbox[0]);
+    if (ov < LINE_OVERLAP_MIN * Math.min(bw, w(a))) continue;
+    const gap = Math.max(block.bbox[1] - a.bbox[3], a.bbox[1] - block.bbox[3]);
+    if (gap <= LINE_CLEARANCE_MIN_PT) return true;
+  }
+  return false;
+}
+
 /** 块的渲染字号：纯文本行按自身行高推算（标题自然更大，层级自动复现 F7）；
  * 含 LaTeX 源码的行用页面基准字号（避免分式撑高 bbox 导致字号翻倍）。
  * baseFont 为 null 时回退到自身行高推算。
@@ -187,12 +296,17 @@ export function reconcileFont(fontH, fontW, baseFont, fwCount) {
  * `reconcileFont(fontH, fontW, baseFont, fullWidthCount(text))` —— **全角字数 ≥ 6** 且宽高两路
  * 不一致（比值 > 1.3）时退回页面基准字号，修掉 `p10[18]` 的 2 倍字号；短块（< 6 字）不比较。
  *
+ * 结构判据（Task 14）：若给了 `pageBlocks`，再判 `isCrampedLine` —— 块 bbox 与同栏邻行挤在
+ * 一起（间隙 ≤ 7pt）⇒ 框被撑大 ⇒ 退回页面基准字号。**仅在会缩小时生效**（`F > baseFont`），
+ * 绝不放大；这覆盖了 Task 13 抓不住的两类残留（短块 + 宽高同时被撑大者）。
+ *
  * @param {{text?: string, bbox: number[]}} block
  * @param {number} pageWidth 页面宽度（pt）
  * @param {number} canvasW 画布像素宽
  * @param {number|null} baseFont 页面基准字号（画布 px），可空
+ * @param {Array<{text?: string, bbox: number[], kind?: string}>} [pageBlocks] 同页候选邻块（判「同栏挤压」用）
  */
-export function fontForBlock(block, pageWidth, canvasW, baseFont) {
+export function fontForBlock(block, pageWidth, canvasW, baseFont, pageBlocks) {
   if (isVerticalText(block.bbox, block.text ?? "")) {
     // 竖排：行高取 bboxW（横轴），否则用 bboxH 会把「文字长度」当行高 → 字号失控
     return fontFromLineHeight(((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW);
@@ -202,7 +316,10 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
   const em = emWidthOf(block.text ?? "");
   if (em <= 0) return fontH; // 无文本：没有宽度估计量可交叉验证，退回行高模型
   const fontW = (((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW) / em;
-  return reconcileFont(fontH, fontW, baseFont, fullWidthCount(block.text ?? ""));
+  const F = reconcileFont(fontH, fontW, baseFont, fullWidthCount(block.text ?? ""));
+  // Task 14：框被撑大（同栏挤压）→ 基准字号；只在会缩小时生效（绝不放大）
+  if (baseFont && F > baseFont && isCrampedLine(block, pageBlocks)) return baseFont;
+  return F;
 }
 
 /** 宽度安全上限（R3/R5）：把行高模型给出的字号夹到「文字当量宽 × 字号 ≤ bbox 宽」，
@@ -229,14 +346,17 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
  *   （只有本会溢出的块被夹小；未溢出的块 `min()` 不改其字号，故「字号保真度」中位数不受影响）。
  * 竖排块（R4）：横向宽度不是约束（文字沿纵向排布），原样返回。
  *
- * ── 公式块豁免（C1 修复，Task 7，**Ruling**）──
- * **公式块（`hasMathSource` 命中）不参与宽度夹子，直接返回未夹字号。**
- * 理由：`emWidthOf` 是**线性字符宽度模型**，对 `\frac`/`\sqrt` 这类**二维排版**根本不成立
- *   —— 源码 `\frac{\sqrt{3}}{3}mg` 记 12.25em，实际渲染 `√33mg` 只有 3em；用错误的模型去夹
- *   比不夹更糟（实测把公式块字号压到基准的 0.20–0.75×，最极端 1.76px，肉眼近乎不可见）。
- * 公式块已有专属规则（`fontForBlock` 用页面基准字号 `baseFont`），其溢出风险由视觉审板承担。
- * 代价：公式块的横向溢出不再被结构性防止（审计「文字溢出」节因此把公式块列入排除分桶，
- *   见 scripts/audit-render.mjs）。
+ * ── 公式块豁免（C1 修复 Task 7；Task 14 **收窄**）──
+ * Task 7 曾对**所有**含 LaTeX 源码的块（`hasMathSource` 命中）豁免夹子，理由是
+ * `emWidthOf` 是线性字符宽度模型、对二维排版不成立（源码 `\frac{\sqrt{3}}{3}mg` 记 12.25em，
+ * 渲染 `√33mg` 只有 3em）——用错误模型夹比不夹更糟（实测压到基准 0.20–0.75×、最极端 1.76px）。
+ * **代价**：公式块横向溢出 **4.24%**（Task 11 真实 DOM 实测），超出部分被 `.canvas{overflow:hidden}` 裁掉。
+ *
+ * **Task 14 Ruling：把度量从「原始源码」换成「渲染后的纯文本」，豁免只留给真正二维的构造。**
+ *   - 宽度度量改用 `emWidthOf(renderedTextOf(text))`（= `stripTags(prettifyLatex(text))` 的纯文本）
+ *     —— 度量对象从「源码」变成「**真正渲染出来的字符**」，线性模型对一维文本重新成立；
+ *   - **仅 `hasTwoDimensionalMath`（含 `\frac`/`\sqrt`）的块**继续豁免（二维叠放/根号，线性模型确实不成立）；
+ *   - 其余含 LaTeX 的块（`$\angle AOB$`、`$F_{a}$` 等）**参与夹子**，用渲染文本宽度兜底。
  *
  * @param {number} fontPx 行高模型给出的字号（画布 px）
  * @param {{text?: string, bbox: number[]}} block
@@ -245,8 +365,10 @@ export function fontForBlock(block, pageWidth, canvasW, baseFont) {
  */
 export function clampByWidth(fontPx, block, pageWidth, canvasW) {
   if (isVerticalText(block.bbox, block.text ?? "")) return fontPx; // 竖排：横向宽度非约束
-  if (hasMathSource(block.text ?? "")) return fontPx; // 公式块豁免（C1 修复，见上方 Ruling）
-  const em = emWidthOf(block.text ?? "");
+  // 仅真正二维的构造（\frac/\sqrt）豁免；其余（含 $\angle AOB$、$F_{a}$）参与夹子（Task 14）
+  if (hasTwoDimensionalMath(block.text ?? "")) return fontPx;
+  // 度量对象是**渲染后的纯文本**，不是原始 LaTeX 源码（后者宽 3–5×，是 C1 过夹的根因）
+  const em = emWidthOf(renderedTextOf(block.text ?? ""));
   if (em <= 0) return fontPx; // 无文字（图片/空块）：无可贴合，不夹
   const wPx = ((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW;
   return Math.min(fontPx, wPx / em);

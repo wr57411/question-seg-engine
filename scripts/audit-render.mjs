@@ -29,7 +29,8 @@
  *   7. **覆盖统计（Task 7）**：第 5、6 节各报一行「覆盖块数 / 排除块数 / 排除原因分桶」。
  *      G1「不静默失败」同样适用于**门自身**——C1 之所以能被藏住，正是因为第 5 节的「可判块」
  *      口径静默排除了 `\`/`$`/ASCII 块而不报数。分桶互斥且**相加 = 排除总数**（无未归类残差）。
- *      第 6 节另把**公式源码块**列入排除桶：C1 修复后渲染层对公式块豁免 `clampByWidth`，
+ *      第 6 节另把**二维公式源码块（\frac/\sqrt）**列入排除桶：Task 14 收窄豁免后，渲染层
+ *      只对这类块豁免 `clampByWidth`（其余含 LaTeX 的块改按渲染文本度量、参与夹子），
  *      触发信号对这类块不再适用（修复前它们 100% 命中，抬高整体触发率）。
  *   8. **上游即时重复前缀（Task 12 / 最终修复波，判定级）**：MinerU 偶发把一段文本前缀连续复制
  *      两遍（形如 `X + X + 其余`）。展示层 `collapseImmediateRepeat` 会折叠一份（判据保守：
@@ -39,10 +40,11 @@
  *      逐块清单仍为提示信息（全量列出，不计退出码）。
  *   8b. **空括号补间距命中块（Task 13，提示级）**：展示层 `spaceEmptyParens` 把选择题末尾的空括号
  *      `()` 补 2 个 EM SPACE（恢复原卷 `（　　）` 的作答空隙）。本节全量列出命中块（G1 可见而非静默）。
- *   9. **画布边界裁切估算（最终修复波，提示级）**：公式块豁免 `clampByWidth` 后不再受 bbox 宽
- *      约束，文字右缘可能越过画布右边界、被 `.canvas{overflow:hidden}` 裁掉（裁切 = 静默丢内容，G1）。
- *      本节用既有 `emWidthOf` 口径 × 渲染字号估算「会被裁切」的块并列出清单，把该未闭合风险显性化。
- *      ⚠️ 对公式块，`emWidthOf(原始 LaTeX)` 是**保守上界**（线性模型对二维排版偏大 3–5×）→ 会高估；
+ *   9. **画布边界裁切估算（最终修复波，提示级）**：`\frac/\sqrt` 块豁免 `clampByWidth`（Task 14
+ *      收窄后**只**这一类）→ 字号取页面基准、不再受 bbox 宽约束，文字右缘可能越过画布右边界、
+ *      被 `.canvas{overflow:hidden}` 裁掉（裁切 = 静默丢内容，G1）。本节用 `emWidthOf(渲染后纯文本)`
+ *      口径 × 实际渲染字号估算「会被裁切」的块并列出清单，把该未闭合风险显性化。
+ *      ⚠️ 对 `\frac/\sqrt` 块，渲染文本是分子分母的**拼接**（二维排版的一维投影），仍是**上界**；
  *      真实是否裁切以视觉审板/DOM 为准。提示项，不计退出码。
  *
  * 用法：node scripts/audit-render.mjs [docId]
@@ -50,7 +52,7 @@
  */
 import { readFileSync } from "node:fs";
 import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediateRepeat, spaceEmptyParens } from "../stages/latex-display.js";
-import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasMathSource, clampByWidth } from "../stages/font-metrics.js";
+import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasTwoDimensionalMath, renderedTextOf, clampByWidth } from "../stages/font-metrics.js";
 
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
@@ -144,13 +146,13 @@ for (const p of snap.pages) {
 // ── 覆盖统计（G1：门自身也不得静默失败）──────────────────────────────────────
 // 审计必须报告自己的**覆盖缺口**：多少块被纳入判定、多少被排除、排除原因分桶。
 // 「字号保真度」与「文字溢出」两节各报一行。分桶**互斥**且**相加 = 排除总数**（无未归类残差）。
-// 前四类为计划钉死的口径：① 含公式源码 ② 含 ASCII 字母数字 ③ 全角字数不足 ④ bbox 异常（比例越界）；
+// 前四类为计划钉死的口径：① 含二维公式源码（\frac/\sqrt）② 含 ASCII 字母数字 ③ 全角字数不足 ④ bbox 异常（比例越界）；
 // 另补 ⑤ 其它非覆盖字符（希腊/数学符号等）⑥ 非文本块（图片/空文本）⑦ 竖排块 ⑧ 无当量宽。
 // 优先级：**公式源码先于 ASCII 字母数字**（`$F_{1}$` 两者都含，归更具体的「公式源码」）。
 // 两节都打印全部桶：某桶为 0 表示**本节不按该原因排除**（即该类块被本节覆盖）——
 // 这本身是信息：例如「文字溢出」节「含 ASCII 字母数字 0」正说明它覆盖了保真度节排除的那类块。
 const COVERAGE_BUCKETS = [
-  "含公式源码",
+  "含二维公式源码（\\frac/\\sqrt）",
   "含 ASCII 字母数字",
   "全角字数不足",
   "bbox 异常（比例越界）",
@@ -210,8 +212,8 @@ for (const p of snap.pages) {
       fidBuckets["非文本块（图片/空文本）"]++;
       continue;
     }
-    if (hasMathSource(text)) {
-      fidBuckets["含公式源码"]++;
+    if (hasTwoDimensionalMath(text)) {
+      fidBuckets["含二维公式源码（\\frac/\\sqrt）"]++;
       continue;
     }
     if (/[0-9A-Za-z]/.test(text)) {
@@ -323,13 +325,21 @@ for (const [name, list, fatal, max = 6] of sections) {
 //
 // 度量：`emWidthOf`（与「字号保真度」同一套，不另立标准）。preFont = **未接宽度上限**时的字号：
 //   · 行级块 / 丢弃块：`fontForBlock(...)`（渲染层随后接 `clampByWidth`），对比模式口径 PANE_W。
+//     ⚠️ 本节**不传同页块池**（Task 14 的 `isCrampedLine`）：该判据把「框被撑大」的块直接压回基准，
+//     传了就会把本节要报的信号本身抹掉 → 本节报的是**保守（偏大）**的触发率。
 //   · 段级块 raw：`fontFromLineHeight(bboxH 换算)`（`fontForRawBlock` 的宽度项即其上限），CANVAS_W。
 //   竖排块（R4）横向宽度非约束，不纳入。
 //
-// ⚠️ **公式源码块（hasMathSource 命中）不纳入**（Task 7 修复 C1 后）：渲染层对公式块豁免
-//   `clampByWidth`，且 `emWidthOf(原始 LaTeX)` 本就把当量宽算大 3–5× → 触发信号对这类块无意义
-//   （C1 修复前它们 100% 命中「触发」，把触发率整体抬高）。排除并计入「含公式源码」桶 ——
-//   这正是审计要报告的**自身覆盖缺口**（G1 同样适用于门自身）。
+// ⚠️ **二维公式源码块（`hasTwoDimensionalMath` 命中：\frac/\sqrt）不纳入**（Task 7 修复 C1；
+//   Task 14 收窄豁免范围）：渲染层**只对这类块**豁免 `clampByWidth`（其余含 LaTeX 的块改按渲染
+//   文本度量、参与夹子），且 `emWidthOf` 是线性模型、对二维排版（叠放/根号）根本不成立 →
+//   触发信号对这类块无意义（C1 修复前它们 100% 命中「触发」，把触发率整体抬高）。排除并计入
+//   「含二维公式源码（\frac/\sqrt）」桶 —— 这正是审计要报告的**自身覆盖缺口**（G1 适用于门自身）。
+//
+// 度量与渲染路径对齐（Task 14）：行级/丢弃块的夹子已改用**渲染后纯文本**的当量宽
+//   （`emWidthOf(renderedTextOf(text))`），本节同源照做；raw 段级块走 `fontForRawBlock`
+//   （**原始源码** em、**无豁免**），故 raw 循环仍用 `emWidthOf(text)`（对含 LaTeX 的 raw 块
+//   是**保守上界**，其触发比偏高）。
 const AUDIT_PANE_W = 460;   // 对比模式单栏
 const AUDIT_CANVAS_W = 760; // 阶段 1 画布
 
@@ -354,11 +364,12 @@ for (const p of snap.pages) {
         ovfBuckets["竖排块（横向非约束）"]++;
         continue; // R4 竖排：横向宽度非约束
       }
-      if (hasMathSource(text)) {
-        ovfBuckets["含公式源码"]++;
-        continue; // 公式块已豁免夹子，触发率不适用
+      if (hasTwoDimensionalMath(text)) {
+        ovfBuckets["含二维公式源码（\\frac/\\sqrt）"]++;
+        continue; // 仅 \frac/\sqrt 块豁免夹子（Task 14），触发率不适用
       }
-      const em = emWidthOf(text);
+      // 与 clampByWidth 同源：夹子按**渲染后纯文本**度量宽度（Task 14）
+      const em = emWidthOf(renderedTextOf(text));
       if (em <= 0) {
         ovfBuckets["无当量宽（emWidthOf=0）"]++;
         continue;
@@ -379,10 +390,8 @@ for (const p of snap.pages) {
       ovfBuckets["竖排块（横向非约束）"]++;
       continue;
     }
-    if (hasMathSource(b.text)) {
-      ovfBuckets["含公式源码"]++;
-      continue;
-    }
+    // raw 段级块走 fontForRawBlock（**原始源码** em、**无豁免**）→ 与渲染路径一致地不排除
+    // 公式块；源码当量宽对含 LaTeX 的块偏大（保守），故这些块的触发比是上界。
     const em = emWidthOf(b.text);
     if (em <= 0) {
       ovfBuckets["无当量宽（emWidthOf=0）"]++;
@@ -460,15 +469,16 @@ const REPEAT_MAX = 12;
 }
 
 // ── 9. 画布边界裁切估算（**提示项**，不计退出码）────────────────────────────────
-// 成因：公式块（hasMathSource）豁免 clampByWidth（C1 修复）→ 渲染字号取页面基准字号，不再受
-//   bbox 宽约束 → 文字右缘可能越过画布右边界，被 `.canvas{overflow:hidden}` 裁掉
-//   （裁切 = 静默丢内容，G1）。本节点把「会被裁切」的块报出来，使这处**未闭合风险**可见。
-// 口径（沿用既有 emWidthOf，不另立度量）：块左缘 = bbox.x0 换算；右缘 = 左缘 + emWidthOf(text) × F，
-//   其中 F 为行级 render path 的实际渲染字号 clampByWidth(fontForBlock(...))；右缘 > canvasW 即会被裁。
-//   ⚠️ 对公式块，emWidthOf 作用在**原始 LaTeX 源码**上是**保守上界**（线性模型对二维排版不成立，
-//      源码当量宽偏大 3–5×）→ 本估算会**高估**公式块；真实是否裁切以视觉审板/DOM 为准。
-// 范围：仅行级 render path（blocks）——公式块豁免正发生在 clampByWidth；raw 段级块走
-//   fontForRawBlock（无豁免，属另一路径），不计入本节。
+// 成因：`\frac/\sqrt` 块豁免 clampByWidth（C1 修复；Task 14 收窄后**只**这一类）→ 渲染字号取页面
+//   基准字号，不再受 bbox 宽约束 → 文字右缘可能越过画布右边界，被 `.canvas{overflow:hidden}`
+//   裁掉（裁切 = 静默丢内容，G1）。本节点把「会被裁切」的块报出来，使这处**未闭合风险**可见。
+// 口径：块左缘 = bbox.x0 换算；右缘 = 左缘 + emWidthOf(渲染后纯文本) × F，其中 F 为行级 render
+//   path 的**实际渲染字号** clampByWidth(fontForBlock(b, …, p.blocks))（Task 14：含同页块池，
+//   与 stages.js 调用一致）；右缘 > canvasW 即会被裁。
+//   ⚠️ 对 `\frac/\sqrt` 块，`renderedTextOf` 是分子分母的**拼接**（二维排版的一维投影）→ 仍是
+//      上界，本估算会**高估**它们；真实是否裁切以视觉审板/DOM 为准。
+// 范围：仅行级 render path（blocks）——豁免正发生在 clampByWidth；raw 段级块走 fontForRawBlock
+//   （无豁免，属另一路径），不计入本节。
 const clipEstimate = [];
 for (const p of snap.pages) {
   const basePane = baseFontOfPage(p.blocks, p.width, AUDIT_CANVAS_W);
@@ -476,16 +486,17 @@ for (const p of snap.pages) {
     const text = b.text;
     if (b.kind === "image" || typeof text !== "string" || !text.length) continue;
     if (isVerticalText(b.bbox, text)) continue;
-    const em = emWidthOf(text);
+    // 与 clampByWidth 同源：按**渲染后纯文本**度量宽度（Task 14）
+    const em = emWidthOf(renderedTextOf(text));
     if (em <= 0) continue;
-    const F = clampByWidth(fontForBlock(b, p.width, AUDIT_CANVAS_W, basePane), b, p.width, AUDIT_CANVAS_W);
+    const F = clampByWidth(fontForBlock(b, p.width, AUDIT_CANVAS_W, basePane, p.blocks), b, p.width, AUDIT_CANVAS_W);
     const right = (b.bbox[0] / p.width) * AUDIT_CANVAS_W + em * F;
     if (right > AUDIT_CANVAS_W + 1e-6) {
       clipEstimate.push({
         p: p.index,
         i: b.i,
         over: right - AUDIT_CANVAS_W,
-        math: hasMathSource(text),
+        math: hasTwoDimensionalMath(text),
         shown: text.slice(0, 56),
       });
     }
@@ -494,12 +505,12 @@ for (const p of snap.pages) {
 {
   const mathN = clipEstimate.filter((x) => x.math).length;
   console.log("\n⚠️ 画布边界裁切估算（提示项，不计退出码）");
-  console.log("     成因：公式块豁免 clampByWidth（C1）→ 字号取基准、不受 bbox 宽约束 → 文字右缘");
-  console.log("     可能越过画布右边界，被 .canvas{overflow:hidden} 裁掉（裁切 = 静默丢内容，G1）。");
+  console.log("     成因：\\frac/\\sqrt 块豁免 clampByWidth（Task 14 收窄后只这一类）→ 字号取基准、");
+  console.log("     不受 bbox 宽约束 → 文字右缘可能越过画布右边界，被 .canvas{overflow:hidden} 裁掉（G1）。");
   console.log(
-    `     估算「右缘 > 画布宽(${AUDIT_CANVAS_W})」的块：${clipEstimate.length} 个（其中含公式源码 ${mathN} 个）`,
+    `     估算「右缘 > 画布宽(${AUDIT_CANVAS_W})」的块：${clipEstimate.length} 个（其中含二维公式源码 ${mathN} 个）`,
   );
-  console.log("     ⚠️ 公式块用 emWidthOf(原始 LaTeX) 是保守上界（线性模型对二维排版偏大 3–5×）→ 会高估；");
+  console.log("     ⚠️ 对 \\frac/\\sqrt 块，renderedTextOf 是分子分母的拼接（二维排版的一维投影）→ 仍是上界；");
   console.log("        真实是否裁切以视觉审板/DOM 为准，本清单只用于把风险显性化。");
   for (const x of [...clipEstimate].sort((a, b) => b.over - a.over).slice(0, 10)) {
     console.log(`        p${x.p} blocks[${x.i}] 右缘超出 ${x.over.toFixed(1)}px math=${x.math} ${JSON.stringify(x.shown)}`);

@@ -12,6 +12,9 @@ import {
   fontForRawBlock,
   isVerticalText,
   hasMathSource,
+  hasTwoDimensionalMath,
+  renderedTextOf,
+  isCrampedLine,
   clampByWidth,
   emWidthOf,
   reconcileFont,
@@ -225,7 +228,7 @@ test("hasMathSource：反斜杠/美元符/下划线/脱字符任一即命中（�
   assert.equal(hasMathSource(undefined as unknown as string), false); // 容空
 });
 
-test("clampByWidth：含公式源码的块**豁免夹子**（返回未夹字号）—— 修复 C1 过夹", () => {
+test("clampByWidth：\\frac/\\sqrt 块**豁免夹子**（返回未夹字号）—— 修复 C1 过夹（Task 14 收窄后）", () => {
   // 原始 LaTeX 源码当量宽远大于渲染文本（3–5×），夹子若生效会把字号压到基准的 0.2–0.75×
   const frac = { kind: "text", text: "{ \\frac { \\sqrt { 3 } } { 3 } } m g", bbox: [0, 0, 60, 15] };
   const wPx = (60 / PAGE_W) * CANVAS_W;
@@ -233,8 +236,9 @@ test("clampByWidth：含公式源码的块**豁免夹子**（返回未夹字号�
   assert.ok(wPx / emWidthOf(frac.text) < 8.74, "前提：原始 LaTeX 当量宽会触发夹子");
   // 豁免后：原样返回未夹字号（修复前这里是 ≈6.5px，即基准 8.74px 的 0.74×）
   assert.equal(clampByWidth(8.74, frac, PAGE_W, CANVAS_W), 8.74);
-  const sub = { kind: "text", text: "$F_{1}$", bbox: [0, 0, 60, 15] };
-  assert.equal(clampByWidth(8.74, sub, PAGE_W, CANVAS_W), 8.74);
+  // \sqrt 同样豁免（二维根号，线性模型不成立）
+  const sqrt = { kind: "text", text: "$\\sqrt{3}$", bbox: [0, 0, 60, 15] };
+  assert.equal(clampByWidth(8.74, sqrt, PAGE_W, CANVAS_W), 8.74);
 });
 
 test("clampByWidth：豁免只针对公式源码块 —— 同一 bbox/字号的纯 CJK 块仍被夹", () => {
@@ -307,4 +311,112 @@ test("fontForBlock：短块（< 6 全角）不触发交叉验证 —— 刷易�
   const b = { kind: "text", text: "刷易错", bbox: [155, 662, 195, 680] };
   // 修复轮 0：比值 1.39 > 1.3 → 被压到基准 9.54px；修复轮 1：3 全角 < 6 → 不比较，保留 fontH
   assert.equal(fontForBlock(b, PAGE_W, PANE_W, 9.54), fontFromLineHeight(((680 - 662) / PAGE_W) * PANE_W));
+});
+
+// ── Task 14：公式块豁免收窄 + 宽度度量改用渲染纯文本（C 部分）─────────────────────
+// 裁定：宽度度量从「原始 LaTeX 源码」换成「渲染后的纯文本」stripTags(prettifyLatex(text))；
+// 豁免只留给真正二维的构造（\frac/\sqrt），其余含 LaTeX 的块（$\angle AOB$、$F_{a}$）参与夹子。
+
+test("hasTwoDimensionalMath：仅 \\frac/\\dfrac/\\tfrac/\\sqrt 命中（真正二维的构造）", () => {
+  assert.equal(hasTwoDimensionalMath("\\frac{mg}{k_1+k_2}"), true);
+  assert.equal(hasTwoDimensionalMath("\\dfrac{a}{b}"), true);
+  assert.equal(hasTwoDimensionalMath("\\tfrac{a}{b}"), true);
+  assert.equal(hasTwoDimensionalMath("$\\sqrt{3}$"), true);
+  assert.equal(hasTwoDimensionalMath("$\\angle AOB$"), false); // 一维：不豁免
+  assert.equal(hasTwoDimensionalMath("$F_{1}$"), false); // 一维下标：不豁免
+  assert.equal(hasTwoDimensionalMath("v_0"), false);
+  assert.equal(hasTwoDimensionalMath("重力弹力摩擦力"), false);
+  assert.equal(hasTwoDimensionalMath(""), false);
+  assert.equal(hasTwoDimensionalMath(undefined as unknown as string), false);
+});
+
+test("renderedTextOf：stripTags(prettifyLatex(text)) —— 源码 → 真正渲染出的字符", () => {
+  assert.equal(renderedTextOf("$\\angle AOB$"), "∠AOB"); // \angle → ∠
+  assert.equal(renderedTextOf("$F_{1}$"), "F1"); // 下标 1 保留（剥 <sub>）
+  assert.equal(renderedTextOf("\\frac { m g } { k _ { 1 } + k _ { 2 } }"), "mgk1+k2"); // 分式拼接
+  assert.equal(renderedTextOf("重力弹力"), "重力弹力"); // 纯 CJK 原样
+  // 展示层变换会改变当量宽（都是原卷就有的）：空括号补 2 个 EM SPACE；即时重复前缀折叠
+  assert.equal(renderedTextOf("确的是()"), "确的是(\u2003\u2003)");
+  assert.equal(emWidthOf(renderedTextOf("确的是()")), 5.6); // 3 + 0.3 + 1.0 + 1.0 + 0.3
+  assert.equal(renderedTextOf("列关系式正确的是列关系式正确的是"), "列关系式正确的是"); // 折叠一份
+});
+
+test("clampByWidth：Task 14 收窄 —— 非二维的 LaTeX 块（$F_{1}$ / $\\angle AOB$）**不再豁免**", () => {
+  // $F_{1}$ 渲染为 "F1"（em=1.0）；bbox 宽 20pt → 25.50px → 上限 25.50（此前全豁免、原样返回 40）
+  const sub = { kind: "text", text: "$F_{1}$", bbox: [0, 0, 20, 15] };
+  approx(clampByWidth(40, sub, PAGE_W, CANVAS_W), 25.50, 0.01);
+  assert.ok(clampByWidth(40, sub, PAGE_W, CANVAS_W) < 40, "已参与夹子（不再豁免）");
+  // $\angle AOB$ 渲染为 "∠AOB"（em=2.5）；bbox 宽 60pt → 76.51px → 上限 30.60
+  const angle = { kind: "text", text: "$\\angle AOB$", bbox: [0, 0, 60, 15] };
+  approx(clampByWidth(40, angle, PAGE_W, CANVAS_W), 30.60, 0.02);
+  // 对照：若按**源码**当量宽（5.15）会夹到 14.86 —— 正是 C1 过夹（Task 14 后不再发生）
+  approx(((60 / PAGE_W) * CANVAS_W) / emWidthOf("$\\angle AOB$"), 14.86, 0.02);
+  // 旧 bbox 宽 60pt 下 $F_{1}$ 渲染文本很窄（em=1.0）→ 不触发夹子（与 Task 7 时的观察值 8.74 一致）
+  assert.equal(clampByWidth(8.74, { kind: "text", text: "$F_{1}$", bbox: [0, 0, 60, 15] }, PAGE_W, CANVAS_W), 8.74);
+});
+
+// ── Task 14：短块碎片的结构判据（isCrampedLine，A 部分）──────────────────────────
+// 回原卷量墨迹：被 MinerU 撑大的块（声明高 15–19pt，墨迹高仅 10.1–10.8pt）**挤在同栏邻行上**
+// （间隙实测 3–7pt）；真标题/横幅（墨迹 12.7–15.1pt）有正常行距（间隙 ≥9pt）。判据用**结构证据**
+// （框与谁相邻）而非再收紧比值阈值。阈值：横向重叠 ≥0.4×min宽；纵向间隙 ≤7pt。
+
+test("isCrampedLine：同栏（横向重叠 ≥0.4×min宽）且纵向间隙 ≤7pt → 命中（框被撑大）", () => {
+  const frag = { kind: "text", text: "确的是()", bbox: [48, 314, 281, 331] }; // 声明高 17pt（墨迹仅 ~10.3）
+  const next = { kind: "text", text: "下列说", bbox: [50, 335, 275, 350] }; // 间隙 4pt
+  assert.equal(isCrampedLine(frag, [frag, next]), true);
+});
+
+test("isCrampedLine：纵向间隙 ≥9pt（真标题的正常行距）→ 不命中（保留）；边界 7pt 命中 / 8pt 不命中", () => {
+  const title = { kind: "text", text: "第二章 相互作用", bbox: [0, 0, 116, 18] };
+  const g9 = { kind: "text", text: "正文", bbox: [0, 27, 116, 42] }; // 27-18 = 9
+  assert.equal(isCrampedLine(title, [title, g9]), false);
+  const g7 = { kind: "text", text: "正文", bbox: [0, 25, 116, 40] }; // 25-18 = 7（判据 ≤7 → 命中）
+  assert.equal(isCrampedLine(title, [title, g7]), true);
+  const g8 = { kind: "text", text: "正文", bbox: [0, 26, 116, 41] }; // 26-18 = 8 → 不命中
+  assert.equal(isCrampedLine(title, [title, g8]), false);
+});
+
+test("isCrampedLine：不同栏（横向无重叠）或擦边（<0.4×min宽）→ 不命中", () => {
+  const b = { kind: "text", text: "第1节", bbox: [0, 0, 100, 16] };
+  const otherCol = { kind: "text", text: "右栏标签", bbox: [300, 10, 400, 26] }; // 无横向重叠
+  assert.equal(isCrampedLine(b, [b, otherCol]), false);
+  // 擦边：宽 194 与宽 40 仅重叠 15pt = 15/40 = 0.375 < 0.4 → 不同栏（排除页边标签）
+  const wide = { kind: "text", text: "第1节 重力 弹力 摩擦力", bbox: [0, 0, 194, 16] };
+  const label = { kind: "text", text: "必刷知识", bbox: [179, 5, 219, 21] };
+  assert.equal(isCrampedLine(wide, [wide, label]), false);
+});
+
+test("isCrampedLine：图片块与空文本块不作邻块；无 pageBlocks → false", () => {
+  const b = { kind: "text", text: "确的是()", bbox: [48, 314, 281, 331] };
+  const img = { kind: "image", bbox: [50, 335, 275, 350] }; // 图片：跳过
+  const empty = { kind: "text", text: "", bbox: [50, 335, 275, 350] }; // 空文本：跳过
+  assert.equal(isCrampedLine(b, [b, img, empty]), false);
+  assert.equal(isCrampedLine(b, undefined), false);
+});
+
+test("fontForBlock：给同页块池且块被同栏邻行挤住 → 退回基准（Task 14，短块也生效）", () => {
+  // p8[16]「确的是()」声明高 17pt（墨迹仅 ~10.3）—— Task 13 因 3 全角 < 6 前置条件跳过，短块漏网
+  const frag = { kind: "text", text: "确的是()", bbox: [48, 314, 281, 331] };
+  const next = { kind: "text", text: "下列说", bbox: [50, 335, 275, 350] };
+  const byH = fontFromLineHeight(((331 - 314) / PAGE_W) * PANE_W);
+  approx(byH, 13.51, 0.05); // 1.55× 页面基准（8.74px）
+  assert.equal(fontForBlock(frag, PAGE_W, PANE_W, 8.74), byH); // 不给块池 → 保留（漏网）
+  assert.equal(fontForBlock(frag, PAGE_W, PANE_W, 8.74, [frag, next]), 8.74); // 给块池 → 退回基准
+});
+
+test("fontForBlock：真标题有正常行距（间隙 9pt）→ 结构判据不命中，字号不被压平", () => {
+  const title = { kind: "text", text: "第二章 相互作用", bbox: [0, 0, 116, 18] };
+  const body = { kind: "text", text: "正文正文正文", bbox: [0, 27, 116, 42] }; // 间隙 9pt
+  const byH = fontFromLineHeight((18 / PAGE_W) * PANE_W);
+  assert.equal(fontForBlock(title, PAGE_W, PANE_W, 9.54, [title, body]), byH);
+  assert.ok(byH > 9.54, "标题字号确实大于基准（未被压平）");
+});
+
+test("fontForBlock：结构判据**只缩小不放大** —— 比基准更小的块不因命中而抬高", () => {
+  const tiny = { kind: "text", text: "小", bbox: [48, 314, 281, 320] }; // 声明高 6pt → fontH < 基准
+  const next = { kind: "text", text: "下列说", bbox: [50, 322, 275, 337] }; // 间隙 2pt → 命中结构判据
+  const byH = fontFromLineHeight(((320 - 314) / PAGE_W) * PANE_W);
+  assert.ok(byH < 8.74, "前提：fontH 小于基准");
+  assert.equal(isCrampedLine(tiny, [tiny, next]), true, "前提：确实命中结构判据");
+  assert.equal(fontForBlock(tiny, PAGE_W, PANE_W, 8.74, [tiny, next]), byH); // 命中但不放大
 });

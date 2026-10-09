@@ -229,7 +229,8 @@ function blockNode(b, p, canvasW = CANVAS_W, baseFont = null) {
     txt.innerHTML = html;
     // 宽度安全上限（R3/R5）：行高模型对个别行（页眉页脚/计划用时/短标签）会过冲，
     // 夹到 bbox 宽以免压到相邻块；纯 CJK 未溢出的块不受影响（见 font-metrics.js clampByWidth）。
-    txt.style.fontSize = `${clampByWidth(fontForBlock(b, p.width, canvasW, baseFont), b, p.width, canvasW)}px`;
+    // Task 14：传入同页块池，供「同栏挤压」结构判据（框被撑大的碎尾退回基准字号）。
+    txt.style.fontSize = `${clampByWidth(fontForBlock(b, p.width, canvasW, baseFont, p.blocks), b, p.width, canvasW)}px`;
     node.append(txt);
     // 竖排块（R4）：字号已按 bboxW 定，排布方向也要竖排，否则文字仍横向越出窄框
     if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");
@@ -283,6 +284,8 @@ const DISCARDED_LABEL = {
  * 曾硬编码 CANVAS_W → 对比栏内丢弃块字号偏大 760/460 = 1.65×（R2）。 */
 function renderDiscardedInto(c, p, canvasW = CANVAS_W) {
   const baseFont = baseFontOfPage(p.blocks, p.width, canvasW);
+  // 邻块池含本页行级块与丢弃块：丢弃块之间也可能互相挤压（Task 14 结构判据）
+  const pool = [...(p.blocks ?? []), ...(p.discarded ?? [])];
   for (const b of p.discarded ?? []) {
     const node = posStyle(el("div", "blk blk-discarded"), b.bbox, p.width, p.height);
     const shown = prettifyLatex(b.text);
@@ -291,7 +294,7 @@ function renderDiscardedInto(c, p, canvasW = CANVAS_W) {
       const txt = el("span", "txt");
       txt.innerHTML = shown;
       // 宽度安全上限（R3/R5）：同 blockNode——丢弃块（页脚等）也会因 bboxH 过冲而压字
-      txt.style.fontSize = `${clampByWidth(fontForBlock(b, p.width, canvasW, baseFont), b, p.width, canvasW)}px`;
+      txt.style.fontSize = `${clampByWidth(fontForBlock(b, p.width, canvasW, baseFont, pool), b, p.width, canvasW)}px`;
       node.append(txt);
       // 竖排块（R4）：同 blockNode——字号按 bboxW 定，方向也要竖排
       if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");

@@ -23,12 +23,15 @@ export function baseFontOfPage(
 
 /** 块的渲染字号：`hasMathSource` 命中（含 `\`/`$`/`_`/`^`）用 baseFont（null 时回退行高推算），
  *  否则按自身行高推算。竖排块（bboxH > 2×bboxW 且当量宽 ≥2）改取 bboxW 当行高。
- *  非公式文本块再过 `reconcileFont`：**全角字数 ≥ 6** 且宽高两路比值 > 1.3（bbox 被撑大）时退回 baseFont。 */
+ *  非公式文本块再过 `reconcileFont`：**全角字数 ≥ 6** 且宽高两路比值 > 1.3（bbox 被撑大）时退回 baseFont。
+ *  若给了 `pageBlocks`，再过 `isCrampedLine`：框与同栏邻行挤在一起（间隙 ≤ 7pt）时退回 baseFont
+ *  ——**仅在会缩小时生效**（Task 14 结构判据）。 */
 export function fontForBlock(
   block: MetricBlock,
   pageWidth: number,
   canvasW: number,
   baseFont: number | null,
+  pageBlocks?: MetricBlock[],
 ): number;
 
 /** 两估计量交叉验证（Task 13）：全角字数 `fwCount < 6` 时**不比较**、直接返回 fontH（短块 fontW 噪声大）；
@@ -50,8 +53,23 @@ export function isVerticalText(bbox: number[], text: string): boolean;
 /** 公式源码判定（C1 修复）：`/[\\$]|[_^]/` —— 反斜杠、美元符、下划线、脱字符任一即命中。 */
 export function hasMathSource(text: string): boolean;
 
-/** 宽度安全上限（R3/R5）：`min(fontPx, bboxW_px / emWidthOf(text))`。
- *  竖排块、**公式源码块**（hasMathSource 命中）或无文本块（emWidthOf=0）原样返回 fontPx。 */
+/** 二维排版构造判定（Task 14）：含 `\frac`/`\dfrac`/`\tfrac`/`\sqrt` 任一。
+ *  只有这两类块继续豁免 `clampByWidth`（线性宽度模型对二维叠放/根号不成立）。 */
+export function hasTwoDimensionalMath(text: string): boolean;
+
+/** 块的渲染后纯文本（Task 14）：`stripTags(prettifyLatex(text))` —— 供 `clampByWidth` 度量宽度。 */
+export function renderedTextOf(text: string): string;
+
+/** 块 bbox 被撑大的**结构判据**（Task 14）：同页存在「同栏（横向重叠 ≥ 0.4×min 宽）、
+ *  纵向挤在一起（垂直间隙 ≤ 7pt）」的另一文本块。命中 ⇒ 该块 bbox 高不可信。 */
+export function isCrampedLine(
+  block: MetricBlock,
+  pageBlocks: MetricBlock[] | undefined,
+): boolean;
+
+/** 宽度安全上限（R3/R5）：`min(fontPx, bboxW_px / emWidthOf(renderedTextOf(text)))`。
+ *  竖排块、**二维公式块**（`hasTwoDimensionalMath`，含 `\frac`/`\sqrt`）或无文本块原样返回 fontPx。
+ *  Task 14：度量从「原始 LaTeX 源码」改为「渲染后纯文本」，豁免收窄到 `\frac`/`\sqrt`。 */
 export function clampByWidth(
   fontPx: number,
   block: MetricBlock,
