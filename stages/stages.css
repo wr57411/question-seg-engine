@@ -378,6 +378,9 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 .q-chip.plain {
   background: rgba(43, 42, 38, 0.78);
   font-size: 10px;
+  /* 行高钉死：题号牌的落位算法（uncovered-layout.js 的 CHIP_H_PX）按此高度算，
+   * 用继承的 1.6 会让牌子高 18px、比算法假设的 15px 高，落位就不再保证不压正文。 */
+  line-height: 1.3;
   padding: 0 6px;
 }
 

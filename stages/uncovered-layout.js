@@ -1,11 +1,14 @@
 /**
- * uncovered-layout.js —— 「解析遗漏」内容级标签的落位算法（纯函数，无 DOM）。
+ * uncovered-layout.js —— 重建纸面上**所有标记**的落位算法（纯函数，无 DOM）。
  *
- * 定位：stages.js 的对比/阶段视图要在重建纸面上给「未覆盖墨迹（内容级）」挂一个
- * 「解析遗漏」标签。但漏识别区域多是**一行文字高**（~10pt），而标签高 14px（对比模式
- * PANE_W=460 下折算 ~18pt）比它高 ⇒ 直接挂在区域左上角必然向下越出行、压到下一行正文。
- * 本模块把「挂哪儿才不遮正文」抽成纯函数，好让 tests/uncovered-layout.test.ts 把它钉死
- * （修复轮 1 发现 2：任何标记都不得盖住正文，是硬保证）。
+ * 定位：stages.js 的对比/阶段视图要在重建纸面上挂两类标记 ——
+ * ①「解析遗漏」标签（未覆盖墨迹，内容级）；②题号牌（题首，可点击看详情）。
+ * 两者都是**浮在纸面上的标记**，共同的红线是：**任何标记都不得盖住正文**。
+ * 本模块把「挂哪儿才不遮正文」抽成纯函数，好让 tests/uncovered-layout.test.ts 把它钉死。
+ *
+ * ⚠️ 2026-10-10 实测（DOM，15 页）：题号牌原先直接挂在**题首块左上角**，
+ * 而块 bbox 紧贴墨迹（F1）→ 牌子必然压住题首前 1–3 个字（每处 400–750px²，
+ * 全卷约 90 处，肉眼可见）。故题号牌也必须走落位算法（见 pickChipRect）。
  *
  * 红线：本目录不 import 引擎代码；本模块无任何依赖。
  */
@@ -83,6 +86,65 @@ export function pickLabelRect(bbox, w, h, pageW, pageH, blocks) {
   return null;
 }
 
+/** 题号牌字号（px，与 CSS `.q-chip.plain` 的 font-size 一致）。 */
+export const CHIP_FONT_PX = 10;
+/** 题号牌左右内边距合计（px，= CSS `.q-chip` 的 padding 1px 7px × 2 + 边框）。 */
+export const CHIP_PAD_PX = 16;
+/** 题号牌高（px，= CSS `.q-chip.plain` 的 font-size × line-height 1.3 + 上下 padding 2px）。 */
+export const CHIP_H_PX = 15;
+
+/**
+ * 题号牌落位：优先**页边距**（左侧 → 右侧），其次块上方 / 下方；
+ * 返回首个既在页内、又不与任何解析块 bbox 相交的矩形；都不行返回 null（该题不挂牌）。
+ *
+ * 为什么不能挂首块左上角：见文件头 2026-10-10 实测（牌子高 15px、宽 ≥19px，
+ * 而块 bbox 紧贴墨迹 → 必压正文）。为什么优先页边距：实测题目首块**上方空隙中位仅 8pt**
+ * （牌子高 15px ≈ 19pt 放不下），而**左边距中位 59pt / 最小 36pt**（够放紧凑牌）。
+ */
+export function pickChipRect(bbox, w, h, pageW, pageH, blocks) {
+  const [x0, y0, x1, y1] = bbox;
+  const cands = [
+    [x0 - w - 1, y0], // 左侧页边距
+    [x1 + 1, y0], // 右侧页边距
+    [x0 - w - 1, y0 - h - 1], // 左上（外扩到边距）
+    [x0, y0 - h - 1], // 上方
+    [x0, y1 + 1], // 下方
+  ];
+  for (const [x, y] of cands) {
+    const rect = [x, y, x + w, y + h];
+    if (rect[0] < 0 || rect[1] < 0 || rect[2] > pageW || rect[3] > pageH) continue;
+    if (!labelOverlapsBlock(rect, blocks)) return rect;
+  }
+  return null;
+}
+
+/** 标签像素宽（含内边距）：全角/CJK 按 1 字宽、ASCII 按半宽估。 */
+function chipTextWidthPx(label) {
+  let em = 0;
+  for (const ch of label) em += ch.codePointAt(0) >= 0x2e80 ? 1 : 0.5;
+  return em * CHIP_FONT_PX + CHIP_PAD_PX;
+}
+
+/**
+ * 为一批题（每项 `{ bbox, label, compact }`）算出**不压正文**的题号牌落位。
+ * 每题先试完整标签（`第N题`），放不下再试紧凑标签（`N`），都不行返回 null（不挂牌）。
+ * 返回与入参等长的数组，元素为 `{ rect, label }` 或 null。
+ * **硬不变量**（见测试）：非 null 的 rect 与 blocks 中任何 bbox 都不相交且在页内。
+ */
+export function chipPlacements(items, blocks, pageW, pageH, canvasW) {
+  const pxPerPt = canvasW / pageW;
+  const h = CHIP_H_PX / pxPerPt;
+  return items.map((it) => {
+    if (!it.bbox) return null;
+    for (const label of [it.label, it.compact]) {
+      if (!label) continue;
+      const w = chipTextWidthPx(label) / pxPerPt;
+      const rect = pickChipRect(it.bbox, w, h, pageW, pageH, blocks);
+      if (rect) return { rect, label };
+    }
+    return null;
+  });
+}
 /**
  * 为内容级未覆盖区域算出「可见标签」的落位（每组一个）。
  * 返回 `[{ rect, count }]`：rect 为 PDF 点坐标的标签矩形，count 为该组区域数。

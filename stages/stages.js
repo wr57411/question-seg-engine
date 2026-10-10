@@ -8,7 +8,7 @@
 
 import { prettifyLatex } from "./latex-display.js";
 import { baseFontOfPage, clampByWidth, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
-import { contentLabelPlacements } from "./uncovered-layout.js";
+import { chipPlacements, contentLabelPlacements } from "./uncovered-layout.js";
 import { mergePlan } from "./block-dedup.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
@@ -612,17 +612,29 @@ function renderCompare(p) {
   renderDiscardedInto(c, p, paneW); // 对比栏宽口径：丢弃块也必须用 paneW（R2）
   const baseFont = baseFontOfPage(p.blocks, p.width, paneW);
   appendBlockNodes(c, p, paneW, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
-  for (const q of p.questions) {
-    const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);
-    if (!first) continue;
-    const chip = el("span", "q-chip plain", `第${q.number}题`);
-    // 内嵌首块左上角（同切题页）：牌子只出现在题目自身位置
-    chip.style.left = `${(first.bbox[0] / p.width) * 100}%`;
-    chip.style.top = `${(first.bbox[1] / p.height) * 100}%`;
-    chip.style.transform = "translate(0, -1px)";
+  // 题号牌：**必须走不压正文的落位**。原先挂在题首块左上角，而块 bbox 紧贴墨迹（F1）
+  // → 牌子必然盖住题首 1–3 个字（2026-10-10 DOM 实测 15 页约 90 处、每处 400–750px²，
+  // 肉眼可见）。落位由 uncovered-layout.js 的 chipPlacements 算好（页边距优先，放不下则不挂）。
+  const firsts = p.questions.map((q) => q.blocks.map((i) => p.blocks[i]).find(Boolean) ?? null);
+  // 避让集合要含**全部会被渲染的块**（行级块 + 丢弃块），否则牌子会压到页眉/页脚的家具块上。
+  const avoid = p.blocks.concat(p.discarded ?? []);
+  const chips = chipPlacements(
+    firsts.map((f, k) => ({ bbox: f ? f.bbox : null, label: `第${p.questions[k].number}题`, compact: p.questions[k].number })),
+    avoid,
+    p.width,
+    p.height,
+    paneW,
+  );
+  p.questions.forEach((q, k) => {
+    const hit = chips[k];
+    if (!hit) return; // 页边距放不下 → 不挂牌（压正文比不挂牌更糟）
+    const chip = el("span", "q-chip plain", hit.label);
+    chip.title = `第${q.number}题（点击看详情）`;
+    chip.style.left = `${(hit.rect[0] / p.width) * 100}%`;
+    chip.style.top = `${(hit.rect[1] / p.height) * 100}%`;
     chip.addEventListener("click", () => showDetail(q, p));
     c.append(chip);
-  }
+  });
   uncoveredInto(c, p, paneW); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
   right.append(c);
 

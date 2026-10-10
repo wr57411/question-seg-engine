@@ -6,9 +6,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CHIP_FONT_PX,
+  CHIP_H_PX,
+  CHIP_PAD_PX,
+  chipPlacements,
   contentLabelPlacements,
   groupContentForLabels,
   labelOverlapsBlock,
+  pickChipRect,
   pickLabelRect,
 } from "../stages/uncovered-layout.js";
 
@@ -123,6 +128,98 @@ test("contentLabelPlacements：全卷任意宽区域产出都不得压正文（�
       for (const { rect } of ps) {
         assert.equal(labelOverlapsBlock(rect, BLOCKS), false, `canvasW=${canvasW} 标签 ${rect} 压正文`);
       }
+    }
+  }
+});
+
+/* ── 题号牌落位（2026-10-10 用户指出的「并排对比」页里题号牌压正文） ──
+ * 旧行为：牌子直接挂题首块左上角，而块 bbox 紧贴墨迹（F1）→ 必压题首 1–3 字。
+ * 下面的测试**先证明旧落位确实会压**（否则测试抓不到回归），再钉死新落位的不变量。 */
+const pxPerPt = CANVAS_W / PAGE_W;
+const chipW = (label: string) => {
+  let em = 0;
+  for (const ch of label) em += (ch.codePointAt(0) ?? 0) >= 0x2e80 ? 1 : 0.5;
+  return (em * CHIP_FONT_PX + CHIP_PAD_PX) / pxPerPt;
+};
+const chipH = CHIP_H_PX / pxPerPt;
+
+
+test("pickChipRect：旧落位（挂首块左上角）确实压正文——保证本测试能抓到回归", () => {
+  const first: [number, number, number, number] = [40, 74, 281, 85]; // 第 5 页题 1 首块
+  const w = chipW("第1题");
+  assert.equal(
+    labelOverlapsBlock([first[0], first[1], first[0] + w, first[1] + chipH], BLOCKS),
+    true,
+    "旧落位本该压到首块正文；若此处为 false，说明夹具失效、测试失去意义",
+  );
+});
+
+test("pickChipRect：新落位不得压任何块、且必须在页内", () => {
+  const first = [40, 74, 281, 85];
+  const rect = pickChipRect(first, chipW("第1题"), chipH, PAGE_W, PAGE_H, BLOCKS);
+  assert.ok(rect, "页边距/上方应能放下题号牌");
+  assert.equal(labelOverlapsBlock(rect!, BLOCKS), false, `题号牌 ${rect} 压到正文`);
+  assert.ok(rect![0] >= 0 && rect![1] >= 0 && rect![2] <= PAGE_W && rect![3] <= PAGE_H, `题号牌 ${rect} 越页`);
+});
+
+test("pickChipRect：四边都被占满时返回 null（宁可不挂牌，也不压正文）", () => {
+  // 造一个四周被块包死的首块：上/下/左/右都放不下（只留首块自身与两条 1pt 缝）
+  const solid = [
+    [0, 0, 596, 99], // 上方整条
+    [0, 141, 596, 824], // 下方整条
+    [0, 0, 199, 824], // 左侧整条
+    [301, 0, 596, 824], // 右侧整条
+  ].map((bbox) => ({ bbox }));
+  const first = [200, 100, 300, 140];
+  assert.equal(pickChipRect(first, chipW("第1题"), chipH, PAGE_W, PAGE_H, solid), null);
+});
+
+test("chipPlacements：完整标签放不下时回退紧凑标签，仍不压正文", () => {
+  // 只留左侧 40pt 边距：装不下「第1题」（需 ~60pt），但装得下紧凑「1」（需 ~34pt）
+  const narrow = [
+    [0, 0, 596, 390], // 上方整条（堵住「上方」候选位）
+    [0, 430, 596, 824], // 下方整条
+  ].map((bbox) => ({ bbox }));
+  const first = [40, 400, 596, 412]; // 右端顶到页右缘 → 右侧候选位越页
+  const out = chipPlacements([{ bbox: first, label: "第1题", compact: "1" }], narrow, PAGE_W, PAGE_H, CANVAS_W);
+  assert.equal(out.length, 1);
+  const hit = out[0];
+  assert.ok(hit, "紧凑标签应能放进 30pt 边距");
+  assert.equal(hit!.label, "1", "应回退到紧凑标签");
+  assert.equal(labelOverlapsBlock(hit!.rect, narrow), false);
+});
+
+test("chipPlacements：bbox 为 null（无首块）时返回 null，且长度与入参一致", () => {
+  const out = chipPlacements(
+    [{ bbox: null, label: "第1题", compact: "1" }, { bbox: [40, 400, 281, 412], label: "第2题", compact: "2" }],
+    BLOCKS,
+    PAGE_W,
+    PAGE_H,
+    CANVAS_W,
+  );
+  assert.equal(out.length, 2);
+  assert.equal(out[0], null);
+  assert.ok(out[1]);
+});
+
+test("chipPlacements：第 5 页真实题目首块——所有产出的题号牌都不压正文（硬不变量）", () => {
+  // 第 5 页题首块（取自实测快照）：题1 [40,74]、题2 [40,379]、题3 [40,596]、题4 [297,149]、题5 [297,406]
+  const firsts = [
+    [40, 74, 281, 85],
+    [40, 379, 176, 389],
+    [40, 596, 199, 607],
+    [297, 149, 538, 159],
+    [297, 406, 538, 417],
+  ];
+  const items = firsts.map((bbox, i) => ({ bbox, label: `第${i + 1}题`, compact: String(i + 1) }));
+  for (const canvasW of [460, 760]) {
+    for (const hit of chipPlacements(items, BLOCKS, PAGE_W, PAGE_H, canvasW)) {
+      if (!hit) continue;
+      assert.equal(labelOverlapsBlock(hit.rect, BLOCKS), false, `canvasW=${canvasW} 题号牌 ${hit.rect} 压正文`);
+      assert.ok(
+        hit.rect[0] >= 0 && hit.rect[1] >= 0 && hit.rect[2] <= PAGE_W && hit.rect[3] <= PAGE_H,
+        `canvasW=${canvasW} 题号牌 ${hit.rect} 越页`,
+      );
     }
   }
 });
