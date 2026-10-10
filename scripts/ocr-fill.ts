@@ -35,6 +35,8 @@ const CROP_DIR = join(OUT_DIR, "ocr-fill");
 const DPI = 300;
 /** 竖向把区域扩成整行（pt）。区域本身只是「行的碎片」。 */
 const LINE_PAD_Y = 3;
+/** 横向外扩（pt）：给 OCR 一点上下文，但不吞掉相邻内容（如紧邻的分式块）。 */
+const PAD_X = 8;
 /** 宽度合理性：恢复文本的当量宽 / 窗口宽，落在此区间外视为不可信。 */
 const RATIO_MIN = 0.45;
 const RATIO_MAX = 1.9;
@@ -182,7 +184,6 @@ function medianLineHeightPt(blocks: any[]): number {
   const hs = blocks.filter((b: any) => b.kind !== "image" && b.text).map((b: any) => b.bbox[3] - b.bbox[1]).sort((a: number, b: number) => a - b);
   return hs.length ? hs[Math.floor(hs.length / 2)]! : 0;
 }
-const overlapY = (a: Box, b: Box) => a[1] < b[3] && a[3] > b[1];
 
 /** 把 win 里与 holes 相交的部分切掉，保留面积最大的一块（只求避开插图，不做通用布尔运算）。 */
 function clipAway(win: Box, holes: Box[]): Box | null {
@@ -238,14 +239,19 @@ for (const [i, t] of todo.entries()) {
   const p = snap.pages[t.page];
   const [rx0, ry0, rx1, ry1] = t.bbox;
 
-  // ① 竖向扩成整行；横向取「同一栏、y 相交的块」的并集范围
-  const sameCol = (b: any) => (b.bbox[0] < p.width / 2) === (rx0 < p.width / 2);
-  const lineBlocks = (p.blocks ?? []).filter(
-    (b: any) => b.kind !== "image" && sameCol(b) && overlapY(b.bbox, [rx0, ry0 - LINE_PAD_Y, rx1, ry1 + LINE_PAD_Y]),
-  );
-  const lx0 = lineBlocks.length ? Math.min(...lineBlocks.map((b: any) => b.bbox[0])) : rx0 - 8;
-  const lx1 = lineBlocks.length ? Math.max(...lineBlocks.map((b: any) => b.bbox[2])) : rx1 + 8;
-  let win: Box = [Math.max(0, lx0 - 2), Math.max(0, ry0 - LINE_PAD_Y), Math.min(p.width, lx1 + 2), ry1 + LINE_PAD_Y];
+  // ① 竖向扩成整行；横向**从区域本身向外扩固定边距**。
+  //
+  // ⚠️ 曾经的写法是「取该行上所有块的 x 并集」当左右边界 —— 那是**错的**：
+  // 这行的文字**正是缺失的**（否则不会被标成未覆盖区域），所以那行上只剩残存的碎片
+  // （热狗题 A/B 第 2 行只剩一个分式块 x 146–165）→ 窗口被推成 23pt 宽 → 判「窗口过小」跳过。
+  // 该启发式恰好在它最该起作用的场景下失效（2026-10-10 用户当场指出）。
+  // 现在只依赖区域自身，不依赖块。
+  let win: Box = [
+    Math.max(0, rx0 - PAD_X),
+    Math.max(0, ry0 - LINE_PAD_Y),
+    Math.min(p.width, rx1 + PAD_X),
+    ry1 + LINE_PAD_Y,
+  ];
 
   // ② 减去图片块（实测：裁到插图会吐图片占位符）
   const holes = (p.blocks ?? []).filter((b: any) => b.kind === "image").map((b: any) => b.bbox as Box);

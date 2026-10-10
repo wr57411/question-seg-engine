@@ -364,7 +364,12 @@ function uncoveredInto(c, p, canvasW = CANVAS_W) {
 
   // 内容级标签：按组挂一个，落位由 uncovered-layout.js 的 contentLabelPlacements 算好
   // （它保证每个标签都不与任何解析块 bbox 相交、且在页内；放不下/必压正文的组不产出）。
-  for (const { rect, count } of contentLabelPlacements(content, p.blocks, p.width, p.height, canvasW)) {
+  // ⚠️ 避让集合必须**含 OCR 候选块** —— 候选不在 p.blocks 里，不带上它标签就会压住刚补出来的候选文本
+  //（2026-10-10 用户当场指出：「标记盖住正文」的规矩对候选同样成立）。
+  const avoidForLabels = p.blocks.concat(
+    (p.ocrFill ?? []).filter((x) => x.accepted).map((x) => ({ bbox: x.win ?? x.bbox })),
+  );
+  for (const { rect, count } of contentLabelPlacements(content, avoidForLabels, p.width, p.height, canvasW)) {
     const tag = el("span", "uncovered-tag", count > 1 ? `解析遗漏 ×${count}` : "解析遗漏");
     tag.style.left = `${(rect[0] / p.width) * 100}%`;
     tag.style.top = `${(rect[1] / p.height) * 100}%`;
@@ -648,7 +653,9 @@ function renderCompare(p) {
   // 肉眼可见）。落位由 uncovered-layout.js 的 chipPlacements 算好（页边距优先，放不下则不挂）。
   const firsts = p.questions.map((q) => q.blocks.map((i) => p.blocks[i]).find(Boolean) ?? null);
   // 避让集合要含**全部会被渲染的块**（行级块 + 丢弃块），否则牌子会压到页眉/页脚的家具块上。
-  const avoid = p.blocks.concat(p.discarded ?? []);
+  const avoid = p.blocks
+    .concat(p.discarded ?? [])
+    .concat((p.ocrFill ?? []).filter((x) => x.accepted).map((x) => ({ bbox: x.win ?? x.bbox })));
   const chips = chipPlacements(
     firsts.map((f, k) => ({ bbox: f ? f.bbox : null, label: `第${p.questions[k].number}题`, compact: p.questions[k].number })),
     avoid,
