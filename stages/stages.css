@@ -329,6 +329,31 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   margin: 4px 0 14px;
 }
 
+/* OCR 候选补全（scripts/ocr-fill.ts 的产物）：**候选**，不是引擎文本。
+ * 与洋红「解析遗漏」区分：青绿虚线框 + 淡底。角标默认隐藏（悬停才出），
+ * 满足「任何标记都不得盖住正文」；悬停 title 里带原卷裁图路径与 OCR 原始输出，便于核对。 */
+.blk-ocr {
+  border: 1px dashed var(--jade);
+  background: rgba(77, 124, 95, 0.08);
+  color: #2f5b41;
+}
+.blk-ocr .tag {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateY(-100%);
+  z-index: 7;
+  font-size: 9px;
+  line-height: 1.4;
+  background: var(--jade);
+  color: #fff;
+  padding: 0 4px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.blk-ocr:hover .tag { display: block; }
+
 /* 丢弃块（页眉/页脚/页码/侧栏）：原卷有、解析器判为家具的内容 */
 .blk-discarded {
   border: 1.5px dotted rgba(43, 42, 38, 0.45);

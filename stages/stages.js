@@ -294,6 +294,7 @@ function renderRaw(p) {
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
+  ocrFillInto(c, p, CANVAS_W); // 阶段 1 也呈现 OCR 候选补全（先画，标记后画才盖得住）
   uncoveredInto(c, p, CANVAS_W); // 阶段 1 也标出解析遗漏（Task 16）
   return c;
 }
@@ -301,6 +302,30 @@ function renderRaw(p) {
 const DISCARDED_LABEL = {
   header: "页眉", footer: "页脚", page_number: "页码", aside_text: "侧栏",
 };
+
+/**
+ * OCR 候选补全（`scripts/ocr-fill.ts` 的产物，**显式步骤**，不进 `npm run check`）：
+ * 对「引擎为空」的解析遗漏区域，用 PaddleOCR-VL 读原卷裁图得到的**候选**文本，**原位**渲染。
+ *
+ * 为什么必须原位渲染：不渲染的话右侧重建就永远缺这一行 —— 那正是「对比之后的明显问题」。
+ * 为什么不静默替换引擎文本：**OCR 会错字**（实测 `D 当口将` ← 原卷 `D. 当只将`），
+ * 所以引擎文本一个字都不动，候选只以**青绿虚线框**呈现（角标默认隐藏、悬停才出，
+ * 避免「标记盖住正文」），悬停可见宽度比、原卷裁图路径与 OCR 原始输出（可核对）。
+ */
+function ocrFillInto(c, p, canvasW = CANVAS_W) {
+  const items = (p.ocrFill ?? []).filter((x) => x.accepted);
+  if (!items.length) return;
+  const baseFont = baseFontOfPage(p.blocks, p.width, canvasW);
+  for (const it of items) {
+    const node = posStyle(el("div", "blk blk-ocr"), it.win ?? it.bbox, p.width, p.height);
+    node.title = `OCR 候选补全（非引擎文本，请核对）\n宽度比 ${it.ratio}（窗口宽 / 当量宽，≈1 为合理）\n原卷裁图：${it.crop}\nOCR 原始输出：${it.raw}`;
+    const txt = el("span", "txt");
+    txt.textContent = it.text;
+    txt.style.fontSize = `${baseFont}px`;
+    node.append(txt, el("span", "tag", "OCR 候选"));
+    c.append(node);
+  }
+}
 
 /**
  * 未覆盖墨迹（Task 16；修复轮 1 分级 + 聚合 + 不遮正文）：
@@ -315,7 +340,12 @@ const DISCARDED_LABEL = {
 function uncoveredInto(c, p, canvasW = CANVAS_W) {
   const all = p.uncovered ?? [];
   if (!all.length) return;
-  const content = all.filter((r) => r.kind !== "furniture");
+  // 已被 OCR 候选补全覆盖的区域：不再画洋红框（否则会盖住候选文本），
+  // 改由 ocrFillInto 的青绿候选块表达「这里原本缺、现已补上候选」。
+  const filled = (p.ocrFill ?? []).filter((x) => x.accepted).map((x) => x.bbox);
+  const isFilled = (r) =>
+    filled.some((f) => r[0] < f[2] && r[2] > f[0] && r[1] < f[3] && r[3] > f[1]);
+  const content = all.filter((r) => r.kind !== "furniture" && !isFilled(r.bbox));
   const furniture = all.filter((r) => r.kind === "furniture");
 
   // 家具级：灰色细虚线框 + title（不挂可见标签）
@@ -432,6 +462,7 @@ function renderSeg(p) {
       c.append(chip);
     }
   }
+  ocrFillInto(c, p, CANVAS_W); // 阶段 3 也呈现 OCR 候选补全
   uncoveredInto(c, p, CANVAS_W); // 阶段 3 也标出解析遗漏（Task 16）
   return c;
 }
@@ -635,6 +666,7 @@ function renderCompare(p) {
     chip.addEventListener("click", () => showDetail(q, p));
     c.append(chip);
   });
+  ocrFillInto(c, p, paneW); // 对比模式：先画 OCR 候选补全
   uncoveredInto(c, p, paneW); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
   right.append(c);
 

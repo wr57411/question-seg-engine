@@ -122,6 +122,7 @@ test("contentRectOf：取全部行级块的并集；无块时退化为整页", (
     order: [0, 1],
     questions: [],
     uncovered: [],
+    ocrFill: [],
   };
   assert.deepEqual(contentRectOf(page), [40, 72, 540, 300]);
   assert.deepEqual(contentRectOf({ ...page, blocks: [] }), [0, 0, 596, 824]);

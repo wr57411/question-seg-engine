@@ -8,7 +8,7 @@
  * 运行：npm run stages:export [-- <docId> <layoutPath>]
  * 默认：docId = 23必刷题 2相互作用，layout = data/smoke/unpacked/layout.json
  */
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -127,6 +127,32 @@ export interface StagePage {
    * 空数组 = 无发现；旧快照或未跑墨迹分析时也缺省为空。**仅新增字段，不改既有字段语义。**
    */
   uncovered: UncoveredRegion[];
+  /**
+   * OCR 候选补全（`scripts/ocr-fill.ts` 的产物，**显式步骤**，不进 `npm run check`）。
+   * 针对「引擎为空」的解析遗漏区域，用 PaddleOCR-VL 读原卷裁图得到的**候选**文本。
+   * ⚠️ OCR 会错字（实测），故一律带 `source` 与 `crop`（原卷裁图证据），
+   * 展示层以**候选**样式渲染，绝不静默替换引擎文本（G1）。
+   * 缺失 `ocr-fill.json` 时为空数组。**仅新增字段，不改既有字段语义。**
+   */
+  ocrFill: OcrFillItem[];
+}
+
+/** OCR 候选补全的一条（见 StagePage.ocrFill）。 */
+export interface OcrFillItem {
+  /** 该区域（碎片）在原卷上的位置（PDF 点） */
+  bbox: BBox;
+  /** 渲染用位置：裁图窗口（= 整行范围）。OCR 读整行，放碎片位置会右移。 */
+  win: BBox;
+  /** 清洗后的候选文本 */
+  text: string;
+  /** OCR 原始输出（留证） */
+  raw: string;
+  /** 原卷裁图路径（相对项目根，G4 证据） */
+  crop: string;
+  /** 窗口宽 / (当量 em × 字号)，用于合理性判据 */
+  ratio: number;
+  accepted: boolean;
+  reason?: string;
 }
 
 export interface StageSnapshot {
@@ -290,6 +316,7 @@ export function buildStageSnapshot(
       order: layout.ordered.map((e) => e.index),
       questions: questionsByPage.get(page.index) ?? [],
       uncovered: uncoveredPages[p] ?? [],
+      ocrFill: [],
     };
   });
   return {
@@ -668,6 +695,24 @@ function main(): void {
 
   const outDir = join("data", "out", docId);
   mkdirSync(outDir, { recursive: true });
+
+  // OCR 候选补全（scripts/ocr-fill.ts 的产物）：**仅新增字段**，缺失时保持空数组。
+  // 与快照解耦：重导快照不丢产物，重跑 OCR 也不碰其它字段。
+  const ocrFillPath = join(outDir, "ocr-fill.json");
+  if (existsSync(ocrFillPath)) {
+    try {
+      const of = JSON.parse(readFileSync(ocrFillPath, "utf8")) as {
+        pages?: { page: number; items: OcrFillItem[] }[];
+      };
+      const byPage = new Map<number, OcrFillItem[]>();
+      for (const pg of of.pages ?? []) byPage.set(pg.page, pg.items ?? []);
+      for (const pg of snapshot.pages) pg.ocrFill = byPage.get(pg.index) ?? [];
+      const n = [...byPage.values()].reduce((acc, a) => acc + a.filter((x) => x.accepted).length, 0);
+      console.log(`  OCR 候选补全：${n} 条通过判据（${ocrFillPath}）`);
+    } catch (e) {
+      console.log(`  ocr-fill.json 读取失败，跳过候选补全：${String(e).slice(0, 80)}`);
+    }
+  }
   // questions.json 与 stages.json 同源重生成：viewer 与 stages 消费同一份引擎产物，
   // 避免算法修复后两个展示层各说各话
   writeFileSync(join(outDir, "questions.json"), JSON.stringify(result.questions, null, 2));
