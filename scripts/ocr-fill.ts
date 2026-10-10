@@ -37,6 +37,9 @@ const DPI = 300;
 const LINE_PAD_Y = 3;
 /** 横向外扩（pt）：给 OCR 一点上下文，但不吞掉相邻内容（如紧邻的分式块）。 */
 const PAD_X = 8;
+/** 窗口下限（pt）：只挡真正的退化窗口，不要拿它当「小内容不重要」的过滤（见下）。 */
+const MIN_WIN_W = 12;
+const MIN_WIN_H = 5;
 /** 宽度合理性：恢复文本的当量宽 / 窗口宽，落在此区间外视为不可信。 */
 const RATIO_MIN = 0.45;
 const RATIO_MAX = 1.9;
@@ -150,7 +153,7 @@ class OcrMcp {
 
   private nextId = 100;
 
-  async ocr(pngBase64: string, timeoutMs = 240_000): Promise<string> {
+  async ocr(pngBase64: string, timeoutMs = 300_000): Promise<string> {
     const id = ++this.nextId;
     this.send({
       jsonrpc: "2.0", id, method: "tools/call",
@@ -257,8 +260,11 @@ for (const [i, t] of todo.entries()) {
   const holes = (p.blocks ?? []).filter((b: any) => b.kind === "image").map((b: any) => b.bbox as Box);
   win = clipAway(win, holes) ?? win;
 
-  if (win[2] - win[0] < 24 || win[3] - win[1] < 5) {
-    console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 窗口过小，跳过`);
+  // 下限只用来挡「真正的退化窗口」（宽 < 12pt 或高 < 5pt）。
+  // ⚠️ 原为 24pt —— 实测它把**插图子图标签 A/B/C/D**（5–7 × 6–9pt）全挡掉了，
+  // 而我一直把这些跳过当成「小标点」没去看（2026-10-10 连续第三次同类错误）。
+  if (win[2] - win[0] < MIN_WIN_W || win[3] - win[1] < MIN_WIN_H) {
+    console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 窗口退化（${(win[2] - win[0]).toFixed(0)}x${(win[3] - win[1]).toFixed(0)}pt），跳过`);
     continue;
   }
 
@@ -284,14 +290,21 @@ for (const [i, t] of todo.entries()) {
     continue;
   }
 
-  // ④ OCR
+  // ④ OCR。⚠️ **空结果要重试** —— 实测同样是 22×11pt 的小裁剪，`分力` 要 222s、`重力` 要 70s，
+  // 全量跑时前者撞上单次超时返回空，被误判成「读不出来」。这不是内容不可读，是服务端对小图很慢。
   const t0 = Date.now();
   let raw = "";
-  try {
-    raw = await mcp.ocr(readFileSync(cropRel).toString("base64"));
-  } catch (e) {
-    console.log(`[${i + 1}/${todo.length}] p${t.page + 1} OCR 失败: ${String(e).slice(0, 80)}`);
-    continue;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      raw = await mcp.ocr(readFileSync(cropRel).toString("base64"));
+    } catch (e) {
+      console.log(`[${i + 1}/${todo.length}] p${t.page + 1} OCR 第${attempt}次异常: ${String(e).slice(0, 60)}`);
+    }
+    if (raw.trim()) break;
+    if (attempt === 1) console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 空结果，重试一次…`);
+  }
+  if (!raw.trim()) {
+    console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 两次均为空，记未通过`);
   }
   const text = cleanOcr(raw);
   // ⚠️ emWidthOf 返回的是**当量 em 数**（不是 pt）。要跟窗口宽（pt）比，必须乘字号。
