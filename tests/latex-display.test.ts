@@ -252,3 +252,24 @@ test("接入渲染管线：prettifyLatex 对空括号补间距、(多选) 不被
   // 空括号与选项分隔互不干扰（选项分隔照旧在 A./B. 前补 EM SPACE）
   assert.equal(prettifyLatex("正确的是()A.甲B.乙"), "正确的是(\u2003\u2003)\u2003A.甲\u2003B.乙");
 });
+
+/* ── `~` 的两种含义必须分开（2026-10-10 修复）────────────────────────
+ * LaTeX 段内 `~` 是不换行空格（10~\mathrm{kg} → 10 kg）；
+ * 段外 `~` 是原卷的**区间号**（页眉 `必刷知识T1~2、4~5`）。
+ * 旧实现末尾做全局 `replace(/~/g," ")`，把区间号也换成空格 → 区间语义被抹掉。
+ * 原卷页眉 400dpi 裁图可见明显的 `~`（data/out/_diff/hdr-p1-01.png）。 */
+const stripTags = (s: string) => s.replace(/<[^>]*>/g, "");
+
+test("prettifyLatex：段外 `~` 是区间号，必须保留", () => {
+  assert.equal(stripTags(prettifyLatex("必刷知识T1~2、4~5、7~8、10、12")), "必刷知识T1~2、4~5、7~8、10、12");
+  assert.equal(stripTags(prettifyLatex("必刷知识T1~2 必刷考点T3~5")), "必刷知识T1~2 必刷考点T3~5");
+});
+
+test("prettifyLatex：LaTeX 段内 `~` 是不换行空格，还原为空格", () => {
+  assert.equal(stripTags(prettifyLatex("$10~\\mathrm{kg}$")), "10 kg");
+  assert.equal(stripTags(prettifyLatex("质量为$m _ { A } = 1 0 ~ \\mathrm { k g }$的物块")), "质量为mA=10 kg的物块");
+});
+
+test("prettifyLatex：同一块内既有公式又有区间号时，两者各按各的规则", () => {
+  assert.equal(stripTags(prettifyLatex("必刷考点T3~5 与 $2~\\mathrm{N}$ 的力")), "必刷考点T3~5 与 2 N 的力");
+});

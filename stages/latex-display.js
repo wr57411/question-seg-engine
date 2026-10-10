@@ -332,7 +332,8 @@ export function collapseImmediateRepeat(text) {
  * - $...$ 段内按 LaTeX 子集渲染成 HTML；段外文本原样保留（仅转义）；
  * - 无 $ 但含 LaTeX 的整块（裸公式块）也按公式渲染；
  * - 不成对的 $ 视为噪声字符去掉（避免源码漏出）；
- * - LaTeX 不换行空格 "~" 还原为普通空格（10~kg → 10 kg）；
+ * - LaTeX 段内的不换行空格 "~" 还原为普通空格（`10~\mathrm{kg}` → `10 kg`）；
+ *   **段外的 "~" 保留**——那是原卷的区间号（页眉 `T1~2`），换掉会抹掉区间语义；
  * - 空括号补间距（spaceEmptyParens）：恢复原卷 `（　　）` 的作答空隙。
  *
  * ⚠️ 不要动段外文本的空格：原卷的数学排版本身就有空格（原卷第 4 页第 1 题实测
@@ -344,7 +345,7 @@ export function prettifyLatex(text) {
   text = collapseImmediateRepeat(text);
   let out = "";
   if (!text.includes("$")) {
-    out = LOOKS_LATEX.test(text) ? desugar(text) : escapeHtml(text);
+    out = LOOKS_LATEX.test(text) ? desugar(text).replace(/~/g, " ") : escapeHtml(text);
   } else {
     let i = 0;
     let inFormula = false;
@@ -353,11 +354,17 @@ export function prettifyLatex(text) {
       if (ch === "$") { inFormula = !inFormula; i++; continue; }
       let j = text.indexOf("$", i);
       if (j === -1) j = text.length;
-      out += inFormula ? desugar(text.slice(i, j)) : escapeHtml(text.slice(i, j));
+      // ⚠️ `~` 有**两种含义**，必须分开处理（2026-10-10 实测修复）：
+      //   - LaTeX 段内：不换行空格（`10~\mathrm{kg}` → `10 kg`）→ 换空格；
+      //   - 段外：原卷的**区间号**（页眉 `T1~2、4~5、7~8`）→ **必须保留**。
+      // 原先在末尾对整串做全局 `replace(/~/g," ")`，把页眉的区间号也换成了空格
+      // （`T1~2` → `T1 2`）→ **区间语义被抹掉**。原卷页眉 400dpi 裁图可见明显的 `~`
+      // （data/out/_diff/hdr-p1-01.png），故此处按段区分。
+      out += inFormula ? desugar(text.slice(i, j)).replace(/~/g, " ") : escapeHtml(text.slice(i, j));
       i = j;
     }
   }
-  return spaceEmptyParens(separateOptionMarks(out.replace(/~/g, " ")));
+  return spaceEmptyParens(separateOptionMarks(out));
 }
 
 /**
