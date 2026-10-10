@@ -335,6 +335,25 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   background: rgba(43, 42, 38, 0.04);
   color: #8a8477;
 }
+/* 丢弃块的类型标签：**默认不显示**，悬停该块才浮出。
+ * 2026-10-10 实测：页眉的丢弃块又小又密，标签（无样式时是行内文字、随 nowrap 外溢）
+ * 会互相堆叠并压住页眉文字（「刷基础」「计划用时」「必刷知识T1~2」与标题，每页 3–4 处
+ * 约 550px²），而左栏页眉是干净的 → 左右对比一眼可见的噪声。
+ * 「解析器判为家具」由 dotted 边框 + 图例表达，具体类型（页眉/页脚/页码/侧栏）由悬停标签与 title 承载。 */
+.blk-discarded .tag {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 7;
+  font-size: 9px;
+  line-height: 1.4;
+  background: rgba(43, 42, 38, 0.72);
+  color: #fff;
+  padding: 0 4px;
+  pointer-events: none;
+}
+.blk-discarded:hover .tag { display: block; }
 .qa-row.noise { border-left-color: #a58a3a; cursor: pointer; }
 .noise-latex {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
