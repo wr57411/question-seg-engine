@@ -23,6 +23,9 @@ const MIME: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".webp": "image/webp",
   ".woff2": "font/woff2",
+  // 原卷 PDF：缺这条会被当成 application/octet-stream → 浏览器下载/空白页，
+  // 而不是内嵌显示（「对照原卷本页」链接因此点了等于没点）。
+  ".pdf": "application/pdf",
 };
 
 const server = createServer(async (req, res) => {

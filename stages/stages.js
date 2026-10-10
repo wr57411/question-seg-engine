@@ -582,7 +582,14 @@ function renderFinal() {
 function renderCompare(p) {
   const row = el("div", "compare-wrap");
 
+  // 栏宽按**可用宽度**算，不写死 460：写死 + flex-wrap 会在窄窗口折行堆叠，
+  // 表现为「并排没了」。paneW 同时是字号换算口径（F10/R2：对比栏必须是真实栏宽）。
+  const GAP = 14;
+  const avail = ($("canvas-wrap").clientWidth || 940) - 2;
+  const paneW = Math.max(180, Math.min(560, Math.floor((avail - GAP) / 2)));
+
   const left = el("div", "compare-pane");
+  left.style.width = `${paneW}px`;
   left.append(el("p", "pane-title", "原卷"));
   if ((state.data.originPages ?? 0) >= state.data.pages.length && state.data.pages.length > 0) {
     const pad = String(state.data.pages.length).length;
@@ -598,13 +605,13 @@ function renderCompare(p) {
   }
 
   const right = el("div", "compare-pane");
+  right.style.width = `${paneW}px`;
   right.append(el("p", "pane-title", "成品（结构化数据按原坐标重建，非原图）"));
   const c = paperCanvas(p);
   c.style.width = "100%";
-  const PANE_W = 460; // 与 CSS .compare-pane 一致，用于字号换算
-  renderDiscardedInto(c, p, PANE_W); // 对比栏宽口径：丢弃块也必须用 PANE_W（R2）
-  const baseFont = baseFontOfPage(p.blocks, p.width, PANE_W);
-  appendBlockNodes(c, p, PANE_W, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
+  renderDiscardedInto(c, p, paneW); // 对比栏宽口径：丢弃块也必须用 paneW（R2）
+  const baseFont = baseFontOfPage(p.blocks, p.width, paneW);
+  appendBlockNodes(c, p, paneW, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
   for (const q of p.questions) {
     const first = q.blocks.map((i) => p.blocks[i]).find(Boolean);
     if (!first) continue;
@@ -616,7 +623,7 @@ function renderCompare(p) {
     chip.addEventListener("click", () => showDetail(q, p));
     c.append(chip);
   }
-  uncoveredInto(c, p, PANE_W); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
+  uncoveredInto(c, p, paneW); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
   right.append(c);
 
   row.append(left, right);
@@ -695,5 +702,13 @@ function legend(items) {
   }
   return l;
 }
+
+/* 对比模式的栏宽随窗口变化 → 防抖重渲染，保证「永远并排」且字号换算口径与真实栏宽同步。 */
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  if (state.stage !== 6 || !state.data) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 150);
+});
 
 load();

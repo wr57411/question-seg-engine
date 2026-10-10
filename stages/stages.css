@@ -347,14 +347,17 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 }
 
 /* ── 对比模式：原卷 | 结构化重建纸面 并排 ─────────────── */
+/* 关键：**不换行**。此前 `flex-wrap: wrap` + 两栏写死 460px，窗口窄于 ~934px 时
+ * 会折行堆成「原卷在上、重建在下」——看起来就像并排功能消失了（实际还在）。
+ * 现在栏宽由 renderCompare 按可用宽度算（paneW 同时是字号换算口径 canvasW，见 F10/R2），
+ * 两栏永远并排、整体等比缩放。 */
 .compare-wrap {
   display: flex;
   gap: 14px;
   justify-content: center;
   align-items: flex-start;
-  flex-wrap: wrap;
 }
-.compare-pane { width: 460px; max-width: 100%; }
+.compare-pane { flex: 0 0 auto; min-width: 0; }
 .compare-pane .pane-title {
   text-align: center;
   font-family: var(--serif);
