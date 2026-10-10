@@ -57,11 +57,13 @@ test("对比模式口径锁：460 单栏（PANE_W）换算回 pt 仍 ≈ 11.33�
   approx(fontFromLineHeight((11 * PANE_W) / PAGE_W) / (PANE_W / PAGE_W), 11.33, 0.1);
 });
 
-test("emWidthOf：全角 1.0 / ASCII 字母数字 0.5 / 空格 0.25 / 标点 0.3 / \\n\\t 0", () => {
+test("emWidthOf：全角 1.0 / ASCII 逐字实测 advance / 控制字符 0", () => {
   assert.equal(emWidthOf("重力"), 2); // 2 个全角字
-  assert.equal(emWidthOf("A.0.20"), 2.6); // 0.5+0.3+0.5+0.3+0.5+0.5
+  // ASCII 用**实测** advance（Songti SC 100px，见 data/out/probe-adv2.html），不再一律 0.5：
+  // A=0.679 . =0.219 0=0.469 . =0.219 2=0.469 0=0.469 → 2.524
+  assert.equal(emWidthOf("A.0.20"), 2.524);
   assert.equal(emWidthOf(""), 0);
-  assert.equal(emWidthOf("a b\n"), 0.5 + 0.25 + 0.5); // 换行 0
+  assert.equal(emWidthOf("a b\n"), 0.504 + 0.25 + 0.521); // 换行 0；a/b 为实测值
 });
 
 test("baseFontOfPage：排除 \\frac 块，取正文块行高中位 → 推得的字号", () => {
@@ -203,9 +205,9 @@ test("clampByWidth：会横向溢出的块被夹到 bboxW_px / emWidthOf（纯 C
 });
 
 test("clampByWidth：含 ASCII 的块按同一 emWidthOf 夹（与字号保真度节同源度量）", () => {
-  // bbox 宽 100pt → 127.5px；"A.0.20" em = 0.5+0.3+0.5+0.3+0.5+0.5 = 2.6 → 上限 49.04px
+  // bbox 宽 100pt → 127.5px；"A.0.20" 实测 em = 2.524 → 上限 50.52px
   const b = { kind: "text", text: "A.0.20", bbox: [0, 0, 100, 15] };
-  approx(clampByWidth(80, b, PAGE_W, CANVAS_W), 127.5 / 2.6, 0.01);
+  approx(clampByWidth(80, b, PAGE_W, CANVAS_W), 127.5 / 2.524, 0.01);
 });
 
 test("clampByWidth：竖排块（R4）与无文本块原样返回（横向宽度非约束）", () => {
@@ -246,7 +248,7 @@ test("clampByWidth：豁免只针对**二维构造**（\\frac/\\sqrt），其余
   approx(clampByWidth(20, cjk, PAGE_W, CANVAS_W), 15.3, 0.1); // 5 字 → 76.5/5 = 15.3
   // 含 ASCII 但无公式源码的块同样仍被夹（不受豁免影响）
   const ascii = { kind: "text", text: "A.0.20", bbox: [0, 0, 100, 15] };
-  approx(clampByWidth(80, ascii, PAGE_W, CANVAS_W), 127.5 / 2.6, 0.01);
+  approx(clampByWidth(80, ascii, PAGE_W, CANVAS_W), 127.5 / 2.524, 0.01); // 实测 em = 2.524
 });
 
 // ── Task 13：两估计量交叉验证（reconcileFont）—— 修 p10[18] 的 2 倍字号 ──────────────
@@ -350,20 +352,20 @@ test("renderedTextOf：stripTags(prettifyLatex(text)) —— 源码 → 真正�
   assert.equal(renderedTextOf("重力弹力"), "重力弹力"); // 纯 CJK 原样
   // 展示层变换会改变当量宽（都是原卷就有的）：空括号补 2 个 EM SPACE；即时重复前缀折叠
   assert.equal(renderedTextOf("确的是()"), "确的是(\u2003\u2003)");
-  assert.equal(emWidthOf(renderedTextOf("确的是()")), 5.6); // 3 + 0.3 + 1.0 + 1.0 + 0.3
+  assert.equal(emWidthOf(renderedTextOf("确的是()")), 5.584); // 3 + 0.292 + 1.0 + 1.0 + 0.292（实测 ( ) = 0.292）
   assert.equal(renderedTextOf("列关系式正确的是列关系式正确的是"), "列关系式正确的是"); // 折叠一份
 });
 
 test("clampByWidth：Task 14 收窄 —— 非二维的 LaTeX 块（$F_{1}$ / $\\angle AOB$）**不再豁免**", () => {
-  // $F_{1}$ 渲染为 "F1"（em=1.0）；bbox 宽 20pt → 25.50px → 上限 25.50（此前全豁免、原样返回 40）
+  // $F_{1}$ 渲染为 "F1"（实测 em = F 0.566 + 1 0.469 = 1.035）；bbox 宽 20pt → 25.51px → 上限 24.64
   const sub = { kind: "text", text: "$F_{1}$", bbox: [0, 0, 20, 15] };
-  approx(clampByWidth(40, sub, PAGE_W, CANVAS_W), 25.50, 0.01);
+  approx(clampByWidth(40, sub, PAGE_W, CANVAS_W), 24.64, 0.02);
   assert.ok(clampByWidth(40, sub, PAGE_W, CANVAS_W) < 40, "已参与夹子（不再豁免）");
-  // $\angle AOB$ 渲染为 "∠AOB"（em=2.5）；bbox 宽 60pt → 76.51px → 上限 30.60
+  // $\angle AOB$ 渲染为 "∠AOB"（实测 em = 1.0 + A 0.679 + O 0.780 + B 0.618 = 3.077）；bbox 60pt → 上限 24.87
   const angle = { kind: "text", text: "$\\angle AOB$", bbox: [0, 0, 60, 15] };
-  approx(clampByWidth(40, angle, PAGE_W, CANVAS_W), 30.60, 0.02);
-  // 对照：若按**源码**当量宽（5.15）会夹到 14.86 —— 正是 C1 过夹（Task 14 后不再发生）
-  approx(((60 / PAGE_W) * CANVAS_W) / emWidthOf("$\\angle AOB$"), 14.86, 0.02);
+  approx(clampByWidth(40, angle, PAGE_W, CANVAS_W), 24.87, 0.02);
+  // 对照：若按**源码**当量宽（5.931）会夹到 12.90 —— 正是 C1 过夹（Task 14 后不再发生）
+  approx(((60 / PAGE_W) * CANVAS_W) / emWidthOf("$\\angle AOB$"), 12.90, 0.02);
   // 旧 bbox 宽 60pt 下 $F_{1}$ 渲染文本很窄（em=1.0）→ 不触发夹子（与 Task 7 时的观察值 8.74 一致）
   assert.equal(clampByWidth(8.74, { kind: "text", text: "$F_{1}$", bbox: [0, 0, 60, 15] }, PAGE_W, CANVAS_W), 8.74);
 });
