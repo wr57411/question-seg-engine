@@ -6,6 +6,7 @@
  */
 import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
+import { fetch as ufetch, ProxyAgent } from "undici";
 import { MineruClient } from "../src/mineru/client.js";
 import { unpackResult } from "../src/mineru/unpack.js";
 import { segmentFromContentList, segmentFromLayout, summarize } from "../src/index.js";
@@ -36,7 +37,16 @@ if (files.length === 0) {
 async function main() {
   // KEY!：模块顶层 `if (!KEY) process.exit(2)` 已保证非空；tsc 7 不把顶层窄化
   // 传入 main() 闭包，故在此用非空断言（运行时守卫不变）。
-  const client = new MineruClient({ baseUrl: "https://mineru.net/api/v4", apiKey: KEY! });
+  // ⚠️ 沙箱里的进程**不走 Clash 的 TUN**，唯一出口是 Clash 的 HTTP 代理口；
+  // 且 node 内置 fetch 不认 HTTP(S)_PROXY、给它外部 undici 的 ProxyAgent 会 UND_ERR_INVALID_ARG。
+  // ⇒ 用 undici 自己的 fetch + dispatcher，代理地址由 MINERU_PROXY 显式给出（不设则直连）。
+  const PROXY = process.env.MINERU_PROXY;
+  const transport = PROXY
+    ? ((url: any, init: any = {}) =>
+        ufetch(url, { ...init, dispatcher: new ProxyAgent(PROXY) })) as unknown as typeof fetch
+    : undefined;
+  if (PROXY) console.log(`[0/5] MinerU 走代理 ${PROXY}`);
+  const client = new MineruClient({ baseUrl: "https://mineru.net/api/v4", apiKey: KEY! }, transport);
   for (const file of files) {
     const docId = basename(file).replace(/\.[^.]+$/, "");
     console.log(`[1/5] 上传 ${basename(file)}`);
