@@ -391,7 +391,12 @@ export const INK_MIN_AREA_PX = 40;
  *   页眉 logo+横线区域 ~0.09、栏间竖线 ~1.0 —— 密度把「实心 logo」与「稀疏横线」推向
  *   两端，无单侧阈值可用；且粗体标题密度接近 logo，会误伤真内容 ⇒ 不引入该信号。 */
 export const UNCOVERED_RULE_MIN_ASPECT = 12;
-export const UNCOVERED_RULE_MAX_SHORT_PT = 4;
+// ⚠️ 2026-10-11：原为 4 —— 实测 p5 有块 80×4pt 的「被切薄的正文行」
+//（`静止时，下列说法正确的是（ ）` 只露出 4pt 高）被这条规则判成家具级，
+// 于是**内容级清单里没有它、界面上也没有洋红标记**，用户看不到「这里缺了内容」。
+// 真正的栏间/页边细线是 1–2pt；4pt 已是字形碎片的高度。⇒ 收到 2.5。
+// 方向依据：误判成内容级=保守提示（人看一眼），误判成家具级=**静默丢内容**，代价不对称。
+export const UNCOVERED_RULE_MAX_SHORT_PT = 2.5;
 export const UNCOVERED_CONTENT_OVERLAP_MIN = 0.5;
 export const UNCOVERED_HEADER_BAND_FRAC = 0.15;
 export const UNCOVERED_FOOTER_BAND_FRAC = 0.06;
