@@ -37,9 +37,17 @@ const DPI = 300;
 const LINE_PAD_Y = 3;
 /** 横向外扩（pt）：给 OCR 一点上下文，但不吞掉相邻内容（如紧邻的分式块）。 */
 const PAD_X = 8;
-/** 窗口下限（pt）：只挡真正的退化窗口，不要拿它当「小内容不重要」的过滤（见下）。 */
-const MIN_WIN_W = 12;
-const MIN_WIN_H = 5;
+/**
+ * 窗口下限（pt）：**低于此值不去尝试**。
+ *
+ * ⚠️ 这不是「小内容不重要」的过滤，而是**防幻觉**：
+ * 实测 5–7pt 的插图子图标签（A/B/C/D），小裁剪返回**空**，连插图一起裁则**幻觉出假字**
+ * （`日去而师形日`，原卷只是 `A`）。而宽度比判据**抓不住幻觉**（该例比值 0.63，落在合格区间内）。
+ * ⇒ 宁可在界面上留一个可见的「解析遗漏」，也不收一个看起来合格的假字。
+ * 22×11pt 的「分力」这类真实两字内容仍在阈值之上，照常处理。
+ */
+const MIN_WIN_W = 16;
+const MIN_WIN_H = 6;
 /** 宽度合理性：恢复文本的当量宽 / 窗口宽，落在此区间外视为不可信。 */
 const RATIO_MIN = 0.45;
 const RATIO_MAX = 1.9;
@@ -268,54 +276,64 @@ for (const [i, t] of todo.entries()) {
     continue;
   }
 
-  // ③ 裁图（G4 证据落盘）。⚠️ pdftoppm 会自动加 `-NN` 页码后缀，必须按实际产物改名。
-  const cropRel = join(CROP_DIR, `p${String(t.page + 1).padStart(2, "0")}-${i + 1}.png`);
-  const prefix = cropRel.replace(/\.png$/, "");
-  const s = DPI / 72;
-  try {
-    execFileSync("pdftoppm", [
-      "-r", String(DPI), "-f", String(t.page + 1), "-l", String(t.page + 1), "-png",
-      "-x", String(Math.round(win[0] * s)), "-y", String(Math.round(win[1] * s)),
-      "-W", String(Math.round((win[2] - win[0]) * s)), "-H", String(Math.round((win[3] - win[1]) * s)),
-      PDF, prefix,
-    ], { stdio: "ignore" });
-    const produced = readdirSync(CROP_DIR)
-      .filter((f) => f.startsWith(`${prefix.split("/").pop()!}-`) && f.endsWith(".png"))
-      .sort()
-      .pop();
-    if (!produced) throw new Error("no output");
-    renameSync(join(CROP_DIR, produced), cropRel);
-  } catch {
-    console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 裁图失败`);
-    continue;
-  }
-
-  // ④ OCR。⚠️ **空结果要重试** —— 实测同样是 22×11pt 的小裁剪，`分力` 要 222s、`重力` 要 70s，
-  // 全量跑时前者撞上单次超时返回空，被误判成「读不出来」。这不是内容不可读，是服务端对小图很慢。
+  // ③+④ 裁图 → OCR。**最多两轮**，第二轮换「窗口尺寸 + DPI」得到不同的图，
+  // 既绕开服务端缓存（实测：同一张图第二次请求会被缓存，空结果也会被缓存），
+  // 又给小图更大像素（5–7pt 的插图子图标签在 300dpi 下只有 ~25×30px，OCR 读不出）。
   const t0 = Date.now();
   let raw = "";
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  let usedWin = win;
+  let usedDpi = 0;
+  for (let attempt = 1; attempt <= 2 && !raw.trim(); attempt++) {
+    // 第二轮：窗口四边各扩 4pt（内容不变，但字节不同 → 不走缓存）
+    usedWin = attempt === 1 ? win : [
+      Math.max(0, win[0] - 4), Math.max(0, win[1] - 2),
+      Math.min(p.width, win[2] + 4), win[3] + 2,
+    ];
+    // 小区域提 DPI：窗口窄于 40pt 时用 600dpi
+    usedDpi = usedWin[2] - usedWin[0] < 40 ? DPI * 2 : DPI;
+    const cropRel = join(CROP_DIR, `p${String(t.page + 1).padStart(2, "0")}-${i + 1}.png`);
+    const prefix = cropRel.replace(/\.png$/, "");
+    const sc = usedDpi / 72;
+    try {
+      execFileSync("pdftoppm", [
+        "-r", String(usedDpi), "-f", String(t.page + 1), "-l", String(t.page + 1), "-png",
+        "-x", String(Math.round(usedWin[0] * sc)), "-y", String(Math.round(usedWin[1] * sc)),
+        "-W", String(Math.round((usedWin[2] - usedWin[0]) * sc)),
+        "-H", String(Math.round((usedWin[3] - usedWin[1]) * sc)),
+        PDF, prefix,
+      ], { stdio: "ignore" });
+      // ⚠️ pdftoppm 会自动加 `-NN` 页码后缀，按实际产物改名
+      const produced = readdirSync(CROP_DIR)
+        .filter((f) => f.startsWith(`${prefix.split("/").pop()!}-`) && f.endsWith(".png"))
+        .sort()
+        .pop();
+      if (!produced) throw new Error("no output");
+      renameSync(join(CROP_DIR, produced), cropRel);
+    } catch {
+      console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 第${attempt}轮裁图失败`);
+      continue;
+    }
     try {
       raw = await mcp.ocr(readFileSync(cropRel).toString("base64"));
     } catch (e) {
-      console.log(`[${i + 1}/${todo.length}] p${t.page + 1} OCR 第${attempt}次异常: ${String(e).slice(0, 60)}`);
+      console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 第${attempt}轮 OCR 异常: ${String(e).slice(0, 60)}`);
     }
-    if (raw.trim()) break;
-    if (attempt === 1) console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 空结果，重试一次…`);
+    if (!raw.trim() && attempt === 1) {
+      console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 第1轮空（${usedDpi}dpi），换尺寸/DPI 重试…`);
+    }
   }
-  if (!raw.trim()) {
-    console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 两次均为空，记未通过`);
-  }
+  if (!raw.trim()) console.log(`[${i + 1}/${todo.length}] p${t.page + 1} 两轮均为空，记未通过`);
+  const cropRel = join(CROP_DIR, `p${String(t.page + 1).padStart(2, "0")}-${i + 1}.png`);
   const text = cleanOcr(raw);
   // ⚠️ emWidthOf 返回的是**当量 em 数**（不是 pt）。要跟窗口宽（pt）比，必须乘字号。
   // 用本页正文块行高中位当字号（与 baseFontOfPage 同口径）—— 曾漏乘，导致比值恒 ≈12 全判 ✗。
   const fontPt = medianLineHeightPt(p.blocks);
   const emW = emWidthOf(text);
-  const winW = win[2] - win[0];
+  const winW = usedWin[2] - usedWin[0];
   const ratio = emW > 0 && fontPt > 0 ? winW / (emW * fontPt) : 0;
   const ok = text.length > 0 && ratio >= RATIO_MIN && ratio <= RATIO_MAX;
   const item: OcrFillItem = {
-    bbox: t.bbox, win, text, raw: raw.trim(), crop: cropRel, ratio: +ratio.toFixed(2),
+    bbox: t.bbox, win: usedWin, text, raw: raw.trim(), crop: cropRel, ratio: +ratio.toFixed(2),
     accepted: ok, ...(ok ? {} : { reason: text ? `宽度比 ${ratio.toFixed(2)} 越界` : "OCR 无文本" }),
   };
   if (!byPage.has(t.page)) byPage.set(t.page, []);
@@ -323,7 +341,7 @@ for (const [i, t] of todo.entries()) {
   if (ok) accepted++;
   const sec = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(
-    `[${i + 1}/${todo.length}] p${t.page + 1} ${sec}s 比=${ratio.toFixed(2)} ${ok ? "✓" : "✗"} ${JSON.stringify(text.slice(0, 60))}`,
+    `[${i + 1}/${todo.length}] p${t.page + 1} ${sec}s ${usedDpi}dpi 比=${ratio.toFixed(2)} ${ok ? "✓" : "✗"} ${JSON.stringify(text.slice(0, 60))}`,
   );
 }
 mcp.close();
