@@ -256,6 +256,11 @@ function mergeContext(p) {
 /** 追加本页行级块节点（跳过被合并掉的块；返回与 p.blocks 对齐的节点数组，null = 未渲染）。 */
 function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx) {
   const nodes = p.blocks.map((b) => blockNode(b, p, canvasW, baseFont, mergeCtx));
+  // `ocr: true` 的块是**从 OCR 候选补进来的题号行**（上游整行漏识别，见 export-stages 的
+  // injectOcrQuestionLines）⇒ 用青绿候选样式渲染，绝不与引擎原文混淆（G1）。
+  nodes.forEach((n, i) => {
+    if (n && p.blocks[i] && p.blocks[i].ocr) n.classList.add("blk-ocr");
+  });
   for (const n of nodes) if (n) c.append(n);
   return nodes;
 }
@@ -653,27 +658,32 @@ function renderCompare(p) {
   const right = el("div", "compare-pane");
   right.style.width = `${paneW}px`;
   right.append(el("p", "pane-title", "成品（结构化数据按原坐标重建，非原图）"));
-  // ⚠️ **左侧留白（gutter）专供题号牌**（2026-10-12 用户当场指出）。
+  // ⚠️ **留白（gutter）专供题号牌**（2026-10-12 用户当场指出）。
   // 原做法是「页内落位，放不下就不挂」—— 但答案册这种密页（86 块/双栏/小字）
   // 页边距根本放不下号牌，于是**整页几乎一个号牌都不显示**，用户看到的就是「题号没识别出来」。
-  // 现在把内容区收窄 GUTTER px、号牌一律挂在留白里 ⇒ 永远放得下，且**绝不压正文**。
-  const GUTTER = 52;
-  const innerW = Math.max(120, paneW - GUTTER);
+  // 现在把内容区收窄、号牌挂在留白里 ⇒ 永远放得下，且**绝不压正文**。
+  //
+  // ⚠️ **号牌必须挂在「题目所在那一栏」的外侧**：双栏页里右栏的题若把号牌挂到左留白，
+  // 看起来就像标在左栏内容上（2026-10-12 用户当场指出「识别错了」——
+  // 实测第 17 页第 3/4/5/6 题首块 x≈276 属右栏，号牌却全挂在左侧）。
+  const firsts = p.questions.map((q) => q.blocks.map((i) => p.blocks[i]).find(Boolean) ?? null);
+  const mid = p.width / 2;
+  const isRightCol = (b) => (p.columns ?? 1) >= 2 && !!b && (b.bbox[0] + b.bbox[2]) / 2 >= mid;
+  const needsRight = p.questions.some((q, k) => q.startsHere !== false && isRightCol(firsts[k]));
+  const GUTTER = 46;
+  const innerW = Math.max(120, paneW - GUTTER - (needsRight ? GUTTER : 0));
   const c = paperCanvas(p);
   c.style.width = `${innerW}px`;
   renderDiscardedInto(c, p, innerW); // 对比栏宽口径：丢弃块也必须用 innerW（R2）
   const baseFont = baseFontOfPage(p.blocks, p.width, innerW);
-  appendBlockNodes(c, p, paneW, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
-  // 题号牌：**必须走不压正文的落位**。原先挂在题首块左上角，而块 bbox 紧贴墨迹（F1）
-  // → 牌子必然盖住题首 1–3 个字（2026-10-10 DOM 实测 15 页约 90 处、每处 400–750px²，
-  // 肉眼可见）。落位由 uncovered-layout.js 的 chipPlacements 算好（页边距优先，放不下则不挂）。
-  const firsts = p.questions.map((q) => q.blocks.map((i) => p.blocks[i]).find(Boolean) ?? null);
+  appendBlockNodes(c, p, innerW, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
   // ⚠️ 号牌**不能**挂在画布内部：`.canvas` 有 `overflow: hidden`（「画布边界裁切」的既定决策，不改），
-  // 挂在画布左外侧的号牌会被**裁掉**（DOM 里有、位置也对，就是看不见 —— 2026-10-12 实测踩到）。
-  // ⇒ 套一层与画布等宽等高的定位容器，号牌挂在容器上（`right: calc(100% + 4px)` 落在左侧留白里）。
+  // 挂在画布外侧的号牌会被**裁掉**（DOM 里有、位置也对，就是看不见 —— 2026-10-12 实测踩到）。
+  // ⇒ 套一层与画布等宽等高的定位容器，号牌挂在容器上。
   const paperWrap = el("div", "paper-wrap");
   paperWrap.style.position = "relative";
   paperWrap.style.marginLeft = `${GUTTER}px`;
+  if (needsRight) paperWrap.style.marginRight = `${GUTTER}px`;
   paperWrap.append(c);
   p.questions.forEach((q, k) => {
     const f = firsts[k];
@@ -683,14 +693,16 @@ function renderCompare(p) {
     if (q.startsHere === false) return;
     const chip = el("span", "q-chip plain", `第${q.number}题`);
     chip.title = `第${q.number}题（点击看详情）`;
-    chip.style.right = "calc(100% + 4px)";
+    // 按题目所在栏决定挂哪一侧：右栏题挂右留白，其余挂左留白
+    if (isRightCol(f)) chip.style.left = "calc(100% + 4px)";
+    else chip.style.right = "calc(100% + 4px)";
     chip.style.top = `${(f.bbox[1] / p.height) * 100}%`;
     chip.addEventListener("click", () => showDetail(q, p));
     paperWrap.append(chip);
   });
   right.append(paperWrap);
-  ocrFillInto(c, p, paneW); // 对比模式：先画 OCR 候选补全
-  uncoveredInto(c, p, paneW); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
+  ocrFillInto(c, p, innerW); // 对比模式：先画 OCR 候选补全
+  uncoveredInto(c, p, innerW); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
   // 注意：**不要再 right.append(c)** —— c 已经在 paperWrap 里；重复 append 会把它移出容器，
   // 号牌就又回到被 `.canvas{overflow:hidden}` 裁掉的状态。
 

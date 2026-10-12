@@ -35,6 +35,12 @@ export type ParsedBlock =
       lineCount: number;
       /** 块内最大字号，用于大题标题/题号的启发判定 */
       maxFontSize: number;
+      /**
+       * 该块是**从 OCR 候选补进来的**（不是 MinerU 的输出）。
+       * 目前只用于「题号行」：MinerU 会整行漏识别，而 OCR 已读对（见 export-stages 的
+       * `injectOcrQuestionLines`）。展示层以**候选**样式呈现，绝不当作引擎原文（G1）。
+       */
+      fromOcr?: boolean;
     }
   | {
       kind: "image";

@@ -13,7 +13,8 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { segmentFromLayout } from "../src/index.js";
+import { ruleStrategy } from "../src/index.js";
+import { matchFirstLine } from "../src/patterns.js";
 import { normalizeLayout } from "../src/normalize.js";
 import { detectColumnCenters, detectColumns, layoutPage } from "../src/layout.js";
 import { scanFormulaNoise, type FormulaNoiseReport } from "../src/formula.js";
@@ -342,6 +343,7 @@ export function buildStageSnapshot(
         bbox: b.bbox,
         text: clip(b.kind === "image" ? "[图片]" : b.kind === "formula" ? b.latex : b.text, BLOCK_TEXT_LIMIT),
         ...(b.kind === "image" ? { img: b.path } : {}),
+        ...(b.kind === "text" && b.fromOcr ? { ocr: true } : {}),
       })),
       order: layout.ordered.map((e) => e.index),
       questions: questionsByPage.get(page.index) ?? [],
@@ -720,13 +722,80 @@ export function computeInkCoverage(
   };
 }
 
+/**
+ * **把 OCR 读到的「题号行」补成块**（2026-10-12 用户当场指出「第 1 题漏识别」后加）。
+ *
+ * 动机：MinerU 会**整行漏识别** —— 答案册 p17 的 `1. AD 必刷模型·传送带模型` 在原卷清晰可见，
+ * 却在 `para_blocks`/`preproc_blocks`/`discarded_blocks` **三层里都不存在**；
+ * 于是引擎看不到题号 ⇒ 那道题不存在，它的【解析】被并进上一题（题号序列缺 1）。
+ *
+ * 而我们已经有两个现成的独立信号：
+ * - **墨迹覆盖率检查**发现了这处墨迹（标为内容级未覆盖区域 `[20,400,260,414]`，240×14pt）；
+ * - **OCR 候选补全**读对了文本（`1. AD 必刷模型·传送带模型`），只是被宽度比判据拒了。
+ * ⇒ 这里把「读对了的题号行」补回块流，喂给引擎（补进去的块同时进展示层，两边一致）。
+ *
+ * 三条纪律：
+ * 1. **只补题号行**（`matchFirstLine` 判为 `question_no`），不补其它文本；
+ * 2. **只补引擎确实没有的题号**（同页同号且位置相近 ⇒ 已有，跳过，避免重复造题）；
+ * 3. 补进去的块带 `fromOcr: true`，展示层以**候选**样式呈现（不静默替换，G1）。
+ */
+function injectOcrQuestionLines(doc: ParsedDocument, docId: string): number {
+  const outDir = join("data", "out", docId);
+  const items: { page: number; bbox: BBox; text: string }[] = [];
+  for (const name of ["ocr-fill.json", "ocr-page-fill.json"]) {
+    const f = join(outDir, name);
+    if (!existsSync(f)) continue;
+    try {
+      const j = JSON.parse(readFileSync(f, "utf8")) as {
+        pages?: { page: number; items?: { bbox: number[]; text?: string }[] }[];
+      };
+      for (const pg of j.pages ?? []) {
+        for (const it of pg.items ?? []) {
+          if (it.text) items.push({ page: pg.page, bbox: it.bbox as BBox, text: it.text });
+        }
+      }
+    } catch {
+      /* 读不动就跳过 */
+    }
+  }
+  let injected = 0;
+  for (const it of items) {
+    const page = doc.pages.find((pg) => pg.index === it.page);
+    if (!page) continue;
+    const first = (it.text.split("\n")[0] ?? "").trim();
+    const m = matchFirstLine(first);
+    if (m.kind !== "question_no") continue; // ① 只补题号行
+    const num = m.captured;
+    const exists = page.blocks.some((b) => {
+      if (b.kind !== "text") return false;
+      const bm = matchFirstLine(b.firstLine);
+      return bm.kind === "question_no" && bm.captured === num && Math.abs(b.bbox[1] - it.bbox[1]) < 24; // ②
+    });
+    if (exists) continue;
+    page.blocks.push({
+      kind: "text",
+      bbox: it.bbox,
+      text: it.text,
+      firstLine: first,
+      lineCount: 1,
+      maxFontSize: 0,
+      fromOcr: true, // ③
+    });
+    injected++;
+  }
+  return injected;
+}
+
 function main(): void {
   const docId = process.argv[2] ?? "23必刷题 2相互作用";
   const layoutPath = process.argv[3] ?? join("data", "smoke", "unpacked", "layout.json");
   const raw = JSON.parse(readFileSync(layoutPath, "utf8"));
 
   const doc = normalizeLayout(raw, docId);
-  const result = segmentFromLayout(raw, docId);
+  // ⚠️ 先补「OCR 读到的题号行」，再切分 —— 否则整行被上游漏掉的题根本不存在（见函数注释）
+  const injected = injectOcrQuestionLines(doc, docId);
+  if (injected) console.log(`  OCR 补入题号行 ${injected} 处（上游整行漏识别，展示层以候选样式呈现）`);
+  const result = ruleStrategy.segment(doc);
   const snapshot = buildStageSnapshot(doc, result, extractRawBlocks(raw), extractDiscardedBlocks(raw));
 
   const outDir = join("data", "out", docId);
