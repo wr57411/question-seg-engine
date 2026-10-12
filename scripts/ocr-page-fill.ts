@@ -416,7 +416,11 @@ for (const p of snap.pages) {
     const expected = fontPt > 0 ? holeW / fontPt : 0;
     const emW = emWidthOf(text);
     const ratio = emW > 0 && fontPt > 0 ? holeW / (emW * fontPt) : 0;
-    const ok = text.length > 0 && expected >= MIN_EXPECT_CHARS && ratio >= RATIO_MIN && ratio <= RATIO_MAX;
+    // **文本必须自洽**：`$` 成对。切分按宽度比例切，可能落在公式中间
+    //（实测答案文档 p13：`律有 $ T - \m` / `= ma $，根` —— 半个公式，渲染出来是噪声）。
+    // 不成对 ⇒ 这不是一段可读文本 ⇒ 宁可不补。
+    const balanced = ((text.match(/\$/g) ?? []).length % 2) === 0;
+    const ok = text.length > 0 && expected >= MIN_EXPECT_CHARS && balanced && ratio >= RATIO_MIN && ratio <= RATIO_MAX;
     if (ok) acc++;
     const reason = ok
       ? undefined
@@ -424,7 +428,9 @@ for (const p of snap.pages) {
         ? "整页对齐未取到文本"
         : expected < MIN_EXPECT_CHARS
           ? `洞太小（期望 ${expected.toFixed(1)} 字 < ${MIN_EXPECT_CHARS}）`
-          : `宽度比 ${ratio.toFixed(2)} 越界`;
+          : !balanced
+            ? "公式被切断（$ 不成对）"
+            : `宽度比 ${ratio.toFixed(2)} 越界`;
     items.push({
       bbox: bb,
       win,
