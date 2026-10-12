@@ -670,7 +670,7 @@ function renderCompare(p) {
   const mid = p.width / 2;
   const isRightCol = (b) => (p.columns ?? 1) >= 2 && !!b && (b.bbox[0] + b.bbox[2]) / 2 >= mid;
   const needsRight = p.questions.some((q, k) => q.startsHere !== false && isRightCol(firsts[k]));
-  const GUTTER = 46;
+  const GUTTER = 22;
   const innerW = Math.max(120, paneW - GUTTER - (needsRight ? GUTTER : 0));
   const c = paperCanvas(p);
   c.style.width = `${innerW}px`;
@@ -691,7 +691,9 @@ function renderCompare(p) {
     // 跨页题的**续段**不挂号牌：那一页的原卷上本来就没有题号，
     // 挂了会让用户看到「不属于这页的题号」（实测第 17 页顶部挂 `第8题`，而该页题号是 9/2/3/4/5/6）。
     if (q.startsHere === false) return;
-    const chip = el("span", "q-chip plain", `第${q.number}题`);
+    // **只写数字**（用户要求：写「第N题」太占版面，把页面挤小了）——
+    // 完整信息放 title（悬停可见），点开看详情的行为不变。
+    const chip = el("span", "q-chip plain", q.number);
     chip.title = `第${q.number}题（点击看详情）`;
     // 按题目所在栏决定挂哪一侧：右栏题挂右留白，其余挂左留白
     if (isRightCol(f)) chip.style.left = "calc(100% + 4px)";

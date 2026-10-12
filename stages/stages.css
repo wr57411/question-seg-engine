@@ -454,13 +454,17 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   background: #fff;
   box-shadow: 0 3px 14px rgba(60, 50, 30, 0.18);
 }
+/* 对比模式的题号牌：**只写数字**（用户要求：写「第N题」太占版面，把重建页面挤小了）。
+ * 小方章样式，宽约 16px ⇒ 留白只需 22px（见 renderCompare 的 GUTTER）。 */
 .q-chip.plain {
-  background: rgba(43, 42, 38, 0.78);
+  background: rgba(43, 42, 38, 0.82);
   font-size: 10px;
-  /* 行高钉死：题号牌的落位算法（uncovered-layout.js 的 CHIP_H_PX）按此高度算，
-   * 用继承的 1.6 会让牌子高 18px、比算法假设的 15px 高，落位就不再保证不压正文。 */
-  line-height: 1.3;
-  padding: 0 6px;
+  line-height: 14px;
+  min-width: 15px;
+  padding: 0 2px;
+  text-align: center;
+  border-radius: 2px;
+  box-shadow: none;
 }
 
 /* ── 解析遗漏标记（Task 16；修复轮 1 分级）──────────────────────
