@@ -384,6 +384,11 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   padding: 8px 10px;
 }
 
+/* 对比模式的左侧留白：专供题号牌（见 renderCompare 的 GUTTER）。
+ * 留白在画布之外，所以牌子永远不会压正文 —— 密页也保证每题都挂得上。 */
+.compare-pane { overflow: visible; }
+.q-chip.plain { white-space: nowrap; }
+
 /* 丢弃块（页眉/页脚/页码/侧栏）：原卷有、解析器判为家具的内容 */
 .blk-discarded {
   border: 1.5px dotted rgba(43, 42, 38, 0.45);

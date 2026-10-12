@@ -653,33 +653,31 @@ function renderCompare(p) {
   const right = el("div", "compare-pane");
   right.style.width = `${paneW}px`;
   right.append(el("p", "pane-title", "成品（结构化数据按原坐标重建，非原图）"));
+  // ⚠️ **左侧留白（gutter）专供题号牌**（2026-10-12 用户当场指出）。
+  // 原做法是「页内落位，放不下就不挂」—— 但答案册这种密页（86 块/双栏/小字）
+  // 页边距根本放不下号牌，于是**整页几乎一个号牌都不显示**，用户看到的就是「题号没识别出来」。
+  // 现在把内容区收窄 GUTTER px、号牌一律挂在留白里 ⇒ 永远放得下，且**绝不压正文**。
+  const GUTTER = 52;
+  const innerW = Math.max(120, paneW - GUTTER);
   const c = paperCanvas(p);
-  c.style.width = "100%";
-  renderDiscardedInto(c, p, paneW); // 对比栏宽口径：丢弃块也必须用 paneW（R2）
-  const baseFont = baseFontOfPage(p.blocks, p.width, paneW);
+  c.style.width = `${innerW}px`;
+  c.style.marginLeft = `${GUTTER}px`;
+  renderDiscardedInto(c, p, innerW); // 对比栏宽口径：丢弃块也必须用 innerW（R2）
+  const baseFont = baseFontOfPage(p.blocks, p.width, innerW);
   appendBlockNodes(c, p, paneW, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
   // 题号牌：**必须走不压正文的落位**。原先挂在题首块左上角，而块 bbox 紧贴墨迹（F1）
   // → 牌子必然盖住题首 1–3 个字（2026-10-10 DOM 实测 15 页约 90 处、每处 400–750px²，
   // 肉眼可见）。落位由 uncovered-layout.js 的 chipPlacements 算好（页边距优先，放不下则不挂）。
   const firsts = p.questions.map((q) => q.blocks.map((i) => p.blocks[i]).find(Boolean) ?? null);
-  // 避让集合要含**全部会被渲染的块**（行级块 + 丢弃块），否则牌子会压到页眉/页脚的家具块上。
-  const avoid = p.blocks
-    .concat(p.discarded ?? [])
-    .concat((p.ocrFill ?? []).filter((x) => x.accepted).map((x) => ({ bbox: x.win ?? x.bbox })));
-  const chips = chipPlacements(
-    firsts.map((f, k) => ({ bbox: f ? f.bbox : null, label: `第${p.questions[k].number}题`, compact: p.questions[k].number })),
-    avoid,
-    p.width,
-    p.height,
-    paneW,
-  );
+  // 号牌一律挂左侧留白：`right: calc(100% + 4px)` ⇒ 牌子长在画布**左外侧**，
+  // 向右生长也不会侵入正文 ⇒ 不再需要「页内落位」那套避让（那套在密页上必然放弃）。
   p.questions.forEach((q, k) => {
-    const hit = chips[k];
-    if (!hit) return; // 页边距放不下 → 不挂牌（压正文比不挂牌更糟）
-    const chip = el("span", "q-chip plain", hit.label);
+    const f = firsts[k];
+    if (!f) return;
+    const chip = el("span", "q-chip plain", `第${q.number}题`);
     chip.title = `第${q.number}题（点击看详情）`;
-    chip.style.left = `${(hit.rect[0] / p.width) * 100}%`;
-    chip.style.top = `${(hit.rect[1] / p.height) * 100}%`;
+    chip.style.right = "calc(100% + 4px)";
+    chip.style.top = `${(f.bbox[1] / p.height) * 100}%`;
     chip.addEventListener("click", () => showDetail(q, p));
     c.append(chip);
   });
