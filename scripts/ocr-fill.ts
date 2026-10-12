@@ -107,7 +107,13 @@ type Target = { page: number; bbox: Box; area: number };
 const targets: Target[] = [];
 for (const p of snap.pages) {
   for (const r of p.uncovered ?? []) {
-    if (r.kind === "content") targets.push({ page: p.index, bbox: r.bbox, area: r.area });
+    if (r.kind !== "content") continue;
+    // 形状前置条件（与 export-stages.ts 同源）：洞必须是**横向文字行碎片**（宽/高 ≥ 1.5）。
+    // 实测反例：题册 p11 36×48pt 的页边小标记，OCR 给出 `第一章` 而宽度比仍合格。
+    const w = r.bbox[2] - r.bbox[0];
+    const h = r.bbox[3] - r.bbox[1];
+    if (!(h > 0 && w / h >= 1.5)) continue;
+    targets.push({ page: p.index, bbox: r.bbox, area: r.area });
   }
 }
 targets.sort((a, b) => b.area - a.area);

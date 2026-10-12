@@ -748,19 +748,48 @@ function main(): void {
     const pageByPage = new Map<number, { items: OcrFillItem[]; fullText: string }>();
     for (const pg of pageJson?.pages ?? []) pageByPage.set(pg.page, { items: pg.items ?? [], fullText: pg.fullText ?? "" });
     const hit = (a: BBox, b: BBox) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+    /**
+     * **形状前置条件**：未覆盖区域是「横向文字行碎片」，所以它必须**明显比高宽**。
+     *
+     * 实测反例（题册 p11 `[548,171,584,219]` = 36×48pt，**高 > 宽**）：那里是页边的一个小标记，
+     * 裁图 OCR 给了 `第一章`、整页给了长文本 —— **两条路径都错**，而两条的宽度比都落在合格区间。
+     * ⇒ 洞本身的形状不对时，任何文本都不可信。
+     *
+     * 这里统一判（两种来源都过），并把结果写回 item，保证快照自身自洽。
+     */
+    const shapeOk = (b: BBox) => {
+      const w = b[2] - b[0];
+      const h = b[3] - b[1];
+      return h > 0 && w / h >= 1.5;
+    };
+    const fixShape = (x: OcrFillItem): OcrFillItem =>
+      x.accepted && !shapeOk(x.bbox)
+        ? {
+            ...x,
+            accepted: false,
+            reason: `洞不是横向文字行（${Math.round(x.bbox[2] - x.bbox[0])}×${Math.round(x.bbox[3] - x.bbox[1])}pt，高 ≥ 宽）`,
+          }
+        : x;
     let nCrop = 0;
     let nPage = 0;
+    let nShape = 0;
     for (const pg of snapshot.pages) {
-      const crop = cropByPage.get(pg.index) ?? [];
+      const crop = (cropByPage.get(pg.index) ?? []).map(fixShape);
       const page = pageByPage.get(pg.index);
       const filled = crop.filter((x) => x.accepted).map((x) => x.bbox);
-      const extra = (page?.items ?? []).filter((x) => x.accepted && !filled.some((f) => hit(f, x.bbox)));
+      const extra = (page?.items ?? [])
+        .map(fixShape)
+        .filter((x) => x.accepted && !filled.some((f) => hit(f, x.bbox)));
       pg.ocrFill = crop.concat(extra);
       pg.ocrFullText = page?.fullText ?? "";
       nCrop += filled.length;
       nPage += extra.length;
+      nShape += crop.concat(extra).filter((x) => !x.accepted && (x.reason ?? "").startsWith("洞不是横向")).length;
     }
-    console.log(`  OCR 候选补全：裁图 ${nCrop} 条 + 整页补 ${nPage} 条（整页只补裁图没补上的洞）`);
+    console.log(
+      `  OCR 候选补全：裁图 ${nCrop} 条 + 整页补 ${nPage} 条（整页只补裁图没补上的洞）` +
+        (nShape ? `；形状前置条件否掉 ${nShape} 条` : ""),
+    );
   }
   // questions.json 与 stages.json 同源重生成：viewer 与 stages 消费同一份引擎产物，
   // 避免算法修复后两个展示层各说各话
