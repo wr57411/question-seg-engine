@@ -19,11 +19,11 @@
  * 用法：node --import tsx scripts/ocr-fill.ts [docId] [--limit N]
  * 需要环境变量 PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN（或从 ~/.workbuddy-ai/mcp.json 读取）。
  */
-import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { emWidthOf } from "../stages/font-metrics.js";
+import { cleanOcr, inter, medianLineHeightPt, OcrMcp, readToken } from "./ocr-lib.js";
 
 const DOC = process.argv[2] ?? "23必刷题 2相互作用";
 const limitArg = process.argv.indexOf("--limit");
@@ -46,6 +46,15 @@ const PAD_X = 8;
  * ⇒ 宁可在界面上留一个可见的「解析遗漏」，也不收一个看起来合格的假字。
  * 22×11pt 的「分力」这类真实两字内容仍在阈值之上，照常处理。
  */
+/**
+ * 裁剪的**目标像素宽**（px）：由它反推 DPI（`dpi = 72 * TARGET_PX_W / 窗口宽pt`）。
+ * 决定成败的是**像素尺寸**而非 pt 宽：太小读不出（题册的插图子图标签），
+ * 太大服务端超时/返回空（答案文档的宽区域，226pt × 600dpi = 1883px 就废了）。
+ */
+const TARGET_PX_W = 1000;
+const MIN_DPI = 300;
+const MAX_DPI = 600;
+
 const MIN_WIN_W = 16;
 const MIN_WIN_H = 6;
 /** 宽度合理性：恢复文本的当量宽 / 窗口宽，落在此区间外视为不可信。 */
@@ -70,132 +79,7 @@ interface OcrFillItem {
   reason?: string;
 }
 
-/* ── 取 token：env 优先，其次读应用 MCP 配置（只读，不打印）─────────────── */
-function readToken(): string {
-  const fromEnv = process.env.PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN;
-  if (fromEnv) return fromEnv;
-  const cfg = join(homedir(), ".workbuddy-ai", "mcp.json");
-  if (existsSync(cfg)) {
-    try {
-      const j = JSON.parse(readFileSync(cfg, "utf8"));
-      const t = j?.mcpServers?.["PaddleOCR-VL-1.6"]?.env?.PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN;
-      if (typeof t === "string" && t) return t;
-    } catch {
-      /* 读不动就走下面的报错 */
-    }
-  }
-  console.error(
-    "缺少 PaddleOCR token：设置 PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN，" +
-      "或在 ~/.workbuddy-ai/mcp.json 的 PaddleOCR-VL-1.6.env 里配置。",
-  );
-  process.exit(2);
-}
-
-/* ── MCP stdio 客户端（只用到 initialize / tools/call）─────────────────── */
-class OcrMcp {
-  private proc: ChildProcessWithoutNullStreams;
-  private buf = "";
-  private waiters = new Map<number, (v: any) => void>();
-
-  constructor(token: string) {
-    this.proc = spawn("/Users/john/.local/bin/uvx", ["--from", "paddleocr-mcp", "paddleocr_mcp"], {
-      env: {
-        ...process.env,
-        PADDLEOCR_MCP_MODEL: "PaddleOCR-VL-1.6",
-        PADDLEOCR_MCP_PPOCR_SOURCE: "aistudio",
-        PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN: token,
-        PATH: process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin",
-      },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    this.proc.stderr!.on("data", () => {}); // 吞掉 banner/日志
-    this.proc.stdout!.on("data", (c: Buffer) => {
-      this.buf += c.toString("utf8");
-      let nl: number;
-      while ((nl = this.buf.indexOf("\n")) >= 0) {
-        const line = this.buf.slice(0, nl).trim();
-        this.buf = this.buf.slice(nl + 1);
-        if (!line) continue;
-        let m: any;
-        try {
-          m = JSON.parse(line);
-        } catch {
-          continue;
-        }
-        // ⚠️ 必须按 id 匹配：server 会先发 notifications/message，
-        // 若把第一条消息当响应，会「0.0s 假完成」（实测踩过）。
-        if (typeof m.id === "number" && this.waiters.has(m.id)) {
-          this.waiters.get(m.id)!(m);
-          this.waiters.delete(m.id);
-        }
-      }
-    });
-  }
-
-  private send(o: unknown) {
-    this.proc.stdin!.write(JSON.stringify(o) + "\n");
-  }
-
-  private await(id: number, timeoutMs: number): Promise<any> {
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        this.waiters.delete(id);
-        resolve(null);
-      }, timeoutMs);
-      this.waiters.set(id, (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      });
-    });
-  }
-
-  async init(): Promise<void> {
-    this.send({
-      jsonrpc: "2.0", id: 1, method: "initialize",
-      params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "ocr-fill", version: "1" } },
-    });
-    const r = await this.await(1, 180_000);
-    if (!r) throw new Error("MCP initialize 超时");
-    this.send({ jsonrpc: "2.0", method: "notifications/initialized" });
-  }
-
-  private nextId = 100;
-
-  async ocr(pngBase64: string, timeoutMs = 300_000): Promise<string> {
-    const id = ++this.nextId;
-    this.send({
-      jsonrpc: "2.0", id, method: "tools/call",
-      params: {
-        name: "paddleocr_vl",
-        arguments: { input_data: pngBase64, file_type: "image", output_mode: "simple", return_images: false },
-      },
-    });
-    const r = await this.await(id, timeoutMs);
-    if (!r) return "";
-    if (r.error) throw new Error(`tools/call 错误: ${JSON.stringify(r.error).slice(0, 200)}`);
-    const res = r.result ?? {};
-    if (res.isError) throw new Error("tools/call isError");
-    return (res.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text ?? "").join("");
-  }
-
-  close() {
-    try {
-      this.proc.kill();
-    } catch {
-      /* 已退出 */
-    }
-  }
-}
-
 /* ── 几何工具 ───────────────────────────────────────────────────────── */
-const inter = (a: Box, b: Box) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
-
-/** 本页正文块的**行高中位**（pt）——当作该页字号，用于宽度合理性判据。 */
-function medianLineHeightPt(blocks: any[]): number {
-  const hs = blocks.filter((b: any) => b.kind !== "image" && b.text).map((b: any) => b.bbox[3] - b.bbox[1]).sort((a: number, b: number) => a - b);
-  return hs.length ? hs[Math.floor(hs.length / 2)]! : 0;
-}
-
 /** 把 win 里与 holes 相交的部分切掉，保留面积最大的一块（只求避开插图，不做通用布尔运算）。 */
 function clipAway(win: Box, holes: Box[]): Box | null {
   let best: Box | null = win;
@@ -209,17 +93,6 @@ function clipAway(win: Box, holes: Box[]): Box | null {
     best = cands[0]!;
   }
   return best;
-}
-
-/** 清洗 OCR 输出：去掉 markdown/HTML/图片占位符与多余空白（不改字）。 */
-function cleanOcr(s: string): string {
-  return s
-    .replace(/<div[\s\S]*?<\/div>/gi, " ")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/^[#>*\s]+/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 /* ── 主流程 ─────────────────────────────────────────────────────────── */
@@ -289,8 +162,15 @@ for (const [i, t] of todo.entries()) {
       Math.max(0, win[0] - 4), Math.max(0, win[1] - 2),
       Math.min(p.width, win[2] + 4), win[3] + 2,
     ];
-    // 小区域提 DPI：窗口窄于 40pt 时用 600dpi
-    usedDpi = usedWin[2] - usedWin[0] < 40 ? DPI * 2 : DPI;
+    // 选 DPI：**按目标像素宽反推**，不按 pt 分段。
+    //
+    // ⚠️ 原写法是「pt 宽 < 40 就用 600dpi」，在题册上有效（那些区域只有 5–22pt，600dpi 后仍小），
+    // 但在答案文档上**净负面**：区域宽可达 226pt，600dpi → 1883px → 服务端超时/返回空。
+    // 实测该文档：300dpi 组通过 11/16（69%），600dpi 组只有 2/34（6%）。
+    // ⇒ 决定成败的是**像素尺寸**，不是 pt 宽：太小读不出、太大服务端失败。
+    const winWpt = usedWin[2] - usedWin[0];
+    usedDpi = Math.round(72 * TARGET_PX_W / winWpt);
+    usedDpi = Math.max(MIN_DPI, Math.min(MAX_DPI, usedDpi));
     const cropRel = join(CROP_DIR, `p${String(t.page + 1).padStart(2, "0")}-${i + 1}.png`);
     const prefix = cropRel.replace(/\.png$/, "");
     const sc = usedDpi / 72;
@@ -358,4 +238,12 @@ const out = {
 writeFileSync(join(OUT_DIR, "ocr-fill.json"), JSON.stringify(out, null, 1));
 console.log(`\n===== 候选补全：${accepted}/${todo.length} 条通过合理性判据 =====`);
 console.log(`落盘 ${join(OUT_DIR, "ocr-fill.json")}；裁图证据在 ${CROP_DIR}/`);
-console.log(`下一步：npm run stages:export（会把 ocr-fill.json 合并进快照）`);
+// 自动重导快照（同一 docId），让候选真正进入 stages.json —— 这样本步骤对**任意文档**都可重复，
+// 不必再手工敲 export（export 需要 layout 路径，默认值只对样卷成立）。
+const layoutPath = existsSync(join(OUT_DIR, "layout.json"))
+  ? join(OUT_DIR, "layout.json")
+  : join("data", "smoke", "unpacked", "layout.json");
+console.log(`重导快照：export-stages.ts "${DOC}" "${layoutPath}"`);
+execFileSync(process.execPath, ["--import", "tsx", "scripts/export-stages.ts", DOC, layoutPath], {
+  stdio: "inherit",
+});

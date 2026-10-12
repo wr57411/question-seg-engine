@@ -135,6 +135,13 @@ export interface StagePage {
    * 缺失 `ocr-fill.json` 时为空数组。**仅新增字段，不改既有字段语义。**
    */
   ocrFill: OcrFillItem[];
+  /**
+   * 该页的**整页 OCR 全文**（`scripts/ocr-page-fill.ts` 的产物）。
+   * 整页 OCR 的输出**没有 bbox**，所以它不能单独用来定位；这里存下来只为在对比模式里
+   * 提供一份「完整、可通读」的对照文本（用户核对时可一眼看到被漏掉的内容确实读出来了）。
+   * 缺失时为空串。**仅新增字段。**
+   */
+  ocrFullText: string;
 }
 
 /** OCR 候选补全的一条（见 StagePage.ocrFill）。 */
@@ -149,9 +156,20 @@ export interface OcrFillItem {
   raw: string;
   /** 原卷裁图路径（相对项目根，G4 证据） */
   crop: string;
-  /** 窗口宽 / (当量 em × 字号)，用于合理性判据 */
+  /**
+   * 宽度比。**两种来源口径不同，别混用**：
+   * - `"crop"`：窗口宽 / (当量 em × 字号)；
+   * - `"page"`：**洞自身**宽 / (当量 em × 字号) —— 整页来源的文本是按洞宽切出来的。
+   */
   ratio: number;
   accepted: boolean;
+  /**
+   * 来源：
+   * - `"crop"` = 区域裁图（`scripts/ocr-fill.ts`），窗口按行裁，位置天然对得上；
+   * - `"page"` = 整页 OCR（`scripts/ocr-page-fill.ts`），上下文完整、文本更干净，
+   *   但会把折行的选项并成一行 ⇒ 只用来**补裁图没补上的洞**。
+   */
+  source?: "crop" | "page";
   reason?: string;
 }
 
@@ -317,6 +335,7 @@ export function buildStageSnapshot(
       questions: questionsByPage.get(page.index) ?? [],
       uncovered: uncoveredPages[p] ?? [],
       ocrFill: [],
+      ocrFullText: "",
     };
   });
   return {
@@ -701,22 +720,47 @@ function main(): void {
   const outDir = join("data", "out", docId);
   mkdirSync(outDir, { recursive: true });
 
-  // OCR 候选补全（scripts/ocr-fill.ts 的产物）：**仅新增字段**，缺失时保持空数组。
+  // OCR 候选补全（**仅新增字段**，缺失时保持空数组）。两条来源：
+  //   - `ocr-fill.json`：**区域裁图**（scripts/ocr-fill.ts）—— 窗口按行裁，位置天然对得上；
+  //   - `ocr-page-fill.json`：**整页 OCR**（scripts/ocr-page-fill.ts）—— 上下文完整、文本更干净，
+  //     但它会把折行的选项并成一行，按比例切分会把下一行开头派给上一行（热狗题实测）。
+  //   ⇒ 合并规则：**裁图已 accepted 的保留，整页只补裁图没补上的洞。**
   // 与快照解耦：重导快照不丢产物，重跑 OCR 也不碰其它字段。
-  const ocrFillPath = join(outDir, "ocr-fill.json");
-  if (existsSync(ocrFillPath)) {
+  const readOcrJson = (name: string) => {
+    const path = join(outDir, name);
+    if (!existsSync(path)) return null;
     try {
-      const of = JSON.parse(readFileSync(ocrFillPath, "utf8")) as {
-        pages?: { page: number; items: OcrFillItem[] }[];
+      return JSON.parse(readFileSync(path, "utf8")) as {
+        pages?: { page: number; items?: OcrFillItem[]; fullText?: string }[];
       };
-      const byPage = new Map<number, OcrFillItem[]>();
-      for (const pg of of.pages ?? []) byPage.set(pg.page, pg.items ?? []);
-      for (const pg of snapshot.pages) pg.ocrFill = byPage.get(pg.index) ?? [];
-      const n = [...byPage.values()].reduce((acc, a) => acc + a.filter((x) => x.accepted).length, 0);
-      console.log(`  OCR 候选补全：${n} 条通过判据（${ocrFillPath}）`);
     } catch (e) {
-      console.log(`  ocr-fill.json 读取失败，跳过候选补全：${String(e).slice(0, 80)}`);
+      console.log(`  ${name} 读取失败，跳过：${String(e).slice(0, 80)}`);
+      return null;
     }
+  };
+  const cropJson = readOcrJson("ocr-fill.json");
+  const pageJson = readOcrJson("ocr-page-fill.json");
+  if (cropJson || pageJson) {
+    const cropByPage = new Map<number, OcrFillItem[]>();
+    for (const pg of cropJson?.pages ?? []) {
+      cropByPage.set(pg.page, (pg.items ?? []).map((x) => ({ ...x, source: x.source ?? "crop" })));
+    }
+    const pageByPage = new Map<number, { items: OcrFillItem[]; fullText: string }>();
+    for (const pg of pageJson?.pages ?? []) pageByPage.set(pg.page, { items: pg.items ?? [], fullText: pg.fullText ?? "" });
+    const hit = (a: BBox, b: BBox) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+    let nCrop = 0;
+    let nPage = 0;
+    for (const pg of snapshot.pages) {
+      const crop = cropByPage.get(pg.index) ?? [];
+      const page = pageByPage.get(pg.index);
+      const filled = crop.filter((x) => x.accepted).map((x) => x.bbox);
+      const extra = (page?.items ?? []).filter((x) => x.accepted && !filled.some((f) => hit(f, x.bbox)));
+      pg.ocrFill = crop.concat(extra);
+      pg.ocrFullText = page?.fullText ?? "";
+      nCrop += filled.length;
+      nPage += extra.length;
+    }
+    console.log(`  OCR 候选补全：裁图 ${nCrop} 条 + 整页补 ${nPage} 条（整页只补裁图没补上的洞）`);
   }
   // questions.json 与 stages.json 同源重生成：viewer 与 stages 消费同一份引擎产物，
   // 避免算法修复后两个展示层各说各话

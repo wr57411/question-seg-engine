@@ -354,6 +354,36 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 }
 .blk-ocr:hover .tag { display: block; }
 
+/* OCR 整页识别全文（scripts/ocr-page-fill.ts）：**无 bbox**，只作逐行对照，
+ * 不参与纸面定位（所以不画在 canvas 上，单独一块）。 */
+.ocr-full {
+  max-width: 980px;
+  margin: 14px auto 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px 12px;
+}
+.ocr-full > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--jade);
+}
+.ocr-full-text {
+  margin: 8px 0 0;
+  max-height: 340px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--serif);
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--ink);
+  background: rgba(77, 124, 95, 0.05);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
 /* 丢弃块（页眉/页脚/页码/侧栏）：原卷有、解析器判为家具的内容 */
 .blk-discarded {
   border: 1.5px dotted rgba(43, 42, 38, 0.45);

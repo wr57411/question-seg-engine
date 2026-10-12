@@ -16,7 +16,8 @@
     "test": "node --import tsx --test \"tests/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test && npm run audit:render",
-    "stages:ocr-fill": "tsx scripts/ocr-fill.ts && tsx scripts/export-stages.ts"
+    "stages:ocr-fill": "tsx scripts/ocr-fill.ts",
+    "stages:ocr-page": "tsx scripts/ocr-page-fill.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

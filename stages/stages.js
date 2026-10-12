@@ -304,25 +304,35 @@ const DISCARDED_LABEL = {
 };
 
 /**
- * OCR 候选补全（`scripts/ocr-fill.ts` 的产物，**显式步骤**，不进 `npm run check`）：
- * 对「引擎为空」的解析遗漏区域，用 PaddleOCR-VL 读原卷裁图得到的**候选**文本，**原位**渲染。
+ * OCR 候选补全（`scripts/ocr-fill.ts` / `scripts/ocr-page-fill.ts` 的产物，
+ * **显式步骤**，不进 `npm run check`）：对「引擎为空」的解析遗漏区域，
+ * 用 PaddleOCR-VL 读到的**候选**文本，**原位**渲染。
+ *
+ * 两条来源（`it.source`，角标会写明）：
+ * - `"crop"`：**区域裁图** —— 窗口按行裁，位置天然对得上；
+ * - `"page"`：**整页 OCR** —— 上下文完整、文本更干净（实测一次读全被漏掉的整行），
+ *   但 OCR 会把折行的选项并成一行 ⇒ 合并时只用来**补裁图没补上的洞**。
  *
  * 为什么必须原位渲染：不渲染的话右侧重建就永远缺这一行 —— 那正是「对比之后的明显问题」。
  * 为什么不静默替换引擎文本：**OCR 会错字**（实测 `D 当口将` ← 原卷 `D. 当只将`），
  * 所以引擎文本一个字都不动，候选只以**青绿虚线框**呈现（角标默认隐藏、悬停才出，
- * 避免「标记盖住正文」），悬停可见宽度比、原卷裁图路径与 OCR 原始输出（可核对）。
+ * 避免「标记盖住正文」），悬停可见来源、宽度比、证据路径与 OCR 原始输出（可核对）。
  */
 function ocrFillInto(c, p, canvasW = CANVAS_W) {
   const items = (p.ocrFill ?? []).filter((x) => x.accepted);
   if (!items.length) return;
   const baseFont = baseFontOfPage(p.blocks, p.width, canvasW);
   for (const it of items) {
+    const isPage = it.source === "page";
     const node = posStyle(el("div", "blk blk-ocr"), it.win ?? it.bbox, p.width, p.height);
-    node.title = `OCR 候选补全（非引擎文本，请核对）\n宽度比 ${it.ratio}（窗口宽 / 当量宽，≈1 为合理）\n原卷裁图：${it.crop}\nOCR 原始输出：${it.raw}`;
+    node.title =
+      `OCR 候选补全（非引擎文本，请核对）\n来源：${isPage ? "整页 OCR" : "区域裁图"}\n` +
+      `宽度比 ${it.ratio}（≈1 为合理；${isPage ? "整页来源按**洞自身**宽度算" : "裁图来源按窗口宽算"}）\n` +
+      `证据：${it.crop}\nOCR 原始输出：${it.raw}`;
     const txt = el("span", "txt");
     txt.textContent = it.text;
     txt.style.fontSize = `${baseFont}px`;
-    node.append(txt, el("span", "tag", "OCR 候选"));
+    node.append(txt, el("span", "tag", isPage ? "OCR·整页" : "OCR·裁图"));
     c.append(node);
   }
 }
@@ -685,6 +695,19 @@ function renderCompare(p) {
       ["transparent", "解析遗漏·家具级：页眉装饰/栏间竖线/页边标等版式墨迹（灰细虚线，悬停看详情）"],
     ]),
   );
+
+  // 整页 OCR 全文（`scripts/ocr-page-fill.ts` 的产物）：**没有 bbox**，所以不能画在纸面上定位；
+  // 但它有整页的**完整上下文** —— 单给一份「可通读」的对照文本，用户核对时能一眼看到
+  // 被引擎漏掉的内容确实读出来了（这是整页路径最大的价值，也是裁图路径给不了的）。
+  if (p.ocrFullText) {
+    const d = el("details", "ocr-full");
+    d.open = true;
+    d.append(el("summary", "", "OCR 整页识别全文（PaddleOCR · 无位置信息 · 供逐行对照）"));
+    const pre = el("pre", "ocr-full-text");
+    pre.textContent = p.ocrFullText;
+    d.append(pre);
+    $("canvas-wrap").append(d);
+  }
 }
 
 function render() {
