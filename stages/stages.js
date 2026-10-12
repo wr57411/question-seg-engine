@@ -661,7 +661,6 @@ function renderCompare(p) {
   const innerW = Math.max(120, paneW - GUTTER);
   const c = paperCanvas(p);
   c.style.width = `${innerW}px`;
-  c.style.marginLeft = `${GUTTER}px`;
   renderDiscardedInto(c, p, innerW); // 对比栏宽口径：丢弃块也必须用 innerW（R2）
   const baseFont = baseFontOfPage(p.blocks, p.width, innerW);
   appendBlockNodes(c, p, paneW, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
@@ -669,21 +668,31 @@ function renderCompare(p) {
   // → 牌子必然盖住题首 1–3 个字（2026-10-10 DOM 实测 15 页约 90 处、每处 400–750px²，
   // 肉眼可见）。落位由 uncovered-layout.js 的 chipPlacements 算好（页边距优先，放不下则不挂）。
   const firsts = p.questions.map((q) => q.blocks.map((i) => p.blocks[i]).find(Boolean) ?? null);
-  // 号牌一律挂左侧留白：`right: calc(100% + 4px)` ⇒ 牌子长在画布**左外侧**，
-  // 向右生长也不会侵入正文 ⇒ 不再需要「页内落位」那套避让（那套在密页上必然放弃）。
+  // ⚠️ 号牌**不能**挂在画布内部：`.canvas` 有 `overflow: hidden`（「画布边界裁切」的既定决策，不改），
+  // 挂在画布左外侧的号牌会被**裁掉**（DOM 里有、位置也对，就是看不见 —— 2026-10-12 实测踩到）。
+  // ⇒ 套一层与画布等宽等高的定位容器，号牌挂在容器上（`right: calc(100% + 4px)` 落在左侧留白里）。
+  const paperWrap = el("div", "paper-wrap");
+  paperWrap.style.position = "relative";
+  paperWrap.style.marginLeft = `${GUTTER}px`;
+  paperWrap.append(c);
   p.questions.forEach((q, k) => {
     const f = firsts[k];
     if (!f) return;
+    // 跨页题的**续段**不挂号牌：那一页的原卷上本来就没有题号，
+    // 挂了会让用户看到「不属于这页的题号」（实测第 17 页顶部挂 `第8题`，而该页题号是 9/2/3/4/5/6）。
+    if (q.startsHere === false) return;
     const chip = el("span", "q-chip plain", `第${q.number}题`);
     chip.title = `第${q.number}题（点击看详情）`;
     chip.style.right = "calc(100% + 4px)";
     chip.style.top = `${(f.bbox[1] / p.height) * 100}%`;
     chip.addEventListener("click", () => showDetail(q, p));
-    c.append(chip);
+    paperWrap.append(chip);
   });
+  right.append(paperWrap);
   ocrFillInto(c, p, paneW); // 对比模式：先画 OCR 候选补全
   uncoveredInto(c, p, paneW); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
-  right.append(c);
+  // 注意：**不要再 right.append(c)** —— c 已经在 paperWrap 里；重复 append 会把它移出容器，
+  // 号牌就又回到被 `.canvas{overflow:hidden}` 裁掉的状态。
 
   row.append(left, right);
   $("canvas-wrap").append(row);

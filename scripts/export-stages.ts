@@ -104,6 +104,8 @@ export interface StageQuestion {
   section: string;
   type: string;
   blocks: number[];
+  /** 该题是否在本页起始（false = 本页只是它的跨页续段）；缺省视为 true */
+  startsHere?: boolean;
   confidence: number;
   status: string;
   reasons: string[];
@@ -302,6 +304,16 @@ export function buildStageSnapshot(
         section: q.section,
         type: q.type,
         blocks,
+        /**
+         * 该题是否**在本页起始**（false = 本页只是它的跨页续段）。
+         *
+         * 为什么需要这个标记（2026-10-12 用户当场指出）：跨页题会在它涉及的每一页各出一条
+         * （`blocks` 是该页内的块），但**续段所在页的原卷上并没有题号**。
+         * 若续段也挂 `第N题` 号牌，用户就会在该页看到「不属于这页的题号」
+         * （实测答案册第 17 页顶部挂着 `第8题`，而该页原卷的题号是 9/2/3/4/5/6）。
+         * ⇒ 号牌只在 `startsHere` 的那一条上挂。
+         */
+        startsHere: q.source.pageIndex === pageIndex,
         confidence: q.confidence,
         status: q.status,
         reasons,
