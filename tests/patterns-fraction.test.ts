@@ -15,7 +15,8 @@ test("真题号形态不受影响", () => {
   assert.equal(matchFirstLine("1. 设集合 A = {x}，则…").kind, "question_no");
   assert.equal(matchFirstLine("2.已知函数 f(x) = 2x - 4，则…").kind, "question_no");
   assert.equal(matchFirstLine("3) 求 a、b 的值").kind, "question_no");
-  assert.equal(matchFirstLine("（2）求 f(x) 的最大值").kind, "question_no");
+  // 2026-10-12：括号小问改为 sub_question（并入当前题，不新开题）
+  assert.equal(matchFirstLine("（2）求 f(x) 的最大值").kind, "sub_question");
 });
 
 test("分支 1 加固：数字与半角点间空格容忍，但空格后接数字仍拒（0 . 2）", () => {

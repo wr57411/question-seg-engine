@@ -10,11 +10,13 @@
 
 export interface TextMatch {
   ok: true;
-  kind: "question_no" | "option" | "section" | "answer_zone";
-  /** 题号原文（如 "1" / "（2）"），用于答案对号和去噪 */
+  kind: "question_no" | "sub_question" | "option" | "section" | "chapter" | "answer_zone";
+  /** 题号原文（如 "1"），用于答案对号和去噪 */
   captured: string;
   /** 大题标题纯编号（如 "一"），section 用 */
   indexNumeral?: string;
+  /** 章/节标题正文（如 "相互作用" / "牛顿第三定律"） */
+  title?: string;
   /** 选项键，如 "A" */
   optionKey?: string;
 }
@@ -30,8 +32,86 @@ export type LineMatch = TextMatch | { ok: false; kind: "other" };
  */
 const ARABIC_QUESTION = /^(\d{1,3})\s*\.(?!\s*\d)|^(\d{1,3})[．、)）]/;
 
-/** 括号小题号：（1） / (2) / （3），常见于解答题大题内 */
+/**
+ * 括号小题号：（1） / (2) / （3），常见于解答题大题内。
+ *
+ * ⚠️ **不是题号**（2026-10-12 定案）：实测把它当题号切题，会让「小问」变成独立题目，
+ * 题号变成 `（2）` —— 答案册里这样切出 21 个假题，题册里 2 个，直接破坏「题号唯一且连续」。
+ * ⇒ 现在返回 `kind: "sub_question"`，由决策层**并入当前题的题干**并记录小问标记，
+ * 绝不新开一道题。
+ */
 const PAREN_QUESTION = /^[（(]\s*(\d{1,2})\s*[)）]/;
+
+/** 汉字/阿拉伯数字 → 阿拉伯数字（章、节号归一化用） */
+const CN_DIGIT: Record<string, number> = {
+  一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9,
+};
+
+/** 章/节标题里的编号归一化为阿拉伯数字字符串（"二"→"2"；"十一"→"11"）。 */
+export function numeralToArabic(s: string): string {
+  const t = s.replace(/[零〇\s]/g, "");
+  if (/^\d+$/.test(t)) return String(Number(t));
+  if (t === "十") return "10";
+  const m = /^([一二三四五六七八九])?十([一二三四五六七八九])?$/.exec(t);
+  if (m) return String((m[1] ? CN_DIGIT[m[1]]! : 1) * 10 + (m[2] ? CN_DIGIT[m[2]]! : 0));
+  return CN_DIGIT[t] !== undefined ? String(CN_DIGIT[t]) : t;
+}
+
+/**
+ * 章标题：`第二章 相互作用` / `第2章 …`（数字可用阿拉伯或汉字，容忍空格）。
+ *
+ * ⚠️ 原实现只有汉字大题型 `一、`，**`第N章/第N节` 一律识别不到** ⇒ 答案册 165 道题的
+ * `section` 全为空，题号在节内重启后无法区分（`#1` 出现 22 次）—— 题库要按
+ * 「章 + 节 + 题号」做唯一键，缺了节就没法一一对应（2026-10-12）。
+ */
+const CHAPTER_HEAD = /^第\s*(\d{1,3}|[一二三四五六七八九十]{1,3})\s*章[　\s]*(.*)$/;
+
+/** 节标题：`第2节 牛顿第三定律` / `第2 节 …` / `第二节 …`（容忍数字与「节」之间的空格）。 */
+const SECTION_HEAD = /^第\s*(\d{1,3}|[一二三四五六七八九十]{1,3})\s*节[　\s]*(.*)$/;
+
+/**
+ * 必刷题系列**非「第N节」形态**的节标题（2026-10-12 实测补）：
+ * `专题 连接体动态平衡问题` / `全章综合测试` / `真题自测 考点复盘`。
+ * 漏掉它们的后果与漏掉 `第N节` 一样：节内的题号重启（1..N 再来一遍）被并进上一节
+ * → 同一节里出现多个 `1`，唯一键失效（题册节5 曾并进 4 组、答案册节5 并进 3 组）。
+ */
+const SECTION_HEAD_ALT = /^(专题[　\s]*(.{0,26})|全章综合测试\s*(.{0,26})|真题自测[　\s]*(.{0,26}))$/;
+
+/**
+ * 必刷题页顶的**分组行**：`必刷知识T1~2、4~5、7~8、10、12`
+ * （可含 必刷方法/必刷考点，段间用 `&`/空格连接，也会拆成两个块）。
+ * 它只在**节起点**出现，且列出该节的题号集合 ⇒ 既当节边界信号，又当**独立校验源**。
+ */
+const T_LINE = /必刷(?:知识|方法|考点|题型)\s*T/;
+
+/** 该块是不是 T 分组行 */
+export function isTLine(text: string): boolean {
+  return T_LINE.test(text);
+}
+
+/**
+ * 解析 T 分组行里的题号集合：`T1~2、4~5、7~8、10、12` → [1,2,4,5,7,8,10,12]。
+ * 支持 `~`/`～`/`-` 区间、`、`/`,`/`&` 分隔；不是 T 行返回 null。
+ * 用途：确定性校验「该节的题号集合是否恰好是 T 行列出的那批」。
+ */
+export function parseTLine(text: string): number[] | null {
+  if (!T_LINE.test(text)) return null;
+  const out = new Set<number>();
+  for (const m of text.matchAll(/T\s*([\d、~～\-&\s]+)/g)) {
+    for (const part of (m[1] ?? "").split(/[、&,，\s]+/)) {
+      const range = /^(\d{1,3})\s*[~～\-]\s*(\d{1,3})$/.exec(part);
+      if (range) {
+        const a = Number(range[1]);
+        const b = Number(range[2]);
+        for (let i = a; i <= b && i - a < 200; i++) out.add(i);
+        continue;
+      }
+      const one = /^(\d{1,3})$/.exec(part);
+      if (one) out.add(Number(one[1]));
+    }
+  }
+  return out.size ? [...out].sort((x, y) => x - y) : null;
+}
 
 /** 行内次要括号编号（用于识别 "（1）…；（2）…" 小题列表行） */
 const SECOND_PAREN_TAG = /[（(]\s*\d{1,2}\s*[)）]/;
@@ -67,6 +147,21 @@ export function isPageFurniture(text: string): boolean {
 }
 
 /**
+ * 首行是否以**题号**开头（含小问形态）。
+ *
+ * 用途：**页眉家具守卫必须让位于题号**。
+ * 实测（2026-10-12）：答案册的题号行天然带「必刷知识/方法/考点」标签 ——
+ * MinerU 把标签行并进了题号行，块文本形如 `7. CD 必刷知识·摩擦力`。
+ * 它同时命中「页顶带」与 `FURNITURE_LINE` 的 `必刷(知识|方法|考点)` ⇒ 整块被当页眉丢弃，
+ * **连题号一起扔掉**（答案册 162 个题号里漏了 16 个，全是这个原因）。
+ * 题号是显式结构信号，优先级高于模糊的家具关键词。
+ */
+export function startsWithQuestionNumber(line: string): boolean {
+  const s = line.trimStart();
+  return ARABIC_QUESTION.test(s) || PAREN_QUESTION.test(s);
+}
+
+/**
  * 物体列举守卫：「字母+顿号+字母」是物理题干高频的对象列举
  * （"A、B用两根轻绳连""A、B、C均处于平衡"），不是选项行。
  * 误判后果严重：伪选项 A 占住 expectOptionKey，后续真选项全部
@@ -96,14 +191,33 @@ export function matchFirstLine(line: string): LineMatch {
     return matchKind(true, "answer_zone");
   }
 
-  const section = CHINESE_SECTION.exec(s);
-  if (section && s.length <= 40) {
-    return {
-      ok: true,
-      kind: "section",
-      captured: section[1] ?? "",
-      indexNumeral: section[1] ?? "",
-    };
+  // 章 / 节标题先于题号判定：它是「题号在节内重启」的**唯一上下文来源**，
+  // 缺了它就没法把「题号」变成唯一键（见 CHAPTER_HEAD 注释）。
+  // 长度守卫：题干里出现「第2节」字样通常不在行首，且在行首时整行不会很短。
+  if (s.length <= 40) {
+    const ch = CHAPTER_HEAD.exec(s);
+    if (ch) {
+      return { ok: true, kind: "chapter", captured: numeralToArabic(ch[1] ?? ""), title: (ch[2] ?? "").trim() };
+    }
+    const sec = SECTION_HEAD.exec(s);
+    if (sec) {
+      return { ok: true, kind: "section", captured: numeralToArabic(sec[1] ?? ""), title: (sec[2] ?? "").trim() };
+    }
+    const alt = SECTION_HEAD_ALT.exec(s);
+    if (alt) {
+      const title = (alt[2] ?? alt[3] ?? alt[4] ?? "").trim();
+      return { ok: true, kind: "section", captured: "", title: title || s };
+    }
+    const section = CHINESE_SECTION.exec(s);
+    if (section) {
+      return {
+        ok: true,
+        kind: "section",
+        captured: "",
+        indexNumeral: section[1] ?? "",
+        title: s.slice((section[0] ?? "").length).trim(),
+      };
+    }
   }
 
   const paren = PAREN_QUESTION.exec(s);
@@ -114,7 +228,8 @@ export function matchFirstLine(line: string): LineMatch {
     if (SECOND_PAREN_TAG.test(rest)) {
       return { ok: false, kind: "other" };
     }
-    return { ok: true, kind: "question_no", captured: `（${paren[1] ?? ""}）` };
+    // **小问**，不是题号：由决策层并入当前题（见 PAREN_QUESTION 注释）
+    return { ok: true, kind: "sub_question", captured: paren[1] ?? "" };
   }
 
   const arabic = ARABIC_QUESTION.exec(s);

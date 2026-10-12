@@ -19,7 +19,8 @@ const load = (name: string) =>
 test("语言层：题号/选项/大题/答案区模式", () => {
   const cases: [string, string][] = [
     ["1．设集合 A = {x}，则…", "question_no"],
-    ["（1）求 a 的值；", "question_no"],
+    // 2026-10-12：括号小问**不是题号**（切题会让小问变成独立题目）
+    ["（1）求 a 的值；", "sub_question"],
     ["三、解答题（本大题共 3 小题）", "section"],
     ["参考答案", "answer_zone"],
     ["A．√2", "option"],

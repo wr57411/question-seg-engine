@@ -15,6 +15,7 @@ import {
   matchFirstLine,
   nextKey,
   splitConjoinedOptions,
+  startsWithQuestionNumber,
   stripOptionPrefix,
   stripQuestionPrefix,
 } from "./patterns.js";
@@ -38,7 +39,14 @@ const EXPECTED_OPTION_COUNT = 4;
 interface Draft {
   seq: number;
   number: string;
+  chapter: string;
+  chapterTitle: string;
+  sectionNo: string;
   section: string;
+  /** 本节内的小问标记（只记录，不切题） */
+  subQuestions: string[];
+  /** **编号组序号**（全局单调）：同一节内题号重启即新组，见 Ctx.openDraft */
+  sectionSeq: number;
   stemParts: string[];
   options: Option[];
   /** 是否见过选项块（区分「无选项题」与「选项收集失败」） */
@@ -54,6 +62,8 @@ interface Draft {
 interface AnswerDraft {
   number: string;
   text: string;
+  /** 答案条目所属节号（同号跨节时用于对号入座） */
+  sectionNo: string;
 }
 
 export function segmentWithRules(doc: ParsedDocument): SegmentationResult {
@@ -111,12 +121,83 @@ class Ctx {
   private current: Draft | null = null;
   private pendingOptions: Option[] = [];
   private expectOptionKey = "A";
+  /**
+   * **编号组序号**（全局单调）。为什么需要它：
+   * 教辅里「节内题号从 1 重新开始」**不止发生在节边界** —— 实测题册第 5 节里
+   * 还并进了「专题」「全章综合测试」「真题自测」三个块，各自也从 1 开始；
+   * 答案册第 5 节同样并进 3 组。只靠节号做键，同一节里会出现多个 `1`，唯一键失效。
+   * ⇒ 题号**回到 1** 就开新组（确定性信号，不依赖标题是否被 OCR 到）。
+   */
+  private sectionSeq = 0;
+  /** 当前编号组里是否已收过题（用于「题号回到 1 ⇒ 新组」的判定） */
+  private groupHasQuestions = false;
+  private chapter = "";
+  private chapterTitle = "";
+  private sectionNo = "";
   private section = "";
+  /** 章/节标题时间线（按 (页, y) 排序）—— 见 buildHeadingTimeline */
+  private headings: {
+    page: number;
+    y: number;
+    chapter?: string;
+    chapterTitle?: string;
+    sectionNo?: string;
+    section?: string;
+  }[] = [];
   private seq = 0;
   private answerEntry: AnswerDraft | null = null;
 
   constructor(doc: ParsedDocument) {
     this.doc = doc;
+    this.buildHeadingTimeline();
+  }
+
+  /**
+   * 预扫描全部块，抽出章/节标题，按 **(页, y)** 排序。
+   *
+   * ⚠️ 为什么不用「阅读顺序」：实测题册 p1 的 `第二章 相互作用` 与题目**不在同一栏**，
+   * 按阅读顺序它被排到了题目之后 ⇒ 前 4 道题拿不到章上下文（`chapter` 为空）。
+   * 标题永远在页面顶部、内容在其下方 ⇒ 按 (页, y) 传播是**确定且与分栏无关**的。
+   */
+  private buildHeadingTimeline(): void {
+    for (const page of this.doc.pages) {
+      for (const b of page.blocks) {
+        if (b.kind !== "text") continue;
+        const m = matchFirstLine(b.firstLine);
+        if (m.kind === "chapter") {
+          this.headings.push({ page: page.index, y: b.bbox[1], chapter: m.captured, chapterTitle: m.title ?? "" });
+        } else if (m.kind === "section") {
+          this.headings.push({
+            page: page.index,
+            y: b.bbox[1],
+            sectionNo: m.captured || (m.indexNumeral ?? ""),
+            section: b.text.trim(),
+          });
+        }
+      }
+    }
+    this.headings.sort((a, b) => a.page - b.page || a.y - b.y);
+  }
+
+  /** (page, y) 处生效的章/节上下文（章标题会清空节上下文） */
+  private contextAt(page: number, y: number): { chapter: string; chapterTitle: string; sectionNo: string; section: string } {
+    let chapter = "";
+    let chapterTitle = "";
+    let sectionNo = "";
+    let section = "";
+    for (const h of this.headings) {
+      if (h.page > page || (h.page === page && h.y > y)) break;
+      if (h.chapter !== undefined) {
+        chapter = h.chapter;
+        chapterTitle = h.chapterTitle ?? "";
+        sectionNo = "";
+        section = "";
+      } else {
+        sectionNo = h.sectionNo ?? "";
+        section = h.section ?? "";
+      }
+    }
+    return { chapter, chapterTitle, sectionNo, section };
   }
 
   process(entry: IndexedBlock): void {
@@ -131,7 +212,16 @@ class Ctx {
     // 页面家具跳过：页顶带的页眉装饰行（计划用时/必刷知识/单字"刷"logo）。
     // MinerU 对它们的去留不稳定，留在正文时会被上一页跨页未关的题吞进
     // 题干/选项（2026-10-07 p4 假第5题实证）——不归属任何题，也不进题干。
-    if (block.kind === "text" && block.bbox[3] <= this.pageHeight * 0.2 && isPageFurniture(block.text)) {
+    // ⚠️ **题号优先**：页眉家具守卫不得吃掉题号行。
+    // 实测（2026-10-12）：答案册题号行天然带「必刷知识/方法/考点」标签
+    // （`7. CD 必刷知识·摩擦力`），同时命中「页顶带」与家具模式 ⇒ 整块被丢，
+    // **连题号一起扔掉**（162 个题号里漏了 16 个）。题号是显式结构信号，优先级更高。
+    if (
+      block.kind === "text" &&
+      block.bbox[3] <= this.pageHeight * 0.2 &&
+      isPageFurniture(block.text) &&
+      !startsWithQuestionNumber(block.firstLine)
+    ) {
       return;
     }
 
@@ -155,10 +245,34 @@ class Ctx {
         this.mode = "answers";
         return;
       }
-      case "section": {
-        // 大题标题：如 "一、选择题" —— 更新 section，并结算悬挂选项
+      case "chapter": {
+        // 章标题：如 "第二章 相互作用" —— 更新章上下文，并**清空节上下文**
+        // （题号会在新章里从 1 重新开始，旧节号留着会造出错误的唯一键）
         this.settleOptions(null);
+        this.current = null;
+        this.chapter = m.captured;
+        this.chapterTitle = m.title ?? "";
+        this.sectionNo = "";
+        this.section = "";
+        return;
+      }
+      case "section": {
+        // 节/大题标题：如 "第2节 牛顿第三定律" / "专题 …" / "一、选择题" —— 更新节上下文
+        this.settleOptions(null);
+        this.current = null;
+        this.sectionNo = m.captured || (m.indexNumeral ?? "");
         this.section = block.text.trim();
+        return;
+      }
+      case "sub_question": {
+        // **小问不是题**：并入当前题题干并记录标记，绝不新开一道题（见 patterns.ts）。
+        this.settleOptions(this.current);
+        if (!this.current) {
+          this.review(blockIndex, `孤立小问「（${m.captured}）」：无当前题目可归属`, null);
+          return;
+        }
+        this.appendToCurrent(block.text.trim(), blockIndex);
+        this.current.subQuestions.push(m.captured);
         return;
       }
       case "question_no": {
@@ -219,9 +333,10 @@ class Ctx {
   /** 答案区：题号条目不匹配任何试题（这里是答案自身的切口），其余行累积 */
   private processAnswerBlock(block: ParsedBlock, blockIndex: number): void {
     if (block.kind !== "text" && block.kind !== "table") return; // 图/公式暂不处理
+    // 答案区里也有章/节标题 —— 同号跨节是常态，必须记下节号才能对号入座
     const entry = matchAnswerEntry(block.text);
     if (entry) {
-      this.answerEntry = { number: entry.number, text: entry.text };
+      this.answerEntry = { number: entry.number, text: entry.text, sectionNo: this.sectionNo };
       this.answers.push(this.answerEntry);
     } else if (this.answerEntry) {
       this.answerEntry.text += "\n" + block.text;
@@ -302,12 +417,25 @@ class Ctx {
   }
 
   private openDraft(number: string, block: { text: string }, entry: IndexedBlock): void {
+    // **题号回到 1 ⇒ 新的编号组**（确定性信号：不依赖标题有没有被 OCR 到）。
+    // 节/章标题也会开新组（见 switch），这里兜住「标题缺失但题号重启」的情况。
+    if (number === "1" && this.groupHasQuestions) this.sectionSeq++;
+    this.groupHasQuestions = true;
+    // 章/节上下文：**阅读顺序为主**（它懂分栏：答案册的节标题在页中部、栏内向下传播），
+    // **（页,y）兜底**（题册 p1 的 `第二章` 与题目不在同一栏，阅读顺序把它排到了题目之后）。
+    let hctx = { chapter: this.chapter, chapterTitle: this.chapterTitle, sectionNo: this.sectionNo, section: this.section };
+    if (!hctx.chapter) hctx = this.contextAt(entry.pageIndex, entry.block.bbox[1]);
     const stem = stripQuestionPrefix(block.text);
     this.stats.inlineFormulas += Math.floor((stem.split("$").length - 1) / 2);
     this.current = {
       seq: this.seq++,
       number,
-      section: this.section,
+      chapter: hctx.chapter,
+      chapterTitle: hctx.chapterTitle,
+      sectionNo: hctx.sectionNo,
+      section: hctx.section,
+      subQuestions: [],
+      sectionSeq: this.sectionSeq,
       stemParts: stem ? [stem] : [],
       options: [],
       optEvidence: false,
@@ -379,7 +507,12 @@ function buildQuestion(d: Draft, ctx: Ctx): Question {
     id: idOf(ctx.doc, d),
     type: d.options.length >= 2 ? "choice" : "subjective",
     number: d.number,
+    chapter: d.chapter,
+    chapterTitle: d.chapterTitle,
+    sectionNo: d.sectionNo,
     section: d.section,
+    subQuestions: d.subQuestions,
+    sectionSeq: d.sectionSeq,
     stem: d.stemParts.join("\n").trim(),
     options: d.options,
     images: d.images,
@@ -406,9 +539,12 @@ function confidenceOf(d: Draft): number {
 /** 答案区条目按题号对号入座（题号去括号比较） */
 function mergeAnswers(ctx: Ctx): void {
   for (const entry of ctx.answers) {
-    const qs = ctx.questionMap.get(entry.number) ?? ctx.questionMap.get(`（${entry.number}）`);
-    if (qs && qs.length > 0) {
-      const target = qs.find((q) => !q.answer) ?? qs[0]!;
+    const qs = ctx.questionMap.get(entry.number) ?? [];
+    if (qs.length > 0) {
+      // 同号跨节是常态（每节题号从 1 开始）⇒ 先按节号收窄，再取首个未配答案的
+      const sameSection = qs.filter((q) => !entry.sectionNo || q.sectionNo === entry.sectionNo);
+      const pool = sameSection.length ? sameSection : qs;
+      const target = pool.find((q) => !q.answer) ?? pool[0]!;
       target.answer = entry.text;
       ctx.stats.answersMatched++;
     } else {

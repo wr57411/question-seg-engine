@@ -15,9 +15,11 @@
     "audit:render": "node scripts/audit-render.mjs",
     "test": "node --import tsx --test \"tests/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run audit:render",
+    "check": "npm run typecheck && npm test && npm run audit:render && npm run audit:numbering",
     "stages:ocr-fill": "tsx scripts/ocr-fill.ts",
-    "stages:ocr-page": "tsx scripts/ocr-page-fill.ts"
+    "stages:ocr-page": "tsx scripts/ocr-page-fill.ts",
+    "audit:numbering": "tsx scripts/audit-numbering.ts",
+    "bank": "tsx scripts/build-bank.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
