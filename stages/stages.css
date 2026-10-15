@@ -565,3 +565,71 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 .blk .txt sub {
   font-size: 0.7em;
 }
+
+/* ── 阶段 5「成品」：按原坐标重建的纸面（与对比右侧同一实现） ──
+   纸面宽度由 renderPaper 按 paneW 算好并写成行内 width，这里只负责居中与提示文案。 */
+.final-wrap { display: flex; justify-content: center; }
+.final-note {
+  max-width: var(--canvas-w); margin: 12px auto 0; text-align: center;
+  font-size: 12.5px; line-height: 1.7; color: var(--ink-soft, #6b665c);
+}
+
+/* ── 题目标签：常驻短码列（只读）──────────────────────────────
+   落位与三级降级（full / count / chip）在 stages/tag-layout.js 计算，这里只负责外观。
+   ⚠️ **pointer-events:none 是刻意的**：留白只有 22px、短码块高 12px，竖排相邻两题的列
+   在密页里靠得很近——一旦让它们可点，触屏上就是「点不准 + 误触上一题/下一题」。
+   所以纸面上唯一的 tap 目标是题号牌，标签的增删全在号牌点开的面板里做（需求 U4/U7）。
+   号牌与短码块同时禁掉系统长按（文本选择/放大镜），否则长按手势会被 Safari 抢走。 */
+.qtag-stack {
+  position: absolute;
+  z-index: 6;
+  width: 18px;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.qtag {
+  font-family: var(--sans);
+  font-size: 9px;
+  line-height: 12px;
+  height: 12px;
+  margin-bottom: 1px;
+  text-align: center;
+  color: #fff;
+  border-radius: 2px;
+  overflow: hidden;
+  /* 短码是主标识、颜色只是次要线索：底色一律压在纸面白上，文字恒为白 */
+  box-shadow: 0 0 0 1px rgba(253, 251, 245, 0.9);
+}
+.qtag-more,
+.qtag-count {
+  background: rgba(43, 42, 38, 0.72);
+}
+/* chip 级降级：留白里连一个短码都放不下时，总数挂到号牌上（绝不静默丢痕） */
+.q-chip .qtag-badge {
+  margin-left: 2px;
+  font-size: 8px;
+  opacity: 0.9;
+}
+
+/* 触屏热区：号牌视觉尺寸不变（14px 高），只在 coarse pointer 上把可点范围扩到约 42×42。
+ * 桌面不扩——桌面鼠标本来就能点中 14px 的目标，扩了反而会抢掉正文文字的点击与选择。 */
+@media (pointer: coarse) {
+  .q-chip.plain {
+    cursor: pointer;
+  }
+  .q-chip.plain::before {
+    content: "";
+    position: absolute;
+    left: -12px;
+    right: -12px;
+    top: -14px;
+    bottom: -14px;
+  }
+  .q-chip.plain {
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+}

@@ -11,7 +11,9 @@
 import { layoutPage } from "./layout.js";
 import {
   isPageFurniture,
+  looksLikeAnswerEntry,
   matchAnswerEntry,
+  matchBoxListItem,
   matchFirstLine,
   nextKey,
   splitConjoinedOptions,
@@ -35,6 +37,12 @@ export const REVIEW_THRESHOLD = 0.75;
 
 /** 选择题默认 4 个选项；多选题后续扩展 */
 const EXPECTED_OPTION_COUNT = 4;
+
+/**
+ * 方框内编号列表状态的**存活上限**（块数）。见 Ctx.boxList。
+ * 实测该方框内条目间的最大间隔为 5 个块（含跨页与三幅插图），取 12 留 2.4 倍余量。
+ */
+const BOX_LIST_MAX_IDLE = 12;
 
 interface Draft {
   seq: number;
@@ -131,6 +139,14 @@ class Ctx {
   private sectionSeq = 0;
   /** 当前编号组里是否已收过题（用于「题号回到 1 ⇒ 新组」的判定） */
   private groupHasQuestions = false;
+  /**
+   * **方框内编号列表**状态（见 patterns.ts 的 BOX_LIST_BULLET）。
+   * `anchor` = 列表起始编号（`▶N.` 的 N，诊断文案用）；`last` = 最近一条方框条目的编号；
+   * `idle` = 距上次方框条目的块数（防状态滞留）。
+   * 只在「见过 `▶N.` 锚点」时建立，且只吞**序号恰好 +1** 的行 —— 判据最严，
+   * 无编号方框完全不受影响。
+   */
+  private boxList: { anchor: number; last: number; idle: number } | null = null;
   private chapter = "";
   private chapterTitle = "";
   private sectionNo = "";
@@ -209,6 +225,11 @@ class Ctx {
       return;
     }
 
+    // 方框列表状态防滞留：距上次方框条目超过 BOX_LIST_MAX_IDLE 个块即失效。
+    // 为什么需要：状态要跨页存活（实测该方框从 p15 底跨到 p16 顶），所以不能用页界清；
+    // 上限取「实测最大间隔 5 个块」的 2.4 倍，既容得下真实间隔，又不会长期滞留。
+    if (this.boxList && ++this.boxList.idle > BOX_LIST_MAX_IDLE) this.boxList = null;
+
     // 页面家具跳过：页顶带的页眉装饰行（计划用时/必刷知识/单字"刷"logo）。
     // MinerU 对它们的去留不稳定，留在正文时会被上一页跨页未关的题吞进
     // 题干/选项（2026-10-07 p4 假第5题实证）——不归属任何题，也不进题干。
@@ -237,11 +258,18 @@ class Ctx {
 
     const m = matchFirstLine(block.firstLine);
 
+    // 方框内编号列表的锚点 `▶1. …`（方法技巧/易错警示方框）：记下起始编号，
+    // 后续「序号恰好 +1」的行按方框条目处理（见 patterns.ts 的 BOX_LIST_BULLET）。
+    // 放在这里而不是函数开头：`firstLine` 只对文本块存在（图/公式块没有）。
+    const boxAnchor = matchBoxListItem(block.firstLine);
+    if (boxAnchor !== null) this.boxList = { anchor: boxAnchor, last: boxAnchor, idle: 0 };
+
     switch (m.kind) {
       case "answer_zone": {
         // 参考答案区：试题流终止，之后只解析答案条目
         this.settleOptions(null);
         this.current = null;
+        this.boxList = null;
         this.mode = "answers";
         return;
       }
@@ -250,6 +278,7 @@ class Ctx {
         // （题号会在新章里从 1 重新开始，旧节号留着会造出错误的唯一键）
         this.settleOptions(null);
         this.current = null;
+        this.boxList = null;
         this.chapter = m.captured;
         this.chapterTitle = m.title ?? "";
         this.sectionNo = "";
@@ -260,6 +289,7 @@ class Ctx {
         // 节/大题标题：如 "第2节 牛顿第三定律" / "专题 …" / "一、选择题" —— 更新节上下文
         this.settleOptions(null);
         this.current = null;
+        this.boxList = null;
         this.sectionNo = m.captured || (m.indexNumeral ?? "");
         this.section = block.text.trim();
         return;
@@ -276,6 +306,28 @@ class Ctx {
         return;
       }
       case "question_no": {
+        // **方框守卫**：`▶N.` 锚点之后、序号恰好 +1、且**不像答案条目**的行，
+        // 是方框内的编号条目（不是题）。判据最严（AND 三条件），且**不静默**：
+        // 记 ReviewNote，文本并入当前题（不丢内容）。
+        // 第三条件是防「静默误吞真题」——见 patterns.ts 的 ANSWER_SHAPE。
+        // 任一条件不满足 ⇒ 方框列表结束，该行按正常题号处理。
+        if (
+          this.boxList &&
+          Number(m.captured) === this.boxList.last + 1 &&
+          !looksLikeAnswerEntry(block.firstLine)
+        ) {
+          const anchor = this.boxList.anchor;
+          this.boxList = { anchor, last: Number(m.captured), idle: 0 };
+          this.settleOptions(null);
+          this.appendToCurrent(block.text, blockIndex);
+          this.review(
+            blockIndex,
+            `方框内编号条目「${m.captured}.」未作为题目（方法技巧/易错警示方框的编号列表，锚点 ▶${anchor}.）`,
+            this.current,
+          );
+          return;
+        }
+        this.boxList = null;
         this.settleOptions(null);
         this.openDraft(m.captured, block, entry);
         return;

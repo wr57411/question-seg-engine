@@ -14,11 +14,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ruleStrategy } from "../src/index.js";
-import { matchFirstLine } from "../src/patterns.js";
+import { looksLikeAnswerEntry, matchFirstLine } from "../src/patterns.js";
 import { normalizeLayout } from "../src/normalize.js";
 import { detectColumnCenters, detectColumns, layoutPage } from "../src/layout.js";
 import { scanFormulaNoise, type FormulaNoiseReport } from "../src/formula.js";
-import type { BBox, IndexedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
+import type { BBox, IndexedBlock, ParsedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
 
 /** 阶段 1：MinerU 原始段级块（保留 MinerU 自身 type，只截断文本） */
 export interface RawStageBlock {
@@ -786,6 +786,86 @@ function injectOcrQuestionLines(doc: ParsedDocument, docId: string): number {
   return injected;
 }
 
+/** 归一化用于「OCR 行 ↔ 块」匹配：去空白/数学记号/标点，只留字面 */
+const normForMatch = (s: string) => s.replace(/[\s$\\{}_^，,。.、;；:：]/g, "");
+
+/** 在页内找「包含某 OCR 行开头」的**文本块**（用于给补入行定位） */
+function findBlockByLine(
+  page: ParsedDocument["pages"][number],
+  line: string,
+): Extract<ParsedBlock, { text: string }> | null {
+  const key = normForMatch(line).slice(0, 10);
+  if (key.length < 6) return null;
+  const hit = page.blocks.find((b) => b.kind !== "image" && b.kind !== "formula" && normForMatch(b.text).includes(key));
+  return hit && hit.kind !== "image" && hit.kind !== "formula" ? hit : null;
+}
+
+/**
+ * OCR **整页全文**补行（第二来源；与 items 路径互补）。
+ *
+ * 为什么需要它：上游偶尔把**整行**吞进一个更宽的 bbox —— 那一行的墨迹落在 bbox 内，
+ * 于是墨迹分析**看不到**它（不会被标成「未覆盖」⇒ 不进 `items`），补行链路就漏了。
+ * 但整页 OCR 的 `fullText` 里有这一行。实测（2026-10-14）：答案册 p10 的
+ * `6. D 必刷考点·共点力平衡` 整行被 MinerU 丢掉，其墨迹被吞进 `【解析】…` 那个块的 bbox
+ * （[63,47,353,156]），items 路径看不见它 —— 直接后果是题库里这道题**永远配不到答案**。
+ *
+ * ⚠️ **判据必须比 items 路径更严**：`items` 的候选来自未覆盖墨迹（位置可靠），
+ * `fullText` 只有形状、没有坐标。实测 p15 的 fullText 里混着「方法技巧」方框内的说明条目
+ * （`1. 质点从竖直圆环上沿不同的光滑弦…` / `2. 质点从竖直圆环上最高点…`，且 `▶` 被 OCR 读丢）
+ * —— 若只看「行首是不是题号形态」，就会把刚修掉的假题**补回来**。
+ * ⇒ 只补**像答案条目**的行（题号后紧跟答案字母 / 小问 / 【解析】 / 必刷标签，见 `looksLikeAnswerEntry`）。
+ *
+ * 定位：用 OCR 的**下一行**在页内找到对应块，把补入行放在它**正上方**（同一栏）。
+ * 找不到落点就**跳过并报数**（不猜坐标、不静默）。
+ */
+function injectOcrFullTextLines(doc: ParsedDocument, docId: string): { injected: number; skipped: number } {
+  const f = join("data", "out", docId, "ocr-page-fill.json");
+  if (!existsSync(f)) return { injected: 0, skipped: 0 };
+  let data: { pages?: { page: number; fullText?: string }[] };
+  try {
+    data = JSON.parse(readFileSync(f, "utf8")) as typeof data;
+  } catch {
+    return { injected: 0, skipped: 0 };
+  }
+  let injected = 0;
+  let skipped = 0;
+  for (const pg of data.pages ?? []) {
+    if (!pg.fullText) continue;
+    const page = doc.pages.find((p) => p.index === pg.page);
+    if (!page) continue;
+    const lines = pg.fullText.split("\n").map((s) => s.trim()).filter(Boolean);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!;
+      const m = matchFirstLine(line);
+      if (m.kind !== "question_no") continue;
+      if (!looksLikeAnswerEntry(line)) continue; // 更严：必须像答案条目
+      const num = m.captured;
+      const exists = page.blocks.some((b) => {
+        if (b.kind !== "text") return false;
+        const bm = matchFirstLine(b.firstLine);
+        return bm.kind === "question_no" && bm.captured === num;
+      });
+      if (exists) continue; // 该页已有同号题切口
+      const target = findBlockByLine(page, lines[i + 1] ?? "");
+      if (!target) {
+        skipped++;
+        continue;
+      }
+      const h = Math.max(6, (target.bbox[3] - target.bbox[1]) / Math.max(1, target.lineCount));      page.blocks.push({
+        kind: "text",
+        bbox: [target.bbox[0], target.bbox[1] - h, target.bbox[2], target.bbox[1]],
+        text: line,
+        firstLine: line,
+        lineCount: 1,
+        maxFontSize: 0,
+        fromOcr: true,
+      });
+      injected++;
+    }
+  }
+  return { injected, skipped };
+}
+
 function main(): void {
   const docId = process.argv[2] ?? "23必刷题 2相互作用";
   const layoutPath = process.argv[3] ?? join("data", "smoke", "unpacked", "layout.json");
@@ -795,6 +875,14 @@ function main(): void {
   // ⚠️ 先补「OCR 读到的题号行」，再切分 —— 否则整行被上游漏掉的题根本不存在（见函数注释）
   const injected = injectOcrQuestionLines(doc, docId);
   if (injected) console.log(`  OCR 补入题号行 ${injected} 处（上游整行漏识别，展示层以候选样式呈现）`);
+  // 第二来源：整页 OCR 全文（补「墨迹被吞进更宽 bbox、items 看不见」的整行漏识别，见函数注释）
+  const full = injectOcrFullTextLines(doc, docId);
+  if (full.injected || full.skipped) {
+    console.log(
+      `  OCR 整页全文补入题号行 ${full.injected} 处` +
+        (full.skipped ? `（另有 ${full.skipped} 处找不到落点，已跳过）` : ""),
+    );
+  }
   const result = ruleStrategy.segment(doc);
   const snapshot = buildStageSnapshot(doc, result, extractRawBlocks(raw), extractDiscardedBlocks(raw));
 

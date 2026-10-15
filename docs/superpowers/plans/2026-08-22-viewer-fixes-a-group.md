@@ -1,5 +1,8 @@
 # viewer 体验修复 A 组：完整 URL + doc 容错 + 浏览器验证 Gate
 
+> 📍 交接导航：本文件是**当时的实施计划（历史记录）**，不代表当前状态。
+> 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](../../HANDOFF.md)**；通用约定见 **[AGENTS.md](../../../AGENTS.md)**。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修复用户反馈的三个真实问题——`npm run view` 不打印带完整 doc 的可点击 URL（导致拿到裸地址误拼截断）、viewer 在 doc 参数截断/非法时静默空白（应回退默认 doc 并明确提示）、以及「没有浏览器验证能力导致此类问题漏检」的验证缺口。**验证缺口用"截图 + 主模型视觉审视"为核心手段**——DOM 断言只能证明元素存在，版面怪异（重叠/错位/间距/溢出/字体/图片）必须截图逐屏审视才能发现；本计划以截图视觉审视作为验收主轴，发现的一切版面异常必须实际修复，而非仅记录。这是对"单一 Gate 不充分"的直接回应。

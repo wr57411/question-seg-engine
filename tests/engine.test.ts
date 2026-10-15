@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { matchFirstLine } from "../src/patterns.js";
+import { matchBoxListItem, matchFirstLine } from "../src/patterns.js";
 import { segmentFromContentList } from "../src/index.js";
 
 const load = (name: string) =>
@@ -114,4 +114,94 @@ test("干扰项：正文行首数字被误切为重复题号 → needs_review，
   assert.match(r.questions.find((x) => x.number === "2")!.answer!, /解析：由 f\(1\)=2/);
   // 答案条目全部对号入座
   assert.equal(r.stats.answersMatched, 4);
+});
+// ---------- 方框守卫：方法技巧/易错警示方框内的编号条目不是题目（2026-10-14） ----------
+
+/** 造一个单页 content_list：blocks = [text, …]（每项一行文字） */
+function pageOf(lines: string[]): unknown {
+  return {
+    pdf_info: [
+      {
+        page_idx: 0,
+        page_size: [1654, 2339],
+        blocks: lines.map((content, i) => ({
+          type: "text",
+          bbox: [60, 100 + i * 40, 1600, 130 + i * 40],
+          lines: [{ spans: [{ type: "text", content }] }],
+        })),
+      },
+    ],
+  };
+}
+
+test("语言层：方框编号列表锚点 `▶N.` 才认，`▶(1)` 不认", () => {
+  assert.equal(matchBoxListItem("▶1. 质点从竖直圆环上沿不同的光滑弦上端由静止开始滑到"), 1);
+  assert.equal(matchBoxListItem("▶ 3、两个竖直圆环相切"), 3);
+  assert.equal(matchBoxListItem("▶(1)判断合运动：物体的实际运动就是合运动."), null);
+  assert.equal(matchBoxListItem("2. 质点从竖直圆环上最高点沿不同的光滑弦"), null);
+  assert.equal(matchBoxListItem("▶分析滑块一木板类模型时要抓住一个转折和两个关联"), null);
+});
+
+test("方框守卫：方框内 `2.` `3.` 不切题，真题号保持 1/2/3 连续（2026-10-14 真实回归）", () => {
+  const r = segmentFromContentList(
+    pageOf([
+      "1. BC 必刷模型·等时圆模型",
+      "【解析】小滑块a、b均能沿各自斜轨道匀速下滑，则 $mg\\sin\\theta=\\mu mg\\cos\\theta$",
+      "方法技巧·等时圆模型",
+      "▶1. 质点从竖直圆环上沿不同的光滑弦上端由静止开始滑到环的最低点所用时间相等，如图甲所示.",
+      "2. 质点从竖直圆环上最高点沿不同的光滑弦由静止开始滑到下端所用时间相等，如图乙所示.",
+      "3.两个竖直圆环相切且两圆环的竖直直径均过切点，质点沿不同的光滑弦上端由静止开始滑到下端所用时间相等，如图丙所示.",
+      "2.B必刷模型·等时圆模型",
+      "【解析】设该圆弧对应的半径为R，小球沿光滑圆弧面ABD运动到底端的时间相当于摆长为R的单摆周期的1/4",
+      "3.B【解析】本题考查运动学公式.物块在桌面上做匀减速直线运动",
+    ]),
+    "box-guard",
+  );
+
+  // 关键：题号必须是 1,2,3 —— 而不是 1,2,3(方框),2,3
+  assert.deepEqual(
+    r.questions.map((q) => q.number),
+    ["1", "2", "3"],
+    "方框内的 2./3. 不得成为题目",
+  );
+
+  // 不静默：被抑制的方框条目必须有 ReviewNote
+  const boxNotes = r.reviews.filter((rv) => rv.reason.includes("方框内编号条目"));
+  assert.equal(boxNotes.length, 2, "两条被抑制的方框条目都要有诊断记录");
+
+  // 不丢内容：方框条目的原文并入当前题题干
+  const q1 = r.questions[0]!;
+  assert.match(q1.stem, /质点从竖直圆环上最高点沿不同的光滑弦/, "方框条目文本必须保留");
+  assert.match(q1.stem, /两个竖直圆环相切且两圆环的竖直直径均过切点/, "方框条目文本必须保留");
+});
+
+test("方框守卫不误伤：序号不连续时照常切题（锚点 ▶1. 之后出现 5.）", () => {
+  const r = segmentFromContentList(
+    pageOf([
+      "1. A 必刷知识·摩擦力",
+      "方法技巧·某技巧",
+      "▶1. 方框里的第一条说明",
+      "5. B 必刷考点·牛顿第三定律",
+    ]),
+    "box-guard-negative",
+  );
+  assert.deepEqual(r.questions.map((q) => q.number), ["1", "5"], "5 不是 1+1，必须照常成为题目");
+  assert.equal(r.reviews.filter((rv) => rv.reason.includes("方框内编号条目")).length, 0);
+});
+
+test("方框守卫不误吞真题：方框 2 条 + 下一条真题号恰好 3（带答案形态）必须切题", () => {
+  const r = segmentFromContentList(
+    pageOf([
+      "1. A 必刷知识·摩擦力",
+      "方法技巧·某技巧",
+      "▶1. 方框里的第一条说明",
+      "2. 方框里的第二条说明",
+      "3.B必刷考点·牛顿第三定律",
+      "4. C 必刷模型·板块模型",
+    ]),
+    "box-guard-answer-shape",
+  );
+  // 若只看「序号恰好 +1」，真题 3 会被静默吞进方框 —— 这道 AND 条件就是拦它的
+  assert.deepEqual(r.questions.map((q) => q.number), ["1", "3", "4"], "带答案形态的 3. 必须切题");
+  assert.equal(r.reviews.filter((rv) => rv.reason.includes("方框内编号条目")).length, 1, "只有第 2 条被抑制");
 });

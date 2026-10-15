@@ -4,6 +4,12 @@
 「垂直演进模型」的起点：功能链路纵向打通、横向只覆盖高中试卷的典型版面，
 但代码姿态是生产级的（正式 schema、正式接口），后续直接演进为正式模块。
 
+> **交接入口（跨 Agent 必读）**：接手指南与当前状态已收敛到
+> **[docs/HANDOFF.md](docs/HANDOFF.md)**（含红线、未闭合风险、文档地图）；
+> 根目录 `AGENTS.md` 是各平台编程 Agent 的通用入口。改口径/阈值前先查
+> `docs/DECISIONS.md`（29 条决策，按时间序）。
+> 当前真实数据：题册 15 页 / 83 题，答案册 23 页 / 167 题（详见 HANDOFF §2）。
+
 ## 架构
 
 ```
@@ -103,16 +109,37 @@ npm run stages               # 导出快照 + 启动服务，然后访问 /stage
 - **自反馈环**：主模型 Read 原卷页图 ↔ Read 阶段截图 → 对照发现项 → 修复 → 复拍。
   首轮发现项与处置记录见 [docs/design/stages-review.md](docs/design/stages-review.md)，
   截图证据在 [docs/design/stages-cap/](docs/design/stages-cap/)。
-- **对比模式**（最后一视图）：左原卷页图、右结构化数据按原坐标重建的纸面，
-  同宽并排、翻页同步——排版保真度检查入口。viewer 为阅读版重排版；
-  保真版（按原版面重排的结构化输出）以对比视图为准。
+- **成品 = 按原坐标重建的纸面**（阶段 5）：与「对比」右侧**同一段代码**画的
+  （`stages/reconstruct.js` 的 `renderPaper`，只此一处实现）——「成品跟对比那个一样」
+  是**结构保证**，不是两处各写一遍碰巧长得像。整册浏览版见下面「成品页」。
+- **对比模式**（最后一视图）：左原卷页图、右同一套重建纸面，
+  同宽并排、翻页同步——排版保真度检查入口（审计标记全开）。
+  viewer 为阅读版重排版，定位见「展示层」一节。
 - **公式噪声检测（检测不改写）**：`src/formula.ts` 扫描全部 $...$ 公式按六类噪声分桶
   （数字间空格/字体包装/\left\right/度符号拼写/花括号失衡/超长），报告进质检页作为
   清洗迭代的追踪基线；展示层另有 `stages/latex-display.js` 轻量美化（θ/°/上下标），
   只影响显示、不改数据。discarded_blocks（页眉/页脚/页码）在重建中以虚线灰块呈现。
 - 命令：`npm run stages:export` 仅重导快照；截图审板的发现项写入 stages-review.md。
 
-## 展示层（独立模块）
+## 成品页（像原版书的那一份）
+
+用户 2026-10-14 定的调子：**成品 = 「对比」右侧那张重建纸面**，整册滚动翻，用起来像翻原版书。
+
+```bash
+npm run view            # 起服务后访问 http://localhost:4173/final/?doc=<docId>
+```
+
+- **不做重排**：每一页都交给 `stages/reconstruct.js` 的 `renderPaper` 按原坐标重建；
+  左侧/右侧留白里的数字是**题号标注**（点一下看该题的结构化详情，含配对答案）。
+- **两个开关**（也可用 URL 参数，便于分享某个视图）：
+  - **审计标记**（默认关，`?audit=1` 开）：解析遗漏（洋红框）+ 丢弃块（灰虚线）——
+    这些标记原版书上没有，默认画就不像原版书了；
+  - **OCR 候选样式**（默认开，`?ocr=0` 关）：上游整行漏读、由 OCR 补回的内容。
+    关掉只是**换回普通正文样式**（文本始终在，悬停仍写明来源）——
+    红线 G1（候选不得与引擎原文混淆）在**审计视图**（stages 的对比/原料/切题）里始终严格执行。
+- 换卷：顶部下拉（题册 / 答案册），或 `?doc=<docId>`。
+
+## 展示层（阅读版）
 
 浏览器查看结构化题目（试题区/答题区/答案区、答案开关、按题型留白、公式渲染）：
 
@@ -151,8 +178,10 @@ fixtures/        三份假夹具（单栏 / 双栏 / 干扰项）
 tests/           node:test 用例（含 viewer-contract / viewer-logic 适配断言）
 scripts/demo.ts  演示
 scripts/view-server.ts  演示/预览静态服务器（零依赖，npm run view）
-viewer/          展示层独立模块（viewer.js/css/index.html，解耦红线见 viewer/docs/CONTRACT.md）
-stages/          阶段样品展示模块（六阶段动线：原卷→原料→阅读顺序→切题→质检→成品）
+viewer/          阅读版展示模块（viewer.js/css/index.html，解耦红线见 viewer/docs/CONTRACT.md）
+final/           成品页（整册保真重建，整册滚动翻；与 stages 共用 reconstruct.js）
+stages/          阶段样品展示模块（七视图动线：原卷→原料→阅读顺序→切题→质检→成品→对比）
+stages/reconstruct.js  纸面重建的**唯一实现**（renderPaper：按原坐标画页 + 留白题号牌 + 可选审计标记）
 scripts/export-stages.ts  阶段快照导出（引擎产物 → stages.json + 原卷页图）
 docs/DECISIONS.md  切片决策记录（第二交付物）
 ```

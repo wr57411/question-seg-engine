@@ -1,5 +1,8 @@
 # 栏目归属修正 + 小数题号守卫 实施计划
 
+> 📍 交接导航：本文件是**当时的实施计划（历史记录）**，不代表当前状态。
+> 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](../../HANDOFF.md)**；通用约定见 **[AGENTS.md](../../../AGENTS.md)**。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 消除真实样本剩余 review 中「跨栏错置」（栏界带行被固定中线错路由）与「0.x 幽灵题号」（小数误判为新题）两类根因，review 35 → 预期大幅下降，并通过读序实验为「整栏拼读」是否需水平带归并产出数据决策。

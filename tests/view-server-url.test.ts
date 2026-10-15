@@ -32,6 +32,8 @@ test("view-server 启动日志打印带完整 doc 参数的可点击 URL", () =>
   }
   assert.match(out, /viewer:\s+http:\/\/localhost:\d+\/viewer\/\?doc=/);
   assert.match(out, /stages:\s+http:\/\/localhost:\d+\/stages\/\?doc=/);
+  // 成品页（2026-10-14 新增：成品 = 按原坐标重建的纸面，整册滚动翻）
+  assert.match(out, /成品页：\s+http:\/\/localhost:\d+\/final\/\?doc=/);
   assert.match(out, /23%E5%BF%85%E5%88%B7%E9%A2%98/); // encodeURIComponent("23必刷题") 前缀
   assert.match(out, /%202%E7%9B%B8%E4%BA%92%E4%BD%9C%E7%94%A8/); // " 2相互作用"
 });

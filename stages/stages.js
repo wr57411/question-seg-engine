@@ -7,9 +7,23 @@
 // 分别负责公式展示美化、字号与全角宽度度量、解析遗漏标签落位（后两者的数学与证据见其头注释）。
 
 import { prettifyLatex } from "./latex-display.js";
-import { baseFontOfPage, clampByWidth, fontForBlock, fontForRawBlock, isVerticalText } from "./font-metrics.js";
-import { chipPlacements, contentLabelPlacements } from "./uncovered-layout.js";
-import { mergePlan } from "./block-dedup.js";
+import { baseFontOfPage, fontForRawBlock } from "./font-metrics.js";
+// 纸面重建的**唯一实现**在 ./reconstruct.js（成品页 final/ 与本页共用，避免两套实现漂移）
+import {
+  CANVAS_W,
+  GUTTER,
+  appendBlockNodes,
+  el,
+  enc,
+  legend,
+  mergeContext,
+  ocrFillInto,
+  paperCanvas,
+  posStyle,
+  renderDiscardedInto,
+  renderPaper,
+  uncoveredInto,
+} from "./reconstruct.js";
 
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
@@ -45,8 +59,8 @@ const EXPLAIN = {
     look: "看：被标红的题是不是真有问题？没被标红的题里，能不能肉眼发现电脑没察觉的错误？页面底部的「公式噪声」扫描量化了上游 LaTeX 的可读性问题——它的计数应随算法迭代下降。",
   },
   final: {
-    do: "全部结构化之后，最终成品是一份可阅读、可开关答案的试卷页（与「最终成品 viewer」同一份数据）。这是**阅读版**——为答题/检索重新排版；与原卷的排版保真度请切到下一步「对比」检查。",
-    look: "看：阅读版整体是否可用——题目排版、答案开关、公式与图片是否正常。",
+    do: "全部结构化之后，最终成品就是**按原坐标重建的纸面**——和下一步「对比」的右侧是同一件东西（同一段代码画的），用起来像翻原版书。左侧留白里的数字就是题号标注，点一下看该题的结构化详情。",
+    look: "看：这一页读起来像不像原版书——字号、分栏、插图、公式是否各就各位；题号牌是否都在留白里、没压住正文。要查「哪里可能漏读了」，切到下一步「对比」（那里会画出解析遗漏框）。",
   },
   compare: {
     do: "左边是原卷，右边是用结构化数据按原始坐标重建的纸面——引擎读到什么就画什么，不借助原卷图像。排版保真度一目了然。",
@@ -72,13 +86,6 @@ const NOISE_KIND_LABEL = {
 const state = { doc: null, effectiveDoc: null, data: null, stage: 0, page: 0, highlight: null };
 
 const $ = (id) => document.getElementById(id);
-const el = (tag, cls, text) => {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
-const enc = encodeURIComponent;
 
 /* ── 数据加载（与 viewer 相同的宽容策略：doc 参数非法时回退默认卷一次） ── */
 async function fetchSnapshot(doc) {
@@ -196,74 +203,7 @@ function syncToolbar(p) {
     (p.questions.some((q) => q.status === "needs_review") ? " · 含待复核题" : "");
 }
 
-/* ── 画布与阶段渲染 ── */
-function paperCanvas(p) {
-  const c = el("div", "canvas");
-  c.style.aspectRatio = `${p.width} / ${p.height}`;
-  return c;
-}
-
-function posStyle(node, bbox, w, h) {
-  const [x0, y0, x1, y1] = bbox;
-  node.style.left = `${(x0 / w) * 100}%`;
-  node.style.top = `${(y0 / h) * 100}%`;
-  node.style.width = `${((x1 - x0) / w) * 100}%`;
-  node.style.height = `${((y1 - y0) / h) * 100}%`;
-  return node;
-}
-
-const CANVAS_W = 760; // 与 CSS --canvas-w 一致，用于字号换算
-// 字号与全角宽度度量见 ./font-metrics.js（纯函数模块，有测试锁定；证据见其头注释）。
-
-/** 行级块节点（阶段 2/3 与对比模式共用；canvasW 为画布像素宽，用于字号换算）
- *  mergeCtx：本页「同页块级重复」的**并集合并**上下文（block-dedup.js，判据只此一处定义）：
- *   - `drop`：被合并掉的块（其内容已进合并文本）→ 返回 null，调用方跳过（**不丢内容**）；
- *   - `keep`：承载块 → 用**合并文本**与两块 **bbox 并集**渲染（更接近原卷该行真实范围）。
- *  返回 null 表示该块不渲染。 */
-function blockNode(b, p, canvasW = CANVAS_W, baseFont = null, mergeCtx = null) {
-  if (mergeCtx?.drop.has(b.i)) return null;
-  const m = mergeCtx?.keep.get(b.i);
-  const blk = m ? { ...b, text: m.text, bbox: m.bbox } : b;
-  const node = posStyle(el("div", `blk blk-line kind-${blk.kind}`), blk.bbox, p.width, p.height);
-  node.title = m ? `${blk.text} ｜（上游把本行读成两个重叠块，已合并）` : blk.text;
-  if (blk.kind === "image" && blk.img) {
-    const img = el("img");
-    img.src = `/data/out/${enc(state.effectiveDoc)}/images/${enc(blk.img)}`;
-    img.alt = "图片块";
-    node.append(img);
-  } else {
-    // prettifyLatex 返回 HTML 片段（\frac 竖排分式 / \sqrt 带上划线根号），必须 innerHTML
-    const html = prettifyLatex(blk.text);
-    const txt = el("span", "txt");
-    txt.innerHTML = html;
-    // 宽度安全上限（R3/R5）：行高模型对个别行（页眉页脚/计划用时/短标签）会过冲，
-    // 夹到 bbox 宽以免压到相邻块；纯 CJK 未溢出的块不受影响（见 font-metrics.js clampByWidth）。
-    // Task 14：传入同页块池，供「同栏挤压」结构判据（框被撑大的碎尾退回基准字号）。
-    txt.style.fontSize = `${clampByWidth(fontForBlock(blk, p.width, canvasW, baseFont, p.blocks), blk, p.width, canvasW)}px`;
-    node.append(txt);
-    // 竖排块（R4）：字号已按 bboxW 定，排布方向也要竖排，否则文字仍横向越出窄框
-    if (isVerticalText(blk.bbox, blk.text ?? "")) node.classList.add("blk-vertical");
-  }
-  return node;
-}
-
-/** 本页并集合并上下文：{ drop:Set<i>, keep:Map<i, {text,bbox}> }（block-dedup.js）。
- *  派生逻辑（含「不可合并则不丢弃」不变式）在 `mergePlan` 内，只此一处实现、有测试锁定。 */
-function mergeContext(p) {
-  return mergePlan(p.blocks);
-}
-
-/** 追加本页行级块节点（跳过被合并掉的块；返回与 p.blocks 对齐的节点数组，null = 未渲染）。 */
-function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx) {
-  const nodes = p.blocks.map((b) => blockNode(b, p, canvasW, baseFont, mergeCtx));
-  // `ocr: true` 的块是**从 OCR 候选补进来的题号行**（上游整行漏识别，见 export-stages 的
-  // injectOcrQuestionLines）⇒ 用青绿候选样式渲染，绝不与引擎原文混淆（G1）。
-  nodes.forEach((n, i) => {
-    if (n && p.blocks[i] && p.blocks[i].ocr) n.classList.add("blk-ocr");
-  });
-  for (const n of nodes) if (n) c.append(n);
-  return nodes;
-}
+/* ── 各阶段渲染（纸面重建的基元在 ./reconstruct.js） ── */
 
 function renderOrigin(p) {
   $("canvas-wrap").replaceChildren();
@@ -304,119 +244,6 @@ function renderRaw(p) {
   return c;
 }
 
-const DISCARDED_LABEL = {
-  header: "页眉", footer: "页脚", page_number: "页码", aside_text: "侧栏",
-};
-
-/**
- * OCR 候选补全（`scripts/ocr-fill.ts` / `scripts/ocr-page-fill.ts` 的产物，
- * **显式步骤**，不进 `npm run check`）：对「引擎为空」的解析遗漏区域，
- * 用 PaddleOCR-VL 读到的**候选**文本，**原位**渲染。
- *
- * 两条来源（`it.source`，角标会写明）：
- * - `"crop"`：**区域裁图** —— 窗口按行裁，位置天然对得上；
- * - `"page"`：**整页 OCR** —— 上下文完整、文本更干净（实测一次读全被漏掉的整行），
- *   但 OCR 会把折行的选项并成一行 ⇒ 合并时只用来**补裁图没补上的洞**。
- *
- * 为什么必须原位渲染：不渲染的话右侧重建就永远缺这一行 —— 那正是「对比之后的明显问题」。
- * 为什么不静默替换引擎文本：**OCR 会错字**（实测 `D 当口将` ← 原卷 `D. 当只将`），
- * 所以引擎文本一个字都不动，候选只以**青绿虚线框**呈现（角标默认隐藏、悬停才出，
- * 避免「标记盖住正文」），悬停可见来源、宽度比、证据路径与 OCR 原始输出（可核对）。
- */
-function ocrFillInto(c, p, canvasW = CANVAS_W) {
-  const items = (p.ocrFill ?? []).filter((x) => x.accepted);
-  if (!items.length) return;
-  const baseFont = baseFontOfPage(p.blocks, p.width, canvasW);
-  for (const it of items) {
-    const isPage = it.source === "page";
-    const node = posStyle(el("div", "blk blk-ocr"), it.win ?? it.bbox, p.width, p.height);
-    node.title =
-      `OCR 候选补全（非引擎文本，请核对）\n来源：${isPage ? "整页 OCR" : "区域裁图"}\n` +
-      `宽度比 ${it.ratio}（≈1 为合理；${isPage ? "整页来源按**洞自身**宽度算" : "裁图来源按窗口宽算"}）\n` +
-      `证据：${it.crop}\nOCR 原始输出：${it.raw}`;
-    const txt = el("span", "txt");
-    txt.textContent = it.text;
-    txt.style.fontSize = `${baseFont}px`;
-    node.append(txt, el("span", "tag", isPage ? "OCR·整页" : "OCR·裁图"));
-    c.append(node);
-  }
-}
-
-/**
- * 未覆盖墨迹（Task 16；修复轮 1 分级 + 聚合 + 不遮正文）：
- * 解析漏掉的墨迹区域 —— 这是「不静默失败」红线的**地面真值呈现**（G1：丢失必须可见）。
- * - **内容级**：洋红标记框 + 「解析遗漏」标签（醒目）；
- * - **家具级**（页眉装饰/栏间竖线/页边标）：灰色细虚线框 + title 提示（仍可见，不抢眼，
- *   避免「洋红墙」）；
- * - **标签聚合**：相邻内容级区域合并为一个标签（避免热狗区那种标签堆叠）；
- * - **不遮正文**：标签矩形从候选位里取首个不与任何解析块 bbox 相交者；若框宽不足、或所有
- *   候选位都压正文，则不挂可见标签（改 title）—— 这是硬保证（验收：任何标记都不得盖住正文）。
- */
-function uncoveredInto(c, p, canvasW = CANVAS_W) {
-  const all = p.uncovered ?? [];
-  if (!all.length) return;
-  // 已被 OCR 候选补全覆盖的区域：不再画洋红框（否则会盖住候选文本），
-  // 改由 ocrFillInto 的青绿候选块表达「这里原本缺、现已补上候选」。
-  const filled = (p.ocrFill ?? []).filter((x) => x.accepted).map((x) => x.bbox);
-  const isFilled = (r) =>
-    filled.some((f) => r[0] < f[2] && r[2] > f[0] && r[1] < f[3] && r[3] > f[1]);
-  const content = all.filter((r) => r.kind !== "furniture" && !isFilled(r.bbox));
-  const furniture = all.filter((r) => r.kind === "furniture");
-
-  // 家具级：灰色细虚线框 + title（不挂可见标签）
-  for (const r of furniture) {
-    const node = posStyle(el("div", "uncovered-mark furniture"), r.bbox, p.width, p.height);
-    node.title = `版式家具级未覆盖：原卷页图上是墨迹（页眉装饰/栏间竖线/页边标等），不在任何解析块内（${r.area}px）`;
-    c.append(node);
-  }
-
-  // 内容级：洋红标记框
-  for (const r of content) {
-    const node = posStyle(el("div", "uncovered-mark content"), r.bbox, p.width, p.height);
-    node.title = `解析遗漏（内容级）：原卷页图上是墨迹，却不在本页任何解析块内（${r.area}px）`;
-    c.append(node);
-  }
-
-  // 内容级标签：按组挂一个，落位由 uncovered-layout.js 的 contentLabelPlacements 算好
-  // （它保证每个标签都不与任何解析块 bbox 相交、且在页内；放不下/必压正文的组不产出）。
-  // ⚠️ 避让集合必须**含 OCR 候选块** —— 候选不在 p.blocks 里，不带上它标签就会压住刚补出来的候选文本
-  //（2026-10-10 用户当场指出：「标记盖住正文」的规矩对候选同样成立）。
-  const avoidForLabels = p.blocks.concat(
-    (p.ocrFill ?? []).filter((x) => x.accepted).map((x) => ({ bbox: x.win ?? x.bbox })),
-  );
-  for (const { rect, count } of contentLabelPlacements(content, avoidForLabels, p.width, p.height, canvasW)) {
-    const tag = el("span", "uncovered-tag", count > 1 ? `解析遗漏 ×${count}` : "解析遗漏");
-    tag.style.left = `${(rect[0] / p.width) * 100}%`;
-    tag.style.top = `${(rect[1] / p.height) * 100}%`;
-    c.append(tag);
-  }
-}
-
-/** 丢弃块（页眉/页脚/页码/侧栏）：虚线灰块呈现——原卷上有、解析器判为家具的内容。
- * canvasW 为**该视图**的画布像素宽：阶段 1–5 传 CANVAS_W(760)、对比模式传 PANE_W(460)；
- * 曾硬编码 CANVAS_W → 对比栏内丢弃块字号偏大 760/460 = 1.65×（R2）。 */
-function renderDiscardedInto(c, p, canvasW = CANVAS_W) {
-  const baseFont = baseFontOfPage(p.blocks, p.width, canvasW);
-  // 邻块池含本页行级块与丢弃块：丢弃块之间也可能互相挤压（Task 14 结构判据）
-  const pool = [...(p.blocks ?? []), ...(p.discarded ?? [])];
-  for (const b of p.discarded ?? []) {
-    const node = posStyle(el("div", "blk blk-discarded"), b.bbox, p.width, p.height);
-    const shown = prettifyLatex(b.text);
-    node.title = `[已被解析器丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}] ${b.text}`;
-    if (shown) {
-      const txt = el("span", "txt");
-      txt.innerHTML = shown;
-      // 宽度安全上限（R3/R5）：同 blockNode——丢弃块（页脚等）也会因 bboxH 过冲而压字
-      txt.style.fontSize = `${clampByWidth(fontForBlock(b, p.width, canvasW, baseFont, pool), b, p.width, canvasW)}px`;
-      node.append(txt);
-      // 竖排块（R4）：同 blockNode——字号按 bboxW 定，方向也要竖排
-      if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");
-    }
-    node.append(el("span", "tag", `丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}`));
-    c.append(node);
-  }
-}
-
 function renderOrder(p) {
   const c = paperCanvas(p);
   if (p.centers.length >= 2) {
@@ -432,7 +259,7 @@ function renderOrder(p) {
     c.append(left, right, divider);
   }
   const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
-  appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
+  appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p), state.effectiveDoc); // 同页块级重复并集合并（Task 15）
   p.order.forEach((blockIdx, seq) => {
     const b = p.blocks[blockIdx];
     if (!b) return;
@@ -449,7 +276,7 @@ function renderSeg(p) {
   const c = paperCanvas(p);
   const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
   // 同页块级重复并集合并（Task 15）：被合并掉的块不渲染 → 节点数组与 p.blocks 按位对齐（null = 未渲染）
-  const blockNodes = appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p));
+  const blockNodes = appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p), state.effectiveDoc);
 
   const covered = new Set();
   for (const q of p.questions) for (const i of q.blocks) covered.add(i);
@@ -619,14 +446,38 @@ function renderQA() {
   extra.append(list);
 }
 
-function renderFinal() {
+/**
+ * 阶段 5「成品」= **按原坐标重建的纸面**（与「对比」右侧同一实现，见 ./reconstruct.js）。
+ *
+ * 2026-10-14 用户定的调子：「成品跟这个对比生成的那个是一样的，这样我使用时可以更接近使用原版书」。
+ * 所以这里不再是「卡片式阅读版」（那个仍在 `/viewer/`，供检索/答案开关/质检用）。
+ *
+ * `diagnostics: false` —— 成品是给人读的，洋红「解析遗漏」框/灰虚线丢弃块**原版书上没有**，
+ * 默认画就不像原版书了；要查漏识别请切到「对比」（那里全开）。
+ * 题号牌保留：它就是用户要的题号标注，且挂在留白里、不压正文。
+ */
+function renderFinal(p) {
   $("canvas-wrap").replaceChildren();
   const extra = $("stage-extra");
   extra.replaceChildren();
-  const f = el("iframe", "viewer-frame");
-  f.src = `/viewer/?doc=${enc(state.effectiveDoc)}`;
-  f.title = "最终成品 viewer";
-  extra.append(f);
+  const holder = el("div", "final-wrap");
+  holder.append(
+    renderPaper(p, {
+      doc: state.effectiveDoc,
+      paneW: CANVAS_W,
+      diagnostics: false,
+      onChipClick: showDetail,
+    }).wrap,
+  );
+  $("canvas-wrap").append(holder);
+
+  const note = el("p", "final-note");
+  note.innerHTML =
+    "成品 = 结构化数据按原坐标重建的纸面（与原卷逐块对位，非原图）。" +
+    `完整成品页（整册浏览 · 可切审计标记）：<a href="/final/?doc=${enc(state.effectiveDoc)}" target="_blank" rel="noopener">打开成品页 ↗</a>` +
+    ` · 要检索/答案开关：<a href="/viewer/?doc=${enc(state.effectiveDoc)}" target="_blank" rel="noopener">阅读版 ↗</a>` +
+    " · 要查漏识别：上一步「对比」。";
+  extra.append(note);
 }
 
 /** 对比模式：左 = 原卷页图，右 = 结构化数据按原坐标重建的纸面 */
@@ -658,55 +509,16 @@ function renderCompare(p) {
   const right = el("div", "compare-pane");
   right.style.width = `${paneW}px`;
   right.append(el("p", "pane-title", "成品（结构化数据按原坐标重建，非原图）"));
-  // ⚠️ **留白（gutter）专供题号牌**（2026-10-12 用户当场指出）。
-  // 原做法是「页内落位，放不下就不挂」—— 但答案册这种密页（86 块/双栏/小字）
-  // 页边距根本放不下号牌，于是**整页几乎一个号牌都不显示**，用户看到的就是「题号没识别出来」。
-  // 现在把内容区收窄、号牌挂在留白里 ⇒ 永远放得下，且**绝不压正文**。
-  //
-  // ⚠️ **号牌必须挂在「题目所在那一栏」的外侧**：双栏页里右栏的题若把号牌挂到左留白，
-  // 看起来就像标在左栏内容上（2026-10-12 用户当场指出「识别错了」——
-  // 实测第 17 页第 3/4/5/6 题首块 x≈276 属右栏，号牌却全挂在左侧）。
-  const firsts = p.questions.map((q) => q.blocks.map((i) => p.blocks[i]).find(Boolean) ?? null);
-  const mid = p.width / 2;
-  const isRightCol = (b) => (p.columns ?? 1) >= 2 && !!b && (b.bbox[0] + b.bbox[2]) / 2 >= mid;
-  const needsRight = p.questions.some((q, k) => q.startsHere !== false && isRightCol(firsts[k]));
-  const GUTTER = 22;
-  const innerW = Math.max(120, paneW - GUTTER - (needsRight ? GUTTER : 0));
-  const c = paperCanvas(p);
-  c.style.width = `${innerW}px`;
-  renderDiscardedInto(c, p, innerW); // 对比栏宽口径：丢弃块也必须用 innerW（R2）
-  const baseFont = baseFontOfPage(p.blocks, p.width, innerW);
-  appendBlockNodes(c, p, innerW, baseFont, mergeContext(p)); // 同页块级重复并集合并（Task 15）
-  // ⚠️ 号牌**不能**挂在画布内部：`.canvas` 有 `overflow: hidden`（「画布边界裁切」的既定决策，不改），
-  // 挂在画布外侧的号牌会被**裁掉**（DOM 里有、位置也对，就是看不见 —— 2026-10-12 实测踩到）。
-  // ⇒ 套一层与画布等宽等高的定位容器，号牌挂在容器上。
-  const paperWrap = el("div", "paper-wrap");
-  paperWrap.style.position = "relative";
-  paperWrap.style.marginLeft = `${GUTTER}px`;
-  if (needsRight) paperWrap.style.marginRight = `${GUTTER}px`;
-  paperWrap.append(c);
-  p.questions.forEach((q, k) => {
-    const f = firsts[k];
-    if (!f) return;
-    // 跨页题的**续段**不挂号牌：那一页的原卷上本来就没有题号，
-    // 挂了会让用户看到「不属于这页的题号」（实测第 17 页顶部挂 `第8题`，而该页题号是 9/2/3/4/5/6）。
-    if (q.startsHere === false) return;
-    // **只写数字**（用户要求：写「第N题」太占版面，把页面挤小了）——
-    // 完整信息放 title（悬停可见），点开看详情的行为不变。
-    const chip = el("span", "q-chip plain", q.number);
-    chip.title = `第${q.number}题（点击看详情）`;
-    // 按题目所在栏决定挂哪一侧：右栏题挂右留白，其余挂左留白
-    if (isRightCol(f)) chip.style.left = "calc(100% + 4px)";
-    else chip.style.right = "calc(100% + 4px)";
-    chip.style.top = `${(f.bbox[1] / p.height) * 100}%`;
-    chip.addEventListener("click", () => showDetail(q, p));
-    paperWrap.append(chip);
+  // 纸面重建的**唯一实现**在 ./reconstruct.js —— 成品页（final/）用的是同一个函数，
+  // 所以「成品 = 对比右侧」是结构保证的，不是两处各写一遍碰巧长得像。
+  // 对比模式是**审计视图** ⇒ diagnostics 全开（解析遗漏框 + 丢弃块）。
+  const paper = renderPaper(p, {
+    doc: state.effectiveDoc,
+    paneW,
+    diagnostics: true,
+    onChipClick: showDetail,
   });
-  right.append(paperWrap);
-  ocrFillInto(c, p, innerW); // 对比模式：先画 OCR 候选补全
-  uncoveredInto(c, p, innerW); // 对比模式必做：把解析遗漏标在右侧重建上（Task 16）
-  // 注意：**不要再 right.append(c)** —— c 已经在 paperWrap 里；重复 append 会把它移出容器，
-  // 号牌就又回到被 `.canvas{overflow:hidden}` 裁掉的状态。
+  right.append(paper.wrap);
 
   row.append(left, right);
   $("canvas-wrap").append(row);
@@ -744,7 +556,7 @@ function render() {
   explain.append(doLine, lookLine);
 
   $("detail").hidden = true;
-  const noToolbar = state.stage === 4 || state.stage === 5;
+  const noToolbar = state.stage === 4; // 质检是列表视图、无页码；成品是逐页重建 ⇒ 要翻页栏
   $("toolbar").hidden = noToolbar;
   $("origin-link").hidden = noToolbar;
 
@@ -779,23 +591,12 @@ function render() {
   } else if (state.stage === 4) {
     renderQA();
   } else if (state.stage === 5) {
-    renderFinal();
+    renderFinal(p);
+    syncToolbar(p);
   } else {
     renderCompare(p);
     syncToolbar(p);
   }
-}
-
-function legend(items) {
-  const l = el("div", "legend");
-  for (const [color, label] of items) {
-    const s = el("span");
-    const sw = el("span", "sw");
-    sw.style.background = color;
-    s.append(sw, document.createTextNode(label));
-    l.append(s);
-  }
-  return l;
 }
 
 /* 对比模式的栏宽随窗口变化 → 防抖重渲染，保证「永远并排」且字号换算口径与真实栏宽同步。 */

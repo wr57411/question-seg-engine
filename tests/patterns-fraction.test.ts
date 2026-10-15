@@ -10,6 +10,24 @@ test("0.x 小数行不再判为题号（幽灵题号守卫）", () => {
   }
 });
 
+/**
+ * 真实回归（2026-10-12）：域约束「题号首位 1-9」。
+ * 答案册 p19 第 6 题解答里一行原文 `0.5~1.5 s内 mg sinθ−μmg cosθ=ma₂`，
+ * MinerU 把 `0.5` 的 `5` 数学化成 `$5` ⇒ 该行首变成 `0.$5 …`。
+ * 旧的「半角点后接数字才算小数」守卫看到 `$` 便放行，凭空切出一道「第 0 题」，
+ * 页面上表现为「6 后面跟一个 0」。
+ */
+test("域约束：题号首位必须是 1-9，`0.$5 …` 这类被读碎的小数不再是题号", () => {
+  const brokenDecimal = "0.$5 \\sim 1 . 5 \\mathrm { ~ s ~ }$内$m g \\sin \\theta - \\mu m g \\cos \\theta = m a _ { 2 }$";
+  assert.equal(matchFirstLine(brokenDecimal).kind, "other", "`0.$5 …` 不是题号");
+  assert.equal(stripQuestionPrefix(brokenDecimal), brokenDecimal, "被拒的形态，剥离层必须一个字都不动");
+  assert.equal(matchAnswerEntry("0.$5,不"), null, "答案条目同样不得把 0 当题号");
+  assert.equal(matchFirstLine("0.5~1.5 s内，小煤块…").kind, "other", "区间号 `0~` 也不是题号");
+  // ⚠️ **残留缺口（不在此处断言，登记备查）**：同族里 `1.$5 …`（即 1.5 被读碎）**仍会被判成题号 1**
+  // —— 域约束只挡 0，挡不住首位合法的被读碎小数。这类行只能靠「组内题号非单调」这类
+  // **上下文合理性**判据发现（见 scripts/audit-numbering.ts 的 N7 提示项）。
+});
+
 test("真题号形态不受影响", () => {
   assert.equal(matchFirstLine("1．设集合 A = {x}，则…").kind, "question_no");
   assert.equal(matchFirstLine("1. 设集合 A = {x}，则…").kind, "question_no");

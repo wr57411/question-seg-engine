@@ -1,5 +1,8 @@
 # 题库查看器（Viewer）前端产品需求文档（PRD v1）
 
+> 📍 交接导航：本文件是 viewer 的**历史设计输入稿**（2026-08-22）。实现以 `viewer/` 实际代码为准；
+> 项目当前状态与跨 Agent 交接入口见 **[docs/HANDOFF.md](HANDOFF.md)**。
+
 > 适用范围：question-seg-engine 切片的展示层独立模块。
 > 用途：作为 Google Stitch（或任何 UI 设计工具/AI）的设计输入稿；Stitch 生成设计稿后，以本文件为准进行评审对齐。
 > 状态：待设计验证。配套技术契约：`viewer/docs/CONTRACT.md`（跨层边界，UI 设计不违背该契约）。

@@ -1,5 +1,8 @@
 # 展示层独立模块：题库查看器实施计划
 
+> 📍 交接导航：本文件是**当时的实施计划（历史记录）**，不代表当前状态。
+> 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](../../HANDOFF.md)**；通用约定见 **[AGENTS.md](../../../AGENTS.md)**。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 为切片增加一个**独立可解耦的题库展示层**——浏览器中查看结构化分类后的试题（试题区/答题区/答案区、答案开关、按题型的答题留白、公式渲染），作为切分质量的可视化验收面；展示层不 import 引擎任何代码，只消费固定数据契约，后期换 React/Vue/原生实现时引擎零改动。

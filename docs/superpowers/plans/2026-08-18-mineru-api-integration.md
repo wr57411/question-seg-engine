@@ -1,5 +1,8 @@
 # MinerU 真实 API 接入实施计划
 
+> 📍 交接导航：本文件是**当时的实施计划（历史记录）**，不代表当前状态。
+> 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](../../HANDOFF.md)**；通用约定见 **[AGENTS.md](../../../AGENTS.md)**。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让 question-seg-engine 通过真实 MinerU API（`mineru_API_KEY`）把本地样卷解析为 content_list.json，并接入现有切分管线，跑通端到端。

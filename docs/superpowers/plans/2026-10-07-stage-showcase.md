@@ -1,5 +1,8 @@
 # 阶段样品展示（stage showcase）设计 —— 2026-10-07
 
+> 📍 交接导航：本文件是**当时的实施计划（历史记录）**，不代表当前状态。
+> 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](../../HANDOFF.md)**；通用约定见 **[AGENTS.md](../../../AGENTS.md)**。
+
 ## 背景与目标
 
 用户（非技术背景）无法从 schema/置信度等专业维度审阅切分引擎，
@@ -11,7 +14,7 @@
 > 实现过程中需求演进为**自反馈环**：不仅用户能看，主模型自己也要能拿
 > **原卷页图 ↔ 阶段输出**对照，自监督地发现问题并修复。
 > 因此增加「阶段 0 · 原卷对照」（pdftoppm 逐页 PNG，无工具时降级 PDF 内嵌），
-> 自反馈首轮发现项见 [docs/design/stages-review.md](../design/stages-review.md)。
+> 自反馈首轮发现项见 [docs/design/stages-review.md](../../design/stages-review.md)。
 
 ## 阶段叙事（6 步，每步回答一个问题）
 

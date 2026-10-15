@@ -1,5 +1,8 @@
 # 展示层数据契约（CONTRACT v1）
 
+> 📍 交接导航：本文件是引擎↔展示层的**技术契约**（持续有效，改 viewer/ 前必读）。
+> 项目当前状态与跨 Agent 交接入口见 **[../../docs/HANDOFF.md](../../docs/HANDOFF.md)**。
+
 引擎与展示层的唯一边界。引擎（src/）产出的 questions.json 序列化形态；展示层（viewer/）只消费本文件描述的数据。
 
 ## 数据源

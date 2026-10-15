@@ -5,6 +5,8 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2022"],
     "strict": true,
+    "allowJs": true,
+    "checkJs": false,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,5 +14,11 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "tests", "scripts"]
+  "include": [
+    "src",
+    "tests",
+    "scripts",
+    "stages/tag-layout.js",
+    "final/tag-store.js"
+  ]
 }

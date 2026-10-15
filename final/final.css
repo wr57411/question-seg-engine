@@ -1,0 +1,261 @@
+/* final.css —— 成品页（整册浏览）的壳样式。
+   纸面本身的样式（.canvas / .blk / .q-chip …）全部来自 ../stages/stages.css，
+   这里只写「书壳」：吸顶工具条、页与页之间的分隔、详情抽屉。
+   颜色沿用 stages.css 的变量（纸色/墨/朱砂/石青）。 */
+
+.fb-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 8px 18px;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1.5px solid var(--line);
+}
+.fb-left { display: flex; align-items: baseline; gap: 8px; }
+.fb-left strong { font-family: var(--serif); font-size: 17px; letter-spacing: .08em; }
+.fb-sub { color: var(--ink-soft); font-size: 12px; }
+.fb-mid { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.fb-mid select {
+  font-family: var(--sans); font-size: 13px; padding: 3px 6px;
+  border: 1px solid var(--line); border-radius: 2px; background: var(--paper); color: var(--ink);
+  max-width: 260px;
+}
+.fb-page { color: var(--ink-soft); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.fb-right { display: flex; align-items: center; gap: 12px; }
+.fb-toggle { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; }
+.fb-toggle input { accent-color: var(--azurite); }
+.fb-right a { color: var(--azurite); font-size: 12.5px; text-decoration: none; }
+.fb-right a:hover { text-decoration: underline; }
+
+/* 书页：一页一节，页与页之间留出「翻页」的呼吸感 */
+#book { padding: 18px 12px 60vh; display: flex; flex-direction: column; align-items: center; gap: 26px; }
+.bk-page { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.bk-head {
+  align-self: center; margin: 0 0 6px; color: var(--ink-soft);
+  font-size: 12px; letter-spacing: .16em; font-variant-numeric: tabular-nums;
+}
+.bk-page .paper-wrap { /* 宽度由 renderPaper 的行内样式决定 */ }
+
+/* 详情抽屉：从右侧滑出，不遮挡纸面主体（点击题号牌触发） */
+.fb-detail {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw); z-index: 30;
+  overflow-y: auto; padding: 16px 18px 40px;
+  background: var(--paper); border-left: 1.5px solid var(--line);
+  box-shadow: -12px 0 28px rgba(43, 42, 38, .12);
+}
+.fb-detail h3 { font-family: var(--serif); font-size: 16px; margin: 4px 0 8px; }
+.fb-detail .close {
+  float: right; border: 1px solid var(--line); background: transparent; color: var(--ink-soft);
+  font-size: 12px; padding: 2px 8px; cursor: pointer; border-radius: 2px;
+}
+.fb-detail .kv { color: var(--ink-soft); font-size: 12.5px; margin: 4px 0; }
+.fb-detail .stem, .fb-detail .ans {
+  font-family: var(--serif); font-size: 14.5px; line-height: 1.9; margin: 10px 0;
+  white-space: pre-wrap; word-break: break-word;
+}
+.fb-detail .ans { border-left: 3px solid var(--azurite); padding-left: 10px; }
+.fb-detail .opt { font-family: var(--serif); font-size: 14px; line-height: 1.85; }
+.fb-detail .lbl { font-family: var(--sans); font-size: 11.5px; color: var(--ink-soft); letter-spacing: .1em; }
+
+/* ── 标签：面板形态（触屏为主设备）──────────────────────────────
+   桌面沿用右侧抽屉；coarse pointer 或窄屏改成**下半屏 sheet**——
+   单手竖屏时拇指只够到屏幕下半部，而打标是最高频动作（需求 T6/U7）。
+   两个布局是同一个 DOM，不是两套实现。 */
+@media (pointer: coarse), (max-width: 760px) {
+  .fb-detail {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: min(74vh, 660px);
+    border-left: none;
+    border-top: 1.5px solid var(--line);
+    box-shadow: 0 -12px 28px rgba(43, 42, 38, 0.2);
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+}
+
+/* 漂移清单要用换行分条 */
+#notice { white-space: pre-line; }
+
+.tag-box {
+  margin: 4px 0 16px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+}
+.tag-rows { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* 44px = 触屏最小可点尺寸；纸面上给不了这个尺寸，所以交互全在这里 */
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tag-row .qtag {
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  font-size: 12px;
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+.tag-row .tag-name { flex: 1 1 auto; }
+.tag-row .tag-act { font-size: 12px; color: var(--ink-soft); }
+.tag-row.on { border-color: var(--ink); background: #eef1e6; }
+.tag-row.on .tag-act { color: var(--cinnabar); }
+.tag-empty { margin: 6px 0; color: var(--ink-soft); font-size: 13px; }
+
+.tag-new-btn,
+.tag-lib-btn {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tag-new-form { display: flex; gap: 8px; margin-top: 8px; }
+/* ⚠️ 作者样式表里的 display 会**顶掉** `hidden` 属性的 UA 规则（实测：新建标签框一直开着）。
+   面板内所有靠 hidden 收起的块都要这一条兜住。 */
+.fb-detail [hidden] { display: none !important; }
+/* iOS：输入框字号 <16px 会聚焦即放大整页，把纸面挤走 */
+.tag-new-input,
+.tag-f {
+  min-height: 44px;
+  font-size: 16px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.tag-new-input { flex: 1 1 auto; min-width: 0; }
+.tag-new-add { min-height: 44px; padding: 0 12px; border: 1px solid var(--ink); border-radius: 4px; background: var(--ink); color: #fff; font-size: 14px; }
+.tag-lib { margin-top: 10px; }
+.tag-lib-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.tag-lib-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tag-f-name { flex: 1 1 120px; min-width: 0; }
+.tag-f-short { width: 56px; flex: 0 0 auto; }
+.tag-f-color { width: 52px; flex: 0 0 auto; padding: 0; }
+.tag-lib-save,
+.tag-lib-del {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tag-lib-del { border-color: #e0b5aa; color: var(--cinnabar); }
+
+.tag-err {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid #e0b5aa;
+  border-radius: 4px;
+  background: #fbeae6;
+  color: var(--cinnabar);
+  font-size: 13px;
+}
+.tag-err .hint { color: var(--ink-soft); font-size: 12px; }
+.tag-dump {
+  width: 100%;
+  min-height: 84px;
+  margin: 6px 0;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.tag-stale {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fdf6e3;
+  color: #7a5b12;
+  font-size: 12.5px;
+}
+.tag-stale-line { margin: 4px 0 0; }
+
+/* ── 面板里的题目图片（题干图 / 答案图）──────────────────────────
+   这些图是上游按 bbox 裁出来的原卷插图，白底线稿 —— 给一条浅边框，
+   否则白底图叠在白底面板上看不出边界（用户会以为"图是空的"）。 */
+.figs { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px; }
+.figs .lbl { flex: 1 1 100%; }
+.fig {
+  max-width: calc(50% - 4px);
+  height: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.fb-detail .warn {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid #e0b5aa;
+  border-radius: 4px;
+  background: #fbeae6;
+  color: var(--cinnabar);
+  font-size: 13px;
+}
+
+/* ── 面板里的「按原卷排版」裁切（entry-paper.js 产出）──────────────
+   外层定尺寸 + overflow:hidden，内层整页按同一比例放大后 translate 到条目左上角。
+   ⚠️ 必须打掉 .canvas 的 max-width:100%：裁切用的画布是**整页宽**（比这块宽得多），
+   被 max-width 夹住就会连缩放比例一起错，图文相对位置全乱。 */
+.sec { margin: 12px 0 18px; }
+.entry-crop {
+  position: relative;
+  overflow: hidden;
+  margin: 6px auto; /* 字号封顶后条目比面板窄，居中而不是硬撑满 */
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.entry-crop .canvas {
+  max-width: none;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+.fb-detail .hint { color: var(--ink-soft); font-size: 12.5px; margin: 6px 0; }
+
+/* 一条目可能切成多段（左栏底 → 右栏顶），段与段之间留出「换栏」的呼吸感 */
+.entry-figs { display: flex; flex-direction: column; gap: 8px; }
+
+/* 原卷有墨迹、两套 OCR 都没读出来的洞 —— 面板里必须看得见（红线 G1：丢失不得静默）。
+   ⚠️ 洞只有 8–13px，虚线 + 14% 斜纹在这个尺寸下等于看不见（2026-10-15 用户「我并没有看到」）。
+   改成实线粗边 + 高对比斜纹 + 白/粉双环：小尺寸下仍能一眼指认，且不与候选块（青绿）混淆。 */
+.uncovered-mark.hole {
+  border: 2px solid #d81b60;
+  background: repeating-linear-gradient(135deg, rgba(216, 27, 96, .45) 0 2px, rgba(255, 255, 255, .65) 2px 4px);
+  /* 只留 1px 白环（把标记从上方图框的墨线里摘出来）。实测标记底边离裁切框只有 1.3–2.8px，
+     再加外圈粉环会被 overflow:hidden 切掉半边，反而像画歪了。 */
+  box-shadow: 0 0 0 1px #fff;
+}
+/* 面板上那句"这里少了东西"的说明：做成告示块，不能混在正文里被扫过去 */
+.fb-detail .lost {
+  color: #8c0f3a;
+  background: #fde8ef;
+  border-left: 3px solid #d81b60;
+  padding: 5px 7px;
+  font-size: 12.5px;
+  margin: 0 0 6px;
+}

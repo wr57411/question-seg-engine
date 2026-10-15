@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>成品 · 原版保真</title>
+  <!-- 复用阶段页的纸面样式（.canvas / .blk / .q-chip 等）——成品与对比右侧是同一件东西，
+       样式也必须同源，否则「一样」就只是口号。 -->
+  <link rel="stylesheet" href="../stages/stages.css" />
+  <link rel="stylesheet" href="./final.css" />
+</head>
+<body>
+  <header class="fb-bar">
+    <div class="fb-left">
+      <strong>成品</strong>
+      <span class="fb-sub">按原坐标重建 · 非原图</span>
+    </div>
+    <div class="fb-mid">
+      <select id="doc-pick" aria-label="选择文档"></select>
+      <span class="fb-page" id="page-now">—</span>
+    </div>
+    <div class="fb-right">
+      <label class="fb-toggle" title="解析遗漏（洋红框）与丢弃块（灰虚线）——原版书上没有这些标记，默认不显示">
+        <input type="checkbox" id="t-audit" /> 审计标记
+      </label>
+      <label class="fb-toggle" title="OCR 补回的行加青绿候选样式；关掉则按普通正文显示（信息仍在悬停里）">
+        <input type="checkbox" id="t-ocr" checked /> OCR 候选样式
+      </label>
+      <a id="lnk-stages" href="#" target="_blank" rel="noopener">分阶段 ↗</a>
+      <a id="lnk-viewer" href="#" target="_blank" rel="noopener">阅读版 ↗</a>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+  <main id="book" aria-label="重建纸面"></main>
+  <aside class="fb-detail" id="detail" hidden aria-label="题目详情"></aside>
+
+  <script type="module" src="./final.js"></script>
+</body>
+</html>

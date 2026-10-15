@@ -1,5 +1,8 @@
 # 分栏检测升级：x0 桶聚类替代单一阈值实施计划
 
+> 📍 交接导航：本文件是**当时的实施计划（历史记录）**，不代表当前状态。
+> 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](../../HANDOFF.md)**；通用约定见 **[AGENTS.md](../../../AGENTS.md)**。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 用 x0 桶直方图聚类替代现有「最大间隙 > 页宽 28%」的分栏判定，让真实 15 页（实际全部为双栏）分栏正确，消除 103 条「选项乱序」review 噪音。

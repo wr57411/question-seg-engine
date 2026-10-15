@@ -1,5 +1,8 @@
 # Stitch 设计稿验收评审（对照 PRD-viewer.md §10）— 全屏视觉实证版
 
+> 📍 交接导航：本文件是**当时的 Stitch 设计稿验收记录**（历史）。
+> 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](../../HANDOFF.md)**；通用约定见 **[AGENTS.md](../../../AGENTS.md)**。
+
 - 日期：2026-08-22
 - 项目：Product Wireframe Generator（ID 11910024452132510696，10 屏 + 设计系统 + PRD 文档屏）
 - 素材：本目录 10 张 PNG 截图（缩略图）+ 10 份 HTML + 设计系统 designMd
