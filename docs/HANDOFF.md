@@ -9,7 +9,9 @@
 - **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **259 例** + audit:render + audit:numbering
   + **bank**；题号审计判定项归零，基线 **5 条**全为源文档限制；题库 **83/83** 配对，
   保序 + 守恒 + 唯一键 + **图片守恒**全部通过 —— 2026-10-27 实跑复验）
-- **快照时的 git HEAD**：`ec30200 fix(panel): 归属、裁切、可见性三处一起修`（10-27 的日常可用改动**尚未提交**）
+- **快照时的 git HEAD**：`076bcd0 feat(daily): 一条命令跑完解析到体检 + 泛化第一轮 + OXR 第二解析源评估`
+  （10-27 的改动**已提交**，工作区干净，未 push；`feature/oxr` 与 `workbuddy/feature-oxr-6b3489a1`
+  同源同 tree）
 
 ---
 
@@ -316,6 +318,10 @@ layout.json / content_list.json
 
 1. 读根目录 `AGENTS.md` → 本文件 → `README.md`。需要设计/口径依据时再按 §4 取 `DECISIONS.md` 对应章节。
 2. `npm install && npm run check` —— **必须全绿才能动手**；不绿先修门，勿带病开发。
+   ⚠️ **新建/换 worktree 时门会红 2 例**（`tests/contract*.test.ts` 读
+   `data/out/23必刷题 2相互作用/questions.json`）：`data/` 是 git 忽略的运行时产物，
+   新 worktree 里没有。不是代码缺陷 —— 把已有产物接过来即可（软链或复制整个 `data/`），
+   或用 `npm run daily` 重新生成。判据：这 2 例之外的任何红都是真红。
 3. 先看**成品页**（`npm run view` → `/final/?doc=<docId>`）：这就是交付物的样子，
    逐页按原坐标重建、像翻原版书。再看 `npm run stages` 的**对比模式**
    （`?doc=第二章相互作用-答案与解析`）对照原卷页图看 5 分钟——建立「这套系统现在长什么样」的直觉。
