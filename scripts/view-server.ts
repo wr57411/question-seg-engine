@@ -14,7 +14,8 @@
  */
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import { extname, join, normalize, resolve } from "node:path";
 import { isKnownDoc, MAX_BODY, tagFilePath, validatePayload } from "./tag-write-guards.js";
@@ -108,11 +109,68 @@ async function handleTagsWrite(req: IncomingMessage, res: ServerResponse, url: U
   }
 }
 
+/* ── 文档清单（成品页据此发现文档，取代前端硬编码 DOCS） ── */
+
+interface DocListItem {
+  id: string;
+  label: string;
+  kind: "quiz" | "answer";
+  /** 有 meta.json = 跑过 `npm run daily` 的体检；false 时前端显示「未体检」，不假装健康 */
+  examined: boolean;
+  stats: Record<string, unknown> | null;
+  health: { level: string; issues: string[] } | null;
+}
+
+/**
+ * 扫 `data/out/<docId>/`：
+ * - **只列有 stages.json 的目录**（没有快照 = 成品页打不开，列出来只会点出 404）；
+ * - 有 meta.json 就带上体检摘要，没有就 `examined: false`（不猜）。
+ */
+async function listDocs(): Promise<DocListItem[]> {
+  const outRoot = join(ROOT, "data", "out");
+  const entries = await readdir(outRoot, { withFileTypes: true }).catch(() => []);
+  const items: DocListItem[] = [];
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    const dir = join(outRoot, e.name);
+    if (!existsSync(join(dir, "stages.json"))) continue;
+    let meta: {
+      label?: string;
+      kind?: "quiz" | "answer";
+      stats?: Record<string, unknown>;
+      health?: { level: string; issues: string[] };
+    } | null = null;
+    try {
+      meta = JSON.parse(await readFile(join(dir, "meta.json"), "utf8"));
+    } catch {
+      meta = null;
+    }
+    items.push({
+      id: e.name,
+      label: meta?.label ?? e.name,
+      kind: meta?.kind ?? (/答案|解析/.test(e.name) ? "answer" : "quiz"),
+      examined: Boolean(meta),
+      stats: meta?.stats ?? null,
+      health: meta?.health ?? null,
+    });
+  }
+  // 题册在前、答案册在后，同类按名字（与用户的翻书顺序一致）
+  const rank = (d: DocListItem) => (d.kind === "quiz" ? 0 : 1);
+  items.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id, "zh"));
+  return items;
+}
+
 /* ── 静态读 ── */
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   try {
+    if (req.method === "GET" && url.pathname === "/api/docs") {
+      const docs = await listDocs();
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ docs }));
+      return;
+    }
     if (req.method === "POST") {
       if (url.pathname === "/api/tags") await handleTagsWrite(req, res, url);
       else res.writeHead(405).end("method not allowed");

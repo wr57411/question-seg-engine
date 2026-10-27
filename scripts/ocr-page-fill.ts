@@ -41,6 +41,15 @@ const pagesArgIdx = process.argv.indexOf("--pages");
 const PAGES: Set<number> | null =
   pagesArgIdx >= 0 ? new Set(process.argv[pagesArgIdx + 1]!.split(",").map((x) => Number(x.trim()))) : null;
 const FORCE = process.argv.includes("--force");
+/**
+ * `--all-pages`：**即使该页没有「洞」也跑整页 OCR**，把 fullText 存下来。
+ *
+ * 为什么需要（2026-10-27 光学卷实测）：题号被上游漏识别时，那点墨迹往往被
+ * `classifyUncovered` 判成**家具级**（面积 45–48px、落在内容矩形之外）⇒ 不进 holes
+ * ⇒ 这一页永远不跑 OCR ⇒ 题号永远补不回来（8 页只切出 15 题）。
+ * 但整页 OCR 的全文里明明读得到 `4.` `5.`。所以"要不要跑"不能只由 holes 决定。
+ */
+const ALL_PAGES = process.argv.includes("--all-pages");
 
 const OUT_DIR = join("data", "out", DOC);
 const PDF = join(OUT_DIR, "origin.pdf");
@@ -191,7 +200,7 @@ for (const p of snap.pages) {
     const h = r.bbox[3] - r.bbox[1];
     return h > 0 && w / h >= 1.5;
   });
-  if (!holes.length) continue;
+  if (!holes.length && !ALL_PAGES) continue;
   totalHoles += holes.length;
 
   /* ① 整页渲染 → OCR（带缓存；空结果换一档 DPI 重试，绕开服务端缓存） */

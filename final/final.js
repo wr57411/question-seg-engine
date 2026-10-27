@@ -27,11 +27,14 @@ import { prettifyLatex } from "../stages/latex-display.js";
 import { tagSection } from "./tag-panel.js";
 import { anchorOf, loadBindings, loadLibrary, reconcile, saveBindings, saveLibrary, tagIdsFor } from "./tag-store.js";
 
-const DOCS = [
-  { id: "23必刷题 2相互作用", label: "题册 · 2 相互作用", kind: "quiz" },
-  { id: "第二章相互作用-答案与解析", label: "答案册 · 第二章", kind: "answer" },
-];
-const DEFAULT_DOC = DOCS[0].id;
+/**
+ * 文档清单来自服务端 `/api/docs`（扫 `data/out/<docId>/` 里有快照的目录），
+ * **不再硬编码** —— 硬编码的代价是「导入一份新卷要改前端代码」，那不叫每天能用。
+ * 每项形如 `{ id, label, kind, examined, stats, health }`，`examined=false` 表示没跑过
+ * `npm run daily` 的体检（此时如实显示「未体检」，不假装健康）。
+ */
+let DOCS = [];
+let DEFAULT_DOC = "";
 
 const $ = (id) => document.getElementById(id);
 
@@ -223,6 +226,55 @@ function docKind(doc) {
   return DOCS.find((x) => x.id === doc)?.kind ?? "quiz";
 }
 
+/**
+ * 顶部体检摘要：把 `meta.json` 的结论翻译成一句人话。
+ * - `examined=false` ⇒ 说「未体检」而不是「通过」（没测过 ≠ 没问题）；
+ * - 有 issues ⇒ 显示第一条，悬停/点击看全部。
+ */
+function renderHealth(doc) {
+  const box = $("doc-health");
+  const d = DOCS.find((x) => x.id === doc);
+  box.hidden = false;
+  box.className = "fb-health";
+  box.replaceChildren();
+  if (!d) {
+    box.hidden = true;
+    return;
+  }
+  const s = d.stats ?? {};
+  const bits = [];
+  if (s.questions !== undefined) bits.push(`${s.questions} 题`);
+  if (s.pages !== undefined) bits.push(`${s.pages} 页`);
+  if (s.ocrFilled) bits.push(`补回 ${s.ocrFilled} 处`);
+
+  let tail = "未体检";
+  if (d.examined && d.health) {
+    if (d.health.level === "fail") {
+      tail = d.health.short ?? "体检失败";
+      box.classList.add("bad");
+    } else if (d.health.level === "warn") {
+      // 只写条数：完整原因在悬停/点击里（顶部一行放不下"3 题标记为需人工校对"这种长句，
+      // 放不下就会把页码挤走 —— 2026-10-27 截图实测）
+      tail = d.health.short ?? `${d.health.issues?.length ?? 0} 处提示`;
+      box.classList.add("warn");
+    } else {
+      tail = "体检通过";
+    }
+  }
+  box.append(el("span", "", [...bits, tail].join(" · ")));
+  if (d.health?.issues?.length) {
+    box.title = d.health.issues.join("\n");
+    box.append(el("span", "more", "详情"));
+    box.onclick = () =>
+      notice([["div", "本册体检："], ...d.health.issues.map((x) => ["div", `· ${x}`])], "warn");
+    box.style.cursor = "pointer";
+  } else {
+    box.title = "体检通过：题号连续、无未解释的抑制";
+    box.onclick = null;
+    box.style.cursor = "";
+  }
+}
+
 /** 一面：先试纸面裁切；拿不到快照或块才退回文本 + 图片条，并明说是降级（不静默换排法）。
  *  返回 null = 这次点击已作废（调用方不许再往面板里塞东西）。 */
 async function sideSection(token, d, label, side, w, fallback) {
@@ -369,6 +421,7 @@ function updatePageIndicator() {
     if (r.top <= mid) cur = Number(s.id.replace("pg-", ""));
   }
   $("page-now").textContent = `第 ${cur} / ${secs.length} 页`;
+  savePosition(cur);
 }
 
 /**
@@ -405,6 +458,45 @@ async function loadBank() {
   }
 }
 
+/**
+ * 拉文档清单。失败时**不空着**：有 `?doc=` 就按它直接开（至少能读这一卷），
+ * 没有就给出「先导入」的可操作提示。静默失败在这里等于「页面白屏且不说为什么」。
+ */
+async function loadDocs() {
+  const asked = new URLSearchParams(location.search).get("doc");
+  try {
+    const j = await fetchJson("/api/docs");
+    DOCS = (j.docs ?? []).map((d) => ({ ...d, label: d.label || d.id }));
+    if (!DOCS.length) throw new Error("服务端没发现任何文档");
+  } catch (e) {
+    DOCS = [];
+    if (asked) {
+      DOCS = [
+        {
+          id: asked,
+          label: asked,
+          kind: /答案|解析/.test(asked) ? "answer" : "quiz",
+          examined: false,
+          stats: null,
+          health: null,
+        },
+      ];
+      notice([`读不到文档清单（${String(e).slice(0, 50)}），已按网址里的 doc 参数直接打开这一卷。`], "warn");
+    } else {
+      notice(
+        [
+          `读不到文档清单（${String(e).slice(0, 50)}）。先跑 `,
+          ["code", "npm run daily -- <pdf>"],
+          " 导入一份试卷；或在网址后加 ?doc=<docId> 指定。",
+        ],
+        "err",
+      );
+    }
+  }
+  DEFAULT_DOC = DOCS[0]?.id ?? "";
+  state.doc = asked && DOCS.some((d) => d.id === asked) ? asked : DEFAULT_DOC;
+}
+
 async function loadDoc(doc) {
   try {
     state.data = await fetchJson(`/data/out/${enc(doc)}/stages.json`);
@@ -419,25 +511,254 @@ async function loadDoc(doc) {
     state.snap = state.data;
     await loadTags();
     renderBook();
+    renderHealth(doc);
+    if (!/^#pg-\d+$/.test(location.hash)) restorePosition();
   } catch (e) {
     notice(
-      ["读取不到「", doc, "」的快照（", String(e).slice(0, 60), "）。先跑 ", ["code", "npm run stages:export"], " 生成。"],
+      [
+        "读取不到「",
+        doc,
+        "」的快照（",
+        String(e).slice(0, 60),
+        "）。先跑 ",
+        ["code", `npm run daily -- <pdf> --id "${doc}"`],
+        " 或 ",
+        ["code", "npm run stages:export"],
+        " 生成。",
+      ],
       "err",
     );
   }
+}
+
+/* ── 跳转 / 搜索 / 阅读进度 ──
+ *
+ * 三件事共用**一个输入框**（用户原话："尽量不让我手动参与"，那就别让他先选模式再输入）：
+ *   12       → 第 12 题（多节同号时列出来让他点）
+ *   p7       → 第 7 页
+ *   摩擦力    → 搜正文，列出命中片段
+ * 判断顺序固定：页码 → 纯数字题号 → 其余当搜索。**认不出的输入必须说话**（flash 提示），
+ * 静默不动会让人以为坏了。
+ */
+
+/** 底部轻提示（2.4s 自动消失） */
+let toastTimer = null;
+function flash(text) {
+  const t = $("toast");
+  t.textContent = text;
+  t.hidden = false;
+  t.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.classList.remove("on");
+    t.hidden = true;
+  }, 2400);
+}
+
+/** 跳转后必须看得见"跳到了哪"：短暂高亮 2s */
+function markHit(node) {
+  if (!node) return;
+  node.classList.add("hit");
+  setTimeout(() => node.classList.remove("hit"), 2000);
+}
+
+function pageEl(index) {
+  return document.getElementById(`pg-${index + 1}`);
+}
+
+function jumpToPage(index) {
+  const sec = pageEl(index);
+  if (!sec) return false;
+  sec.scrollIntoView({ block: "start", behavior: "smooth" });
+  // 跳转即视为"读到这里"，并锁住途中上报的中间页（见 posLockUntil 的说明）
+  posLockUntil = Date.now() + 1500;
+  savePosition(index + 1, true);
+  return true;
+}
+
+/** 本册所有该题号的题（不同节会重号 ⇒ 天然是列表） */
+function questionsByNumber(n) {
+  const out = [];
+  state.data.pages.forEach((p, i) => {
+    for (const q of p.questions ?? []) if (String(q.number) === String(n)) out.push({ pageIndex: i, q });
+  });
+  return out;
+}
+
+function jumpToQuestion(hit) {
+  jumpToPage(hit.pageIndex);
+  const chip = document.querySelector(`.q-chip[data-qid="${CSS.escape(hit.q.id)}"]`);
+  markHit(chip);
+  return Boolean(chip);
+}
+
+/** 搜正文：返回 { pageIndex, blockIndex, snippet }，最多 60 条（再多也没人翻） */
+function searchBlocks(text) {
+  const needle = text.trim().toLowerCase();
+  if (!needle) return [];
+  const out = [];
+  for (let i = 0; i < state.data.pages.length; i++) {
+    const blocks = state.data.pages[i].blocks ?? [];
+    for (let k = 0; k < blocks.length; k++) {
+      const t = blocks[k].text ?? "";
+      const at = t.toLowerCase().indexOf(needle);
+      if (at < 0) continue;
+      const from = Math.max(0, at - 16);
+      const snippet =
+        (from > 0 ? "…" : "") +
+        t
+          .slice(from, at + needle.length + 24)
+          .replace(/\s+/g, " ")
+          .trim() +
+        (at + needle.length + 24 < t.length ? "…" : "");
+      out.push({ pageIndex: i, blockIndex: k, snippet });
+      if (out.length >= 60) return out;
+    }
+  }
+  return out;
+}
+
+/** 结果面板（题号候选与正文命中共用；点一行就跳过去） */
+function showHits(hits, title) {
+  const box = $("hits");
+  box.replaceChildren();
+  box.hidden = false;
+  if (!hits.length) {
+    box.append(el("div", "hit-empty", `没有找到「${title}」`));
+    return;
+  }
+  box.append(el("div", "hit-head", `${hits.length} 处「${title}」—— 点一条跳过去`));
+  for (const h of hits) {
+    const row = el("button", "hit-row");
+    row.append(el("span", "hit-pg", `p${h.pageIndex + 1}`));
+    row.append(el("span", "hit-txt", h.snippet));
+    row.addEventListener("click", () => {
+      if (h.kind === "question") jumpToQuestion(h);
+      else {
+        jumpToPage(h.pageIndex);
+        markHit(document.querySelector(`#pg-${h.pageIndex + 1} [data-bi="${h.blockIndex}"]`));
+      }
+      box.hidden = true;
+    });
+    box.append(row);
+  }
+}
+
+/** 输入框的唯一入口：页码 → 题号 → 搜索 */
+function runJump(raw) {
+  const q = String(raw ?? "").trim();
+  if (!q || !state.data) return;
+  const box = $("hits");
+
+  const pageM = /^p\s*(\d{1,3})$/i.exec(q);
+  if (pageM) {
+    const n = Number(pageM[1]);
+    const total = state.data.pages.length;
+    if (n < 1 || n > total) {
+      flash(`本册共 ${total} 页，没有第 ${n} 页`);
+      return;
+    }
+    box.hidden = true;
+    jumpToPage(n - 1);
+    flash(`已到第 ${n} 页`);
+    return;
+  }
+
+  if (/^\d{1,3}$/.test(q)) {
+    const hits = questionsByNumber(q);
+    if (!hits.length) {
+      flash(`本册没有第 ${q} 题（要搜正文请直接输入文字）`);
+      return;
+    }
+    if (hits.length === 1) {
+      box.hidden = true;
+      jumpToQuestion(hits[0]);
+      flash(`已到第 ${q} 题（第 ${hits[0].pageIndex + 1} 页）`);
+      return;
+    }
+    showHits(
+      hits.map((h) => ({
+        kind: "question",
+        pageIndex: h.pageIndex,
+        q: h.q,
+        snippet: `第 ${q} 题${h.q.section ? ` · ${h.q.section}` : ""}`,
+      })),
+      `第 ${q} 题`,
+    );
+    return;
+  }
+
+  showHits(searchBlocks(q), q);
+}
+
+/* ── 阅读进度（每册独立）──
+ * 每天用的人不会每天从第 1 页翻起。位置存 localStorage：
+ * 隐私模式/禁用存储时**写不进去也不影响阅读**（try/catch 兜住，不弹错）。 */
+
+const posKey = (doc) => `final:pos:${doc}`;
+let posTimer = null;
+/**
+ * 跳转后的短暂锁：平滑滚动途中 `updatePageIndicator` 会一路报**中间页**
+ * （实测跳 p7 被记成 p5）。锁住这段时间，只认"跳到的目标页"；锁一过，
+ * 用户自己滚到哪就记哪。
+ */
+let posLockUntil = 0;
+
+function savePosition(page, force = false) {
+  if (!force && Date.now() < posLockUntil) return;
+  clearTimeout(posTimer);
+  posTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(posKey(state.doc), String(page));
+    } catch {
+      /* 存不了就算了，下次从第 1 页开始，不影响读 */
+    }
+  }, 400);
+}
+
+function restorePosition() {
+  let p = 0;
+  try {
+    p = Number(localStorage.getItem(posKey(state.doc)) || 0);
+  } catch {
+    return;
+  }
+  if (!p || p < 1 || p > state.data.pages.length) return;
+  const sec = pageEl(p - 1);
+  if (!sec) return;
+  sec.scrollIntoView({ block: "start" });
+  posLockUntil = Date.now() + 1500;
+  savePosition(p, true);
+  flash(`已回到上次位置：第 ${p} 页`);
 }
 
 /* ── 交互 ── */
 
 function initBar() {
   const pick = $("doc-pick");
+  pick.replaceChildren();
   for (const d of DOCS) {
     const o = el("option", "", d.label);
     o.value = d.id;
     pick.append(o);
   }
+  if (!DOCS.length) {
+    const o = el("option", "", "（没有可用文档）");
+    o.value = "";
+    pick.append(o);
+    pick.disabled = true;
+  }
   pick.value = state.doc;
   pick.addEventListener("change", () => loadDoc(pick.value));
+
+  const jump = $("jump");
+  jump.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    runJump(jump.value);
+  });
+  // 输入框失焦时收起结果面板（点面板里的行之前会先失焦 ⇒ 延迟收，否则点不中）
+  jump.addEventListener("blur", () => setTimeout(() => ($("hits").hidden = true), 180));
 
   $("t-audit").addEventListener("change", (e) => {
     state.audit = e.target.checked;
@@ -468,6 +789,7 @@ async function main() {
   state.audit = qs.get("audit") === "1";
   state.ocrStyle = qs.get("ocr") !== "0";
   state.tagsOn = qs.get("tags") !== "0";
+  await loadDocs();
   initBar();
   $("t-audit").checked = state.audit;
   $("t-ocr").checked = state.ocrStyle;
@@ -476,6 +798,12 @@ async function main() {
   await loadDoc(asked);
   const hash = /^#pg-(\d+)$/.exec(location.hash);
   if (hash) document.getElementById(`pg-${hash[1]}`)?.scrollIntoView();
+  // ?q= 打开即执行一次跳转/搜索（方便收藏"某个搜索"，也让交互可被自动化核对）
+  const q = qs.get("q");
+  if (q) {
+    $("jump").value = q;
+    runJump(q);
+  }
 }
 
 main();

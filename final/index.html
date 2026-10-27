@@ -17,6 +17,14 @@
     </div>
     <div class="fb-mid">
       <select id="doc-pick" aria-label="选择文档"></select>
+      <input
+        id="jump"
+        type="search"
+        autocomplete="off"
+        placeholder="题号 / p页码 / 搜正文"
+        aria-label="跳转到题号、页码，或搜索正文"
+      />
+      <span class="fb-health" id="doc-health" hidden></span>
       <span class="fb-page" id="page-now">—</span>
     </div>
     <div class="fb-right">
@@ -32,6 +40,8 @@
   </header>
 
   <div class="notice" id="notice" hidden></div>
+  <div class="hits" id="hits" hidden aria-label="搜索结果"></div>
+  <div class="toast" id="toast" hidden></div>
   <main id="book" aria-label="重建纸面"></main>
   <aside class="fb-detail" id="detail" hidden aria-label="题目详情"></aside>
 

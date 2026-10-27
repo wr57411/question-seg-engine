@@ -22,6 +22,9 @@ interface Stub {
   textContent: string;
   innerHTML: string;
   title: string;
+  /** `dataset` 是 DOM 标准属性：号牌带 `data-qid`、块带 `data-bi`（跳转/搜索定位用），
+   *  桩里必须给，否则实现一用就 TypeError —— 那是桩落后，不是实现错。 */
+  dataset: Record<string, string>;
   classList: { add: (c: string) => void; contains: (c: string) => boolean };
   append: (...n: Stub[]) => void;
   addEventListener: () => void;
@@ -36,6 +39,7 @@ function makeNode(tagName: string): Stub {
     textContent: "",
     innerHTML: "",
     title: "",
+    dataset: {},
     classList: {
       add: (c: string) => {
         if (!n.className.split(" ").includes(c)) n.className = `${n.className} ${c}`.trim();

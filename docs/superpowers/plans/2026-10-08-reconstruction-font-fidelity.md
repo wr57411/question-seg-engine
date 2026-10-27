@@ -5,7 +5,7 @@
 
 **日期**：2026-10-08
 **Spec（权威）**：本计划「已定案事实」一节 —— 全部数字来自对**原卷页图墨迹**的直接测量，
-证据文件 `data/out/ink-groundtruth.md`、`data/out/font-calibration.md`、`data/out/fidelity-analysis.md`。
+证据文件 `docs/evidence/ink-groundtruth.md`、`docs/evidence/font-calibration.md`、`docs/evidence/fidelity-analysis.md`。
 **前置**：工作区已有一份未提交改动（`stages/stages.js` + `stages/stages.css`，字号改为按行高推算 +
 文字不裁切）。本计划在其之上继续。
 
@@ -137,7 +137,7 @@ div，位置来自 MinerU bbox，**字号由代码推导**（MinerU 输出无字
      全角/CJK（含全角标点）= 1.0；ASCII 字母数字 = 0.5；ASCII 空格 = 0.25；
      其余可见 ASCII 标点 = 0.3；`\n`/`\t` = 0
    - **模块头注释必须写入 F1–F6 与「被推翻的旧前提」**，并注明来源
-     `data/out/ink-groundtruth.md`、测量方法（原卷页图墨迹二值化 → 墨迹包围盒 → `墨迹宽/全角字数`）
+     `docs/evidence/ink-groundtruth.md`、测量方法（原卷页图墨迹二值化 → 墨迹包围盒 → `墨迹宽/全角字数`）
 2. 新建 `stages/font-metrics.d.ts`（照 `latex-display.d.ts` 的写法，供 TS 测试 import）
 3. 改 `stages/stages.js`：删掉本地的 `fontFromLineHeight` / `baseFontOfPage` / `fontForBlock`，
    改为 `import { baseFontOfPage, fontForBlock } from "./font-metrics.js";`；
@@ -284,9 +284,9 @@ R5 是同一缺陷的**可见性缺口**：审计「可判块」口径排除了�
 **产出文件**
 
 1. **测量（先做，结论决定改法）**：取 ≥20 行「含 ASCII 且能在原卷页图上量出墨迹宽」的行，
-   沿用 `data/out/ink-groundtruth.md` 的二值化方法量原卷墨迹宽；在浏览器里以**当前字号**渲染同一文本，
+   沿用 `docs/evidence/ink-groundtruth.md` 的二值化方法量原卷墨迹宽；在浏览器里以**当前字号**渲染同一文本，
    比较 `渲染宽 / 原卷墨迹宽`。**分三组报**：纯 ASCII 行、CJK+ASCII 混排行、纯 CJK 行（作对照，
-   应 ≈ 1.0）。报告写入 `data/out/latin-metrics.md`。
+   应 ≈ 1.0）。报告写入 `docs/evidence/latin-metrics.md`。
 2. **修复（按测量结果二选一，必须写明选了哪个及依据）**：
    - 若「混排行」系统性 > 1.05 且**换拉丁字体栈能显著改善** → 改 `stages/stages.css` 的 `--serif`，
      把拉丁衬线字体提到 Songti 之前（候选 `"Times New Roman"`、`"Liberation Serif"` 等，
@@ -299,7 +299,7 @@ R5 是同一缺陷的**可见性缺口**：审计「可判块」口径排除了�
    报 `> 1.05` 的块数与清单。**判定项**：溢出块占比 > 2% 即失败；**提示项**：逐块清单。
    （此节与「字号保真度」分工：后者判**系统偏差**，前者判**个体溢出**）
 
-**验收**：`data/out/latin-metrics.md` 有分组的实测数字；修复前后同一测量**复测**并给出对比；
+**验收**：`docs/evidence/latin-metrics.md` 有分组的实测数字；修复前后同一测量**复测**并给出对比；
 `npm run check` 全绿；审计新节的溢出占比数字出现在输出里。
 
 **Non-goals**：不改 `emWidthOf` 的权重表（除非测量证明权重表本身错，那就必须给出证据并说明

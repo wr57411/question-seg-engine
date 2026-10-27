@@ -58,10 +58,26 @@ async function main() {
     console.log("[2/5] 轮询解析结果…");
     const { zipUrl } = await client.pollResult(batch.batchId);
 
-    console.log("[3/5] 下载结果 Zip");
-    const zip = await client.downloadZip(zipUrl);
     const out = join(outRoot, docId);
     mkdirSync(join(out, "images"), { recursive: true });
+    // 先把 zip 地址落盘再下载（2026-10-27 实测教训）：MinerU 的解析**已经完成**、
+    // 只是 CDN 下载被网络阻断时，重新跑一遍 = 重新上传 + 重新解析（白烧额度）。
+    // 有了这个地址，网络恢复后可以直接下载解包，不必重解析。
+    writeFileSync(join(out, "zip-url.txt"), `${zipUrl}\n`);
+
+    console.log("[3/5] 下载结果 Zip");
+    let zip: Buffer;
+    try {
+      zip = await client.downloadZip(zipUrl);
+    } catch (e) {
+      const err = e as Error;
+      console.error(`  ❌ 下载失败：${err.message}`);
+      console.error(`     解析已完成，zip 地址已存 ${join(out, "zip-url.txt")}`);
+      console.error(`     网络恢复后可执行：curl -L -o ${join(out, "result.zip")} "<zip-url.txt 里的地址>"`);
+      console.error(`     然后解包：unzip -o ${join(out, "result.zip")} -d ${out}`);
+      console.error(`     （再跑 npm run daily 时，已有 layout.json 会自动跳过解析）`);
+      throw err;
+    }
     writeFileSync(join(out, "result.zip"), zip);
 
     console.log("[4/5] 解包 + 结构化切分");

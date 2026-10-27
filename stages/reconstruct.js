@@ -100,6 +100,9 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
       n.title = `OCR 补入行（非引擎原文，请核对）：${n.title}`;
     }
   });
+  nodes.forEach((n, i) => {
+    if (n) n.dataset.bi = String(i); // 块索引 = p.blocks 下标（stages.json 的 i）
+  });
   for (const n of nodes) if (n) c.append(n);
   return nodes;
 }
@@ -365,6 +368,8 @@ export function renderPaper(p, opts = {}) {
     if (q.startsHere === false) return;
     // **只写数字**（用户要求：写「第N题」太占版面，把页面挤小了）——完整信息放 title。
     const chip = el("span", "q-chip plain", q.number);
+    // 号牌必须能追溯到题目 id：跳转/高亮/测试都靠它（`textContent` 只有题号，多节同号会认错）
+    chip.dataset.qid = q.id;
     chip.title = `第${q.number}题${onChipClick ? (resolveTags ? "（点击看详情 / 增删标签）" : "（点击看详情）") : ""}`;
     // 按题目所在栏决定挂哪一侧：右栏题挂右留白，其余挂左留白
     if (isRightCol(f)) chip.style.left = "calc(100% + 4px)";

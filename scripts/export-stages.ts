@@ -452,6 +452,11 @@ export function classifyUncovered(bbox: BBox, contentRect: BBox, pageW: number, 
   const inLeft = bbox[2] <= pageW * UNCOVERED_LEFT_BAND_FRAC;
   const inRight = bbox[0] >= pageW * (1 - UNCOVERED_RIGHT_BAND_FRAC);
   if (inHeader || inFooter || inLeft || inRight) return "furniture";
+  // 2.5) **小方块 = 更可能是字符，不是装饰**（2026-10-27 光学卷实测）
+  //   题号印在「题目末尾的空白里」，离内容矩形很远 ⇒ 原判据 3 会把它判成家具级
+  //   ⇒ 不进 OCR 候选 ⇒ 题号永远补不回来（8 页只切出 15 题）。
+  //   版式装饰的形状是**细长线**或**大面积色块**，不会是 25pt 以内、接近正方形的块。
+  if (w <= 25 && h <= 25 && long / Math.max(1, short) < 2) return "content";
   // 3) 过半落在内容矩形外
   const ix = Math.max(0, Math.min(bbox[2], contentRect[2]) - Math.max(bbox[0], contentRect[0]));
   const iy = Math.max(0, Math.min(bbox[3], contentRect[3]) - Math.max(bbox[1], contentRect[1]));
@@ -838,7 +843,15 @@ function injectOcrFullTextLines(doc: ParsedDocument, docId: string): { injected:
       const line = lines[i]!;
       const m = matchFirstLine(line);
       if (m.kind !== "question_no") continue;
-      if (!looksLikeAnswerEntry(line)) continue; // 更严：必须像答案条目
+      /**
+       * 两类候选（判据都取最严）：
+       * ① **答案条目**：题号后紧跟答案字母/小问/`$`/【解析】/必刷标签 —— 答案册形态；
+       * ② **题号独占一行**（整行只有一个编号 + 分隔符）—— 光学卷形态（2026-10-27 实测）：
+       *    题号印在**题目末尾**，题干在下一栏或下一页顶部。这类行 `looksLikeAnswerEntry`
+       *    不成立（后面什么都没有），但它是真题号，漏了就会把两三道题并成一道。
+       */
+      const bareNumber = /^\d{1,2}\s*[.．、)）]\s*$/.test(line);
+      if (!looksLikeAnswerEntry(line) && !bareNumber) continue;
       const num = m.captured;
       const exists = page.blocks.some((b) => {
         if (b.kind !== "text") return false;
@@ -846,14 +859,35 @@ function injectOcrFullTextLines(doc: ParsedDocument, docId: string): { injected:
         return bm.kind === "question_no" && bm.captured === num;
       });
       if (exists) continue; // 该页已有同号题切口
-      const target = findBlockByLine(page, lines[i + 1] ?? "");
+      // 显式声明结构类型：`ParsedBlock` 的 text 与 table 共用同一分支，
+      // `Extract<…, {kind:"text"}>` 会退化成 never（2026-10-27 踩到）。
+      let target: { bbox: BBox; lineCount: number } | null = findBlockByLine(page, lines[i + 1] ?? "");
+      // 题号独占行 + 后面没有可锚定的行 ⇒ 它印在**页尾**（题干在下一页）。
+      // 放到本页最后一个文字块的下方：阅读顺序上等于「页尾开新题」，下一页的题干自然接上。
+      let below = false;
+      if (!target && bareNumber) {
+        const texts = page.blocks.filter(
+          (b): b is Extract<ParsedBlock, { text: string }> => b.kind === "text" || b.kind === "table",
+        );
+        if (!texts.length) {
+          skipped++;
+          continue;
+        }
+        let last = texts[0]!;
+        for (const t of texts) if (t.bbox[3] > last.bbox[3]) last = t;
+        target = last;
+        below = true;
+      }
       if (!target) {
         skipped++;
         continue;
       }
-      const h = Math.max(6, (target.bbox[3] - target.bbox[1]) / Math.max(1, target.lineCount));      page.blocks.push({
+      const h = Math.max(6, (target.bbox[3] - target.bbox[1]) / Math.max(1, target.lineCount));
+      page.blocks.push({
         kind: "text",
-        bbox: [target.bbox[0], target.bbox[1] - h, target.bbox[2], target.bbox[1]],
+        bbox: below
+          ? [target.bbox[0], target.bbox[3] + 1, target.bbox[2], target.bbox[3] + 1 + h]
+          : [target.bbox[0], target.bbox[1] - h, target.bbox[2], target.bbox[1]],
         text: line,
         firstLine: line,
         lineCount: 1,
@@ -968,7 +1002,12 @@ function main(): void {
   // 原卷 PDF 一并复制到 data/out/<docId>/，供展示层「原卷对照」内嵌浏览；
   // 本机有 pdftoppm（poppler）时再渲染逐页 PNG（任何浏览器可靠显示，缺工具则跳过降级 PDF）。
   const unpackedDir = join(layoutPath, "..");
-  const originPdf = readdirSync(unpackedDir).find((f) => f.endsWith("_origin.pdf"));
+  // 原卷 PDF 的命名有**两种**历史形态，都认（否则静默降级成「没有页图、墨迹 —%」）：
+  //   · `<docId>_origin.pdf` —— `npm run daily` 与 unpack 的约定（首选）
+  //   · `origin.pdf`         —— 早期手工放的文件
+  const originPdf =
+    readdirSync(unpackedDir).find((f) => f.endsWith("_origin.pdf")) ??
+    (existsSync(join(unpackedDir, "origin.pdf")) ? "origin.pdf" : undefined);
   let originPages = 0;
   if (originPdf) {
     const pdfPath = join(outDir, "origin.pdf");

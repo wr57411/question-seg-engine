@@ -259,3 +259,74 @@
   font-size: 12.5px;
   margin: 0 0 6px;
 }
+
+/* ── 顶部体检摘要（数据来自 meta.json，由 `npm run daily` 写） ──
+   颜色只是提示：warn = 有需要人看一眼的地方（待校对/缺号），bad = 没切出题。 */
+.fb-health {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; line-height: 1.6; color: var(--ink-soft);
+  padding: 2px 9px; border-radius: 999px;
+  border: 1px solid #ddd6c6; background: #faf8f2; white-space: nowrap;
+}
+.fb-health.warn { border-color: #d9a441; color: #8a5b00; background: #fdf6e6; }
+.fb-health.bad { border-color: #c2503f; color: #8f2d1f; background: #fdeeeb; }
+.fb-health .more { color: var(--azurite); text-decoration: underline; }
+
+/* ── 跳转输入框（题号 / p页码 / 搜正文，一个框三种用法） ── */
+.fb-mid input#jump {
+  font-family: var(--sans); font-size: 13px; padding: 4px 9px;
+  width: 168px; border: 1px solid var(--line); border-radius: 2px;
+  background: var(--paper); color: var(--ink);
+}
+.fb-mid input#jump:focus { outline: 2px solid color-mix(in srgb, var(--azurite) 40%, transparent); outline-offset: 1px; }
+
+/* 吸顶工具条会盖住 scrollIntoView 的目标顶部 —— 留出它的高度 */
+.bk-page { scroll-margin-top: 64px; }
+
+/* ── 搜索结果面板 ── */
+.hits {
+  position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+  width: min(720px, 94vw); max-height: 56vh; overflow: auto; z-index: 40;
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 4px;
+  box-shadow: 0 12px 32px rgba(60, 50, 30, .18);
+  padding: 6px 0;
+}
+.hit-head {
+  padding: 4px 14px 8px; font-size: 12px; letter-spacing: .06em;
+  color: var(--ink-soft); border-bottom: 1px solid var(--line);
+}
+.hit-empty { padding: 12px 14px; font-size: 13px; color: var(--ink-soft); }
+.hit-row {
+  display: flex; gap: 10px; align-items: baseline; width: 100%;
+  padding: 7px 14px; border: 0; background: transparent; cursor: pointer;
+  text-align: left; font-family: var(--sans); font-size: 13px; color: var(--ink);
+}
+.hit-row:hover { background: color-mix(in srgb, var(--azurite) 8%, transparent); }
+.hit-pg { flex: 0 0 auto; color: var(--azurite); font-variant-numeric: tabular-nums; font-size: 12px; }
+.hit-txt { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 底部轻提示 ── */
+.toast {
+  position: fixed; bottom: 26px; left: 50%; z-index: 60;
+  transform: translateX(-50%) translateY(10px); opacity: 0;
+  transition: opacity .18s ease, transform .18s ease;
+  background: #2f2b25; color: #fff; padding: 8px 16px; border-radius: 999px;
+  font-size: 13px; pointer-events: none; max-width: 88vw;
+}
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── 命中高亮（2s 后自动褪去，由 JS 移除 class） ── */
+@keyframes chipHit {
+  0%, 55% { background: #ffe08a; box-shadow: 0 0 0 3px rgba(255, 224, 138, .85); }
+  100% { box-shadow: none; }
+}
+.q-chip.hit { animation: chipHit 2s ease-out; }
+[data-bi].hit { background: #fff3c4; transition: background .3s ease; }
+
+/* ── 成品页 = 产品视图：去掉「块边框」这类审计标记 ──
+   `.blk-line .txt` 的 1px 灰框是 stages 用来显示「块划分」的（审计用），
+   原版书上没有。题册字号大时被文字盖住看不出来，换到窄行小字的卷（光学，2026-10-27）
+   整页就像表格 —— 只有换卷才会暴露。
+   图片块的青绿虚线框同理（那是「这里是图片块」的标记，不是图本身的边框）。 */
+#book .blk-line .txt { border-color: transparent; }
+#book .blk-line.kind-image { border: 0; background: none; }
