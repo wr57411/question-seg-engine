@@ -128,6 +128,17 @@ layout.json / content_list.json
   产物 `data/oxr/`（含可视化审板 `report.html`）；实验脚本 `scripts/oxr-eval.ts`（评估用，不入 check）。
   ⚠️ 正式版（`somark.cn`，用户 key，日 500 页）与免费版 **schema 不同**（小写类型+更细粒度），
   适配须分支。**下一步（normalize 加 OXR 分支 / 两源交叉核对修 O→0 与图注）未拍板未实施。**
+- **OXR 适配 v2：成品页首次可读**（2026-10-27 深夜，`oxr-evaluation.md` §4）：
+  新增 `scripts/oxr-adapter.ts`（可复现适配器，取代原先的一次性 `oxr-as-layout.json`），
+  修掉 3 个**适配层与契约不匹配**的缺陷 ——
+  A 图片全 404（`images[].path` 契约是裸文件名，OXR 给绝对 URL）⇒ 下载落盘 **90/90**；
+  B 正文坍缩 3px（OXR 无行级 bbox/`font_size`，引擎取不到字号）⇒ 按块宽高与文本宽度联立解字号；
+  C 修完 B 后字号被放大 45%（我给 line 的 bbox 高度是**行距**，展示层却拿它当**字号**）
+  ⇒ 改墨迹口径（bbox 高 = 字号）。
+  结果：15 页 · **1115 行级块** · 83 题 · 字号 p50 **10.6pt** · 成品页标题/正文/选项/图片/双栏可读。
+  ⚠️ 代价与未闭项：需人工校对 1 → **6**（拆行后选项分组不稳）；公式 LaTeX 噪声；
+  **全量逐页审板未做**（仅两屏抽样，不构成显示层验收）；
+  `audit:render` 按 docId 单卷审计，**默认不审 OXR** ⇒ 之前"判定项归零"不能当 OXR 证据。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
 
