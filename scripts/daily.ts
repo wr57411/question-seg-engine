@@ -173,6 +173,8 @@ interface Meta {
     correctionsUnverified: number;
     /** OCR 产物“存在但读不动”的错误条数（>0 时题号补行可能被跳过） */
     ocrInputErrors: number;
+    /** 修正清单里已标记 disabled、未应用的条数（人工核对为重复；保留可审计） */
+    correctionsDisabled: number;
   };
   /** `short` = 顶部工具栏那一枚胶囊的文案（一行放得下）；`issues` = 展开后的完整原因 */
   health: { level: "ok" | "warn" | "fail"; short: string; issues: string[] };
@@ -196,7 +198,7 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
     pages: { ocrFill?: { accepted?: boolean }[]; uncovered?: { kind?: string }[] }[];
     reviews?: { reason?: string }[];
     inkCoverage?: { ratio: number; contentCount: number } | null;
-    corrections?: { unverified?: number[] } | null;
+    corrections?: { unverified?: number[]; disabled?: number[] } | null;
     ocrInputErrors?: string[];
   };
 
@@ -219,6 +221,7 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
   const suppressed = (snap.reviews ?? []).filter((r) => /未作为题目/.test(r.reason ?? "")).length;
   const needsReview = questions.filter((q) => q.status === "needs_review").length;
   const correctionsUnverified = snap.corrections?.unverified?.length ?? 0;
+  const correctionsDisabled = snap.corrections?.disabled?.length ?? 0;
   const ocrInputErrors = (snap.ocrInputErrors ?? []).length;
 
   const issues: string[] = [];
@@ -262,6 +265,7 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
       inkCoveragePct: snap.inkCoverage ? Number((snap.inkCoverage.ratio * 100).toFixed(2)) : null,
       missingNumberGroups,
       correctionsUnverified,
+      correctionsDisabled,
       ocrInputErrors,
     },
     health: { level: questions.length === 0 ? "fail" : issues.length ? "warn" : "ok", short, issues },

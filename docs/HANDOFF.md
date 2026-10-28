@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **275 例** + audit:render + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **276 例** + audit:render + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **420 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -199,10 +199,10 @@ layout.json / content_list.json
      基准字号 ⇒ 候选文字超宽溢出行、压到公式）。展示层微调，已实跑质量门 259/259 全绿，**已提交（见 `git log -1`）**。
   ⚠️ 详细实验记录在 `docs/oxr-evaluation.md` §4.12；`feature/oxr` 领先 `origin/main` 以 `git rev-list --count origin/main..HEAD` 为准，未 push。
 
-- **修正层可信度显式化（2026-10-28，`DECISIONS §48`，提交 `20fc07c`）**：`corrections/` 185 条中 **63 条 `verified:false`**
+- **修正层可信度显式化（2026-10-28，`DECISIONS §48`，提交 `20fc07c`）**：`corrections/` 185 条中 **6 条 `disabled`**、**57 条应用且 `verified:false`**
   （body-hole 正文补行）**仍应用**，但导出日志、`stages.json.corrections.unverified` 与
   `meta.stats.correctionsUnverified` 都会显示；OCR 输入文件“存在但读不动”写 `ocrInputErrors` 与体检告警，
-  不再静默跳过（文件缺失仍是合法状态）。质量门 **275/275**；实跑 2相互作用：17 条未核对、0 条 OCR 输入错误。
+  不再静默跳过（文件缺失仍是合法状态）。质量门 **276/276**；实跑 2相互作用：17 条未核对、0 条 OCR 输入错误。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
 
@@ -424,7 +424,8 @@ layout.json / content_list.json
         还只是让 stem/options 重复，并未补上缺失的 D 选项；p6 两条已在 q42 stem 中。
       - 邻近条目：3卷 p2 的 A 选项两条（`A. 静止时...` + `与 B 对 C...`）在当前 q7 options 中缺失，
         **疑似真缺口，保留**；p5/p7 的 D 选项缺失但 insert 未补，属另一类问题。
-      - **未删任何条目**；6 条重复建议标记 disabled/待删，须逐条批准；A 选项两条保留。
+      - **已处理（2026-10-28）**：6 条重复加 `disabled:true` + 原因，**停用未删**（`DECISIONS §51`）；
+        应用且未核对降至 **57 条**；3卷 p2 A 选项两条保留启用。
     ⚠️ 禁止机械自动删条目；删/禁用须逐条批准。
     现已在导出/体检中显式计数（`DECISIONS §48`）；但这 63 条仍未逐条核对，抽查前不得当成已核对。
 20. **答案册 p18 MinerU 漏切 #3（已修，2026-10-28；上游解析质量问题，`feature/oxr` 暴露）**：

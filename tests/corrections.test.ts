@@ -94,6 +94,19 @@ test("applyCorrections：replace_text 未命中进 missed，verified:false 计�
   assert.deepEqual(hit.unverified, [0]);
 });
 
+test("applyCorrections：disabled 条目不应用、不计 missed/unverified", () => {
+  const doc = makeDoc();
+  const rep = applyCorrections(doc, {
+    docId: "t",
+    items: [{ page: 1, kind: "insert", text: "禁用的图注", bbox: [10, 100, 200, 115], source: "body-hole", verified: false, disabled: true, disabledReason: "逐页核对为重复" }],
+  });
+  assert.equal(rep.insert, 0);
+  assert.deepEqual(rep.missed, []);
+  assert.deepEqual(rep.unverified, []);
+  assert.deepEqual(rep.disabled, [0]);
+  assert.equal(doc.pages[0]!.blocks.length, 2);
+});
+
 test("applyCorrections：未命中的 replace 进 missed，不误报 unverified", () => {
   const rep = applyCorrections(makeDoc(), {
     docId: "t",
@@ -133,6 +146,7 @@ interface Counts {
   replaceText?: number;
   insert?: number;
   bodyHole?: number;
+  disabled?: number;
   total?: number;
 }
 
@@ -145,6 +159,7 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
   let insertN = 0;
   let bodyHoleN = 0;
   let unverifiedN = 0;
+  let disabledN = 0;
   file.items.forEach((it, idx) => {
     const at = `${name} items[${idx}]`;
     assert.ok(Number.isInteger(it.page) && it.page >= 1, `${at}: page 非法`);
@@ -153,7 +168,13 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
       `${at}: kind 非法`,
     );
     assert.ok(it.verified === undefined || typeof it.verified === "boolean", `${at}: verified 必须是布尔或缺省`);
-    if (it.verified !== true) unverifiedN++;
+    assert.ok(it.disabled === undefined || typeof it.disabled === "boolean", `${at}: disabled 必须是布尔或缺省`);
+    if (it.disabled === true) {
+      disabledN++;
+      assert.ok((it.disabledReason ?? "").length > 0, `${at}: disabled 缺 disabledReason`);
+    } else if (it.verified !== true) {
+      unverifiedN++;
+    }
     if (it.kind === "replace") {
       replaceN++;
       assert.ok((it.blockText ?? "").length > 0, `${at}: replace 缺 blockText`);
@@ -177,11 +198,12 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
     assert.equal(file.counts.replace, replaceN, `${name}: counts.replace 不一致`);
     assert.equal(file.counts.replaceText ?? 0, replaceTextN, `${name}: counts.replaceText 不一致`);
     assert.equal(file.counts.insert, insertN, `${name}: counts.insert 不一致`);
+    assert.equal(file.counts.disabled ?? 0, disabledN, `${name}: counts.disabled 不一致`);
     if (file.counts.bodyHole !== undefined) {
       assert.equal(file.counts.bodyHole, bodyHoleN, `${name}: counts.bodyHole 不一致`);
     }
   }
-  return { replaceN, replaceTextN, insertN, bodyHoleN, unverifiedN };
+  return { replaceN, replaceTextN, insertN, bodyHoleN, unverifiedN, disabledN };
 }
 
 test("corrections/*.json：docId/counts/字段结构一致；有 data 时干跑 0 未命中", () => {

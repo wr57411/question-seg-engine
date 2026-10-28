@@ -41,6 +41,10 @@ export interface CorrectionItem {
   from?: string;
   /** true = 已逐条回原卷页图核对；false/缺省 = 未逐条核对（仍应用，但计入 unverified） */
   verified?: boolean;
+  /** true = 保留清单但**不应用**（人工核对为重复/不再适用）；可审计、可回滚，不删除条目 */
+  disabled?: boolean;
+  /** disabled 的原因/证据（可审计） */
+  disabledReason?: string;
   /**
    * 插入来源，决定**插到哪**：
    * - `caption`（默认）：图注 → 插在该页最近的**图片块之后**（图注跟着图）
@@ -66,6 +70,8 @@ export interface ApplyReport {
   missed: number[];
   /** 已应用但 `verified !== true` 的条目下标（未逐条回原卷核对；调用方必须显示） */
   unverified: number[];
+  /** 已标记 disabled、**未应用**的条目下标（人工核对为重复/不再适用；保留可审计） */
+  disabled: number[];
 }
 
 /** O/0 修正：只替换**紧跟「点/角」**的那个 0，避免改到真正的数字 0 */
@@ -102,9 +108,13 @@ function nearestImageIndex(blocks: ParsedBlock[], bbox: BBox): number {
  * 会**全部**替换（图注/公式同文重复的情况在正文里罕见，且语义一致）。
  */
 export function applyCorrections(doc: ParsedDocument, file: CorrectionFile): ApplyReport {
-  const report: ApplyReport = { replace: 0, replaceText: 0, insert: 0, missed: [], unverified: [] };
+  const report: ApplyReport = { replace: 0, replaceText: 0, insert: 0, missed: [], unverified: [], disabled: [] };
 
   file.items.forEach((item, idx) => {
+    if (item.disabled) {
+      report.disabled.push(idx);
+      return;
+    }
     const page = doc.pages[item.page - 1];
     if (!page) {
       report.missed.push(idx);

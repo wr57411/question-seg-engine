@@ -989,6 +989,7 @@ function main(): void {
         (rep.replaceText > 0 ? ` · 半行修补 ${rep.replaceText} 处` : "") +
         ` · 补入图注 ${rep.insert} 处` +
         (rep.unverified.length > 0 ? `（其中 ${rep.unverified.length} 条未逐条回原卷核对，已标记）` : "") +
+        (rep.disabled.length > 0 ? `；跳过 ${rep.disabled.length} 条已 disabled` : "") +
         (rep.missed.length > 0 ? `（⚠️ ${rep.missed.length} 条未命中，清单可能已过期）` : ""),
     );
   }

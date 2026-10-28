@@ -1,6 +1,6 @@
 # 切片决策记录（DECISIONS）
 
-> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§50，按时间序；顶部有索引）。
+> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§51，按时间序；顶部有索引）。
 > 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](HANDOFF.md)**；通用约定见 **[AGENTS.md](../AGENTS.md)**。
 
 垂直演进模型的两份交付物：可运行的骨架代码 + 本决策记录。
@@ -53,6 +53,7 @@
 | 48 | **修正层可信度显式化**：未核对条目应用但可见；OCR 输入损坏不再静默 | 2026-10-28 |
 | 49 | **修正层新增 `replace_text`**：p18 半行修补，不新增重复行 | 2026-10-28 |
 | 50 | **OCR 候选绿框画在证据 bbox 上**：p13 避让，不压公式 | 2026-10-28 |
+| 51 | **`corrections` disabled 标记**：6 条重复 insert 停用未删 | 2026-10-28 |
 
 ## 1. 公式指标修正：语义正确率替代可编译率
 
@@ -2591,5 +2592,26 @@ vs 公式 x69–179）。绿框此前画在 `win` 上 ⇒ 边框压到公式；�
 - p13 成品页截图 `tmp/verify/after-p13-13.png`：绿框不再与公式块相交；
 - `tests/layout-invariant.test.ts` 新增 `ocr-evidence` 几何断言（bbox 相对 win 的百分比）；
 - `npm run check` **275/275**；`bank:all` **420 条**；未改 OCR 数据。
+
+**状态**：已实现。
+
+## 51. `corrections` disabled 标记：6 条重复 insert 停用未删（2026-10-28）
+
+**背景**：HANDOFF §6-19 的逐页核对确认 6 条 insert 是重复（原文已在原生块/题目 stem 或 options 中）。
+用户明确要求**不得自动删条目**；直接删会丢失「当时为什么加、后来为什么判重复」的审计链。
+
+**决策**：
+1. `CorrectionItem` 增加 `disabled?: boolean` 与 `disabledReason?: string`；
+2. `applyCorrections` 遇到 `disabled` **跳过且不应用**，记入 `ApplyReport.disabled`；
+3. `export-stages` 日志打印跳过条数；`stages.json.corrections.disabled` 与
+   `meta.stats.correctionsDisabled` 可见；不算 `missed`，也不算「应用且未核对」；
+4. 6 条重复条目（2相互作用 p5×2/p7、3卷 p2、答案册 p6×2）标记 `disabled:true` + 原因。
+
+**验证（2026-10-28）**：
+- 题数不变：2相互作用 83、3卷 62、答案册 167；只少了重复块
+  （2相互作用 p5 q1 19→18、q4 16→15；p7 q5 19→18；3卷 p2 q4 15→14；答案 p6 q1 13→11）。
+- 应用且未核对：63→**57**（2相互作用 17→14、3卷 8→7、答案册 7→5）；6 条 disabled。
+- `npm run check` **276/276**；`bank:all` **420 条**；`audit:numbering` 基线仍 5 条。
+- 3卷 p2 的 A 选项两条（`A. 静止时...` + `与 B 对 C...`）**保留启用**（当前 q7 options 缺失，疑似真缺口）。
 
 **状态**：已实现。

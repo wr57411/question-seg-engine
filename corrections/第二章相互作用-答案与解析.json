@@ -1,12 +1,13 @@
 {
   "docId": "第二章相互作用-答案与解析",
-  "generatedAt": "2026-10-28T10:18:38.362Z",
-  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）。p13 原有 3 条 body-hole 经 2026-10-28 回原卷核实为「填错文本」（照抄 OXR 行块、y 坐标未换算），已删除，见 docs/oxr-evaluation.md §4.12.4；p18 #3 为 replace_text（半行→完整行，已回原卷核对）",
+  "generatedAt": "2026-10-28T10:29:05.296Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）。p13 原有 3 条 body-hole 经 2026-10-28 回原卷核实为「填错文本」（照抄 OXR 行块、y 坐标未换算），已删除，见 docs/oxr-evaluation.md §4.12.4；p18 #3 为 replace_text（半行→完整行，已回原卷核对）；2 条重复 insert 已 disabled（p6；未删，见 HANDOFF §6-19）",
   "counts": {
     "replace": 7,
     "replaceText": 1,
     "insert": 14,
     "bodyHole": 7,
+    "disabled": 2,
     "total": 22
   },
   "items": [
@@ -190,7 +191,9 @@
       ],
       "verified": false,
       "source": "body-hole",
-      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）",
+      "disabled": true,
+      "disabledReason": "2026-10-28 逐页回原卷核对：原文已在原生块/题目 stem 或 options 中，属重复 insert；保留条目、禁用应用（未删）"
     },
     {
       "page": 6,
@@ -204,7 +207,9 @@
       ],
       "verified": false,
       "source": "body-hole",
-      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）",
+      "disabled": true,
+      "disabledReason": "2026-10-28 逐页回原卷核对：原文已在原生块/题目 stem 或 options 中，属重复 insert；保留条目、禁用应用（未删）"
     },
     {
       "page": 6,

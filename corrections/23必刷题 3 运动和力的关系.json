@@ -1,11 +1,12 @@
 {
   "docId": "23必刷题 3 运动和力的关系",
-  "generatedAt": "2026-10-28T07:07:55.622Z",
-  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
+  "generatedAt": "2026-10-28T10:29:05.296Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）；1 条重复 insert 已 disabled（p2 B；A 选项两条保留；未删，见 HANDOFF §6-19）",
   "counts": {
     "replace": 0,
     "insert": 33,
     "bodyHole": 8,
+    "disabled": 1,
     "total": 33
   },
   "items": [
@@ -374,7 +375,9 @@
       ],
       "verified": false,
       "source": "body-hole",
-      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）",
+      "disabled": true,
+      "disabledReason": "2026-10-28 逐页回原卷核对：原文已在原生块/题目 stem 或 options 中，属重复 insert；保留条目、禁用应用（未删）"
     },
     {
       "page": 5,
