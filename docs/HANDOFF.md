@@ -11,7 +11,7 @@
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
   其后还有 OXR 收口提交（`--parser oxr` 接入 → 8 卷交叉核对 → 106 条修正落地）—— **以 `git log -1` 为准**。
-  两侧自 `076bcd0` 分叉时：main 侧 +4、功能侧 +9，见下表；`main` 已快进到功能分支，未 push
+  两侧自 `076bcd0` 分叉时：main 侧 +4、功能侧 +9，见下表；`main` 已快进到功能分支；`feature/oxr` 已推送 `origin/feature/oxr`（2026-10-28，`a7787c8`），`main` 本身仍未 push
 
 ### 分支与 worktree（2026-10-28 起的工作方式）
 
@@ -181,7 +181,7 @@ layout.json / content_list.json
   根因统一为 **OXR 只有块级 bbox、无行级几何**（§2.5 已预告）。
   ⇒ 结论：OXR 内容识别更强，但**排版精度不及 MinerU**，当前定位仍是**第二解析源/交叉核对**。
   ⚠️ `audit:render` 按 docId 单卷审计、**默认不审 OXR** ⇒ 它的"判定项归零"不能当 OXR 证据。
-- **`feature/oxr` 分支本轮修复（2026-10-28 下午，`ca488d2`/`ddb848c`/`841536b` + 本轮 reconstruct 提交，领先 `origin/main` 以 `git rev-list --count origin/main..HEAD` 为准，未 push）**：
+- **`feature/oxr` 分支本轮修复（2026-10-28 下午，`ca488d2`/`ddb848c`/`841536b` + 本轮 reconstruct 提交，领先 `origin/main` 以 `git rev-list --count origin/main..HEAD` 为准；`feature/oxr` 已推送 `origin/feature/oxr`（`a7787c8`））**：
   ① **推翻"OXR 整页失效"误判**：实测 OXR 光学 p2 10 块/1025 字、p3 8 块/1011 字（选项齐全）⇒ 非没读出；
      题号印在页边，MinerU/OXR 双路都没读到；MinerU 靠 OCR 补行切题，而 OXR 卷当时跑 `--no-ocr` 缺
      `ocr-page-fill.json` ⇒ **输入不对等，非 OXR 能力缺陷**（上一轮 `d6419e7` 的结论已推翻）。
@@ -197,7 +197,7 @@ layout.json / content_list.json
      （实跑 `["4","5","1","2","3","4","5","1","2"]`）；corrections 条目 24 → 21。
   ⑥ **本轮已提交改动** `stages/reconstruct.js`：OCR 候选字号改按自身框宽 `clampByWidth`（旧硬编码整页
      基准字号 ⇒ 候选文字超宽溢出行、压到公式）。展示层微调，已实跑质量门 259/259 全绿，**已提交（见 `git log -1`）**。
-  ⚠️ 详细实验记录在 `docs/oxr-evaluation.md` §4.12；`feature/oxr` 领先 `origin/main` 以 `git rev-list --count origin/main..HEAD` 为准，未 push。
+  ⚠️ 详细实验记录在 `docs/oxr-evaluation.md` §4.12；`feature/oxr` 已推送 `origin/feature/oxr`（`a7787c8`）；`main` 仍未 push。
 
 - **修正层可信度显式化（2026-10-28，`DECISIONS §48`，提交 `20fc07c`）**：`corrections/` 185 条中 **6 条 `disabled`**、**57 条应用且 `verified:false`**
   （body-hole 正文补行）**仍应用**，但导出日志、`stages.json.corrections.unverified` 与
