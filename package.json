@@ -29,7 +29,9 @@
     "score": "tsx scripts/score.ts",
     "score:all": "tsx scripts/score.ts --all",
     "check:accuracy": "tsx scripts/score.ts --all --gate",
-    "gold:worksheet": "tsx scripts/gold-worksheet.ts"
+    "gold:worksheet": "tsx scripts/gold-worksheet.ts",
+    "batch": "tsx scripts/batch.ts",
+    "batch:report": "tsx scripts/batch.ts --report"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

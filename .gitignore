@@ -10,3 +10,6 @@ sample/*
 .workbuddy-ai/
 # 用户提供的资料 PDF（大文件，不入库）
 *.pdf
+
+# 批量导入的运行时输入（PDF 已在上面忽略；layout 目录也一并忽略）
+inbox/

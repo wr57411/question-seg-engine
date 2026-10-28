@@ -1,6 +1,6 @@
 # 切片决策记录（DECISIONS）
 
-> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§57，按时间序；顶部有索引）。
+> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§58，按时间序；顶部有索引）。
 > 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](HANDOFF.md)**；通用约定见 **[AGENTS.md](../AGENTS.md)**。
 
 垂直演进模型的两份交付物：可运行的骨架代码 + 本决策记录。
@@ -60,6 +60,7 @@
 | 55 | **OCR 环境可配置 + 失败可见**：`UVX_BIN` 覆盖；`meta.ocrError`/`source.ocr=failed` | 2026-10-28 |
 | 56 | **非基线卷 LaTeX 命令覆盖 + 全卷审计入 check**：8/8 通过 | 2026-10-28 |
 | 57 | **view-server 默认只监听本机**：`view:lan` 开 LAN；`TAGS_WRITE=0` 只读 | 2026-10-28 |
+| 58 | **批量导入 MVP**：hash 去重 + 台账 + 断点 + 失败隔离 + 日报 | 2026-10-28 |
 
 ## 1. 公式指标修正：语义正确率替代可编译率
 
@@ -2733,3 +2734,20 @@ CSS/HTML 的 `<script src>` 不由本门覆盖（展示层是 ESM 直接加载�
 `npm run check` **284/284**；`audit:render:all` 8/8；`bank:all` 420。
 
 **状态**：已实现。
+
+
+## 58. 批量导入 MVP：hash 去重 + 台账 + 断点 + 失败隔离（2026-10-28）
+
+**背景**：`daily` 一次一本；每天批量/大量需要队列、断点、失败隔离、台账与日报（spec B03/B04）。
+
+**决策**：
+1. `scripts/batch.ts` 只做外层编排，每本仍调用 `scripts/daily.ts`；不改 daily 语义。
+2. inbox 收 PDF / `layout.json`；按文件 SHA-256 去重；同哈希 done 跳过；同 docId 不同哈希记 `collision`，不覆盖。
+3. 台账 `data/batch/ledger.jsonl` 逐行追写：运行前 `running`，结束 `done`/`failed`；崩溃后 `running` 可重试。
+4. 失败隔离：单本失败不阻塞整批；`--retry` 控制重试；日志落 `data/batch/logs/`。
+5. `npm run batch:report` 生成 `data/batch/report.md`；serial MVP，并发/限流/100 本/日留 Phase 2。
+
+**验证（2026-10-28）**：`tests/batch.test.ts` —— 2 本成功 + 1 本坏 layout 单独失败 + 重跑不重复；
+`npm run check` **287/287**。真实 PDF 的 MinerU/OCR 时间/成本未测（B05）。
+
+**状态**：MVP 已实现（串行，夹具验证）；真实批量与 20/100 本/日未验。

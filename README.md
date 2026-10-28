@@ -7,7 +7,7 @@
 > **交接入口（跨 Agent 必读）**：接手指南与当前状态已收敛到
 > **[docs/HANDOFF.md](docs/HANDOFF.md)**（含红线、未闭合风险、文档地图）；
 > 根目录 `AGENTS.md` 是各平台编程 Agent 的通用入口。改口径/阈值前先查
-> `docs/DECISIONS.md`（57 条决策，按时间序）。
+> `docs/DECISIONS.md`（58 条决策，按时间序）。
 > 当前真实数据：题册 15 页 / 83 题，答案册 23 页 / 167 题（详见 HANDOFF §2）。
 
 ## 架构
@@ -127,6 +127,13 @@ npm run stages               # 导出快照 + 启动服务，然后访问 /stage
 npm run daily -- ~/Downloads/新试卷.pdf     # ① 导入：一条命令，不用改代码
 npm run view                                # ② 打开：http://localhost:4173/final/（仅本机）
 npm run view:lan                            # 手机/平板：同 WiFi；TAGS_WRITE=0 只读
+```
+
+批量导入：
+```bash
+mkdir -p inbox && cp ~/Downloads/*.pdf inbox/   # PDF/layout.json 都可以
+npm run batch -- --inbox inbox                  # 逐本 daily；同哈希跳过；失败隔离
+npm run batch:report                            # 日报：data/batch/report.md
 ```
 
 **① 导入**（`npm run daily`）跑完整条链：MinerU 解析 → 解包 → 导出快照（页图 + 墨迹覆盖率）
