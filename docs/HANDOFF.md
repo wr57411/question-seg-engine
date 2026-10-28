@@ -9,8 +9,9 @@
 - **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **259 例** + audit:render + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **419 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
-- **快照时的 git HEAD**：`main` 侧为 `b5e272c`；本文件所在分支已把 `main` **merge 进来**
-  （两侧自 `076bcd0` 分叉：main 侧 +4、功能侧 +9，见下表）
+- **快照时的 git HEAD**：合并提交 `cfbce09`（把 `main` 的 `b5e272c` merge 进 `feature/oxr`，
+  冲突按实跑解决）。两侧自 `076bcd0` 分叉：main 侧 +4、功能侧 +9，见下表；
+  合并提交之后可能还有 docs 更新 —— 以 `git log -1` 为准，`cfbce09` 是**合并且验证全绿**的那个锚点
 
 ### 分支与 worktree（2026-10-28 起的工作方式）
 
