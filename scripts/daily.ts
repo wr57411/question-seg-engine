@@ -16,6 +16,7 @@
  * npm run daily -- <layout.json> --id <docId> # 已有解析结果：跳过 MinerU（省额度）
  * npm run daily -- <pdf> --no-ocr             # 跳过 OCR 补行（更快）
  * npm run daily -- <pdf> --force-parse        # 强制重新解析（默认幂等：已有 layout.json 就跳过）
+ * npm run daily -- <pdf> --no-proxy            # 强制直连（默认会自动用本机 Clash 端口）
  * ```
  *
  * ## 设计约束（别在这里加"聪明"的东西）
@@ -98,6 +99,29 @@ function run(script: string, args: string[]): void {
     cwd: ROOT,
     env: process.env,
   });
+}
+
+/**
+ * 本机是否有 Clash 的混合端口在监听。
+ *
+ * 为什么需要（2026-10-28 实测，DECISIONS §44/§45）：这份环境里 **MinerU 的 CDN 直连会被
+ * TLS 重置**（`ECONNRESET`，4–31ms 即断；`--noproxy` 真直连也一样），而**走 Clash 代理
+ * 稳定 200**（实测 57MB 的 zip 5.7 秒下完）。node 的 fetch **不读 `HTTP(S)_PROXY`**，
+ * 所以必须在进程里显式给 `MINERU_PROXY`。
+ *
+ * 判据：只认「端口在监听」，不猜节点是否可用 —— 代理不通时 real-pipeline 会报错，
+ * 那时加 `--no-proxy` 走直连（或换网络）。
+ */
+function detectLocalProxy(): string | null {
+  for (const port of [7897, 7890, 1087]) {
+    try {
+      execFileSync("nc", ["-z", "-w", "1", "127.0.0.1", String(port)], { stdio: "ignore" });
+      return `http://127.0.0.1:${port}`;
+    } catch {
+      /* 该端口没在监听，试下一个 */
+    }
+  }
+  return null;
 }
 
 /** OCR 凭据是否可用（与 ocr-lib.readToken 同源，但**不打印 token**） */
@@ -224,7 +248,19 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
   };
 }
 
+// 合并说明（2026-10-28）：本分支给 main() 加了 async（`--parser oxr` 分支需要 await 解析），
+// main 那边加了「MinerU 出网走代理」——两者都要：保留 async，同时保留代理检测。
 async function main(): Promise<void> {
+  // MinerU 出网：直连会被 TLS 重置 ⇒ 本机有代理就默认走它（`--no-proxy` 可强制直连）
+  if (!process.env.MINERU_PROXY && flags["no-proxy"] !== true) {
+    const proxy = detectLocalProxy();
+    if (proxy) {
+      process.env.MINERU_PROXY = proxy;
+      console.log(`MinerU 出网：走本机代理 ${proxy}（直连 CDN 会被 TLS 重置，见 DECISIONS §45）`);
+    } else {
+      console.log("MinerU 出网：直连（本机未发现 7897/7890/1087 代理端口）");
+    }
+  }
   const abs = resolve(input!);
   if (!existsSync(abs)) {
     console.error(`输入不存在：${abs}`);
@@ -339,9 +375,12 @@ async function main(): Promise<void> {
       if (existsSync(from) && !existsSync(join(outDir, extra))) copyFileSync(from, join(outDir, extra));
     }
     const imgDir = join(isDir ? abs : resolve(abs, ".."), "images");
-    if (existsSync(imgDir)) {
-      mkdirSync(join(outDir, "images"), { recursive: true });
-      cpSync(imgDir, join(outDir, "images"), { recursive: true });
+    const imgDest = join(outDir, "images");
+    // ⚠️ 源与目标可能是**同一个目录**（直接对 `data/out/<doc>/layout.json` 跑时），
+    // cpSync 会抛 EINVAL（2026-10-28 合订本导入实测）。同路径就什么都不用做。
+    if (existsSync(imgDir) && resolve(imgDir) !== resolve(imgDest)) {
+      mkdirSync(imgDest, { recursive: true });
+      cpSync(imgDir, imgDest, { recursive: true });
     }
     console.log("\n[1/4] 使用已有解析结果（跳过 MinerU）");
   }

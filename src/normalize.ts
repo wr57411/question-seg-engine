@@ -226,6 +226,35 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
       const leaks: ParsedBlock[] = [];
       const pageWidth = asNumber(size?.[0]) ?? 1654;
       const pageHeight = asNumber(size?.[1]) ?? 2339;
+      /**
+       * **被 MinerU 误判为页眉的章标题，提升回正文**（2026-10-28 实测）：
+       * `第四章 曲线运动` 印在页顶居中，MinerU 把它塞进 `discarded_blocks`（type=header）；
+       * 而同一版式的 `第三章 运动和力的关系` 却是 `title`。丢掉的后果不是"少一行字"：
+       * `chapter` 为空 ⇒ 题号组归到 `?` ⇒ **无法按章配对答案**（bank:all 整册跳过）。
+       * 判据取最严：**只在 discarded 里、只认行首 `第N章`**，别的一律不动。
+       */
+      for (const dbRaw of asArray(rec.discarded_blocks as unknown)) {
+        const db = asRecord(dbRaw);
+        // **只认 header**：`aside_text` 是页边竖排的章号标记（题册 p1 右侧那列「第二章相互作用」），
+        // 它位置在栏外，提升进正文会打乱分栏 ⇒ 图片归属掉 8 张、选项组掉 7 组
+        // （2026-10-28 实测回归）。章标题只印在页顶。
+        if (String(db.type ?? "") !== "header") continue;
+        const raw = layoutBlockText(db);
+        if (!CHAPTER_TITLE_LINE.test(raw)) continue;
+        // 章标题常被拆成两行（实测 `第四章\n曲线运动`）——`matchFirstLine` 只看首行，
+        // 不压平就会丢掉「曲线运动」这个标题，后面 9 道题的 chapterTitle 全空
+        // （2026-10-28 曲线运动 p9 实测）。判据仍是行首 `第N章`，不放松。
+        const text = raw.replace(/\s*\n\s*/g, " ").trim();
+        blocks.push({
+          kind: "text",
+          bbox: toBBox(db.bbox),
+          text,
+          firstLine: text,
+          lineCount: 1,
+          maxFontSize: 0,
+        });
+      }
+
       for (const pbRaw of asArray(rec.para_blocks as unknown)) {
         const pb = asRecord(pbRaw);
         const pbType = String(pb.type ?? "text");
@@ -393,6 +422,33 @@ function dropCrossPageLeaks(pages: (PageInfo & { leaks: ParsedBlock[] })[]): Pag
  * 兜底：块级 `path` 字段（旧版结构）。
  * 找不到任何图片路径返回 null（不产出悬空块）。
  */
+/**
+ * 从 layout 的块结构里取纯文本（`lines[].spans[].content`）。
+ * 用于 `discarded_blocks` —— 那里同样只有行/span 结构，没有现成的 text 字段。
+ */
+function layoutBlockText(pb: Record<string, unknown>): string {
+  const out: string[] = [];
+  for (const lineRaw of asArray(pb.lines as unknown)) {
+    const line = asRecord(lineRaw);
+    const parts: string[] = [];
+    for (const spanRaw of asArray(line.spans as unknown)) {
+      const span = asRecord(spanRaw);
+      const c = String(span.content ?? span.text ?? "");
+      if (c) parts.push(c);
+    }
+    if (parts.length) out.push(parts.join(""));
+  }
+  return out.join("\n").trim();
+}
+
+/**
+ * 章标题形态：`第四章 曲线运动` / `第 4 章 …`。
+ * **章号后面必须还有标题文本** —— 只有 `第六章` 三个字的那种是**页眉上的章号**，
+ * 不是章标题；把它当章标题提升，反而会把 `chapterTitle` 清空
+ * （2026-10-28 机械能 p7/p9 实测：p8–p11 共 15 题标题变空）。
+ */
+const CHAPTER_TITLE_LINE = /^第\s*[一二三四五六七八九十0-9]{1,3}\s*章\s*\S/;
+
 function extractLayoutImage(
   pb: Record<string, unknown>,
 ): Extract<ParsedBlock, { kind: "image" }> | null {

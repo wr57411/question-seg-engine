@@ -26,12 +26,30 @@
  *      **不允许出现没有原因的缺口**（不静默失败）。
  *
  * 用法：`node --import tsx scripts/build-bank.ts`（有违规 → 退出码 1）
+ *
+ * ⚠️ **单册模式**：只配一对（默认那对，或 `--quiz/--answer` 指定），输出覆盖 `bank/bank.json`。
+ * 正式产出请用 `npm run bank:all`（多册，`check` 用的就是它）—— 单册命令留作调试与局部复算。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const QUIZ_DOC = "23必刷题 2相互作用";
-const ANSWER_DOC = "第二章相互作用-答案与解析";
+/**
+ * 参数（都可省略，默认值 = 2026-10-14 定案的那一对，保持向后兼容）：
+ *   `--quiz <docId>`   题册
+ *   `--answer <docId>` 答案册
+ *   `--out <path>`     输出 json（默认 `data/out/bank/bank.json`）
+ *
+ * 为什么加这三个：`scripts/bank-all.ts` 要按「一章一对」逐次调用本脚本（配对逻辑只此一份），
+ * 再把各次结果合并 —— 而不是在第二个脚本里重写一遍块级对齐。
+ */
+function argOf(name: string): string | undefined {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+
+const QUIZ_DOC = argOf("quiz") ?? "23必刷题 2相互作用";
+const ANSWER_DOC = argOf("answer") ?? "第二章相互作用-答案与解析";
+const OUT_JSON = argOf("out") ?? join("data", "out", "bank", "bank.json");
 
 interface Q {
   id: string;
@@ -113,8 +131,18 @@ interface Alignment {
   ans: Block | null;
 }
 
-/** 同一章内做单调对齐（DP 最大化总分）；允许任一侧跳过某个块（得分 0） */
-function alignChapter(quizBlocks: Block[], ansBlocks: Block[]): Alignment[] {
+/**
+ * 同一章内做单调对齐（DP 最大化总分）；允许任一侧跳过某个块（得分 0）。
+ *
+ * ⚠️ **跳过的答案块必须回传**（2026-10-28 曲线运动实测）：原来 `left` 分支只做 `j--`，
+ * 被跳过的答案块连同它的题目**直接消失** —— 既没配对也没进未配对记录，
+ * 守恒校验（答案册章内 18 ≠ 配对 16 + 未配对 0）当场红。
+ * 现在回传 `skippedAns`，由调用方逐条记入未配对（每条都要有原因）。
+ */
+function alignChapter(
+  quizBlocks: Block[],
+  ansBlocks: Block[],
+): { rows: Alignment[]; skippedAns: Block[] } {
   const n = quizBlocks.length;
   const m = ansBlocks.length;
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
@@ -139,6 +167,7 @@ function alignChapter(quizBlocks: Block[], ansBlocks: Block[]): Alignment[] {
     }
   }
   const out: Alignment[] = [];
+  const skippedAns: Block[] = [];
   let i = n;
   let j = m;
   while (i > 0 || j > 0) {
@@ -151,10 +180,11 @@ function alignChapter(quizBlocks: Block[], ansBlocks: Block[]): Alignment[] {
       out.push({ quiz: quizBlocks[i - 1]!, ans: null });
       i--;
     } else {
+      skippedAns.push(ansBlocks[j - 1]!);
       j--;
     }
   }
-  return out.reverse();
+  return { rows: out.reverse(), skippedAns };
 }
 
 // ---------- T 行交叉核验（独立证据，提示项） ----------
@@ -223,13 +253,15 @@ const pageOfQuiz = new Map(quiz.map((q) => [q.id, q.source?.pageIndex ?? -1]));
 
 const chapters = [...new Set(quizBlocks.map((b) => b.chapter))].sort();
 const alignments: Alignment[] = [];
+/** 对齐时被跳过的答案块（DP 允许跳过）—— 它们的题目必须逐条记入未配对，否则守恒失败 */
+const skippedAnsBlocks: Block[] = [];
 for (const ch of chapters) {
-  alignments.push(
-    ...alignChapter(
-      quizBlocks.filter((b) => b.chapter === ch),
-      ansBlocks.filter((b) => b.chapter === ch),
-    ),
+  const r = alignChapter(
+    quizBlocks.filter((b) => b.chapter === ch),
+    ansBlocks.filter((b) => b.chapter === ch),
   );
+  alignments.push(...r.rows);
+  skippedAnsBlocks.push(...r.skippedAns);
 }
 
 interface Entry {
@@ -332,6 +364,16 @@ for (const al of alignments) {
       .map((x) => x.number)
       .join(",")}） |`,
   );
+}
+
+// 对齐时被跳过的答案块：逐条记录原因（**不静默**，守恒校验靠它）
+for (const b of skippedAnsBlocks) {
+  for (const a of b.items) {
+    unmatchedAns.push({
+      at: `${ANSWER_DOC} 章${b.chapter || "?"} 组${b.sectionSeq} #${a.number}`,
+      reason: "该答案块没有对齐的题册块（结构差异过大，DP 跳过）",
+    });
+  }
 }
 
 // 章节只出现在答案册（题册片段不含）：逐条记录原因，不算违规
@@ -446,7 +488,8 @@ const violations: string[] = [
 
 const outDir = join("data", "out", "bank");
 mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, "bank.json"), JSON.stringify(bank, null, 1));
+mkdirSync(join(OUT_JSON, ".."), { recursive: true });
+writeFileSync(OUT_JSON, JSON.stringify(bank, null, 1));
 
 const report = [
   "# 题目—答案仓库构建报告",
@@ -483,7 +526,11 @@ const report = [
   "- 覆盖缺口：本卷 10 个块里只有 6 个块的块头 T 行被上游读到，故只能核验 55/83 条。",
   "",
 ].join("\n");
-writeFileSync(join(outDir, "report.md"), report);
+// 默认路径写 bank/report.md；`--out` 指定时写同名 .report.md（多册合并时互不覆盖）
+writeFileSync(
+  OUT_JSON === join(outDir, "bank.json") ? join(outDir, "report.md") : OUT_JSON.replace(/\.json$/, ".report.md"),
+  report,
+);
 
 console.log(`题册 ${quiz.length} 题 / 答案册 ${ans.length} 条`);
 console.log(`配对成功 ${bank.length} 条；未配对：题册 ${unmatchedQuiz.length} 题 / 答案册 ${unmatchedAns.length} 条`);
