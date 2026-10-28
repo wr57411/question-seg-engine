@@ -7,7 +7,7 @@
 > **交接入口（跨 Agent 必读）**：接手指南与当前状态已收敛到
 > **[docs/HANDOFF.md](docs/HANDOFF.md)**（含红线、未闭合风险、文档地图）；
 > 根目录 `AGENTS.md` 是各平台编程 Agent 的通用入口。改口径/阈值前先查
-> `docs/DECISIONS.md`（58 条决策，按时间序）。
+> `docs/DECISIONS.md`（60 条决策，按时间序）。
 > 当前真实数据：题册 15 页 / 83 题，答案册 23 页 / 167 题（详见 HANDOFF §2）。
 
 ## 架构
@@ -32,7 +32,7 @@ layout.json / content_list.json（MinerU 返回；layout 优先）
 npm install
 npm run demo    # 三份夹具跑全流程
 npm test        # 核心机制验收
-npm run check   # typecheck + test
+npm run check   # typecheck + test + 基线渲染/题号/题库审计
 ```
 
 ## 核心机制（对应架构决策）
@@ -134,6 +134,12 @@ npm run view:lan                            # 手机/平板：同 WiFi；TAGS_WR
 mkdir -p inbox && cp ~/Downloads/*.pdf inbox/   # PDF/layout.json 都可以
 npm run batch -- --inbox inbox                  # 逐本 daily；同哈希跳过；失败隔离
 npm run batch:report                            # 日报：data/batch/report.md
+```
+
+两源融合（原型，未接 daily/batch）：
+```bash
+npm run fuse:eval -- --all   # 8 对 MinerU/OXR：字符级对齐，MinerU 几何 + OXR 文本
+                             # 报告 data/fuse/report.md
 ```
 
 **① 导入**（`npm run daily`）跑完整条链：MinerU 解析 → 解包 → 导出快照（页图 + 墨迹覆盖率）

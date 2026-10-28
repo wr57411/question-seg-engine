@@ -47,6 +47,8 @@ export type ParsedBlock =
        * 见 docs/oxr-evaluation.md §4.9。修正清单进仓库、可审计、可撤销。
        */
       fromCorrection?: boolean;
+      /** 该块文本来自两源融合（MinerU 几何 + OXR 文本）；展示/审计必须可见（G1） */
+      fromFusion?: boolean;
     }
   | {
       kind: "image";
@@ -58,6 +60,8 @@ export type ParsedBlock =
       bbox: BBox;
       /** LaTeX 表达式（不含 $ 包裹） */
       latex: string;
+      /** 该公式文本来自两源融合（MinerU 几何 + OXR 文本） */
+      fromFusion?: boolean;
     };
 
 export interface PageInfo {

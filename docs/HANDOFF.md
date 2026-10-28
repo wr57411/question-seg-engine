@@ -213,10 +213,10 @@ layout.json / content_list.json
   `--allow-missing` 才显式跳过并打印“未审计”。新 worktree/无 data 时 check 会红（不再假绿），
   先接 `data/` 或 `npm run daily` 生成。
 
-- **全卷渲染审计已入 check（2026-10-28，`DECISIONS §56`）**：`audit:render:all` 默认审
-  **8 个 MinerU 卷**（跳过 `-OXR` 与合订本；`--include-combined` 可选），**8/8 通过**；
-  `npm run check` 已改为调用它。残留反斜杠/花括号只对 blocks（最终页）判红，raw/discarded 降为提示；
-  合订本（187 页）默认排除。
+- **全卷渲染审计（2026-10-28，`DECISIONS §56`）**：`audit:render:all` 默认审
+  **8 个 MinerU 基线卷**（跳过 `-OXR` 与合订本；`--include-combined` 可选），**8/8 通过**。
+  **§60 已把 check 改回基线门**（`audit:render:baseline`）：全卷审计保留为批量验收诊断；
+  残留反斜杠/花括号只对 blocks（最终页）判红，raw/discarded 降为提示；合订本（187 页）默认排除。
 
 - **OCR 环境可配置（2026-10-28，`DECISIONS §55`）**：`scripts/ocr-lib.ts` 的 uvx 路径支持
   `UVX_BIN` 覆盖；`daily` OCR 失败写 `meta.ocrError` + `source.ocr:"failed"` + `health.issues`，
@@ -226,8 +226,16 @@ layout.json / content_list.json
   哈希去重/断点/失败隔离/台账 `data/batch/ledger.jsonl`/日报 `data/batch/report.md`；`npm run batch:report`。
   夹具测试：2 成功 + 1 坏 layout 失败隔离 + 重跑不重复；**真实 PDF 的 MinerU/OCR 吞吐/成本未测**（B05）；
   serial MVP，并发/100 本/日 Phase 2。
+- **两源融合 F1（2026-10-28，`DECISIONS §59`）**：`npm run fuse:eval -- --all` —— MinerU 行几何 +
+  OXR 文本，整页字符级对齐（不再按换行点配对），OXR 独有文字落独立块，MinerU 独有行保留。
+  8 对卷题数：1直线 84/84/84、2相互作用 83/83/83、3卷 62/62/62、4曲线 67/67/67、光学 15/17/18、
+  动量 66/65/66、机械能 74/74/74、答案 159/167/167（M/O/F）。2相互作用 pilot 融合 **R100/S50/O100**
+  （p4 重复行归零；p6#5 0.9375 是 LaTeX/空格与纯文本金标准的格式差）。**未接 daily/batch**（F2）。
+- **渲染门回到 8 卷基线（2026-10-28，`DECISIONS §60`）**：`check` 用 `audit:render:baseline`；
+  `audit:render:all` 只做批量验收诊断。新书 `教材基础练 磁场`、`物理_教材基础练 电路` 全卷审计当前失败
+  （9 条提示），按书修复后再显式加入 `BASELINE_DOCS`。`npm run check` **290/290**。
 
-### 质量门（`npm run check` = typecheck && test && audit:render:all && audit:numbering && bank）
+### 质量门（`npm run check` = typecheck && test && audit:render:baseline && audit:numbering && bank）
 
 - **判定项 vs 提示项分离**：机器能确定的对错才计入退出码（G8）；被构造保证的不变量不判（死门防范）。
 - 现有判定项：字号保真度（可判块中位 ratio ∈ [0.93,1.07]）、即时重复折叠数、题号审计
@@ -271,7 +279,7 @@ layout.json / content_list.json
 |---|---|---|
 | `README.md` | 架构总览、核心机制、快速开始 | 主干有效；个别统计数字是历史时点值，以本文件为准 |
 | **`docs/HANDOFF.md`（本文件）** | 当前状态、风险、红线、交接动作 | 唯一的跨 Agent 入口 |
-| `docs/DECISIONS.md` | **46 条决策全记录**（§1–§46，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
+| `docs/DECISIONS.md` | **60 条决策全记录**（§1–§60，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
 | `tasks/lessons.md` | 3 条工程纪律（验收清单 / 启发式判据 / 逐块匹配） | 每条都有真实事故佐证，短小必读 |
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |

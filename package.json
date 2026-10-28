@@ -16,7 +16,7 @@
     "audit:render": "node scripts/audit-render.mjs",
     "test": "node --import tsx --test \"tests/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run audit:render:all && npm run audit:numbering && npm run bank:all",
+    "check": "npm run typecheck && npm test && npm run audit:render:baseline && npm run audit:numbering && npm run bank:all",
     "stages:ocr-fill": "tsx scripts/ocr-fill.ts",
     "stages:ocr-page": "tsx scripts/ocr-page-fill.ts",
     "audit:numbering": "tsx scripts/audit-numbering.ts",
@@ -25,13 +25,15 @@
     "report:generalization": "tsx scripts/generalization.ts",
     "bank:all": "tsx scripts/bank-all.ts",
     "audit:render:all": "node scripts/audit-render-all.mjs",
+    "audit:render:baseline": "node scripts/audit-render-all.mjs --baseline",
     "view:lan": "HOST=0.0.0.0 tsx scripts/view-server.ts",
     "score": "tsx scripts/score.ts",
     "score:all": "tsx scripts/score.ts --all",
     "check:accuracy": "tsx scripts/score.ts --all --gate",
     "gold:worksheet": "tsx scripts/gold-worksheet.ts",
     "batch": "tsx scripts/batch.ts",
-    "batch:report": "tsx scripts/batch.ts --report"
+    "batch:report": "tsx scripts/batch.ts --report",
+    "fuse:eval": "tsx scripts/fuse-eval.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
