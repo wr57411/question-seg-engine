@@ -41,12 +41,27 @@ interface Ratio {
   engineFont: number;
   measuredFont: number;
   ratio: number;
-  lineHeightPx: number;
-  lines: number;
+  /** 原卷该区域的墨迹垂直跨度（px） */
+  spanPx: number;
+  /** 该区域 bbox 高（px），用于判定是否单行块 */
+  bboxHpx: number;
 }
 
-/** 在灰度图的指定区域里做水平投影，返回该区域文本行的中位行高（px）与行数 */
-function measureLineHeight(img: GrayImage, bbox: number[]): { lineHeightPx: number; lines: number } | null {
+/**
+ * 量区域的**墨迹垂直跨度**（第一暗行 → 最后暗行）。
+ *
+ * 为什么不用「连续暗行段」：第一版按连续段切行，而 CJK 字形在垂直方向中间常有空隙
+ * （「二」的上下两横之间），一行会被切成多段 ⇒ 行高被系统性低估
+ * （对照组 MinerU 卷 ratio p50 达 1.711，本该≈1，就是这个原因）。
+ * 改用整块跨度后，字形内部空隙不影响结果。
+ *
+ * ⚠️ 另外第一版把跨度又除以了 LINE_HEIGHT_RATIO(1.45) —— 也是错的：
+ * **墨迹跨度本身 ≈ 字号（1em）**，1.45 是「行距 / 字号」，只适用于把行距换算成字号。
+ */
+function measureInkSpan(
+  img: GrayImage,
+  bbox: number[],
+): { spanPx: number; bboxHpx: number } | null {
   const x0 = Math.max(0, Math.round((bbox[0] ?? 0) * PX_PER_PT));
   const y0 = Math.max(0, Math.round((bbox[1] ?? 0) * PX_PER_PT));
   const x1 = Math.min(img.width, Math.round((bbox[2] ?? 0) * PX_PER_PT));
@@ -55,8 +70,8 @@ function measureLineHeight(img: GrayImage, bbox: number[]): { lineHeightPx: numb
 
   const w = x1 - x0;
   const thresh = Math.max(1, Math.floor(w * INK_ROW_RATIO));
-  const runs: number[] = [];
-  let run = 0;
+  let first = -1;
+  let last = -1;
   for (let y = y0; y < y1; y++) {
     let dark = 0;
     const row = y * img.width;
@@ -64,16 +79,12 @@ function measureLineHeight(img: GrayImage, bbox: number[]): { lineHeightPx: numb
       if ((img.data[row + x] ?? 255) < 128) dark++;
     }
     if (dark >= thresh) {
-      run++;
-    } else if (run > 0) {
-      if (run >= 3) runs.push(run); // 少于 3px 的当噪点
-      run = 0;
+      if (first < 0) first = y;
+      last = y;
     }
   }
-  if (run >= 3) runs.push(run);
-  if (runs.length === 0) return null;
-  runs.sort((a, b) => a - b);
-  return { lineHeightPx: runs[Math.floor(runs.length / 2)] ?? 0, lines: runs.length };
+  if (first < 0) return null;
+  return { spanPx: last - first + 1, bboxHpx: y1 - y0 };
 }
 
 function audit(docId: string): Ratio[] {
@@ -97,9 +108,12 @@ function audit(docId: string): Ratio[] {
       if (b.text.length < MIN_TEXT_LEN) continue;
       // 含 LaTeX 源码的行 bbox 会被二维结构撑高，不是纯行高样本（与 baseFontOfPage 同口径）
       if (/[\\$]|[_^]/.test(b.text)) continue;
-      const measured = measureLineHeight(img, b.bbox);
-      if (!measured || measured.lineHeightPx <= 0) continue;
-      const measuredFont = measured.lineHeightPx / PX_PER_PT / LINE_HEIGHT_RATIO;
+      const m = measureInkSpan(img, b.bbox);
+      if (!m || m.spanPx <= 0) continue;
+      // **只取单行块**：墨迹跨度 ≈ 字号只对单行成立；多行块的跨度是多行总高，
+      // 拿它当字号会严重高估。判据：跨度接近 bbox 高（块内没有整行空白）。
+      if (m.spanPx / m.bboxHpx < 0.85) continue;
+      const measuredFont = m.spanPx / PX_PER_PT; // 墨迹跨度(px) → pt，本身即字号量级
       if (measuredFont <= 0) continue;
       // 引擎侧字号：展示层模型就是 `fontFromLineHeight(bboxH) = bboxH × 1.03`（HANDOFF 记载）。
       // ⚠️ 不能用 `maxFontSize` —— 实测**两卷它全是 0**：MinerU 的 layout.json 同样没有
@@ -114,8 +128,8 @@ function audit(docId: string): Ratio[] {
         engineFont: Number(engineFont.toFixed(2)),
         measuredFont: Number(measuredFont.toFixed(2)),
         ratio: Number((engineFont / measuredFont).toFixed(3)),
-        lineHeightPx: measured.lineHeightPx,
-        lines: measured.lines,
+        spanPx: m.spanPx,
+        bboxHpx: m.bboxHpx,
       });
     }
   });
