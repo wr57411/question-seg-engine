@@ -1,12 +1,12 @@
 {
   "docId": "第二章相互作用-答案与解析",
   "generatedAt": "2026-10-28T07:07:55.739Z",
-  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）。p13 原有 3 条 body-hole 经 2026-10-28 回原卷核实为「填错文本」（照抄 OXR 行块、y 坐标未换算），已删除，见 docs/oxr-evaluation.md §4.12.4",
   "counts": {
     "replace": 7,
-    "insert": 17,
-    "bodyHole": 10,
-    "total": 24
+    "insert": 14,
+    "bodyHole": 7,
+    "total": 21
   },
   "items": [
     {
@@ -242,48 +242,6 @@
         522.2,
         468.5,
         531.7
-      ],
-      "verified": false,
-      "source": "body-hole",
-      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
-    },
-    {
-      "page": 13,
-      "kind": "insert",
-      "text": "小后增加，根据 mg-F=ma 可知，加速度先增加后减小，",
-      "bbox": [
-        32,
-        648.5,
-        285.4,
-        658.5
-      ],
-      "verified": false,
-      "source": "body-hole",
-      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
-    },
-    {
-      "page": 13,
-      "kind": "insert",
-      "text": "则 v-t 图像的斜率先增加后减小，故选 A.",
-      "bbox": [
-        32,
-        665.1,
-        285.4,
-        675.1
-      ],
-      "verified": false,
-      "source": "body-hole",
-      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
-    },
-    {
-      "page": 13,
-      "kind": "insert",
-      "text": "2. AC 必刷模型·连接体模型",
-      "bbox": [
-        22.2,
-        686.8,
-        145,
-        695.4
       ],
       "verified": false,
       "source": "body-hole",
