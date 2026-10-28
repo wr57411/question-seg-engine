@@ -84,6 +84,7 @@ if (!input) {
       "  --no-ocr          跳过整页 OCR 补行",
       "  --force-parse     强制重新调用 MinerU 解析（默认幂等）",
       "  --parser <name>   解析引擎：mineru（默认）| oxr（免费档，超 20 页/10MB 自动分片）",
+      "  --reuse-oxr       复用已有 oxr-response.json 重新转换（不调 OXR API；代码修复后重生成用）",
     ].join("\n"),
   );
   process.exit(2);
@@ -343,19 +344,29 @@ async function main(): Promise<void> {
     // 来生成页图与墨迹覆盖率。写成裸 `origin.pdf` 它会找不到 ⇒ 静默降级成「没有页图」，
     // 而页图正是「解析漏了什么」的唯一地面真值（2026-10-27 实测踩过）。
     copyFileSync(abs, join(outDir, `${docId}_origin.pdf`));
-    const needParse = flags["force-parse"] === true || !existsSync(layoutPath);
-    if (needParse && flags["parser"] === "oxr") {
+    const cachedOxr = join(outDir, "oxr-response.json");
+    const reuseOxr = flags["reuse-oxr"] === true && existsSync(cachedOxr);
+    const needParse = flags["force-parse"] === true || reuseOxr || !existsSync(layoutPath);
+    if (needParse && (flags["parser"] === "oxr" || reuseOxr)) {
       // OXR 第二解析源（分支 feature/oxr）。与 MinerU **走完全相同的下游**：
       // 产出的 layout.json 是同构格式，②导出 / ③OCR补行 / ④体检原样复用 —— 引擎一行不改。
-      console.log("\n[1/4] OXR 解析（免费档；超 20 页或 10MB 自动分片）…");
-      const resp = await parsePdfWithOxr(abs, { onProgress: (m) => console.log(`  ${m}`) });
-      // 原始响应落盘：① 便于事后复现/复核 ② inferSource 靠它判定 parser="oxr"
-      writeFileSync(join(outDir, "oxr-response.json"), JSON.stringify(resp));
-      const conv = await convertOxrResponse(resp, { docId, outDir });
+      let resp;
+      if (reuseOxr) {
+        // 代码修复后重生成：原始响应已在本地，不重复调 OXR API（省时省钱，2026-10-28）。
+        console.log("\n[1/4] OXR 复用缓存响应（--reuse-oxr，不调 API）…");
+        resp = JSON.parse(readFileSync(cachedOxr, "utf8"));
+      } else {
+        console.log("\n[1/4] OXR 解析（免费档；超 20 页或 10MB 自动分片）…");
+        resp = await parsePdfWithOxr(abs, { onProgress: (m) => console.log(`  ${m}`) });
+        // 原始响应落盘：① 便于事后复现/复核 ② inferSource 靠它判定 parser="oxr"
+        writeFileSync(cachedOxr, JSON.stringify(resp));
+      }
+      const conv = await convertOxrResponse(resp, { docId, outDir, onProgress: (m) => console.log(`  ${m}`) });
       writeFileSync(layoutPath, JSON.stringify(conv.layout, null, 1));
       console.log(
         `  ${conv.stats.pages} 页 · ${conv.stats.lines} 行 · 图片 ${conv.stats.imageOk}/${conv.stats.imageBlocks} 落盘` +
-          ` · 字号 p50 ${conv.stats.fontSize.p50}pt`,
+          ` · 字号 p50 ${conv.stats.fontSize.p50}pt` +
+          (conv.stats.dedupeDropped ? ` · 合并重复块 ${conv.stats.dedupeDropped}（补题号 ${conv.stats.dedupeMergedBadge}）` : ""),
       );
       parser = "oxr";
     } else if (needParse) {

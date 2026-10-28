@@ -3,7 +3,7 @@
 // 用法：
 //   npm run batch -- --inbox inbox
 //   npm run batch -- --inbox inbox --no-ocr --limit 20
-//   npm run batch -- --inbox inbox --retry 1
+//   npm run batch -- --inbox inbox --retry 1 --delay 3000
 //   npm run batch:report
 //
 // 设计（spec 2026-10-28-batch-book-ingestion-spec.md B03/B04）：
@@ -41,6 +41,8 @@ interface Options {
   state: string;
   limit: number;
   retry: number;
+  /** 每本之间的等待毫秒数（免费档限流；默认 0） */
+  delay: number;
   noOcr: boolean;
   parser: string | null;
   report: boolean;
@@ -52,6 +54,7 @@ function parseArgs(argv: string[]): Options {
     state: join("data", "batch"),
     limit: Infinity,
     retry: 1,
+    delay: 0,
     noOcr: false,
     parser: null,
     report: false,
@@ -64,6 +67,7 @@ function parseArgs(argv: string[]): Options {
     else if (a === "--state") opt.state = argv[++i] ?? opt.state;
     else if (a === "--limit") opt.limit = Number(argv[++i] ?? opt.limit);
     else if (a === "--retry") opt.retry = Number(argv[++i] ?? opt.retry);
+    else if (a === "--delay") opt.delay = Number(argv[++i] ?? opt.delay);
     else if (a === "--parser") opt.parser = argv[++i] ?? null;
     else throw new Error(`未知参数：${a}`);
   }
@@ -179,7 +183,7 @@ function writeReport(stateDir: string, entries: Entry[]): string {
       return `| ${e.docId} | ${e.status} | ${e.questions ?? "—"} | ${e.pages ?? "—"} | ${e.needsReview ?? "—"} | ${dur} | \`${e.input}\` | ${e.error ? e.error.replace(/\|/g, "\\|").slice(0, 120) : ""} |`;
     }),
     "",
-    "> 每个哈希只显示最后一条。failed 的书重跑同一条命令即可重试；collision 表示同 docId 换了文件，需人工改名。",
+    "> 每个哈希只显示最后一条。failed 的书重跑时用 `--retry 2 --delay 3000`（429 限流请等配额恢复）；collision 表示同 docId 换了文件，需人工改名。",
   ];
   const path = join(stateDir, "report.md");
   mkdirSync(stateDir, { recursive: true });
@@ -187,6 +191,10 @@ function writeReport(stateDir: string, entries: Entry[]): string {
   console.log(lines.slice(0, 5).join("\n"));
   console.log(`\n报告：${path}`);
   return path;
+}
+
+function sleepMs(ms: number): void {
+  if (ms > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function main(): void {
@@ -276,6 +284,14 @@ function main(): void {
     const log = join(stateDir, "logs", `${safeId(docId)}.log`);
     writeFileSync(log, out);
     const finishedAt = new Date().toISOString();
+    if (!ok && /HTTP 429/.test(out)) {
+      appendLedger(ledgerPath, {
+        hash, docId, input: rel, status: "failed", at: finishedAt, startedAt, finishedAt,
+        error: "OXR HTTP 429（限流）；本批停止，剩余书稍后重跑",
+      });
+      console.error(`\n⏸ ${docId}：OXR 限流（HTTP 429）。本批先停，剩余书未处理；稍后重跑会接着来。`);
+      break;
+    }
     if (ok) {
       const meta = readMeta(docId);
       appendLedger(ledgerPath, {
@@ -291,6 +307,7 @@ function main(): void {
       });
       console.log(`  ❌ failed（日志 ${log}）`);
     }
+    if (opt.delay > 0) sleepMs(opt.delay);
   }
 
   writeReport(stateDir, readLedger(ledgerPath));
