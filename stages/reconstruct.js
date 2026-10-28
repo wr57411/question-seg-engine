@@ -141,14 +141,22 @@ const DISCARDED_LABEL = { header: "页眉", footer: "页脚", page_number: "页�
  */
 export function ocrFillNode(it, p, canvasW, baseFont, candidateStyle = true) {
   const isPage = it.source === "page";
-  const node = posStyle(el("div", candidateStyle ? "blk blk-ocr" : "blk blk-line"), it.win ?? it.bbox, p.width, p.height);
+  const box = it.win ?? it.bbox;
+  const node = posStyle(el("div", candidateStyle ? "blk blk-ocr" : "blk blk-line"), box, p.width, p.height);
   node.title =
     `OCR 候选补全（非引擎文本，请核对）\n来源：${isPage ? "整页 OCR" : "区域裁图"}\n` +
     `宽度比 ${it.ratio}（≈1 为合理；${isPage ? "整页来源按**洞自身**宽度算" : "裁图来源按窗口宽算"}）\n` +
     `证据：${it.crop}\nOCR 原始输出：${it.raw}`;
   const txt = el("span", "txt");
   txt.textContent = it.text;
-  txt.style.fontSize = `${baseFont}px`;
+  /**
+   * 字号必须**按候选自身框宽夹紧**（与 `blockNode` 同源，`clampByWidth`）。
+   * 定死 baseFont 会让长候选横向溢出，而 `posStyle` 连**高度**也定死了 ⇒
+   * 溢出的字直接压到下一行正文上（2026-10-28 实测：答案册 p13 的
+   * 「【解析】设 A、B…」一行宽 246pt，13.6px 时需 ~408px，横向溢出后压住公式行）。
+   * 候选是「行」级证据，一行必须落在一行的高度里 —— 宁可字略小，也不能压正文。
+   */
+  txt.style.fontSize = `${clampByWidth(baseFont, { bbox: box, text: it.text ?? "" }, p.width, canvasW)}px`;
   node.append(txt);
   if (candidateStyle) node.append(el("span", "tag", isPage ? "OCR·整页" : "OCR·裁图"));
   return node;
