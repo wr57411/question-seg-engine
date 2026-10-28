@@ -8,7 +8,7 @@ TypeScript ESM + node:test，零运行时依赖。
 1. `docs/HANDOFF.md` —— 当前状态、未闭合风险、红线、前 30 分钟指引。**这是主入口。**
 2. `README.md` —— 架构总览与核心机制。
 3. `tasks/lessons.md` —— 3 条工程纪律（各有真实事故佐证）。
-4. 需要口径/阈值依据时再查 `docs/DECISIONS.md` 对应章节（顶部有索引，共 46 条）。
+4. 需要口径/阈值依据时再查 `docs/DECISIONS.md` 对应章节（顶部有索引，共 48 条）。
 
 ## 不可违反的红线（完整版见 HANDOFF.md §5）
 

@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **259 例** + audit:render + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **272 例** + audit:render + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **419 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -198,6 +198,11 @@ layout.json / content_list.json
   ⑥ **本轮已提交改动** `stages/reconstruct.js`：OCR 候选字号改按自身框宽 `clampByWidth`（旧硬编码整页
      基准字号 ⇒ 候选文字超宽溢出行、压到公式）。展示层微调，已实跑质量门 259/259 全绿，**已提交（见 `git log -1`）**。
   ⚠️ 详细实验记录在 `docs/oxr-evaluation.md` §4.12；`feature/oxr` 领先 `origin/main` **30** commit，未 push。
+
+- **修正层可信度显式化（2026-10-28，`DECISIONS §48`）**：`corrections/` 184 条中 **63 条 `verified:false`**
+  （body-hole 正文补行）**仍应用**，但导出日志、`stages.json.corrections.unverified` 与
+  `meta.stats.correctionsUnverified` 都会显示；OCR 输入文件“存在但读不动”写 `ocrInputErrors` 与体检告警，
+  不再静默跳过（文件缺失仍是合法状态）。质量门 **272/272**；实跑 2相互作用：17 条未核对、0 条 OCR 输入错误。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
 
@@ -404,7 +409,7 @@ layout.json / content_list.json
     属主线上游解析质量问题，**非本分支引入**；修复需回原卷确认题号印在哪，单独立项。
 18. **答案册 p13 OCR 候选与公式块同 y 带轻微叠压（`feature/oxr` 部分缓解，未根治）**：
     p13 的 `【解析】…牛顿第二定律有` 等正文行由 OCR 补行以**绿虚线候选**读出（`ocrFill` 4 条 accepted），
-    与同带 MinerU 公式块（y671/686/688）轻微压边。本轮将候选字号改按框宽 `clampByWidth`（未提交），
+    与同带 MinerU 公式块（y671/686/688）轻微压边。本轮将候选字号改按框宽 `clampByWidth`（已提交 `8dd7660`），
     文字不再溢出行，但**候选避让/行流化未做**（渲染层改动，需立项）。
     ⚠️ `5c2770c` 当初那三条 `insert` 是**重复补已有内容**（OCR 已读出），且因坐标未换算落入 q1 重复文本，
     已在 `841536b` 删除；**禁止再往 p13 加 insert 补这行**（试过按原卷重插 4 条会叠字，已回退）。
@@ -413,6 +418,7 @@ layout.json / content_list.json
     （2相互作用 p5/p7、3 运动和力的关系 p2、答案与解析 p6×2）。但答案册 p13 那三条因公式写法差异
     （`mg-F=ma` vs `$m g - F = m a$`）被漏判 ⇒ **真实数量未知，6 仅为下界**。
     判据：须逐页回原卷看图核对，**禁止机械自动删条目**。
+    现已在导出/体检中显式计数（`DECISIONS §48`）；但这 63 条仍未逐条核对，抽查前不得当成已核对。
 20. **答案册 p18 MinerU 漏切 #3（上游解析质量问题，`feature/oxr` 暴露）**：
     实跑 MinerU p18 题号 `["6","7","1","2"]`（缺 #3），OXR `["6","7","1","2","3"]`（切对）。
     #3 整页无 `3.` 块、被并入 #2 的 41 块。属上游 MinerU 解析质量，非本分支引入。

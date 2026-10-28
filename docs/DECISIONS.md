@@ -1,6 +1,6 @@
 # 切片决策记录（DECISIONS）
 
-> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§46，按时间序；顶部有索引）。
+> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§48，按时间序；顶部有索引）。
 > 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](HANDOFF.md)**；通用约定见 **[AGENTS.md](../AGENTS.md)**。
 
 垂直演进模型的两份交付物：可运行的骨架代码 + 本决策记录。
@@ -50,6 +50,7 @@
 | 45 | **更正 §44**：不是「网络侧阻断」，是 **Clash 的 `GEOIP,CN,DIRECT` 把 CDN 送去直连**；daily 自动走本机代理 | 2026-10-28 |
 | 46 | Clash 落地的**真实机制**：Merge 的 `prepend-rules` 不生效（实测），要改 profile 的 `rules:` 段 | 2026-10-28 |
 | 47 | **图注漏读会让相邻两题「粘」成一块 —— 是结构缺陷（少切一题），不是显示缺陷**；修正层 `corrections/` 落地 8 卷 106 条 | 2026-10-28 |
+| 48 | **修正层可信度显式化**：未核对条目应用但可见；OCR 输入损坏不再静默 | 2026-10-28 |
 
 ## 1. 公式指标修正：语义正确率替代可编译率
 
@@ -2519,3 +2520,26 @@ grep -n "openxlab\|mineru.net" "~/Library/Application Support/io.github.clash-ve
 **未闭项**：这套修正要落到主线，需要主线也能拿到第二解析源 ——
 本分支的 `npm run daily -- <pdf> --parser oxr` 提供了能力（超 20 页/10MB 自动分片），
 但主线是否采纳该依赖尚未决策。
+
+## 48. 修正层可信度显式化：未核对条目应用但可见；OCR 输入损坏不再静默（2026-10-28）
+
+**背景**：`corrections/` 从 §47 的 106 条（13 replace + 93 caption，逐条核对）扩到 **184 条**，
+其中 **63 条是 `body-hole` 正文补行，`verified:false`**（`scripts/build-body-corrections.ts` 生成；
+详见 `docs/oxr-evaluation.md` §4.12）。这些条目此前仍被 `applyCorrections` 应用，但没有任何界面/体检信号；
+答案册 p13 的三条错误 insert 已造成过一次重复题（`841536b` 删除）。
+
+**决策**：
+1. **保留应用** `verified:false` 条目——它们修复题边界；默认跳过会让题数与第二解析源回退；
+2. `ApplyReport` 增加 `unverified`；`export-stages` 打印条数并写入 `stages.json.corrections`；
+3. `daily` 的 `meta.json` 增加 `stats.correctionsUnverified` 与 `health.issues` 告警；
+4. OCR 输入文件区分「缺失（合法，未跑 OCR）」与「存在但读不动（异常）」：后者写
+   `stages.json.ocrInputErrors` 与 `meta.health.issues`，不再静默跳过；
+5. 新增 `tests/corrections.test.ts`（结构/计数/命中/未核对计数 + 反向验证）与
+   `tests/ocr-input-error.test.ts`。
+
+**理由**：G1「不静默失败」同样适用于人工修正与验收门。保留应用避免改变已验收题数；
+显式计数让「未核对」能被后续抽查、交接与体检看到。要彻底关闭，仍需逐条回原卷核对这 63 条并翻转
+`verified`（HANDOFF §6-19）。
+
+**状态**：已实现（2026-10-28）。质量门 **272/272**；实跑 `23必刷题 2相互作用`：
+17 条未核对、0 条 OCR 输入错误；`meta.health.issues` 已显示该告警。

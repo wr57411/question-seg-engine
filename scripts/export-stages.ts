@@ -17,7 +17,7 @@ import { ruleStrategy } from "../src/index.js";
 import { looksLikeAnswerEntry, matchFirstLine } from "../src/patterns.js";
 import { normalizeLayout } from "../src/normalize.js";
 import { detectColumnCenters, detectColumns, layoutPage } from "../src/layout.js";
-import { applyCorrections, type CorrectionFile } from "../src/corrections.js";
+import { applyCorrections, type ApplyReport, type CorrectionFile } from "../src/corrections.js";
 import { scanFormulaNoise, type FormulaNoiseReport } from "../src/formula.js";
 import type { BBox, IndexedBlock, ParsedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
 
@@ -199,6 +199,16 @@ export interface StageSnapshot {
    * 让「检查自身出 bug」不再静默假绿（G1 同样适用于门自身）。
    */
   inkCoverageError: string | null;
+  /**
+   * 修正清单应用报告（2026-10-28 新增）。null = 本卷无清单。
+   * `unverified` 非空 = 有未逐条回原卷核对但已应用的条目（不静默，meta 体检会显示）。
+   */
+  corrections: ApplyReport | null;
+  /**
+   * OCR 输入文件解析错误（文件存在但读不动/结构异常；文件缺失不算错误）。
+   * 非空 = 题号补行/候选合并可能被跳过，meta 体检会显示。
+   */
+  ocrInputErrors: string[];
   pages: StagePage[];
   reviews: SegmentationResult["reviews"];
 }
@@ -370,6 +380,10 @@ export function buildStageSnapshot(
     inkCoverage: null,
     /** 墨迹分析异常：由 main() 在非 ENOENT 失败时回填（见下方 catch） */
     inkCoverageError: null,
+    /** 修正清单应用报告：由 main() 在应用清单后回填 */
+    corrections: null,
+    /** OCR 输入解析错误：由 main() 在读取 OCR 产物后回填 */
+    ocrInputErrors: [],
     pages,
     reviews: result.reviews,
   };
@@ -733,6 +747,22 @@ export function computeInkCoverage(
 }
 
 /**
+ * 读取一个 OCR JSON 文件。**缺失 = 正常**（未跑 OCR），返回 `{json:null,error:null}`；
+ * **存在但读不动/解析失败 = 异常**，返回错误说明，由调用方汇总到 `ocrInputErrors`。
+ *
+ * 为什么要区分：文件不存在是“用户没跑 OCR”的合法状态；文件存在却读不动
+ * （中断、磁盘满、手工编辑）会让题号补行静默失效、题数无声减少 —— 必须可见（G1）。
+ */
+export function readOcrJsonFile(path: string): { json: unknown; error: string | null } {
+  if (!existsSync(path)) return { json: null, error: null };
+  try {
+    return { json: JSON.parse(readFileSync(path, "utf8")), error: null };
+  } catch (e) {
+    return { json: null, error: `${path} 读取/解析失败：${String(e).slice(0, 120)}` };
+  }
+}
+
+/**
  * **把 OCR 读到的「题号行」补成块**（2026-10-12 用户当场指出「第 1 题漏识别」后加）。
  *
  * 动机：MinerU 会**整行漏识别** —— 答案册 p17 的 `1. AD 必刷模型·传送带模型` 在原卷清晰可见，
@@ -749,14 +779,18 @@ export function computeInkCoverage(
  * 2. **只补引擎确实没有的题号**（同页同号且位置相近 ⇒ 已有，跳过，避免重复造题）；
  * 3. 补进去的块带 `fromOcr: true`，展示层以**候选**样式呈现（不静默替换，G1）。
  */
-function injectOcrQuestionLines(doc: ParsedDocument, docId: string): number {
-  const outDir = join("data", "out", docId);
+export function injectOcrQuestionLines(doc: ParsedDocument, outDir: string): { injected: number; errors: string[] } {
   const items: { page: number; bbox: BBox; text: string }[] = [];
+  const errors: string[] = [];
   for (const name of ["ocr-fill.json", "ocr-page-fill.json"]) {
-    const f = join(outDir, name);
-    if (!existsSync(f)) continue;
+    const r = readOcrJsonFile(join(outDir, name));
+    if (r.error) {
+      errors.push(r.error);
+      continue;
+    }
+    if (!r.json) continue;
     try {
-      const j = JSON.parse(readFileSync(f, "utf8")) as {
+      const j = r.json as {
         pages?: { page: number; items?: { bbox: number[]; text?: string }[] }[];
       };
       for (const pg of j.pages ?? []) {
@@ -764,8 +798,8 @@ function injectOcrQuestionLines(doc: ParsedDocument, docId: string): number {
           if (it.text) items.push({ page: pg.page, bbox: it.bbox as BBox, text: it.text });
         }
       }
-    } catch {
-      /* 读不动就跳过 */
+    } catch (e) {
+      errors.push(`${name} 结构异常：${String(e).slice(0, 120)}`);
     }
   }
   let injected = 0;
@@ -793,7 +827,7 @@ function injectOcrQuestionLines(doc: ParsedDocument, docId: string): number {
     });
     injected++;
   }
-  return injected;
+  return { injected, errors };
 }
 
 /** 归一化用于「OCR 行 ↔ 块」匹配：去空白/数学记号/标点，只留字面 */
@@ -828,19 +862,19 @@ function findBlockByLine(
  * 定位：用 OCR 的**下一行**在页内找到对应块，把补入行放在它**正上方**（同一栏）。
  * 找不到落点就**跳过并报数**（不猜坐标、不静默）。
  */
-function injectOcrFullTextLines(doc: ParsedDocument, docId: string): { injected: number; skipped: number } {
-  const f = join("data", "out", docId, "ocr-page-fill.json");
-  if (!existsSync(f)) return { injected: 0, skipped: 0 };
-  let data: { pages?: { page: number; fullText?: string }[] };
-  try {
-    data = JSON.parse(readFileSync(f, "utf8")) as typeof data;
-  } catch {
-    return { injected: 0, skipped: 0 };
+export function injectOcrFullTextLines(doc: ParsedDocument, outDir: string): { injected: number; skipped: number; errors: string[] } {
+  const errors: string[] = [];
+  const r = readOcrJsonFile(join(outDir, "ocr-page-fill.json"));
+  if (r.error) return { injected: 0, skipped: 0, errors: [r.error] };
+  if (!r.json) return { injected: 0, skipped: 0, errors: [] };
+  const data = r.json as { pages?: { page: number; fullText?: string }[] };
+  if (data.pages !== undefined && !Array.isArray(data.pages)) {
+    return { injected: 0, skipped: 0, errors: ["ocr-page-fill.json 结构异常：pages 不是数组"] };
   }
   let injected = 0;
   let skipped = 0;
   for (const pg of data.pages ?? []) {
-    if (!pg.fullText) continue;
+    if (typeof pg.fullText !== "string" || !pg.fullText) continue;
     const page = doc.pages.find((p) => p.index === pg.page);
     if (!page) continue;
     const lines = pg.fullText.split("\n").map((s) => s.trim()).filter(Boolean);
@@ -915,7 +949,7 @@ function injectOcrFullTextLines(doc: ParsedDocument, docId: string): { injected:
       injected++;
     }
   }
-  return { injected, skipped };
+  return { injected, skipped, errors };
 }
 
 function main(): void {
@@ -924,33 +958,45 @@ function main(): void {
   const raw = JSON.parse(readFileSync(layoutPath, "utf8"));
 
   const doc = normalizeLayout(raw, docId);
+  const outDir = join("data", "out", docId);
+  /** OCR 输入文件“存在但读不动”的错误（不静默：写入快照，meta 体检会显示） */
+  const ocrInputErrors: string[] = [];
   // ⚠️ 先补「OCR 读到的题号行」，再切分 —— 否则整行被上游漏掉的题根本不存在（见函数注释）
-  const injected = injectOcrQuestionLines(doc, docId);
-  if (injected) console.log(`  OCR 补入题号行 ${injected} 处（上游整行漏识别，展示层以候选样式呈现）`);
+  const injected = injectOcrQuestionLines(doc, outDir);
+  ocrInputErrors.push(...injected.errors);
+  if (injected.injected) console.log(`  OCR 补入题号行 ${injected.injected} 处（上游整行漏识别，展示层以候选样式呈现）`);
+  if (injected.errors.length) console.warn(`  ⚠️ OCR 题号补行输入异常：${injected.errors.join("；")}`);
   // 第二来源：整页 OCR 全文（补「墨迹被吞进更宽 bbox、items 看不见」的整行漏识别，见函数注释）
-  const full = injectOcrFullTextLines(doc, docId);
+  const full = injectOcrFullTextLines(doc, outDir);
+  ocrInputErrors.push(...full.errors);
   if (full.injected || full.skipped) {
     console.log(
       `  OCR 整页全文补入题号行 ${full.injected} 处` +
         (full.skipped ? `（另有 ${full.skipped} 处找不到落点，已跳过）` : ""),
     );
   }
+  if (full.errors.length) console.warn(`  ⚠️ OCR 整页全文输入异常：${full.errors.join("；")}`);
   // 人工已核对的上游错误修正（corrections/<docId>.json）—— 必须在**切题之前**应用，
   // 否则修正只影响显示、不影响切题判定。清单进仓库、可审计；缺失即跳过（引擎行为不变）。
+  let correctionReport: ApplyReport | null = null;
   const correctionPath = join("corrections", `${docId}.json`);
   if (existsSync(correctionPath)) {
     const file = JSON.parse(readFileSync(correctionPath, "utf8")) as CorrectionFile;
     const rep = applyCorrections(doc, file);
+    correctionReport = rep;
     console.log(
       `  已核对修正：替换 ${rep.replace} 块 · 补入图注 ${rep.insert} 处` +
+        (rep.unverified.length > 0 ? `（其中 ${rep.unverified.length} 条未逐条回原卷核对，已标记）` : "") +
         (rep.missed.length > 0 ? `（⚠️ ${rep.missed.length} 条未命中，清单可能已过期）` : ""),
     );
   }
 
   const result = ruleStrategy.segment(doc);
   const snapshot = buildStageSnapshot(doc, result, extractRawBlocks(raw), extractDiscardedBlocks(raw));
+  snapshot.corrections = correctionReport;
+  // 先挂引用：后面候选合并若再发现 OCR 读取错误，会追加到同一数组（写快照前已全部发生）
+  snapshot.ocrInputErrors = ocrInputErrors;
 
-  const outDir = join("data", "out", docId);
   mkdirSync(outDir, { recursive: true });
 
   // OCR 候选补全（**仅新增字段**，缺失时保持空数组）。两条来源：
@@ -960,16 +1006,14 @@ function main(): void {
   //   ⇒ 合并规则：**裁图已 accepted 的保留，整页只补裁图没补上的洞。**
   // 与快照解耦：重导快照不丢产物，重跑 OCR 也不碰其它字段。
   const readOcrJson = (name: string) => {
-    const path = join(outDir, name);
-    if (!existsSync(path)) return null;
-    try {
-      return JSON.parse(readFileSync(path, "utf8")) as {
-        pages?: { page: number; items?: OcrFillItem[]; fullText?: string }[];
-      };
-    } catch (e) {
-      console.log(`  ${name} 读取失败，跳过：${String(e).slice(0, 80)}`);
-      return null;
+    const r = readOcrJsonFile(join(outDir, name));
+    if (r.error) {
+      ocrInputErrors.push(r.error);
+      console.warn(`  ⚠️ ${r.error}（候选合并跳过该文件）`);
     }
+    return r.json as {
+      pages?: { page: number; items?: OcrFillItem[]; fullText?: string }[];
+    } | null;
   };
   const cropJson = readOcrJson("ocr-fill.json");
   const pageJson = readOcrJson("ocr-page-fill.json");

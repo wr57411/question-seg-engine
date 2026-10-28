@@ -169,6 +169,10 @@ interface Meta {
     contentUncovered: number;
     inkCoveragePct: number | null;
     missingNumberGroups: number;
+    /** 人工修正里未逐条回原卷核对但已应用的条数（2026-10-28 新增；>0 时体检告警） */
+    correctionsUnverified: number;
+    /** OCR 产物“存在但读不动”的错误条数（>0 时题号补行可能被跳过） */
+    ocrInputErrors: number;
   };
   /** `short` = 顶部工具栏那一枚胶囊的文案（一行放得下）；`issues` = 展开后的完整原因 */
   health: { level: "ok" | "warn" | "fail"; short: string; issues: string[] };
@@ -192,6 +196,8 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
     pages: { ocrFill?: { accepted?: boolean }[]; uncovered?: { kind?: string }[] }[];
     reviews?: { reason?: string }[];
     inkCoverage?: { ratio: number; contentCount: number } | null;
+    corrections?: { unverified?: number[] } | null;
+    ocrInputErrors?: string[];
   };
 
   // 组 = (章, 节序)；组内题号是否 1..N 连续（缺号合法但要如实报数）
@@ -212,11 +218,19 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
   );
   const suppressed = (snap.reviews ?? []).filter((r) => /未作为题目/.test(r.reason ?? "")).length;
   const needsReview = questions.filter((q) => q.status === "needs_review").length;
+  const correctionsUnverified = snap.corrections?.unverified?.length ?? 0;
+  const ocrInputErrors = (snap.ocrInputErrors ?? []).length;
 
   const issues: string[] = [];
   if (questions.length === 0) issues.push("没有切出任何题目（先看阶段 4 质检，多半是版式未识别）");
   if (needsReview > 0) issues.push(`${needsReview} 题标记为需人工校对（点题号牌看原因）`);
   if (missingNumberGroups > 0) issues.push(`${missingNumberGroups} 个编号组的题号不连续（可能缺题）`);
+  if (ocrInputErrors > 0) {
+    issues.push(`OCR 产物有 ${ocrInputErrors} 处解析失败（题号补行可能被跳过，详见 stages.json 的 ocrInputErrors）`);
+  }
+  if (correctionsUnverified > 0) {
+    issues.push(`${correctionsUnverified} 条人工修正未逐条回原卷核对（已应用，需抽查）`);
+  }
 
   const short =
     questions.length === 0
@@ -225,7 +239,11 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
         ? `${needsReview} 题待校对`
         : missingNumberGroups > 0
           ? `${missingNumberGroups} 组缺号`
-          : "通过";
+          : ocrInputErrors > 0
+            ? "OCR 输入异常"
+            : correctionsUnverified > 0
+              ? `${correctionsUnverified} 条修正待核`
+              : "通过";
 
   return {
     id: docId,
@@ -243,6 +261,8 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
       contentUncovered: snap.inkCoverage?.contentCount ?? 0,
       inkCoveragePct: snap.inkCoverage ? Number((snap.inkCoverage.ratio * 100).toFixed(2)) : null,
       missingNumberGroups,
+      correctionsUnverified,
+      ocrInputErrors,
     },
     health: { level: questions.length === 0 ? "fail" : issues.length ? "warn" : "ok", short, issues },
   };

@@ -16,6 +16,11 @@
  *
  * 注意：引擎默认**不**应用修正 —— 只有 `scripts/export-stages.ts` 在导出快照时显式调用。
  * 这样 `segmentFromLayout` 等纯引擎接口的行为保持不变，修正可整体撤销（删清单即可）。
+ *
+ * ⚠️ 2026-10-28 起：清单允许 `verified: false` / 缺省的条目存在（正文补行先按双重判据落地，
+ * 待逐条回原卷核对）。这类条目**仍会应用**，但会记入 `ApplyReport.unverified`；
+ * 调用方（export-stages / meta 体检）必须显示，不能把它们当成“已核对”。
+ * 取舍与理由见 DECISIONS §48。
  */
 import type { BBox, ParsedBlock, ParsedDocument } from "./types.js";
 
@@ -28,6 +33,7 @@ export interface CorrectionItem {
   /** insert：图注文本与 pt 坐标（bbox 已在生成阶段换算为 pt） */
   text?: string;
   bbox?: number[];
+  /** true = 已逐条回原卷页图核对；false/缺省 = 未逐条核对（仍应用，但计入 unverified） */
   verified?: boolean;
   /**
    * 插入来源，决定**插到哪**：
@@ -50,6 +56,8 @@ export interface ApplyReport {
   insert: number;
   /** 清单里没能命中的条目下标（不静默：调用方应打印出来） */
   missed: number[];
+  /** 已应用但 `verified !== true` 的条目下标（未逐条回原卷核对；调用方必须显示） */
+  unverified: number[];
 }
 
 /** O/0 修正：只替换**紧跟「点/角」**的那个 0，避免改到真正的数字 0 */
@@ -86,7 +94,7 @@ function nearestImageIndex(blocks: ParsedBlock[], bbox: BBox): number {
  * 会**全部**替换（图注/公式同文重复的情况在正文里罕见，且语义一致）。
  */
 export function applyCorrections(doc: ParsedDocument, file: CorrectionFile): ApplyReport {
-  const report: ApplyReport = { replace: 0, insert: 0, missed: [] };
+  const report: ApplyReport = { replace: 0, insert: 0, missed: [], unverified: [] };
 
   file.items.forEach((item, idx) => {
     const page = doc.pages[item.page - 1];
@@ -113,7 +121,10 @@ export function applyCorrections(doc: ParsedDocument, file: CorrectionFile): App
         hit++;
       }
       if (hit === 0) report.missed.push(idx);
-      else report.replace += hit;
+      else {
+        report.replace += hit;
+        if (item.verified !== true) report.unverified.push(idx);
+      }
       return;
     }
 
@@ -152,6 +163,7 @@ export function applyCorrections(doc: ParsedDocument, file: CorrectionFile): App
       page.blocks.push(block);
     }
     report.insert++;
+    if (item.verified !== true) report.unverified.push(idx);
   });
 
   return report;
