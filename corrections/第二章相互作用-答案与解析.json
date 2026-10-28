@@ -1,11 +1,12 @@
 {
   "docId": "第二章相互作用-答案与解析",
-  "generatedAt": "2026-10-28T01:40:39.649Z",
-  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "generatedAt": "2026-10-28T07:07:55.739Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 7,
-    "insert": 7,
-    "total": 14
+    "insert": 17,
+    "bodyHole": 10,
+    "total": 24
   },
   "items": [
     {
@@ -161,6 +162,146 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "沿垂直MN、PQ所在的平面和平行该平面分解",
+      "bbox": [
+        306.5,
+        418.7,
+        502.6,
+        428.2
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "变大，张力变大，故 C 正确；b 端在杆 B 上位置不变，将",
+      "bbox": [
+        47,
+        538.3,
+        298.8,
+        548
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "杆 B 再向右倾斜一点，绳两端水平间距变大，$\\theta$ 变大，张",
+      "bbox": [
+        47,
+        552.4,
+        298.8,
+        562.1
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "最大；由几何关系可知",
+      "bbox": [
+        320.4,
+        574.5,
+        528.4,
+        584.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 8,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        55.2,
+        587.6,
+        289.5,
+        602.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 8,
+      "kind": "insert",
+      "text": "由平衡条件得",
+      "bbox": [
+        321,
+        522.2,
+        468.5,
+        531.7
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 13,
+      "kind": "insert",
+      "text": "小后增加，根据 mg-F=ma 可知，加速度先增加后减小，",
+      "bbox": [
+        32,
+        648.5,
+        285.4,
+        658.5
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 13,
+      "kind": "insert",
+      "text": "则 v-t 图像的斜率先增加后减小，故选 A.",
+      "bbox": [
+        32,
+        665.1,
+        285.4,
+        675.1
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 13,
+      "kind": "insert",
+      "text": "2. AC 必刷模型·连接体模型",
+      "bbox": [
+        22.2,
+        686.8,
+        145,
+        695.4
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 18,
+      "kind": "insert",
+      "text": "$2mg\\sin\\theta=\\mu _ {2}\\cdot 2mg\\cos\\theta$，故有$f=\\mu _ {2}mg\\cos\\theta$，故D错误.",
+      "bbox": [
+        322.5,
+        227.7,
+        576.9,
+        236.9
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
     }
   ]
 }

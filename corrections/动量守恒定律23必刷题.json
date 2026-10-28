@@ -1,11 +1,12 @@
 {
   "docId": "动量守恒定律23必刷题",
-  "generatedAt": "2026-10-28T07:00:20.869Z",
-  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "generatedAt": "2026-10-28T07:07:55.689Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 0,
-    "insert": 13,
-    "total": 13
+    "insert": 14,
+    "bodyHole": 1,
+    "total": 14
   },
   "items": [
     {
@@ -176,6 +177,20 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 4,
+      "kind": "insert",
+      "text": "D. $1.8v_{0}$",
+      "bbox": [
+        61.9,
+        552.4,
+        297.5,
+        560.6
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
     }
   ]
 }

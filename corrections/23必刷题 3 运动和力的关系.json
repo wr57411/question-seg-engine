@@ -1,11 +1,12 @@
 {
   "docId": "23必刷题 3 运动和力的关系",
-  "generatedAt": "2026-10-28T07:00:20.846Z",
-  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "generatedAt": "2026-10-28T07:07:55.622Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 0,
-    "insert": 25,
-    "total": 25
+    "insert": 33,
+    "bodyHole": 8,
+    "total": 33
   },
   "items": [
     {
@@ -332,6 +333,118 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "A. 静止时, A 对 C 的支持力",
+      "bbox": [
+        305.6,
+        292.5,
+        544.5,
+        303.5
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "与 B 对 C 的支持力大小不相等",
+      "bbox": [
+        305.6,
+        313.7,
+        544.5,
+        324.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "B. 加速时, B 对 C 的弹力大小大于 C 对 B 的弹力",
+      "bbox": [
+        305.6,
+        335,
+        544.5,
+        346
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "B",
+      "bbox": [
+        155.3,
+        502,
+        163.1,
+        507.7
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "D",
+      "bbox": [
+        264,
+        502.2,
+        272.3,
+        507.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "A",
+      "bbox": [
+        100.1,
+        502.7,
+        107.7,
+        508
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "的瞬间 ( )",
+      "bbox": [
+        59.1,
+        185.1,
+        302.8,
+        195.1
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 7,
+      "kind": "insert",
+      "text": "丙",
+      "bbox": [
+        332,
+        226.6,
+        554.9,
+        238.6
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
     }
   ]
 }

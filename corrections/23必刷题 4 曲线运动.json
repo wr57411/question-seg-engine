@@ -1,11 +1,12 @@
 {
   "docId": "23必刷题 4 曲线运动",
-  "generatedAt": "2026-10-28T06:22:17.761Z",
-  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "generatedAt": "2026-10-28T07:07:55.651Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 3,
-    "insert": 11,
-    "total": 14
+    "insert": 15,
+    "bodyHole": 4,
+    "total": 18
   },
   "items": [
     {
@@ -177,6 +178,62 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "刷易错",
+      "bbox": [
+        413.2,
+        496.8,
+        451.8,
+        506.9
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 12,
+      "kind": "insert",
+      "text": "D",
+      "bbox": [
+        257.4,
+        380.7,
+        266.5,
+        387.2
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 12,
+      "kind": "insert",
+      "text": "B",
+      "bbox": [
+        150.8,
+        380.9,
+        159.8,
+        387
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 12,
+      "kind": "insert",
+      "text": "C",
+      "bbox": [
+        204.6,
+        380.8,
+        213.2,
+        387
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
     }
   ]
 }

@@ -29,6 +29,13 @@ export interface CorrectionItem {
   text?: string;
   bbox?: number[];
   verified?: boolean;
+  /**
+   * 插入来源，决定**插到哪**：
+   * - `caption`（默认）：图注 → 插在该页最近的**图片块之后**（图注跟着图）
+   * - `body-hole`：MinerU 整块漏读的**正文行** → 按 bbox 的 y 位置插入，
+   *   否则会跑到某张图后面、与阅读顺序错位
+   */
+  source?: "caption" | "body-hole";
 }
 
 export interface CorrectionFile {
@@ -129,8 +136,21 @@ export function applyCorrections(doc: ParsedDocument, file: CorrectionFile): App
       fromCorrection: true,
     };
     const imgIdx = nearestImageIndex(page.blocks, bbox);
-    if (imgIdx >= 0) page.blocks.splice(imgIdx + 1, 0, block);
-    else page.blocks.push(block);
+    if (item.source === "body-hole") {
+      // 正文漏读行：**按阅读顺序（y 中心）插入**。
+      // 用「图片块之后」会错位 —— 图注跟着图是对的，正文行必须落在它原来的位置。
+      const cy = (bbox[1] + bbox[3]) / 2;
+      let at = page.blocks.findIndex((b) => {
+        const by = (b.bbox[1] + b.bbox[3]) / 2;
+        return by > cy;
+      });
+      if (at < 0) at = page.blocks.length;
+      page.blocks.splice(at, 0, block);
+    } else if (imgIdx >= 0) {
+      page.blocks.splice(imgIdx + 1, 0, block);
+    } else {
+      page.blocks.push(block);
+    }
     report.insert++;
   });
 

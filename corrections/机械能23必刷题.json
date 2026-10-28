@@ -1,11 +1,12 @@
 {
   "docId": "机械能23必刷题",
-  "generatedAt": "2026-10-28T07:00:20.889Z",
-  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "generatedAt": "2026-10-28T07:07:55.708Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 4,
-    "insert": 20,
-    "total": 24
+    "insert": 29,
+    "bodyHole": 9,
+    "total": 33
   },
   "items": [
     {
@@ -303,6 +304,132 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "A. 欲使轻杆 S 发生移动, 物体运动的",
+      "bbox": [
+        303.5,
+        381.6,
+        544.9,
+        396.6
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "B. 欲使轻杆 S 发生移动, 物体运动的",
+      "bbox": [
+        303.5,
+        436,
+        544.9,
+        451
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "D. 欲使轻杆 S 左端恰好完全进入薄",
+      "bbox": [
+        303.5,
+        544.8,
+        544.9,
+        559.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "C. 欲使轻杆 S 左端恰好完全进入薄板",
+      "bbox": [
+        303.5,
+        490.4,
+        544.9,
+        505.4
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "板, 物体运动的速度为 $\\sqrt{6}/3v_{0}$",
+      "bbox": [
+        303.5,
+        572,
+        544.9,
+        587
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": ", 物体运动的速度为 $\\sqrt{6}/2v_{0}$",
+      "bbox": [
+        303.5,
+        517.6,
+        544.9,
+        532.6
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "最小速度为 $\\sqrt{10}v_{0}$",
+      "bbox": [
+        303.5,
+        408.8,
+        544.9,
+        423.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "最小速度为 $\\sqrt{6}/3v_{0}$",
+      "bbox": [
+        303.5,
+        463.2,
+        544.9,
+        478.2
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 14,
+      "kind": "insert",
+      "text": "(1)运动员从 M 点水平飞出的速度 $v_{M}$;",
+      "bbox": [
+        329.3,
+        457.9,
+        524.9,
+        469.2
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
     }
   ]
 }

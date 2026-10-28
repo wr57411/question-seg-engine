@@ -1,11 +1,12 @@
 {
   "docId": "23必刷题 光学",
-  "generatedAt": "2026-10-28T06:22:17.788Z",
-  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "generatedAt": "2026-10-28T07:07:55.670Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 0,
-    "insert": 2,
-    "total": 2
+    "insert": 5,
+    "bodyHole": 3,
+    "total": 5
   },
   "items": [
     {
@@ -33,6 +34,48 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "2. B 必刷知识·几何光学在指纹识别中的应用",
+      "bbox": [
+        38.9,
+        650.4,
+        221,
+        659.3
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "必刷考点·折射率的计算",
+      "bbox": [
+        315.5,
+        562.5,
+        414.2,
+        571.3
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "4. (1) 1.6 m (2) 1.33",
+      "bbox": [
+        305,
+        544.7,
+        399.4,
+        553.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
     }
   ]
 }

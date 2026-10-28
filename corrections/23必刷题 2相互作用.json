@@ -1,11 +1,12 @@
 {
   "docId": "23必刷题 2相互作用",
-  "generatedAt": "2026-10-28T01:40:39.626Z",
-  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "generatedAt": "2026-10-28T07:07:55.597Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 6,
-    "insert": 8,
-    "total": 14
+    "insert": 25,
+    "bodyHole": 17,
+    "total": 31
   },
   "items": [
     {
@@ -165,6 +166,244 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 1,
+      "kind": "insert",
+      "text": "D",
+      "bbox": [
+        54.8,
+        514.2,
+        286.2,
+        524.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "B. 生“热狗”对单根金属圆柱的压力大小为",
+      "bbox": [
+        47.3,
+        243.4,
+        285.9,
+        255.4
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "$\\frac{5}{6}G$",
+      "bbox": [
+        47.3,
+        265.2,
+        285.9,
+        277.3
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "A. 生“热狗”对单根金属圆柱的压力大小为",
+      "bbox": [
+        47.3,
+        199.8,
+        285.9,
+        211.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "压力变大",
+      "bbox": [
+        304.6,
+        339.3,
+        542.5,
+        352
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "D. 当只将滑轮 B 向上移动时，A 的轴所受",
+      "bbox": [
+        304.6,
+        360.4,
+        542.5,
+        373.1
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "C. 两根金属圆柱对生“热狗”的合力大于对",
+      "bbox": [
+        47.3,
+        287,
+        285.9,
+        299.1
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "$\\frac{5}{8}G$",
+      "bbox": [
+        47.3,
+        221.6,
+        285.9,
+        233.6
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "静止时,下列说法正确的是",
+      "bbox": [
+        51.8,
+        183.3,
+        186.3,
+        193.6
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 7,
+      "kind": "insert",
+      "text": "A. 初始时 P 受到地面的摩擦力为 19 N",
+      "bbox": [
+        302.8,
+        633.6,
+        541.7,
+        645.1
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 7,
+      "kind": "insert",
+      "text": "B. 此过程中绳子拉力先增大后减小",
+      "bbox": [
+        302.8,
+        660.3,
+        541.7,
+        671.8
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 7,
+      "kind": "insert",
+      "text": "C. 小球 Q 与滑轮 1 间的轻绳与竖直方向的夹角",
+      "bbox": [
+        302.8,
+        687,
+        541.7,
+        698.5
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 14,
+      "kind": "insert",
+      "text": "D. 摩擦力大于手机所受的重力沿斜面向下",
+      "bbox": [
+        318.3,
+        233.3,
+        557.3,
+        246.4
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 14,
+      "kind": "insert",
+      "text": "的分力",
+      "bbox": [
+        318.3,
+        256.1,
+        557.3,
+        269.2
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 14,
+      "kind": "insert",
+      "text": "B. 支持力小于手机所受的重力",
+      "bbox": [
+        318.3,
+        187.8,
+        557.3,
+        200.9
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 14,
+      "kind": "insert",
+      "text": "A. 支持力竖直向上",
+      "bbox": [
+        318.3,
+        165,
+        557.3,
+        178.1
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 14,
+      "kind": "insert",
+      "text": "C. 摩擦力沿斜面向下",
+      "bbox": [
+        318.3,
+        210.6,
+        557.3,
+        223.6
+      ],
+      "verified": false,
+      "source": "body-hole",
+      "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
     }
   ]
 }
