@@ -7,7 +7,7 @@
 > **交接入口（跨 Agent 必读）**：接手指南与当前状态已收敛到
 > **[docs/HANDOFF.md](docs/HANDOFF.md)**（含红线、未闭合风险、文档地图）；
 > 根目录 `AGENTS.md` 是各平台编程 Agent 的通用入口。改口径/阈值前先查
-> `docs/DECISIONS.md`（56 条决策，按时间序）。
+> `docs/DECISIONS.md`（57 条决策，按时间序）。
 > 当前真实数据：题册 15 页 / 83 题，答案册 23 页 / 167 题（详见 HANDOFF §2）。
 
 ## 架构
@@ -125,7 +125,8 @@ npm run stages               # 导出快照 + 启动服务，然后访问 /stage
 
 ```bash
 npm run daily -- ~/Downloads/新试卷.pdf     # ① 导入：一条命令，不用改代码
-npm run view                                # ② 打开：http://localhost:4173/final/
+npm run view                                # ② 打开：http://localhost:4173/final/（仅本机）
+npm run view:lan                            # 手机/平板：同 WiFi；TAGS_WRITE=0 只读
 ```
 
 **① 导入**（`npm run daily`）跑完整条链：MinerU 解析 → 解包 → 导出快照（页图 + 墨迹覆盖率）
@@ -153,7 +154,8 @@ npm run view                                # ② 打开：http://localhost:4173
 用户 2026-10-14 定的调子：**成品 = 「对比」右侧那张重建纸面**，整册滚动翻，用起来像翻原版书。
 
 ```bash
-npm run view            # 起服务后访问 http://localhost:4173/final/?doc=<docId>
+npm run view            # 本机起服务：http://localhost:4173/final/?doc=<docId>
+npm run view:lan        # 手机/平板：同 WiFi（共享网络加 TAGS_WRITE=0 只读）
 ```
 
 - **不做重排**：每一页都交给 `stages/reconstruct.js` 的 `renderPaper` 按原坐标重建；
@@ -171,7 +173,8 @@ npm run view            # 起服务后访问 http://localhost:4173/final/?doc=<d
 浏览器查看结构化题目（试题区/答题区/答案区、答案开关、按题型留白、公式渲染）：
 
 ```bash
-npm run view                 # 默认打开 23必刷题 2相互作用
+npm run view                 # 本机；默认打开 23必刷题 2相互作用
+npm run view:lan             # 手机/平板（同一 WiFi；TAGS_WRITE=0 只读）
 npm run view "23必刷题 2相互作用"
 # 然后访问 http://localhost:4173/viewer/
 ```

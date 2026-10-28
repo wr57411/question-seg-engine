@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **282 例** + audit:render:all + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **284 例** + audit:render:all + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **420 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -242,9 +242,10 @@ layout.json / content_list.json
 | 已有解析结果、只重导 | `npm run daily -- <layout.json> --id <docId> --no-ocr` |
 | 只刷新体检摘要（不动产物） | `npm run daily -- <layout.json> --id <docId> --meta-only` |
 | 质量门（改任何代码后必跑） | `npm run check` |
-| **全卷渲染审计（诊断，不入 check）** | `npm run audit:render:all`（自动跳过 `-OXR`；`--include-oxr` 可选） |
+| **全卷渲染审计（已入 check）** | `npm run audit:render:all`（默认 8 个 MinerU 卷；`--include-combined`/`--include-oxr` 可选） |
 | 演示（夹具全流程） | `npm run demo` |
-| **成品页（像原版书的那一份）** | `npm run view` → http://localhost:4173/final/?doc=<docId> |
+| **成品页（像原版书的那一份）** | `npm run view`（本机）→ http://localhost:4173/final/?doc=<docId> |
+| **手机/平板（同一 WiFi）** | `npm run view:lan`（`HOST=0.0.0.0`；共享网络加 `TAGS_WRITE=0` 只读） |
 | 阶段样品 + 对比模式（主验收） | `npm run stages` → http://localhost:4173/stages/?doc=<docId> |
 | 仅重导快照 | `npm run stages:export` |
 | 阅读版 viewer（检索/答案开关） | http://localhost:4173/viewer/?doc=<docId> |
@@ -420,9 +421,11 @@ layout.json / content_list.json
     改为 `// @ts-check` + JSDoc（**实现自带类型，删掉手写 d.ts**），其余 6 个手写 `.d.ts` 配对
     由 `tests/dts-drift.test.ts` 双向锁名字集合。**约定：新增纯逻辑模块一律 `@ts-check`，不再新写 `.d.ts`。**
     见 `DECISIONS.md` §31。逐文件清理时把它加进 `tsconfig.json` 的 `include` 即可，无其它前置。
-10. **标签写通道 = 局域网可写**：`POST /api/tags` 对同一 WiFi 内任何能访问该端口的人开放
-    （本地开发工具的既定取舍，无鉴权）。已把可写面**限制在 `data/out/tags/` 一个目录**，
-    但部署到公网/共享网络前必须先加鉴权或关掉写分支。**未立任务**。
+10. ~~**标签写通道 = 局域网可写**~~ **已收窄（2026-10-28，`DECISIONS §57`）**：默认只监听
+    `127.0.0.1`；手机/平板用 `npm run view:lan`（`HOST=0.0.0.0`）显式开 LAN；
+    `TAGS_WRITE=0` 关闭写路径（`POST /api/tags` 403）；启动日志在本机默认提示 `view:lan`，
+    LAN 且可写时提示「同网段可写」。可写面仍在 `data/out/tags/`；仍无鉴权，
+    公网/共享网络必须 `TAGS_WRITE=0` 或加鉴权。
 17. **光学 p4/p5 两道题整页无归属（主线既有缺口，`feature/oxr` 未引入，2026-10-28 复核）**：
     光学卷 p4、p5 是完整题面页，但 MinerU 与 OXR **两版都切出 0 题**（实跑 `Q=0`），
     整页块全部"无主"。根因：那两道题的题号在解析器与 OCR 整页全文里都不存在

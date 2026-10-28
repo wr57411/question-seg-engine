@@ -17,6 +17,11 @@ const isStr = (v: unknown): v is string => typeof v === "string";
 const isRec = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 
+/** 标签写通道开关：默认开；TAGS_WRITE=0 关闭（只读预览，POST /api/tags 返回 403）。 */
+export function tagsWriteEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.TAGS_WRITE !== "0";
+}
+
 /** doc 必须是 `data/out/<doc>/stages.json` 真实存在的目录名：目录名即白名单。 */
 export async function isKnownDoc(root: string, doc: unknown): Promise<boolean> {
   if (typeof doc !== "string" || !doc || doc.length > DOC_MAX_LEN) return false;

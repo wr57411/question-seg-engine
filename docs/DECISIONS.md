@@ -1,6 +1,6 @@
 # 切片决策记录（DECISIONS）
 
-> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§56，按时间序；顶部有索引）。
+> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§57，按时间序；顶部有索引）。
 > 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](HANDOFF.md)**；通用约定见 **[AGENTS.md](../AGENTS.md)**。
 
 垂直演进模型的两份交付物：可运行的骨架代码 + 本决策记录。
@@ -59,6 +59,7 @@
 | 54 | **展示层解耦门**：自动扫描 viewer/stages/final 的 `../src/` import | 2026-10-28 |
 | 55 | **OCR 环境可配置 + 失败可见**：`UVX_BIN` 覆盖；`meta.ocrError`/`source.ocr=failed` | 2026-10-28 |
 | 56 | **非基线卷 LaTeX 命令覆盖 + 全卷审计入 check**：8/8 通过 | 2026-10-28 |
+| 57 | **view-server 默认只监听本机**：`view:lan` 开 LAN；`TAGS_WRITE=0` 只读 | 2026-10-28 |
 
 ## 1. 公式指标修正：语义正确率替代可编译率
 
@@ -2714,5 +2715,21 @@ CSS/HTML 的 `<script src>` 不由本门覆盖（展示层是 ESM 直接加载�
 `audit:numbering` 基线 5；新增渲染回归测试覆盖上述命令/环境。
 
 **残留**：`audit-numbering` 仍只审 2 卷（基线单卷标定）；CI 未做；合订本需单独标定。
+
+**状态**：已实现。
+
+## 57. view-server 默认只监听本机；LAN 显式开启；`TAGS_WRITE=0` 只读（2026-10-28）
+
+**背景**：`POST /api/tags` 对同网段开放且无鉴权；`server.listen(PORT)` 默认监听所有接口，
+手机调试方便，但共享网络/公网暴露时任何人可覆盖标签文件（人工劳动成果）。
+
+**决策**：
+1. `HOST` 默认 `127.0.0.1`；手机/平板用 `npm run view:lan`（`HOST=0.0.0.0`）显式开 LAN；
+2. `TAGS_WRITE=0` 关闭写路径：`POST /api/tags` 返回 403（只读预览），静态读不受影响；
+3. 启动日志：本机默认提示 `view:lan`；LAN 且可写时提示「同网段可写」；LAN 只读时提示只读；
+4. 共享网络推荐 `TAGS_WRITE=0 npm run view:lan`；公网仍需鉴权，本次不重写权限体系。
+
+**验证（2026-10-28）**：`tagsWriteEnabled` 单测；view-server 启动日志测试 + POST 403 测试；
+`npm run check` **284/284**；`audit:render:all` 8/8；`bank:all` 420。
 
 **状态**：已实现。

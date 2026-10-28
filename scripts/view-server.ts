@@ -18,10 +18,13 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import { extname, join, normalize, resolve } from "node:path";
-import { isKnownDoc, MAX_BODY, tagFilePath, validatePayload } from "./tag-write-guards.js";
+import { isKnownDoc, MAX_BODY, tagFilePath, tagsWriteEnabled, validatePayload } from "./tag-write-guards.js";
 
 const ROOT = process.cwd();
 const PORT = Number(process.env.PORT ?? 4173);
+/** 默认只监听本机；手机/平板用 `npm run view:lan`（HOST=0.0.0.0）显式开 LAN。 */
+const HOST = process.env.HOST?.trim() || "127.0.0.1";
+const READ_ONLY = !tagsWriteEnabled();
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 
 const TAG_DIR = join(ROOT, "data", "out", "tags");
@@ -69,6 +72,11 @@ async function atomicWrite(file: string, text: string): Promise<void> {
 }
 
 async function handleTagsWrite(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+  if (READ_ONLY) {
+    res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: "标签写通道已关闭（TAGS_WRITE=0）" }));
+    return;
+  }
   const scope = url.searchParams.get("scope") ?? "";
   const doc = url.searchParams.get("doc") ?? "";
   if (scope !== "library" && !(await isKnownDoc(ROOT, doc))) {
@@ -213,9 +221,9 @@ function lanAddresses(): string[] {
   return out;
 }
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   const enc = encodeURIComponent(docId);
-  const hosts = ["localhost", ...lanAddresses()];
+  const lan = HOST === "0.0.0.0" || HOST === "::";
   console.log(`成品页：  http://localhost:${PORT}/final/?doc=${enc}`);
   console.log(`viewer:   http://localhost:${PORT}/viewer/?doc=${enc}`);
   console.log(`stages:   http://localhost:${PORT}/stages/?doc=${enc}`);
@@ -224,14 +232,22 @@ server.listen(PORT, () => {
   console.log(`  stages = 七视图样品展示（原卷→原料→阅读顺序→切题→质检→成品→对比）`);
   console.log(`  无快照时先运行 npm run stages:export 生成`);
   console.log(`  换卷：npm run view <docId> 或用 ?doc=<docId> 查询参数（doc 需完整，空格写 %20）`);
-  // 触屏是主战场：手机/平板必须拿到能直接输的地址，只报 localhost 等于没报
-  if (hosts.length > 1) {
-    console.log(`\n手机 / 平板请用下面的地址（需与本机同一 WiFi）：`);
-    for (const h of hosts.slice(1)) {
-      console.log(`  成品页  http://${h}:${PORT}/final/?doc=${enc}`);
+  if (READ_ONLY) console.log(`  标签写通道：只读（TAGS_WRITE=0）`);
+  if (lan) {
+    // 显式开了 LAN 才报；默认只监听本机，避免同网段默认可写（HANDOFF §6-10）
+    const hosts = lanAddresses();
+    if (hosts.length > 0) {
+      console.log(`\n手机 / 平板请用下面的地址（需与本机同一 WiFi）：`);
+      for (const h of hosts) console.log(`  成品页  http://${h}:${PORT}/final/?doc=${enc}`);
+      console.log(`  打不开时：系统设置 → 通用 → 关于本机 查 IP；并放行 macOS 防火墙对 node 的入站连接`);
+      if (!READ_ONLY) {
+        console.log(`  ⚠️ 标签写通道：同网段可写；共享网络请加 TAGS_WRITE=0 只读`);
+      }
+    } else {
+      console.log(`\n⚠️ 未找到局域网 IPv4 地址 —— 手机/平板将无法访问（检查 WiFi 连接或网络权限）`);
     }
-    console.log(`  打不开时：系统设置 → 通用 → 关于本机 查 IP；并放行 macOS 防火墙对 node 的入站连接`);
   } else {
-    console.log(`\n⚠️ 未找到局域网 IPv4 地址 —— 手机/平板将无法访问（检查 WiFi 连接或网络权限）`);
+    console.log(`\n仅本机访问（默认）。手机/平板请运行：npm run view:lan（或 HOST=0.0.0.0 npm run view）`);
+    if (!READ_ONLY) console.log(`  标签写通道：仅本机可写；LAN 调试请显式开 view:lan`);
   }
 });

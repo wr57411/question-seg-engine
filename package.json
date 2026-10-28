@@ -24,7 +24,8 @@
     "audit:attribution": "tsx scripts/audit-attribution.ts",
     "report:generalization": "tsx scripts/generalization.ts",
     "bank:all": "tsx scripts/bank-all.ts",
-    "audit:render:all": "node scripts/audit-render-all.mjs"
+    "audit:render:all": "node scripts/audit-render-all.mjs",
+    "view:lan": "HOST=0.0.0.0 tsx scripts/view-server.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

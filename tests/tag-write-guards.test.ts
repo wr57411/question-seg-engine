@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { isKnownDoc, tagFilePath, validatePayload } from "../scripts/tag-write-guards.js";
+import { isKnownDoc, tagFilePath, tagsWriteEnabled, validatePayload } from "../scripts/tag-write-guards.js";
 
 /** 造一个临时 ROOT，只放一个真卷的 stages.json（不依赖 data/ —— 它是 git 忽略的运行时产物）。 */
 function fixtureRoot() {
@@ -77,4 +77,11 @@ test("⑤ 落盘目标必须仍在 tags 目录内", () => {
   // 万一上游白名单被放宽，这里仍是第二道防线
   assert.equal(tagFilePath(tagDir, "", "../../../etc/passwd"), null);
   assert.equal(tagFilePath(tagDir, "", "a/../../b"), null);
+});
+
+
+test("④ 标签写通道开关：默认开，TAGS_WRITE=0 关", () => {
+  assert.equal(tagsWriteEnabled({}), true);
+  assert.equal(tagsWriteEnabled({ TAGS_WRITE: "1" }), true);
+  assert.equal(tagsWriteEnabled({ TAGS_WRITE: "0" }), false);
 });
