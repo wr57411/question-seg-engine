@@ -213,6 +213,11 @@ layout.json / content_list.json
   `--allow-missing` 才显式跳过并打印“未审计”。新 worktree/无 data 时 check 会红（不再假绿），
   先接 `data/` 或 `npm run daily` 生成。
 
+- **全卷渲染审计诊断（2026-10-28，`DECISIONS §53`）**：`npm run audit:render:all` 自动发现
+  **9 卷**（跳过 `-OXR`），仅默认卷通过；其余 **8 卷失败在残留花括号 / 未覆盖 LaTeX 命令**
+  （3卷：2+3），是真问题，不是单卷基线误报。暂为诊断命令，未入 `check`；见 §6-21。
+  逐卷清理/按卷标定后再考虑纳入门。
+
 ### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
 
 - **判定项 vs 提示项分离**：机器能确定的对错才计入退出码（G8）；被构造保证的不变量不判（死门防范）。
@@ -233,6 +238,7 @@ layout.json / content_list.json
 | 已有解析结果、只重导 | `npm run daily -- <layout.json> --id <docId> --no-ocr` |
 | 只刷新体检摘要（不动产物） | `npm run daily -- <layout.json> --id <docId> --meta-only` |
 | 质量门（改任何代码后必跑） | `npm run check` |
+| **全卷渲染审计（诊断，不入 check）** | `npm run audit:render:all`（自动跳过 `-OXR`；`--include-oxr` 可选） |
 | 演示（夹具全流程） | `npm run demo` |
 | **成品页（像原版书的那一份）** | `npm run view` → http://localhost:4173/final/?doc=<docId> |
 | 阶段样品 + 对比模式（主验收） | `npm run stages` → http://localhost:4173/stages/?doc=<docId> |
@@ -445,6 +451,11 @@ layout.json / content_list.json
     #2 41→10 块、#3 31 块；答案册 166→**167 题**。修正条目进 `corrections/`，可审计、删文件即回滚。
     ⚠️ 这例说明：在答案册上 OXR 的题号切分并非处处弱于 MinerU，§2「排版精度不及」须理解为
     整体观感/公式精度，不涵盖题号切分；交叉核对时**两源互有胜负**，勿预设某源必胜。
+21. **非基线卷渲染审计未过（2026-10-28，`audit:render:all`，诊断）**：
+    9 卷（8 个 MinerU 卷 + 答案册合订本）仅默认卷通过；其余 **8 卷**失败在
+    **残留花括号 / 未覆盖的 LaTeX 命令**（如 3卷 2+3）。字号保真度、重复折叠、墨迹覆盖率多数通过
+    ⇒ 不是单卷基线误报，是非基线卷的真实渲染问题。`npm run audit:render:all` 已提供（诊断，
+    未入 `check`）；逐卷清理残留 LaTeX 或按卷标定后再考虑纳入门。**未修**。
 
 ## 7. 新接手者的前 30 分钟
 
