@@ -985,7 +985,9 @@ function main(): void {
     const rep = applyCorrections(doc, file);
     correctionReport = rep;
     console.log(
-      `  已核对修正：替换 ${rep.replace} 块 · 补入图注 ${rep.insert} 处` +
+      `  已核对修正：替换 ${rep.replace} 块` +
+        (rep.replaceText > 0 ? ` · 半行修补 ${rep.replaceText} 处` : "") +
+        ` · 补入图注 ${rep.insert} 处` +
         (rep.unverified.length > 0 ? `（其中 ${rep.unverified.length} 条未逐条回原卷核对，已标记）` : "") +
         (rep.missed.length > 0 ? `（⚠️ ${rep.missed.length} 条未命中，清单可能已过期）` : ""),
     );

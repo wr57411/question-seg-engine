@@ -51,6 +51,49 @@ test("applyCorrections：verified:false 仍应用，但必须计入 unverified",
   assert.deepEqual(rep.unverified, [0]);
 });
 
+test("applyCorrections：replace_text 精确替换半行为完整行", () => {
+  const half = "1 \\mathrm { \\ m } / \\mathrm { \\ s } ^ { 2 } \\quad ( 2 ) 5 \\mathrm { \\ m } \\quad ( 3 )";
+  const full = "3. (1) 1 \\mathrm { \\ m } / \\mathrm { \\ s } ^ { 2 } \\quad ( 2 ) 5 \\mathrm { \\ m } \\quad ( 3 ) 不能相撞 2.4 \\mathrm { \\ m }";
+  const doc: ParsedDocument = {
+    docId: "t",
+    pages: [{ index: 0, width: 600, height: 800, blocks: [{ kind: "text", bbox: [10, 10, 300, 25], text: half, firstLine: half, lineCount: 1, maxFontSize: 0 }] }],
+  };
+  const rep = applyCorrections(doc, {
+    docId: "t",
+    items: [{ page: 1, kind: "replace_text", blockText: half, to: full, verified: true }],
+  });
+  assert.equal(rep.replaceText, 1);
+  assert.equal(rep.replace, 0);
+  assert.deepEqual(rep.missed, []);
+  assert.deepEqual(rep.unverified, []);
+  const b = doc.pages[0]!.blocks[0]!;
+  assert.equal(b.kind, "text");
+  if (b.kind === "text") {
+    assert.equal(b.text, full);
+    assert.ok(b.firstLine.startsWith("3. (1)"));
+  }
+});
+
+test("applyCorrections：replace_text 未命中进 missed，verified:false 计入 unverified", () => {
+  const doc: ParsedDocument = {
+    docId: "t",
+    pages: [{ index: 0, width: 600, height: 800, blocks: [{ kind: "text", bbox: [10, 10, 300, 25], text: "半行", firstLine: "半行", lineCount: 1, maxFontSize: 0 }] }],
+  };
+  const miss = applyCorrections(doc, {
+    docId: "t",
+    items: [{ page: 1, kind: "replace_text", blockText: "不存在", to: "完整行", verified: false }],
+  });
+  assert.deepEqual(miss.missed, [0]);
+  assert.equal(miss.replaceText, 0);
+  assert.deepEqual(miss.unverified, []);
+  const hit = applyCorrections(doc, {
+    docId: "t",
+    items: [{ page: 1, kind: "replace_text", blockText: "半行", to: "完整行", verified: false }],
+  });
+  assert.equal(hit.replaceText, 1);
+  assert.deepEqual(hit.unverified, [0]);
+});
+
 test("applyCorrections：未命中的 replace 进 missed，不误报 unverified", () => {
   const rep = applyCorrections(makeDoc(), {
     docId: "t",
@@ -87,6 +130,7 @@ test("applyCorrections：caption insert 跟在图片后，verified:true 不进 u
 
 interface Counts {
   replace?: number;
+  replaceText?: number;
   insert?: number;
   bodyHole?: number;
   total?: number;
@@ -97,18 +141,28 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
   assert.equal(file.docId, name.replace(/\.json$/, ""), `${name}: docId 与文件名不一致`);
   assert.ok(Array.isArray(file.items), `${name}: items 不是数组`);
   let replaceN = 0;
+  let replaceTextN = 0;
   let insertN = 0;
   let bodyHoleN = 0;
   let unverifiedN = 0;
   file.items.forEach((it, idx) => {
     const at = `${name} items[${idx}]`;
     assert.ok(Number.isInteger(it.page) && it.page >= 1, `${at}: page 非法`);
-    assert.ok(it.kind === "replace" || it.kind === "insert", `${at}: kind 非法`);
+    assert.ok(
+      it.kind === "replace" || it.kind === "replace_text" || it.kind === "insert",
+      `${at}: kind 非法`,
+    );
     assert.ok(it.verified === undefined || typeof it.verified === "boolean", `${at}: verified 必须是布尔或缺省`);
     if (it.verified !== true) unverifiedN++;
     if (it.kind === "replace") {
       replaceN++;
       assert.ok((it.blockText ?? "").length > 0, `${at}: replace 缺 blockText`);
+      return;
+    }
+    if (it.kind === "replace_text") {
+      replaceTextN++;
+      assert.ok((it.blockText ?? "").length > 0, `${at}: replace_text 缺 blockText`);
+      assert.ok((it.to ?? "").length > 0, `${at}: replace_text 缺 to`);
       return;
     }
     insertN++;
@@ -121,12 +175,13 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
   if (file.counts) {
     assert.equal(file.counts.total, file.items.length, `${name}: counts.total 与 items 数不一致`);
     assert.equal(file.counts.replace, replaceN, `${name}: counts.replace 不一致`);
+    assert.equal(file.counts.replaceText ?? 0, replaceTextN, `${name}: counts.replaceText 不一致`);
     assert.equal(file.counts.insert, insertN, `${name}: counts.insert 不一致`);
     if (file.counts.bodyHole !== undefined) {
       assert.equal(file.counts.bodyHole, bodyHoleN, `${name}: counts.bodyHole 不一致`);
     }
   }
-  return { replaceN, insertN, bodyHoleN, unverifiedN };
+  return { replaceN, replaceTextN, insertN, bodyHoleN, unverifiedN };
 }
 
 test("corrections/*.json：docId/counts/字段结构一致；有 data 时干跑 0 未命中", () => {

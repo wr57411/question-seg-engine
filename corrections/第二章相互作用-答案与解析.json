@@ -1,12 +1,13 @@
 {
   "docId": "第二章相互作用-答案与解析",
-  "generatedAt": "2026-10-28T07:07:55.739Z",
-  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）。p13 原有 3 条 body-hole 经 2026-10-28 回原卷核实为「填错文本」（照抄 OXR 行块、y 坐标未换算），已删除，见 docs/oxr-evaluation.md §4.12.4",
+  "generatedAt": "2026-10-28T10:18:38.362Z",
+  "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）。p13 原有 3 条 body-hole 经 2026-10-28 回原卷核实为「填错文本」（照抄 OXR 行块、y 坐标未换算），已删除，见 docs/oxr-evaluation.md §4.12.4；p18 #3 为 replace_text（半行→完整行，已回原卷核对）",
   "counts": {
     "replace": 7,
+    "replaceText": 1,
     "insert": 14,
     "bodyHole": 7,
-    "total": 21
+    "total": 22
   },
   "items": [
     {
@@ -260,6 +261,14 @@
       "verified": false,
       "source": "body-hole",
       "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 18,
+      "kind": "replace_text",
+      "blockText": "1 \\mathrm { \\ m } / \\mathrm { s } ^ { 2 } \\quad ( 2 ) 5 \\mathrm { \\ m } \\quad ( 3 )",
+      "to": "3. (1) 1 \\mathrm { \\ m } / \\mathrm { s } ^ { 2 } \\quad ( 2 ) 5 \\mathrm { \\ m } \\quad ( 3 ) 不能相撞 2.4 \\mathrm { \\ m }",
+      "verified": true,
+      "evidence": "原卷 page-18.png 明确印有 3. (1) 1 m/s² (2) 5 m (3) 不能相撞 2.4 m；OXR 同文（2026-10-28）"
     }
   ]
 }
