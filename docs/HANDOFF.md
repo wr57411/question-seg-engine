@@ -57,6 +57,29 @@ layout.json / content_list.json
   2 相互作用 83 题 / 运动和力 62 题 / 曲线运动 67 题）**全部零回退**、题/页 4.1–5.5、墨迹 2.85–4.5%；
   唯一异类是光学卷（手机截图，题/页 2.1、回退 2、墨迹 12.59%）。⇒ §41.3 的三项缺口**优先级下调**：
   只在「截图拼接 + 题号印在栏底」这类输入上触发。
+- **多册配对**（2026-10-27，DECISIONS §42）：`npm run bank:all` —— 每本题册按**真章号**配到答案池里
+  最合适的册，**144 条**（2 相互作用 83 + 运动和力的关系 61；后者因答案册**含第 3 章**而成立）。
+  语义抽查 3 条全对；唯一键 + 归属自检（`quizId` 必须能在该册 `questions.json` 找到）进退出码。
+  `check` 已切到 `bank:all`；单册 `npm run bank` 保留为调试（参数化后输出与基线**逐字节相同**）。
+- **章标题提升**（2026-10-28，DECISIONS §43）：MinerU 会把**页顶居中的章标题**判成 `header`
+  丢进 `discarded_blocks`（同版式的另一本却标成 `title`）⇒ `chapter` 为空 ⇒ 无法按章配对。
+  现按「只认 header + 章号后必须有标题文本 + 换行压平」提升回正文：曲线运动 `4|曲线运动`、
+  机械能 `6|机械能守恒定律` 全部归位，题册**零变化**。配对 144 → **160 条**。
+  顺带修：`alignChapter` 的 DP 跳过答案块时**静默丢题**（守恒校验抓到，已记入未配对）。
+- **合订本下载失败 = 网络侧时段性阻断，不是 MinerU 限流**（2026-10-28，DECISIONS §44）：
+  分层证据 —— API（上传 59MB + 轮询）全通、根路径曾 20/20 HTTP 403、12 个边缘 IP 全握手成功、
+  8 页 zip 同刻能下、失败在 **TLS 握手**（4–31ms RST，限流会给 429/code）、
+  直连/代理/禁沙箱三种路径都失败。⇒ 不用去控制台查额度。
+  **改进**：`downloadZip` 加连接级重试（5 次指数退避，HTTP 4xx/5xx 不重试）+ zip 地址落盘可续。
+- **MinerU 出网 = 必须走代理**（2026-10-28，DECISIONS §45，**更正 §44 的"网络阻断"结论**）：
+  根因是 Clash 的 `GEOIP,CN,DIRECT` 把 CDN 的 CN 段 IP 送去直连，而直连被 TLS 重置。
+  实测同一 URL：走 Clash `7897` → **57MB / 5.7 秒**；直连 → 4–31ms RST。
+  `npm run daily` 现会**自动探测 7897/7890/1087 并设 `MINERU_PROXY`**（`--no-proxy` 可强制直连）。
+  ⚠️ **不要把 openxlab/mineru 设成 DIRECT** —— 那是这个坑的原始形态（用户另一份订阅 10-10 已修过）。
+  规则落地机制（DECISIONS §46）：**Merge 的 `prepend-rules` 在 Verge 2.5.x 不生效**（实测），
+  已写进当前 profile 的 `rules:` 段开头（`蓝莓桥`），**需在 Verge 里重载一次才生效**；
+  订阅更新会覆盖 ⇒ 想持久要用 `type: rules` 覆写的 `prepend:`。
+- **合订本已导入**（187 页 / 503 题 / 71 组），配对 **419 条**（6 本题册全部配上，光学因章标题缺失除外）。
 - **产物目录纪律**（2026-10-27）：`data/out/` 只留「文档目录 + bank + tags」；
   325 项历史调试产物移入 `data/archive/2026-10-27/`（移动不删除）；
   7 份测量证据文档从 `data/out/`（git 忽略）迁到 **`docs/evidence/`**（换机器不丢），引用已同步。
@@ -152,7 +175,9 @@ layout.json / content_list.json
 | 仅重导快照 | `npm run stages:export` |
 | 阅读版 viewer（检索/答案开关） | http://localhost:4173/viewer/?doc=<docId> |
 | 截图审板 | `npm run view:cap`；DOM 存在性 Gate：`npm run view:test` |
-| 题库配对 | `npm run bank` |
+| **题库配对（多册，正式）** | `npm run bank:all` —— 每本题册配到答案池里最合适的册，输出 `data/out/bank/` |
+| 单册配对（调试/局部复算） | `npm run bank`（默认那对，或 `--quiz/--answer/--out`） |
+| 泛化矩阵（各卷切题质量） | `npm run report:generalization` → `data/out/generalization.md` |
 | OCR 补全 | `npm run stages:ocr-fill` / `npm run stages:ocr-page`；后者加 `--all-pages` 时**无洞的页也跑**（题号被漏识别的页只有这条路） |
 | OCR 局部重跑 | ⚠️ `--pages N` 经 `npm run` **传不进去**（实测跑成全卷）⇒ 直接 `node --import tsx scripts/ocr-page-fill.ts "<docId>" --pages N` |
 | 底层：MinerU 解析（`npm run daily` 内部调用） | `node --import tsx scripts/real-pipeline.ts <文件或目录> [outRoot]` |
@@ -163,7 +188,7 @@ layout.json / content_list.json
 |---|---|---|
 | `README.md` | 架构总览、核心机制、快速开始 | 主干有效；个别统计数字是历史时点值，以本文件为准 |
 | **`docs/HANDOFF.md`（本文件）** | 当前状态、风险、红线、交接动作 | 唯一的跨 Agent 入口 |
-| `docs/DECISIONS.md` | **41 条决策全记录**（§1–§41，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
+| `docs/DECISIONS.md` | **46 条决策全记录**（§1–§46，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
 | `tasks/lessons.md` | 3 条工程纪律（验收清单 / 启发式判据 / 逐块匹配） | 每条都有真实事故佐证，短小必读 |
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |

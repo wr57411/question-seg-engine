@@ -122,10 +122,38 @@ export class MineruClient {
     }
   }
 
-  async downloadZip(zipUrl: string): Promise<Buffer> {
-    // notes §3：zip 下载 GET 可直接带 Authorization 头
-    const res = await this.transport(zipUrl, { headers: this.headers });
-    if (!res.ok) throw new Error(`zip 下载失败: HTTP ${res.status}`);
-    return Buffer.from(await res.arrayBuffer());
+  /**
+   * 下载结果 zip。
+   *
+   * ⚠️ **必须重试**（2026-10-28 实测）：这份环境里对 CDN 的 TLS 握手会被**时段性 RST**
+   * （`ECONNRESET` / `SSL_ERROR_SYSCALL`，4–31ms 就断）。它不是 MinerU 限流 ——
+   * 同一时刻上传与轮询（API）全部正常、8 页的 zip 能下、失败发生在**握手层**（应用层之前），
+   * 而限流会返回 HTTP 429/业务 code。所以这是网络侧干扰，**重试是唯一有效的对抗手段**。
+   *
+   * 判据：只对**连接级失败**重试（ECONNRESET / ECONNREFUSED / ETIMEDOUT / socket 断开）；
+   * HTTP 4xx/5xx 不重试（那是服务端的明确答复，重试只会重复烧请求）。
+   */
+  async downloadZip(zipUrl: string, attempts = 5): Promise<Buffer> {
+    let lastErr: unknown;
+    for (let i = 1; i <= attempts; i++) {
+      try {
+        // notes §3：zip 下载 GET 可直接带 Authorization 头
+        const res = await this.transport(zipUrl, { headers: this.headers });
+        if (!res.ok) throw new Error(`zip 下载失败: HTTP ${res.status}`);
+        return Buffer.from(await res.arrayBuffer());
+      } catch (e) {
+        const err = e as Error & { cause?: { code?: string } };
+        const code = err.cause?.code ?? "";
+        const retryable =
+          /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|socket/i.test(code) ||
+          /socket disconnected|fetch failed/i.test(err.message);
+        lastErr = e;
+        if (!retryable || i === attempts) break;
+        const wait = 800 * i; // 800 / 1600 / 2400 / 3200ms
+        console.warn(`  zip 下载第 ${i} 次失败（${code || err.message}），${wait}ms 后重试…`);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+    throw lastErr;
   }
 }

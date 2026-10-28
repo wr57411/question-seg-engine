@@ -16,6 +16,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const OUT = join("data", "out");
+const BANK_DIR = join(OUT, "bank");
 
 interface Row {
   id: string;
@@ -157,9 +158,10 @@ function main(): void {
     "",
   ].join("\n");
 
-  writeFileSync(join(OUT, "generalization.md"), md);
+  // 落在 bank/ 下：`data/out/` 根只放「文档目录 + bank + tags」（DECISIONS §40.5 目录纪律）
+  writeFileSync(join(BANK_DIR, "generalization.md"), md);
   console.log(md);
-  console.log(`已落盘 ${join(OUT, "generalization.md")}`);
+  console.log(`已落盘 ${join(BANK_DIR, "generalization.md")}`);
 }
 
 main();
