@@ -17,7 +17,7 @@
 | 位置 | 分支 | 用途 |
 |---|---|---|
 | 本仓库目录（含 `data/`、`books/`） | **`main`** | **日常改动的基线**——新 Agent 默认从这里开始 |
-| `/Users/john/WorkBuddy/Worktrees/question-seg-engine/feature-oxr-6b3489a1` | `workbuddy/feature-oxr-6b3489a1` | **功能开发专用 worktree**（OXR 第二解析源），比 main 多 9 个提交 |
+| `/Users/john/WorkBuddy/Worktrees/question-seg-engine/feature-oxr-6b3489a1` | `workbuddy/feature-oxr-6b3489a1` | **功能开发专用 worktree**（OXR 第二解析源）：领先 main 9 个提交，且不含 main 上 10-28 的提交 ⇒ **两侧已分叉，合回时是真正的 merge（不是 ff）** |
 
 ⚠️ 功能分支合回 main 前先跑 `npm run check`；`docs/HANDOFF.md` 与 `docs/DECISIONS.md`
 在两条线上都被改动过，合并时**预期冲突**，按「事实以实跑为准」重写该段，不要机械选一边。
