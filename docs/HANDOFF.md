@@ -44,7 +44,7 @@ layout.json / content_list.json
    SegmentationResult { questions, reviews, stats }
 ```
 
-- 技术栈：TypeScript ESM、`node:test`、tsx；**零运行时依赖**（devDeps 仅 adm-zip/tsx/typescript）。
+- 技术栈：TypeScript ESM、`node:test`、tsx；**零运行时依赖**（devDeps：adm-zip、tsx、typescript、undici）。
 - 定位：垂直演进模型起点，代码是生产级姿态。
 
 ## 2. 当前状态（事实，非计划）
@@ -202,7 +202,12 @@ layout.json / content_list.json
 - **修正层可信度显式化（2026-10-28，`DECISIONS §48`，提交 `20fc07c`）**：`corrections/` 185 条中 **6 条 `disabled`**、**57 条应用且 `verified:false`**
   （body-hole 正文补行）**仍应用**，但导出日志、`stages.json.corrections.unverified` 与
   `meta.stats.correctionsUnverified` 都会显示；OCR 输入文件“存在但读不动”写 `ocrInputErrors` 与体检告警，
-  不再静默跳过（文件缺失仍是合法状态）。质量门 **276/276**；实跑 2相互作用：17 条未核对、0 条 OCR 输入错误。
+  不再静默跳过（文件缺失仍是合法状态）。质量门 **276/276**；实跑 2相互作用：14 条未核对、0 条 OCR 输入错误。
+
+- **依赖补齐（2026-10-28，`undici@8.12.3`）**：`scripts/real-pipeline.ts` 的 MinerU 代理 transport
+  依赖 `undici`；此前靠用户级 `/Users/john/node_modules/undici` 解析，换机/干净安装会在加载时报
+  `ERR_MODULE_NOT_FOUND`。现进 `devDependencies`，`import.meta.resolve("undici")` 指向项目内；
+  `npm run check` 276/276。日常 `npm run daily` 不再依赖全局包。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
 
