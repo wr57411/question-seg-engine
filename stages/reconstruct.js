@@ -142,11 +142,38 @@ const DISCARDED_LABEL = { header: "页眉", footer: "页脚", page_number: "页�
 export function ocrFillNode(it, p, canvasW, baseFont, candidateStyle = true) {
   const isPage = it.source === "page";
   const box = it.win ?? it.bbox;
-  const node = posStyle(el("div", candidateStyle ? "blk blk-ocr" : "blk blk-line"), box, p.width, p.height);
+  const node = posStyle(
+    el("div", candidateStyle ? "blk blk-ocr blk-ocr-window" : "blk blk-line"),
+    box,
+    p.width,
+    p.height,
+  );
   node.title =
     `OCR 候选补全（非引擎文本，请核对）\n来源：${isPage ? "整页 OCR" : "区域裁图"}\n` +
     `宽度比 ${it.ratio}（≈1 为合理；${isPage ? "整页来源按**洞自身**宽度算" : "裁图来源按窗口宽算"}）\n` +
     `证据：${it.crop}\nOCR 原始输出：${it.raw}`;
+  /**
+   * 2026-10-28：绿框画在候选**证据 bbox** 上，不再画在 `win` 上。
+   *
+   * `win` 是为了把整行 OCR 文本排进去而扩出来的窗口，常与相邻公式块有几 pt 重叠
+   * （答案册 p13 实测：`二 定律有1` 的 win x24.6–74.7 vs 公式 x69–179，重叠 5.7pt；
+   * `a，根据运动学规律有` 重叠 5.2pt）。绿框画在 win 上 ⇒ 边框压到公式。
+   * 证据 bbox 是「原卷上真正缺墨的洞」，与原生块天然不相交；文字仍按 win 排版，
+   * 证据框只负责标记。宁可框比文字小，也不让标记压正文（G1/G9）。
+   */
+  if (candidateStyle) {
+    const ev = el("div", "ocr-evidence");
+    const [x0, y0, x1, y1] = it.bbox;
+    const [wx0, wy0, wx1, wy1] = box;
+    const w = wx1 - wx0;
+    const h = wy1 - wy0;
+    ev.style.left = `${((x0 - wx0) / w) * 100}%`;
+    ev.style.top = `${((y0 - wy0) / h) * 100}%`;
+    ev.style.width = `${((x1 - x0) / w) * 100}%`;
+    ev.style.height = `${((y1 - y0) / h) * 100}%`;
+    ev.append(el("span", "tag", isPage ? "OCR·整页" : "OCR·裁图"));
+    node.append(ev);
+  }
   const txt = el("span", "txt");
   txt.textContent = it.text;
   /**
@@ -158,7 +185,6 @@ export function ocrFillNode(it, p, canvasW, baseFont, candidateStyle = true) {
    */
   txt.style.fontSize = `${clampByWidth(baseFont, { bbox: box, text: it.text ?? "" }, p.width, canvasW)}px`;
   node.append(txt);
-  if (candidateStyle) node.append(el("span", "tag", isPage ? "OCR·整页" : "OCR·裁图"));
   return node;
 }
 

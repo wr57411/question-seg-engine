@@ -354,6 +354,21 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 }
 .blk-ocr:hover .tag { display: block; }
 
+/* OCR 候选的**证据框**：画在候选自己的 bbox（洞）上，而不是 OCR 行窗口 win。
+   win 是为了整行排版扩出来的窗口，常与相邻公式块有几 pt 重叠（p13 实测 5.2–5.7pt）；
+   绿框画在 win 上会压到公式。文字仍按 win 排版，证据框只负责标记。 */
+.blk-ocr.blk-ocr-window {
+  border: none;
+  background: none;
+}
+.ocr-evidence {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed var(--jade);
+  background: rgba(77, 124, 95, 0.08);
+  pointer-events: none;
+}
+
 /* 人工已核对的上游错误修正（corrections/<docId>.json，DECISIONS §47）：
  * 两种来源 —— 「替换」（字母 O 被读成 0，块内改字）与「补入」（漏读的图注，新增块）。
  * 与 OCR 候选区分颜色（琥珀 vs 青绿），避免审阅时把"人工核对过的"与"机器候选"混为一谈。

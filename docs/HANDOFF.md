@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **274 例** + audit:render + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **275 例** + audit:render + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **420 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -202,7 +202,7 @@ layout.json / content_list.json
 - **修正层可信度显式化（2026-10-28，`DECISIONS §48`，提交 `20fc07c`）**：`corrections/` 185 条中 **63 条 `verified:false`**
   （body-hole 正文补行）**仍应用**，但导出日志、`stages.json.corrections.unverified` 与
   `meta.stats.correctionsUnverified` 都会显示；OCR 输入文件“存在但读不动”写 `ocrInputErrors` 与体检告警，
-  不再静默跳过（文件缺失仍是合法状态）。质量门 **274/274**；实跑 2相互作用：17 条未核对、0 条 OCR 输入错误。
+  不再静默跳过（文件缺失仍是合法状态）。质量门 **275/275**；实跑 2相互作用：17 条未核对、0 条 OCR 输入错误。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
 
@@ -407,10 +407,12 @@ layout.json / content_list.json
     整页块全部"无主"。根因：那两道题的题号在解析器与 OCR 整页全文里都不存在
     （p3/p4/p5 的纯题号行在 OCR 全文里都没有）⇒ 现有 OCR 补行"题号独占一行"分支也够不着。
     属主线上游解析质量问题，**非本分支引入**；修复需回原卷确认题号印在哪，单独立项。
-18. **答案册 p13 OCR 候选与公式块同 y 带轻微叠压（`feature/oxr` 部分缓解，未根治）**：
+18. **答案册 p13 OCR 候选与公式块同 y 带轻微叠压（已修，2026-10-28）**：
     p13 的 `【解析】…牛顿第二定律有` 等正文行由 OCR 补行以**绿虚线候选**读出（`ocrFill` 4 条 accepted），
-    与同带 MinerU 公式块（y671/686/688）轻微压边。本轮将候选字号改按框宽 `clampByWidth`（已提交 `8dd7660`），
-    文字不再溢出行，但**候选避让/行流化未做**（渲染层改动，需立项）。
+    候选 `win` 与同带 MinerU 公式块（y671/686/688）在 x 上重叠 **5.2–5.7pt**；绿框此前画在 `win` 上 ⇒ 压公式。
+    修法：绿框改画在候选**证据 `bbox`**（洞）上，文字仍按 `win` 排版（`DECISIONS §50`）。
+    验证：`tmp/verify/after-p13-13.png` 绿框不再压公式；`tests/layout-invariant.test.ts` 新增
+    `ocr-evidence` 几何断言；`npm run check` **275/275**。**候选文本仍完整可见，未改 OCR 数据。**
     ⚠️ `5c2770c` 当初那三条 `insert` 是**重复补已有内容**（OCR 已读出），且因坐标未换算落入 q1 重复文本，
     已在 `841536b` 删除；**禁止再往 p13 加 insert 补这行**（试过按原卷重插 4 条会叠字，已回退）。
 19. **`corrections/` 其余 insert 是否同类填错（2026-10-28 机械审计 + 逐页核对，下界 6 条）**：

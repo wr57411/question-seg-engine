@@ -60,7 +60,7 @@ function makeNode(tagName: string): Stub {
   createTextNode: (t: string) => Object.assign(makeNode("#text"), { textContent: t }),
 };
 
-const { GUTTER, renderPaper } = await import("../stages/reconstruct.js");
+const { GUTTER, renderPaper, ocrFillNode } = await import("../stages/reconstruct.js");
 
 /* ── 夹具：一页两题双栏（够触发号牌分栏与标签列，不依赖 git 忽略的 data/） ── */
 
@@ -161,4 +161,38 @@ test("④ 标签列挂在号牌所在的同一侧（右栏题不能标到左栏�
   assert.ok(left && right, "夹具应产出两列");
   assert.ok(left.style.right, "左栏题的标签列挂左侧留白");
   assert.ok(right.style.left, "右栏题的标签列挂右侧留白");
+});
+
+
+test("② OCR 候选绿框画在证据 bbox 上（p13 避让回归）", () => {
+  const bbox: [number, number, number, number] = [32.6, 672.4, 66.7, 680.6];
+  const win: [number, number, number, number] = [24.6, 669.4, 74.7, 683.6];
+  const it = {
+    bbox,
+    win,
+    text: "二 定律有1",
+    raw: "二 定律有1",
+    crop: "crop.png",
+    ratio: 1.18,
+    accepted: true,
+    source: "crop" as const,
+  };
+  const page = { width: 595, height: 842, blocks: [] };
+  const node = ocrFillNode(it, page, 760, 14, true);
+  const ev = node.children.find((c: Stub) => c.classList.contains("ocr-evidence"));
+  assert.ok(ev, "候选缺少 ocr-evidence 子节点（绿框仍画在 win 上）");
+  const winW = it.win[2] - it.win[0];
+  const winH = it.win[3] - it.win[1];
+  const eq = (style: string, want: number) => {
+    assert.ok(Math.abs(parseFloat(style) - want) < 1e-9, `${style} != ${want}%`);
+  };
+  eq(ev.style.left, ((it.bbox[0] - it.win[0]) / winW) * 100);
+  eq(ev.style.top, ((it.bbox[1] - it.win[1]) / winH) * 100);
+  eq(ev.style.width, ((it.bbox[2] - it.bbox[0]) / winW) * 100);
+  eq(ev.style.height, ((it.bbox[3] - it.bbox[1]) / winH) * 100);
+  // 夹具：候选 bbox 在公式块（x69）左侧，绿框右缘不得越过公式块左缘
+  assert.ok(it.bbox[2] <= 69, "fixture 候选 bbox 不该与公式块相交");
+  const plain = ocrFillNode(it, page, 760, 14, false);
+  assert.equal(plain.children.some((c: Stub) => c.classList.contains("ocr-evidence")), false);
+  assert.ok(plain.classList.contains("blk-line"));
 });
