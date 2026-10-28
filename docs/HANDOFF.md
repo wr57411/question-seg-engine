@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **284 例** + audit:render:all + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **286 例** + audit:render:all + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **420 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -242,6 +242,7 @@ layout.json / content_list.json
 | 已有解析结果、只重导 | `npm run daily -- <layout.json> --id <docId> --no-ocr` |
 | 只刷新体检摘要（不动产物） | `npm run daily -- <layout.json> --id <docId> --meta-only` |
 | 质量门（改任何代码后必跑） | `npm run check` |
+| 题目/选项/答案准确率（金标准） | `npm run score -- --all`；`npm run check:accuracy`（无完整金标准时 exit 2） |
 | **全卷渲染审计（已入 check）** | `npm run audit:render:all`（默认 8 个 MinerU 卷；`--include-combined`/`--include-oxr` 可选） |
 | 演示（夹具全流程） | `npm run demo` |
 | **成品页（像原版书的那一份）** | `npm run view`（本机）→ http://localhost:4173/final/?doc=<docId> |

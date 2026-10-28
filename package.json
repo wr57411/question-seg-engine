@@ -25,7 +25,10 @@
     "report:generalization": "tsx scripts/generalization.ts",
     "bank:all": "tsx scripts/bank-all.ts",
     "audit:render:all": "node scripts/audit-render-all.mjs",
-    "view:lan": "HOST=0.0.0.0 tsx scripts/view-server.ts"
+    "view:lan": "HOST=0.0.0.0 tsx scripts/view-server.ts",
+    "score": "tsx scripts/score.ts",
+    "score:all": "tsx scripts/score.ts --all",
+    "check:accuracy": "tsx scripts/score.ts --all --gate"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
