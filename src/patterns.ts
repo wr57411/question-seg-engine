@@ -42,6 +42,18 @@ export type LineMatch = TextMatch | { ok: false; kind: "other" };
 const ARABIC_QUESTION = /^([1-9]\d{0,2})\s*\.(?!\s*\d)|^([1-9]\d{0,2})[．、)）]/;
 
 /**
+ * 徽标题号：题号印在彩色方块/圆形图标里，OCR 只拿到数字，没有点号。
+ *
+ * 实测（2026-10-28《教材基础练 磁场》）：行首形如 `1 2024年1月浙江卷 [鲁科版…]`、
+ * `2[鲁科版必修三 P146…]`、`3[多选][人教版…]`、`4 [人教版…]`。8 卷基线扫描 **0 命中**，
+ * 新书 OXR **35 命中 / MinerU 25 命中**。
+ *
+ * 守卫（AND）：数字后必须是 `[`/`【`，或四位年份 —— 不接普通中文/字母，
+ * 避免把「10 m 的…」「2 个…」这类正文数字当成题号。
+ */
+const BARE_BADGE_QUESTION = /^([1-9]\d{0,2})\s*(?=[\[【]|\d{4}\s*年)/;
+
+/**
  * 括号小题号：（1） / (2) / （3），常见于解答题大题内。
  *
  * ⚠️ **不是题号**（2026-10-12 定案）：实测把它当题号切题，会让「小问」变成独立题目，
@@ -214,7 +226,7 @@ export function isPageFurniture(text: string): boolean {
  */
 export function startsWithQuestionNumber(line: string): boolean {
   const s = line.trimStart();
-  return ARABIC_QUESTION.test(s) || PAREN_QUESTION.test(s);
+  return ARABIC_QUESTION.test(s) || BARE_BADGE_QUESTION.test(s) || PAREN_QUESTION.test(s);
 }
 
 /**
@@ -294,6 +306,11 @@ export function matchFirstLine(line: string): LineMatch {
     return { ok: true, kind: "question_no", captured: arabic[1] ?? arabic[2] ?? "" };
   }
 
+  const badge = BARE_BADGE_QUESTION.exec(s);
+  if (badge) {
+    return { ok: true, kind: "question_no", captured: badge[1] ?? "" };
+  }
+
   const opt = OPTION_LINE.exec(s);
   if (opt) {
     const rest = s.slice(opt[0].length);
@@ -321,6 +338,7 @@ export function stripQuestionPrefix(line: string): string {
   return line
     .trimStart()
     .replace(/^[1-9]\d{0,2}\s*\.(?!\s*\d)|^[1-9]\d{0,2}\s*[．、)）]/, "")
+    .replace(/^[1-9]\d{0,2}\s*(?=[\[【]|\d{4}\s*年)/, "")
     .replace(/^[（(]\s*\d{1,2}\s*[)）]/, "")
     .trimStart();
 }

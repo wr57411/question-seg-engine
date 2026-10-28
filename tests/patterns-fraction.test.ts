@@ -64,3 +64,19 @@ test("matchAnswerEntry：答案条目「1．B」正常解析，0.x 行守卫生�
   assert.equal(matchAnswerEntry("0 . 5,不"), null, "「0 . 5」空格后仍接数字 → 仍应拒");
   assert.deepEqual(matchAnswerEntry("1 . B"), { number: "1", text: "B" }, "与判定层一致的「1 . B」应可解析");
 });
+test("徽标题号：数字后接 [ / 【 / 四位年份 才判题号（2026-10-28《教材基础练 磁场》）", () => {
+  for (const line of [
+    "1 2024年1月浙江卷 [鲁科版选修二P8第3题设问变式]磁电式电表",
+    "2[鲁科版必修三 P146 科学书屋拓展变式]中国宋代科学家沈括",
+    "3[多选][人教版必修三P108第4题角度变式]如图,某科技小组",
+    "4 [人教版必修三 P111 图 13.2]反亥姆霍兹线圈",
+  ]) {
+    assert.equal(matchFirstLine(line).kind, "question_no", `「${line}」应判徽标题号`);
+  }
+  // 正文数字不误伤：数字后接普通单位/量词 → 仍不是题号
+  for (const line of ["10 m 的位移", "2 个相同的小木块", "2024年1月浙江卷"]) {
+    assert.notEqual(matchFirstLine(line).kind, "question_no", `「${line}」不应判题号`);
+  }
+  assert.equal(stripQuestionPrefix("2[鲁科版必修三 P146 科学书屋拓展变式]"), "[鲁科版必修三 P146 科学书屋拓展变式]");
+  assert.equal(stripQuestionPrefix("1 2024年1月浙江卷 [鲁科版]"), "2024年1月浙江卷 [鲁科版]");
+});

@@ -86,6 +86,10 @@ export interface ConvertStats {
   imageBlocks: number;
   imageOk: number;
   imageFail: number;
+  /** 重叠重复块被合并的数量（明细写 oxr-dedupe.json） */
+  dedupeDropped: number;
+  /** 被合并块带徽标题号、而保留块没有时补回的次数 */
+  dedupeMergedBadge: number;
   fontSize: { p10: number; p50: number; p90: number };
 }
 
@@ -157,6 +161,103 @@ function wrapByWidth(text: string, widthPt: number, fontSize: number): string[] 
   return out.length > 0 ? out : [text.trim()];
 }
 
+/**
+ * OXR 会把同一段正文同时返回成「短行块」和「整段块」（bbox 高度重叠、文本前者是后者前缀），
+ * 不合并就会把同一题切两次（2026-10-28《教材基础练 磁场》实测：p1/p2/p9 共 5 对）。
+ * 合并条件（AND）：bbox 高/宽重叠 ≥0.6 + 长文本前缀相似 ≥0.85；保留文本更长的块。
+ * 被合并的短块若带徽标题号（`1 2024年…`），而保留块没有，则把题号补到保留块开头。
+ */
+const BADGE_PREFIX = /^([1-9]\d{0,2})\s*(?=[\[【]|\d{4}\s*年)/;
+
+function normDedupe(s: string): string {
+  return s
+    .replace(/\\[A-Za-z]+/g, "")
+    .replace(/[\s${}\\]/g, "")
+    .replace(/[，。；：、,.;:!?（）()【】《》“”"'']/g, "")
+    .toLowerCase();
+}
+
+function diceDedupe(a: string, b: string): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const A = new Set<string>();
+  const B = new Set<string>();
+  for (let i = 0; i + 1 < a.length; i++) A.add(a.slice(i, i + 2));
+  for (let i = 0; i + 1 < b.length; i++) B.add(b.slice(i, i + 2));
+  let inter = 0;
+  for (const g of A) if (B.has(g)) inter++;
+  return (2 * inter) / (A.size + B.size || 1);
+}
+
+function textCore(content: string): { text: string; badge: string | null } {
+  const t = content.trim();
+  const m = BADGE_PREFIX.exec(t);
+  const n = normDedupe(t);
+  return { text: m ? n.slice(m[1]!.length) : n, badge: m?.[1] ?? null };
+}
+
+function isTextish(b: OxrBlock): boolean {
+  const t = String(b.type ?? "Text").toLowerCase();
+  return t !== "picture" && t !== "figure" && t !== "image" && t !== "footer";
+}
+
+/** 页内重叠重复块合并；返回保留块、被合并明细与补回题号次数。 */
+function dedupeBlocks(blocks: OxrBlock[]): {
+  blocks: OxrBlock[];
+  dropped: { type: string; bbox: number[]; content: string }[];
+  mergedBadge: number;
+} {
+  let cur = blocks.map((b) => ({ ...b }));
+  const dropped: { type: string; bbox: number[]; content: string }[] = [];
+  let mergedBadge = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    const dead = new Set<number>();
+    for (let i = 0; i < cur.length; i++) {
+      if (dead.has(i)) continue;
+      const A = cur[i]!;
+      if (!isTextish(A) || !Array.isArray(A.bbox)) continue;
+      for (let j = i + 1; j < cur.length; j++) {
+        if (dead.has(j)) continue;
+        const B = cur[j]!;
+        if (!isTextish(B) || !Array.isArray(B.bbox)) continue;
+        const [ax0 = 0, ay0 = 0, ax1 = 0, ay1 = 0] = A.bbox as number[];
+        const [bx0 = 0, by0 = 0, bx1 = 0, by1 = 0] = B.bbox as number[];
+        const oy = Math.min(ay1, by1) - Math.max(ay0, by0);
+        const ox = Math.min(ax1, bx1) - Math.max(ax0, bx0);
+        const hRatio = oy / Math.max(1, Math.min(ay1 - ay0, by1 - by0));
+        const wRatio = ox / Math.max(1, Math.min(ax1 - ax0, bx1 - bx0));
+        if (hRatio < 0.6 || wRatio < 0.6) continue;
+        const ca = textCore(String(A.content ?? ""));
+        const cb = textCore(String(B.content ?? ""));
+        if (ca.text.length < 10 || cb.text.length < 10) continue;
+        const shortFirst = ca.text.length <= cb.text.length;
+        const shortCore = shortFirst ? ca : cb;
+        const longCore = shortFirst ? cb : ca;
+        const sim = diceDedupe(shortCore.text, longCore.text.slice(0, shortCore.text.length));
+        if (sim < 0.85) continue;
+        const keep = shortFirst ? j : i;
+        const drop = shortFirst ? i : j;
+        const dropCore = shortFirst ? ca : cb;
+        const keepCore = shortFirst ? cb : ca;
+        if (!keepCore.badge && dropCore.badge) {
+          cur[keep] = { ...cur[keep]!, content: `${dropCore.badge} ${cur[keep]!.content ?? ""}` };
+          mergedBadge++;
+        }
+        dropped.push({
+          type: String(cur[drop]!.type ?? "Text"),
+          bbox: cur[drop]!.bbox as number[],
+          content: String(cur[drop]!.content ?? "").slice(0, 500),
+        });
+        dead.add(drop);
+        if (drop === i) break;
+      }
+    }
+    if (dead.size === 0) break;
+    cur = cur.filter((_, idx) => !dead.has(idx));
+  }
+  return { blocks: cur, dropped, mergedBadge };
+}
+
 /** 从 markdown 图片语法或裸 URL 里剥出纯 URL */
 function pickImageUrl(block: OxrBlock): string | null {
   if (block.img_url) return block.img_url;
@@ -212,6 +313,8 @@ export async function convertOxrResponse(
   let lineTotal = 0;
   let blockTotal = 0;
   let imageBlocks = 0;
+  let mergedBadgeTotal = 0;
+  const droppedTotal: { page: number; type: string; bbox: number[]; content: string }[] = [];
   const fontSamples: number[] = [];
 
   for (const [pageIdx, page] of pages.entries()) {
@@ -219,8 +322,11 @@ export async function convertOxrResponse(
     const k = scaleOf(w);
     const paraBlocks: OutBlock[] = [];
     const discarded: OutBlock[] = [];
+    const deduped = dedupeBlocks(page.blocks ?? []);
+    droppedTotal.push(...deduped.dropped.map((d) => ({ page: pageIdx, ...d })));
+    mergedBadgeTotal += deduped.mergedBadge;
 
-    for (const block of page.blocks ?? []) {
+    for (const block of deduped.blocks) {
       const bb = block.bbox;
       if (!Array.isArray(bb) || bb.length < 4) continue;
       const [bx0 = 0, by0 = 0, bx1 = 0, by1 = 0] = bb;
@@ -305,6 +411,24 @@ export async function convertOxrResponse(
   const sorted = [...fontSamples].sort((a, b) => a - b);
   const pct = (p: number): number => Number((sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0).toFixed(1));
 
+  if (droppedTotal.length > 0) {
+    writeFileSync(
+      join(opts.outDir, "oxr-dedupe.json"),
+      JSON.stringify(
+        {
+          docId: opts.docId,
+          generatedAt: new Date().toISOString(),
+          note: "bbox 重叠 + 文本前缀相似（≥0.85）的重复块合并；保留文本更长的块；短块徽标题号补回",
+          mergedBadge: mergedBadgeTotal,
+          dropped: droppedTotal,
+        },
+        null,
+        2,
+      ),
+    );
+    opts.onProgress?.(`🔁 OXR 去重：合并 ${droppedTotal.length} 个重叠重复块（明细 oxr-dedupe.json）`);
+  }
+
   return {
     layout: { pdf_info: pdfInfo },
     stats: {
@@ -314,6 +438,8 @@ export async function convertOxrResponse(
       imageBlocks,
       imageOk,
       imageFail,
+      dedupeDropped: droppedTotal.length,
+      dedupeMergedBadge: mergedBadgeTotal,
       fontSize: { p10: pct(0.1), p50: pct(0.5), p90: pct(0.9) },
     },
   };

@@ -234,6 +234,12 @@ layout.json / content_list.json
 - **渲染门回到 8 卷基线（2026-10-28，`DECISIONS §60`）**：`check` 用 `audit:render:baseline`；
   `audit:render:all` 只做批量验收诊断。新书 `教材基础练 磁场`、`物理_教材基础练 电路` 全卷审计当前失败
   （9 条提示），按书修复后再显式加入 `BASELINE_DOCS`。`npm run check` **290/290**。
+- **徽标题号 + OXR 重复块合并（2026-10-28，`DECISIONS §61`）**：新书《教材基础练 磁场》题号是红色
+  方形徽标，OCR 得到 `1 2024年…` / `2[鲁科版…` 无标点形态；旧判据只认 `1.`，10 页只切 2 题。
+  新增 `BARE_BADGE_QUESTION`（数字后接 `[`/`【`/四位年份；8 卷基线 0 命中）+ OXR 同页重叠重复段合并
+  （bbox 重叠 + 前缀相似，明细 `oxr-dedupe.json`）。该书 OXR 题数 **2 → 33**，融合原型 **35 题**；
+  `npm run check` **292/292**，8 卷基线/题库 420 条零变化。残留：p2/p9 仍有重复题号与页眉「答案 P052」
+  混入题干，待逐页核对。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render:baseline && audit:numbering && bank）
 
@@ -279,7 +285,7 @@ layout.json / content_list.json
 |---|---|---|
 | `README.md` | 架构总览、核心机制、快速开始 | 主干有效；个别统计数字是历史时点值，以本文件为准 |
 | **`docs/HANDOFF.md`（本文件）** | 当前状态、风险、红线、交接动作 | 唯一的跨 Agent 入口 |
-| `docs/DECISIONS.md` | **60 条决策全记录**（§1–§60，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
+| `docs/DECISIONS.md` | **61 条决策全记录**（§1–§61，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
 | `tasks/lessons.md` | 3 条工程纪律（验收清单 / 启发式判据 / 逐块匹配） | 每条都有真实事故佐证，短小必读 |
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |
