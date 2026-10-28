@@ -19,7 +19,7 @@
  * 用法：npx tsx scripts/oxr-crosscheck.ts
  * 输出：data/oxr/crosscheck.md + data/oxr/crosscheck.json
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 interface Blk {
@@ -40,20 +40,35 @@ interface OxrPage {
   blocks?: OxrBlock[];
 }
 
-const DOCS = [
-  {
-    name: "题册 · 2 相互作用",
-    mineru: "23必刷题 2相互作用",
-    oxr: "23必刷题 2相互作用-OXR",
-    response: "data/oxr/book-response.json",
-  },
-  {
-    name: "答案册 · 第二章",
-    mineru: "第二章相互作用-答案与解析",
-    oxr: "第二章相互作用-答案与解析-OXR",
-    response: "data/oxr/answer-response.json",
-  },
-];
+/**
+ * 卷对：**自动发现** `data/out/*-OXR`，配对同名的 MinerU 卷。
+ * 原先硬编码两卷，扩样本时每次都要改代码 —— 改成扫描后，新跑一卷自动纳入。
+ * 响应来源优先用 daily 落盘的 `<outDir>/oxr-response.json`（`--parser oxr` 会写），
+ * 退回早期的 data/oxr/*.json。
+ */
+interface DocPair {
+  name: string;
+  mineru: string;
+  oxr: string;
+  response: string;
+}
+
+function discoverDocs(): DocPair[] {
+  const outRoot = join("data", "out");
+  if (!existsSync(outRoot)) return [];
+  const pairs: DocPair[] = [];
+  for (const dir of readdirSync(outRoot)) {
+    if (!dir.endsWith("-OXR")) continue;
+    const base = dir.slice(0, -4);
+    if (!existsSync(join(outRoot, base, "stages.json"))) continue;
+    const resp = join(outRoot, dir, "oxr-response.json");
+    if (!existsSync(resp)) continue;
+    pairs.push({ name: base, mineru: base, oxr: dir, response: resp });
+  }
+  return pairs.sort((a, b) => a.name.localeCompare(b.name, "zh"));
+}
+
+const DOCS = discoverDocs();
 
 /** 归一化：去空白与常见标点，用于跨源文本比对 */
 function norm(s: string): string {
@@ -172,6 +187,10 @@ for (const pair of DOCS) {
     for (const cap of info?.captions ?? []) {
       const c = norm(cap.text);
       if (c.length === 0 || c.length > 12) continue;
+      // 单拉丁字母（A/B/C/D）是**选项键**，不是图注 —— 实测多卷都出现这类假候选，
+      // 必须在这里排除，否则图注候选数会被虚高（build-corrections 的中文过滤也拦住了它，
+      // 这里保持同一口径，避免两份报告数字对不上）。
+      if (/^[A-Za-z]$/.test(c)) continue;
       capTotal++;
       const boxPt = cap.bbox.map((v) => v * (info?.scale ?? 1));
       const occupied = mBlocks.some(
