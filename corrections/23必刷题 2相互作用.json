@@ -1,0 +1,170 @@
+{
+  "docId": "23必刷题 2相互作用",
+  "generatedAt": "2026-10-28T01:40:39.626Z",
+  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "counts": {
+    "replace": 6,
+    "insert": 8,
+    "total": 14
+  },
+  "items": [
+    {
+      "page": 3,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        347,
+        282.8,
+        358.3,
+        292.8
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 3,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        476.7,
+        282.6,
+        488.1,
+        293.7
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 4,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        150.6,
+        525.7,
+        162,
+        536.4
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 4,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        219.8,
+        526,
+        231.3,
+        537
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 5,
+      "kind": "replace",
+      "blockText": "点拉至0点.开始两测力计夹角小于$9 0 ^ { \\circ }$,现让",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 5,
+      "kind": "replace",
+      "blockText": "位于0点，则关于$F _ { 2 }$的大小和图中的θ角，下",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "replace",
+      "blockText": "装置以0点为轴顺时针缓慢转动($\\angle A O B$保持",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "replace",
+      "blockText": "三角形的中心，用三根轻绳将在0点处的小",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 10,
+      "kind": "replace",
+      "blockText": "轻质弹簧连接，球A用轻绳悬挂于0点，在水平",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 13,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        113.8,
+        708.6,
+        124.3,
+        719
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 13,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        204.4,
+        708.5,
+        215.8,
+        719.4
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 14,
+      "kind": "replace",
+      "blockText": "状态.0点是三根轻绳的结点，${ , F , F _ { 1 } }$和$F _ { 2 }$分别表",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 14,
+      "kind": "insert",
+      "text": "曲辕犁",
+      "bbox": [
+        345.1,
+        727.7,
+        370.2,
+        737
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 14,
+      "kind": "insert",
+      "text": "直辕犁",
+      "bbox": [
+        458.4,
+        728,
+        483.6,
+        737.1
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    }
+  ]
+}

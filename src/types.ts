@@ -41,6 +41,12 @@ export type ParsedBlock =
        * `injectOcrQuestionLines`）。展示层以**候选**样式呈现，绝不当作引擎原文（G1）。
        */
       fromOcr?: boolean;
+      /**
+       * 该块经**人工已核对的上游错误修正**（`corrections/<docId>.json`）改动或补入。
+       * 与 `fromOcr` 同思路但不同来源：来自两源交叉核对 + 逐条回原卷核对，
+       * 见 docs/oxr-evaluation.md §4.9。修正清单进仓库、可审计、可撤销。
+       */
+      fromCorrection?: boolean;
     }
   | {
       kind: "image";

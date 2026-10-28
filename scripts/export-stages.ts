@@ -17,6 +17,7 @@ import { ruleStrategy } from "../src/index.js";
 import { looksLikeAnswerEntry, matchFirstLine } from "../src/patterns.js";
 import { normalizeLayout } from "../src/normalize.js";
 import { detectColumnCenters, detectColumns, layoutPage } from "../src/layout.js";
+import { applyCorrections, type CorrectionFile } from "../src/corrections.js";
 import { scanFormulaNoise, type FormulaNoiseReport } from "../src/formula.js";
 import type { BBox, IndexedBlock, ParsedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
 
@@ -917,6 +918,18 @@ function main(): void {
         (full.skipped ? `（另有 ${full.skipped} 处找不到落点，已跳过）` : ""),
     );
   }
+  // 人工已核对的上游错误修正（corrections/<docId>.json）—— 必须在**切题之前**应用，
+  // 否则修正只影响显示、不影响切题判定。清单进仓库、可审计；缺失即跳过（引擎行为不变）。
+  const correctionPath = join("corrections", `${docId}.json`);
+  if (existsSync(correctionPath)) {
+    const file = JSON.parse(readFileSync(correctionPath, "utf8")) as CorrectionFile;
+    const rep = applyCorrections(doc, file);
+    console.log(
+      `  已核对修正：替换 ${rep.replace} 块 · 补入图注 ${rep.insert} 处` +
+        (rep.missed.length > 0 ? `（⚠️ ${rep.missed.length} 条未命中，清单可能已过期）` : ""),
+    );
+  }
+
   const result = ruleStrategy.segment(doc);
   const snapshot = buildStageSnapshot(doc, result, extractRawBlocks(raw), extractDiscardedBlocks(raw));
 

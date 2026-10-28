@@ -1,0 +1,166 @@
+{
+  "docId": "第二章相互作用-答案与解析",
+  "generatedAt": "2026-10-28T01:40:39.649Z",
+  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "counts": {
+    "replace": 7,
+    "insert": 7,
+    "total": 14
+  },
+  "items": [
+    {
+      "page": 3,
+      "kind": "replace",
+      "blockText": "【解析】如图所示，对0点受力分析，受秤",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 4,
+      "kind": "replace",
+      "blockText": "【解析】对0点受力分析，受到两个弹簧测力计的拉力和橡",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 4,
+      "kind": "replace",
+      "blockText": "皮条的拉力，由于0点位置不变，因此橡皮条长度不变，其拉",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        198.7,
+        147.6,
+        209.5,
+        157.9
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 7,
+      "kind": "insert",
+      "text": "图2",
+      "bbox": [
+        184.7,
+        206.4,
+        201.8,
+        217.2
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 8,
+      "kind": "replace",
+      "blockText": "点，对0点受力分析如图丁所示，$T _ { 2 } ^ { \\prime } = T _ { 2 } , T _ { 1 } ^ { \\prime } = T _ { 2 } ^ { \\prime } { \\cos \\theta } = G$不",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "replace",
+      "blockText": "【解析】对0点受力分析如图所示，",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "replace",
+      "blockText": "0点由平衡条件可得$G = 2 T \\cos \\alpha$将绳的B端向上缓慢移动",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 10,
+      "kind": "replace",
+      "blockText": "2.D【解析】本题考查共点力的平衡.对0点进行受力分析，根",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 10,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        121.8,
+        813.2,
+        133.1,
+        823
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 10,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        217.2,
+        813.2,
+        228.6,
+        823
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 12,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        498.5,
+        241.5,
+        510.3,
+        251.8
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 15,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        358.1,
+        443.8,
+        370,
+        456.2
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 15,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        480.4,
+        444.8,
+        492.8,
+        455.6
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    }
+  ]
+}
