@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **278 例** + audit:render + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **280 例** + audit:render + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **420 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -282,6 +282,8 @@ layout.json / content_list.json
 3. **检测不改写**：`src/formula.ts` 只统计不改数据；数据清洗必须是显式独立决策。
 4. **解耦**：`viewer/`、`stages/`、`final/` 只消费快照（questions.json / stages.json），不 import 引擎 `src/`；
    唯一可 import 引擎代码处是构建期脚本 `scripts/export-stages.ts`。
+   **自动门**：`tests/decoupling.test.ts` 扫描三个展示层的 `.js/.mjs/.d.ts`，禁止 `../src/` import
+   （含 `import()`/`require()`）；反向验证锁扫描器本身。`npm run check` 自动包含。
    **纸面重建只此一处实现**（`stages/reconstruct.js` 的 `renderPaper`）—— 成品页与 stages 的
    「成品/对比」共用它；再写第二套 = 必然漂移（字号口径/留白/号牌落位任一处改了另一处不知道）。
 5. **验收方法**：显示层/算法修复的验收 = **文本全量清点**（逐块独立匹配，不拼接）+
