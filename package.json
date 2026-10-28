@@ -28,7 +28,8 @@
     "view:lan": "HOST=0.0.0.0 tsx scripts/view-server.ts",
     "score": "tsx scripts/score.ts",
     "score:all": "tsx scripts/score.ts --all",
-    "check:accuracy": "tsx scripts/score.ts --all --gate"
+    "check:accuracy": "tsx scripts/score.ts --all --gate",
+    "gold:worksheet": "tsx scripts/gold-worksheet.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

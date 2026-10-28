@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "createdAt": "2026-10-28",
+  "note": "现有 7 本种子；class A=原书扫描，B=手机截图，C=答案册；完整标注见 worksheets。",
+  "books": [
+    {
+      "docId": "23必刷题 1 直线运动",
+      "class": "A",
+      "pages": 16,
+      "questions": 84,
+      "sourcePdf": "books/23必刷题 1 直线运动.pdf",
+      "status": "seed-verified",
+      "gold": "gold/23必刷题 1 直线运动.json"
+    },
+    {
+      "docId": "23必刷题 3 运动和力的关系",
+      "class": "A",
+      "pages": 15,
+      "questions": 62,
+      "sourcePdf": "books/23必刷题 3 运动和力的关系.pdf",
+      "status": "seed-verified",
+      "gold": "gold/23必刷题 3 运动和力的关系.json"
+    },
+    {
+      "docId": "23必刷题 4 曲线运动",
+      "class": "A",
+      "pages": 14,
+      "questions": 67,
+      "sourcePdf": "books/23必刷题 4 曲线运动.pdf",
+      "status": "seed-verified",
+      "gold": "gold/23必刷题 4 曲线运动.json"
+    },
+    {
+      "docId": "23必刷题 光学",
+      "class": "B",
+      "pages": 8,
+      "questions": 19,
+      "sourcePdf": "books/23必刷题 光学.pdf",
+      "status": "worksheet",
+      "gold": null
+    },
+    {
+      "docId": "动量守恒定律23必刷题",
+      "class": "A",
+      "pages": 17,
+      "questions": 66,
+      "sourcePdf": "books/动量守恒定律23必刷题.pdf",
+      "status": "worksheet",
+      "gold": null
+    },
+    {
+      "docId": "机械能23必刷题",
+      "class": "A",
+      "pages": 18,
+      "questions": 74,
+      "sourcePdf": "books/机械能23必刷题.pdf",
+      "status": "worksheet",
+      "gold": null
+    },
+    {
+      "docId": "答案册-合订本",
+      "class": "C",
+      "pages": 187,
+      "questions": 503,
+      "sourcePdf": "books/【4】2023版《高考必刷题合订本（新教材版）》-物理 答案与解析.pdf",
+      "status": "worksheet",
+      "gold": null
+    }
+  ]
+}

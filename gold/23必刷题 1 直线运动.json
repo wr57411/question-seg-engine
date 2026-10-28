@@ -1,0 +1,31 @@
+{
+  "docId": "23必刷题 1 直线运动",
+  "complete": false,
+  "source": "seed: page-01 image verified 2026-10-28; 1 question only",
+  "notes": "只标第1题；完整标注见 gold/worksheets/23必刷题 1 直线运动.md。",
+  "questions": [
+    {
+      "page": 0,
+      "number": "1",
+      "stem": "[辽宁2022·1,4分]如图所示，桥式起重机主要由可移动“桥架”“小车”和固定“轨道”三部分组成.在某次作业中，桥架沿轨道单向移动了8m，小车在桥架上单向移动了6m，该次作业中小车相对地面的位移大小为()",
+      "options": [
+        {
+          "key": "A",
+          "text": "6 m"
+        },
+        {
+          "key": "B",
+          "text": "8 m"
+        },
+        {
+          "key": "C",
+          "text": "10 m"
+        },
+        {
+          "key": "D",
+          "text": "14 m"
+        }
+      ]
+    }
+  ]
+}

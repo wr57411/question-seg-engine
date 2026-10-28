@@ -291,7 +291,15 @@ function main(): void {
   }
   const files = readdirSync(goldDir)
     .filter((f) => f.endsWith(".json"))
-    .map((f) => join(goldDir, f));
+    .map((f) => join(goldDir, f))
+    .filter((f) => {
+      try {
+        const j = JSON.parse(readFileSync(f, "utf8")) as { docId?: unknown; questions?: unknown };
+        return typeof j.docId === "string" && Array.isArray(j.questions);
+      } catch {
+        return false;
+      }
+    });
   const selected = all
     ? files
     : docArg

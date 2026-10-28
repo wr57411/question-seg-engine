@@ -44,3 +44,21 @@ npm run check:accuracy          # 同 --gate
 - `23必刷题 2相互作用.pilot.json`：**试点**，只标了 p5 第1题、p7 第5题（A–D 选项），
   用于验证评分器；`complete:false`，不能当整本准确率。
 - 完整 30 本（A/B/C 分层）待补；见 `docs/specs/2026-10-28-batch-book-ingestion-spec.md` B01。
+
+
+## 现有 7 本种子（2026-10-28）
+
+`gold/registry.json` 登记了 `books/` 的 7 本：
+
+| 类 | 书 | 状态 |
+|---|---|---|
+| A | 1 直线运动 / 3 运动和力的关系 / 4 曲线运动 | **seed-verified**：各标 1 题并回 p1 页图核对 |
+| B | 光学 | worksheet：待标 |
+| A | 动量守恒 / 机械能 | worksheet：待标 |
+| C | 答案册-合订本 | worksheet：待标 |
+
+- **完整标注前，`score --all` 只算这些书里已标部分的 recall/选项指标，不算 precision/整本准确率。**
+- `gold/worksheets/*.md` 由 `npm run gold:worksheet -- --all` 生成：每本抽 5 题（首/25%/50%/75%/末），
+  含页图路径、系统草稿（仅参考）、金标 JSON 模板。**必须回页图转写**，不能照抄系统草稿。
+- 整本标完后把 `complete` 改成 `true`，`check:accuracy` 才会对这本书判门槛。
+- `23必刷题 2相互作用.pilot.json` 是额外试点（2 题；不在 7 本 registry 内）。
