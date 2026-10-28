@@ -42,3 +42,28 @@ test("convertOxrResponse：重叠重复段合并，短块徽标题号补回保�
   const artifact = JSON.parse(readFileSync(join(outDir, "oxr-dedupe.json"), "utf8")) as { dropped: unknown[] };
   assert.equal(artifact.dropped.length, 1, "去重明细必须落盘（不静默）");
 });
+
+
+test("convertOxrResponse：table HTML 扁平化为可读文本", async () => {
+  const outDir = mkdtempSync(join(tmpdir(), "oxr-table-"));
+  const raw: OxrResponse = {
+    pages: [
+      {
+        page_num: 0,
+        page_size: { w: 596, h: 842 },
+        blocks: [
+          {
+            type: "Table",
+            bbox: [10, 10, 580, 120],
+            content: "<table><tr><td>研究对象</td><td>磁感应强度 B</td></tr><tr><td>意义</td><td>描述磁场</td></tr></table>",
+          },
+        ],
+      },
+    ],
+  };
+  const { layout } = await convertOxrResponse(raw, { docId: "t", outDir, noImages: true });
+  const blocks = (layout.pdf_info[0] as { para_blocks: { lines?: { spans?: { content?: string }[] }[] }[] }).para_blocks;
+  const text = blocks.flatMap((b) => (b.lines ?? []).flatMap((l) => (l.spans ?? []).map((s) => s.content ?? ""))).join("");
+  assert.ok(!text.includes("<table>"), "不得把 HTML 标签留给渲染器");
+  assert.ok(text.includes("研究对象") && text.includes("磁感应强度") && text.includes("描述磁场"));
+});

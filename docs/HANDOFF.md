@@ -251,8 +251,11 @@ layout.json / content_list.json
 - **F2 融合落盘（2026-10-28，`DECISIONS §64`）**：`npm run fuse:doc -- <docId>` 把 MinerU 几何 +
   OXR 文本写回正式 `layout.json`（备份 `layout.oxr.json`、写 `fuse.json`、meta parser=fuse），
   并在融合页出口合并同 bbox 重复块；融合作品跳过 OCR 题号注入（坐标系不同会造重复）。
-  新书小金标：磁场 3/3、电路 4/4，均 **R100/S100/O100**；残留：待复核率 5.7%/38.2%，
+  新书小金标：磁场 3/3、电路 4/4，均 **R100/S100/O100**；残留：待复核率 5.7%/36.4%，
   第 4/6 页同号重复待逐页核对，批量自动双源未接线。
+- **表格 HTML 扁平化（2026-10-28，`DECISIONS §65`）**：成品页不再原样显示 `<table>` 标签；
+  重生成后磁场 35 题/电路 33 题，小金标仍 S100；表格被压成文本行（不是网格），
+  页顶 OCR 候选可用 `?ocr=0` 隐藏。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render:baseline && audit:numbering && bank）
 
@@ -298,7 +301,7 @@ layout.json / content_list.json
 |---|---|---|
 | `README.md` | 架构总览、核心机制、快速开始 | 主干有效；个别统计数字是历史时点值，以本文件为准 |
 | **`docs/HANDOFF.md`（本文件）** | 当前状态、风险、红线、交接动作 | 唯一的跨 Agent 入口 |
-| `docs/DECISIONS.md` | **64 条决策全记录**（§1–§64，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
+| `docs/DECISIONS.md` | **65 条决策全记录**（§1–§65，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
 | `tasks/lessons.md` | 3 条工程纪律（验收清单 / 启发式判据 / 逐块匹配） | 每条都有真实事故佐证，短小必读 |
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |

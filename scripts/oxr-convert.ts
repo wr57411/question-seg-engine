@@ -258,6 +258,29 @@ function dedupeBlocks(blocks: OxrBlock[]): {
   return { blocks: cur, dropped, mergedBadge };
 }
 
+/**
+ * OXR 的表格块 content 是 `<table><tr><td>…` HTML；展示层不渲染 HTML，会原样露出标签。
+ * 这里扁平化为「单元格 | 单元格」+ 换行，保留全部文字、丢掉不可见的标签结构。
+ * 结构信息损失可接受：当前渲染器不消费 HTML 表格，留着只会变成可见噪声。
+ */
+function htmlTableToText(content: string): string {
+  if (!/<\/?(?:table|tr|td|th)\b/i.test(content)) return content;
+  return content
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:td|th)>/gi, " | ")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s*\|\s*\n/g, "\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
 /** 从 markdown 图片语法或裸 URL 里剥出纯 URL */
 function pickImageUrl(block: OxrBlock): string | null {
   if (block.img_url) return block.img_url;
@@ -362,7 +385,8 @@ export async function convertOxrResponse(
         continue;
       }
 
-      const text = String(block.content ?? "");
+      const rawText = String(block.content ?? "");
+      const text = lower === "table" ? htmlTableToText(rawText) : rawText;
       if (text.trim().length === 0) continue;
 
       // 拆行 + 反推字号（缺陷 B）。OXR 正文块**多数不带 \n**，不能靠数 \n 得行数。

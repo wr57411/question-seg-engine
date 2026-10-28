@@ -79,7 +79,7 @@
       "docId": "物理_教材基础练 电路",
       "class": "A",
       "pages": 13,
-      "questions": 34,
+      "questions": 33,
       "sourcePdf": "data/batch-inbox/物理_教材基础练 电路.pdf",
       "status": "pilot-verified",
       "gold": "gold/物理_教材基础练 电路.pilot.json"
