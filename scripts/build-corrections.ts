@@ -16,7 +16,7 @@
  *
  * 用法：npx tsx scripts/build-corrections.ts
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const A4_WIDTH_PT = 596;
@@ -36,10 +36,47 @@ interface OxrPage {
   blocks?: OxrBlock[];
 }
 
-const DOCS = [
-  { docId: "23必刷题 2相互作用", response: "data/oxr/book-response.json" },
-  { docId: "第二章相互作用-答案与解析", response: "data/oxr/answer-response.json" },
-];
+/**
+ * 卷清单：**自动发现** `data/out/*-OXR`（要求同名 MinerU 卷与 `oxr-response.json` 都在）。
+ * 原先硬编码两卷，扩样本每次都要改代码；现在新跑一卷自动纳入。
+ */
+function discoverDocs(): { docId: string; response: string }[] {
+  const outRoot = join("data", "out");
+  if (!existsSync(outRoot)) return [];
+  const list: { docId: string; response: string }[] = [];
+  for (const dir of readdirSync(outRoot)) {
+    if (!dir.endsWith("-OXR")) continue;
+    const base = dir.slice(0, -4);
+    if (!existsSync(join(outRoot, base, "stages.json"))) continue;
+    const resp = join(outRoot, dir, "oxr-response.json");
+    if (!existsSync(resp)) continue;
+    list.push({ docId: base, response: resp });
+  }
+  return list.sort((a, b) => a.docId.localeCompare(b.docId, "zh"));
+}
+
+/**
+ * ⚠️ **必须显式列出已逐条核对过的卷**。
+ * 原因（实测踩过）：本脚本的判据是「当前 stages.json 与 OXR 的差异」，
+ * 而清单一旦应用、差异就消失 ⇒ 不带参数重跑会把**已落地的清单清空**（2相互作用/答案册
+ * 就从 14+14 变成 0+0，靠 git 才恢复）。所以：
+ *   ① 必须显式指定卷，避免顺手把**未核对**的卷写进清单（纪律：只收已核对项）；
+ *   ② 写入时与已有清单**合并**（按 page+kind+内容去重），不覆盖。
+ */
+const targets = process.argv.slice(2);
+if (targets.length === 0) {
+  console.error(
+    "用法：npx tsx scripts/build-corrections.ts <docId> [...]\n" +
+      "  ⚠️ 只列**已逐条回原卷核对过**的卷 —— 未核对的候选不得进清单。",
+  );
+  process.exit(2);
+}
+
+const DOCS = discoverDocs().filter((d) => targets.includes(d.docId));
+if (DOCS.length === 0) {
+  console.error(`没有匹配的卷：${targets.join(" / ")}`);
+  process.exit(2);
+}
 
 function norm(s: string): string {
   return s
@@ -160,23 +197,37 @@ for (const { docId, response } of DOCS) {
     }
   }
 
+  // **合并已有清单**，不覆盖：已应用的条目在 stages.json 里已经"看不到差异"了，
+  // 若按当前差异重生成就会把它们抹掉（实测把 28 条清成 0 条）。清单是**人工决策记录**，
+  // 不该由当前数据反推 —— 只有新增候选才追加。
+  const existingPath = join(outDir, `${docId}.json`);
+  const prevItems: Item[] = existsSync(existingPath)
+    ? ((JSON.parse(readFileSync(existingPath, "utf8")) as { items?: Item[] }).items ?? [])
+    : [];
+  const keyOf = (x: Item): string => `${x.page}|${x.kind}|${x.blockText ?? x.text ?? ""}`;
+  const seen = new Set(prevItems.map(keyOf));
+  const merged = [...prevItems, ...items.filter((x) => !seen.has(keyOf(x)))];
+
   const payload = {
     docId,
     generatedAt: new Date().toISOString(),
     basis:
-      "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9）。" +
+      "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。" +
       "只收录已核对项；未经核对的候选不得进入本清单。",
     counts: {
-      replace: items.filter((i) => i.kind === "replace").length,
-      insert: items.filter((i) => i.kind === "insert").length,
-      total: items.length,
+      replace: merged.filter((i) => i.kind === "replace").length,
+      insert: merged.filter((i) => i.kind === "insert").length,
+      total: merged.length,
     },
-    items,
+    items: merged,
   };
   const out = join(outDir, `${docId}.json`);
   writeFileSync(out, JSON.stringify(payload, null, 2));
-  grand += items.length;
-  console.log(`✓ ${out}  替换 ${payload.counts.replace} / 插入 ${payload.counts.insert}`);
+  grand += merged.length;
+  console.log(
+    `✓ ${out}  替换 ${payload.counts.replace} / 插入 ${payload.counts.insert}` +
+      `（新增 ${merged.length - prevItems.length}）`,
+  );
 }
 
 console.log(`合计 ${grand} 条已核对修正`);
