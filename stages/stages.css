@@ -359,9 +359,12 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
  * 与 OCR 候选区分颜色（琥珀 vs 青绿），避免审阅时把"人工核对过的"与"机器候选"混为一谈。
  * 标记不盖正文：只用虚线边 + 极淡底；细节放悬停 title。 */
 .blk-corrected {
-  border: 1px dashed #b0720f;
-  background: rgba(214, 158, 46, 0.10);
-  color: #6f4703;
+  /* 1px 虚线在整页缩放下几乎看不见（实测截图确认 class 已加、但视觉不明显），
+     故加粗到 2px + 加深 + 加一圈外描边；仍不遮正文（框在块边缘，不覆盖文字）。 */
+  border: 2px dashed #a05f00;
+  background: rgba(214, 158, 46, 0.18);
+  color: #6b4400;
+  box-shadow: 0 0 0 1px rgba(160, 95, 0, 0.35);
 }
 
 /* OCR 整页识别全文（scripts/ocr-page-fill.ts）：**无 bbox**，只作逐行对照，
