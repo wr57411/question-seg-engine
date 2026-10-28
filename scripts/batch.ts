@@ -102,7 +102,17 @@ function collectInputs(dir: string): string[] {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const p = join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (e.isFile() && (extname(e.name).toLowerCase() === ".pdf" || e.name === "layout.json")) out.push(p);
+      else if (e.isFile() || e.isSymbolicLink()) {
+        // 支持「新书用符号链接投递」：readdir 的 Dirent 对 symlink 不报 isFile，
+        // 但 statSync 会跟随链接；不跟随会把整个 inbox 当成空的（2026-10-28 实测）。
+        let isFile = false;
+        try {
+          isFile = statSync(p).isFile();
+        } catch {
+          continue;
+        }
+        if (isFile && (extname(e.name).toLowerCase() === ".pdf" || e.name === "layout.json")) out.push(p);
+      }
     }
   };
   if (!existsSync(dir) || !statSync(dir).isDirectory()) return [];

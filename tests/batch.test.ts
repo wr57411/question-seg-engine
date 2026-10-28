@@ -2,7 +2,7 @@
 // 用 layout 夹具，不调 MinerU/OCR（--no-ocr），不依赖网络。
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -39,7 +39,7 @@ test("batch：正常两本 + 单本失败隔离 + 重复投递不重复跑", () 
   mkdirSync(b, { recursive: true });
   mkdirSync(bad, { recursive: true });
   copyFileSync(FIXTURE, join(a, "layout.json"));
-  copyFileSync(FIXTURE, join(b, "layout.json"));
+  symlinkSync(FIXTURE, join(b, "layout.json")); // inbox 用符号链接投递也要能识别
   writeFileSync(join(bad, "layout.json"), "{ not json");
 
   try {
