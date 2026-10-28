@@ -267,6 +267,7 @@ layout.json / content_list.json
 | `tasks/lessons.md` | 3 条工程纪律（验收清单 / 启发式判据 / 逐块匹配） | 每条都有真实事故佐证，短小必读 |
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |
+| `docs/specs/2026-10-28-batch-book-ingestion-spec.md` | 批量扫书目标、可量化指标、待办清单（B01–B14） | 草案；待拍板 Q1–Q5 |
 | `docs/PRD-viewer.md` | viewer 的产品需求（设计输入稿） | 状态为「待设计验证」，实现以 viewer/ 实际为准 |
 | `docs/real-api-notes.md` | MinerU API 字段事实 | 字段争议以它为准 |
 | `docs/第二章答案-结构化提取.md` | 答案册首跑报告 | 含首尾边界与 46 处待校对的如实说明 |
