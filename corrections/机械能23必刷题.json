@@ -1,11 +1,11 @@
 {
   "docId": "机械能23必刷题",
-  "generatedAt": "2026-10-28T05:49:06.941Z",
+  "generatedAt": "2026-10-28T07:00:20.889Z",
   "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
   "counts": {
     "replace": 4,
-    "insert": 16,
-    "total": 20
+    "insert": 20,
+    "total": 24
   },
   "items": [
     {
@@ -251,6 +251,58 @@
       "to": "O点/O角",
       "verified": true,
       "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 3,
+      "kind": "insert",
+      "text": "图(a)",
+      "bbox": [
+        119.3,
+        734.8,
+        143.7,
+        746.1
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 3,
+      "kind": "insert",
+      "text": "图(b)",
+      "bbox": [
+        203.5,
+        734.7,
+        228.1,
+        746.2
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 15,
+      "kind": "insert",
+      "text": "图(b)",
+      "bbox": [
+        463.6,
+        191.9,
+        489.5,
+        203.3
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 15,
+      "kind": "insert",
+      "text": "图(a)",
+      "bbox": [
+        347.9,
+        192.1,
+        373,
+        203.1
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
     }
   ]
 }

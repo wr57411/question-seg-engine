@@ -1,11 +1,11 @@
 {
   "docId": "23必刷题 3 运动和力的关系",
-  "generatedAt": "2026-10-28T05:49:06.926Z",
+  "generatedAt": "2026-10-28T07:00:20.846Z",
   "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
   "counts": {
     "replace": 0,
-    "insert": 22,
-    "total": 22
+    "insert": 25,
+    "total": 25
   },
   "items": [
     {
@@ -290,6 +290,45 @@
         752,
         277.6,
         762
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 15,
+      "kind": "insert",
+      "text": "图(a)",
+      "bbox": [
+        172.6,
+        252,
+        198.4,
+        263.3
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 15,
+      "kind": "insert",
+      "text": "图(b)",
+      "bbox": [
+        118.5,
+        343.8,
+        145,
+        355.3
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 15,
+      "kind": "insert",
+      "text": "图(c)",
+      "bbox": [
+        230.9,
+        344,
+        255.1,
+        355.3
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"

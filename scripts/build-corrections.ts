@@ -176,10 +176,17 @@ for (const { docId, response } of DOCS) {
       if (type !== "caption" && type !== "figure_caption") continue;
       const text = String(ob.content ?? "").trim();
       if (text.length === 0 || text.length > 12) continue;
-      // 只要「真正的图注文字」：纯中文 1–4 字（甲/乙/丙/曲辕犁…）或「图N」。
-      // 排除形如 `$\dot{G}$`（**图上印的点标号**，不是图注 —— 插进去会与原图重复）
-      // 和 `i i` 这类 OCR 噪声。收紧判据的代价是可能漏收，但漏收好过插入重复内容。
-      if (!/^[\u4e00-\u9fa5]{1,4}$/.test(text) && !/^图\d{1,2}$/.test(text)) continue;
+      // 图注白名单（三条并集）：
+      //   ① 纯中文 1–4 字 —— 甲/乙/丙/曲辕犁/直辕犁
+      //   ② 图+数字 —— 图1 / 图2
+      //   ③ 图+括号字母 —— **图(a) / 图（b） / 图(1)**（同一道题配多图时用字母区分，物理卷常见）
+      // 仍**刻意排除**：`$\dot{G}$`（图上印的点标号，插入会与原图重复）、`i i` 这类 OCR 噪声
+      // —— 前者含 `$`、后者是纯 ASCII，三条白名单都不匹配，所以放宽 ③ 不会让它们回流。
+      const isCaption =
+        /^[\u4e00-\u9fa5]{1,4}$/.test(text) ||
+        /^图\s*\d{1,2}$/.test(text) ||
+        /^图\s*[（(]\s*[a-zA-Z0-9]\s*[）)]$/.test(text);
+      if (!isCaption) continue;
       const boxPt = (ob.bbox ?? []).map((v) => v * k);
       if (boxPt.length < 4) continue;
       const occupied = blocks.some(

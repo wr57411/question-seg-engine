@@ -1,11 +1,11 @@
 {
   "docId": "23必刷题 1 直线运动",
-  "generatedAt": "2026-10-28T06:22:17.741Z",
+  "generatedAt": "2026-10-28T07:00:20.812Z",
   "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
   "counts": {
     "replace": 1,
-    "insert": 12,
-    "total": 13
+    "insert": 14,
+    "total": 15
   },
   "items": [
     {
@@ -169,6 +169,32 @@
         314.3,
         236.1,
         326.1
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "insert",
+      "text": "图(a)",
+      "bbox": [
+        105.6,
+        552.4,
+        131.7,
+        564.4
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "insert",
+      "text": "图(b)",
+      "bbox": [
+        212.5,
+        552.5,
+        238.5,
+        564.8
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
