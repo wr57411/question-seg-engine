@@ -200,7 +200,13 @@ async function fetchImage(url: string): Promise<string | null> {
   }
 }
 
-const pdfInfo: { page_idx: number; page_size: [number, number]; para_blocks: OutBlock[] }[] = [];
+const pdfInfo: {
+  page_idx: number;
+  page_size: [number, number];
+  para_blocks: OutBlock[];
+  /** 页眉页脚等：**保留可见**（展示层有「已丢弃」样式），不静默丢（红线 G1）。MinerU 也放这里 */
+  discarded_blocks?: OutBlock[];
+}[] = [];
 let lineTotal = 0;
 let blockTotal = 0;
 let imageBlocks = 0;
@@ -210,6 +216,7 @@ for (const [pageIdx, page] of pages.entries()) {
   const { w, h } = readPageSize(page);
   const k = scaleOf(w);
   const paraBlocks: OutBlock[] = [];
+  const discarded: OutBlock[] = [];
 
   for (const block of page.blocks ?? []) {
     const bb = block.bbox;
@@ -218,9 +225,24 @@ for (const [pageIdx, page] of pages.entries()) {
     const bbox = [bx0 * k, by0 * k, bx1 * k, by1 * k] as [number, number, number, number];
     const type = String(block.type ?? "Text");
     blockTotal++;
-
-    // 映射：Title→title / Text→text / Caption→text（图注也是正文，且正是 MinerU 双漏的那类）
     const lower = type.toLowerCase();
+
+    // footer 是**正式版专有**类型（答案册 46 块，内容如「答案及解析」）。
+    // 归入 discarded_blocks 而不是正文：MinerU 同样把页眉页脚放这里；
+    // 但**必须保留**（展示层有「已被解析器丢弃」样式 + title 悬浮原文），不能静默删。
+    if (lower === "footer") {
+      const t = String(block.content ?? "").trim();
+      if (t.length > 0) {
+        const fs = 8;
+        discarded.push({
+          type: "footer",
+          bbox,
+          lines: [{ bbox, font_size: fs, spans: [{ content: t, font_size: fs }] }],
+        });
+      }
+      continue;
+    }
+
     if (lower === "picture" || lower === "figure" || lower === "image") {
       const url = pickImageUrl(block);
       const name = url && !noImages ? await fetchImage(url) : null;
@@ -254,7 +276,10 @@ for (const [pageIdx, page] of pages.entries()) {
     const lineH = blockHPt / lineCount;
     fontSamples.push(fontSize);
 
-    const outType = lower === "title" ? "title" : lower === "table" ? "table" : "text";
+    // 引擎的 BlockKind 只有 `text | image | table | formula`，**没有 title** ——
+    // 造枚举外的值不合契约（实测：MinerU 原始 layout 有 10 个 title，引擎产物里 0 个，
+    // 说明 title 最终都归 text）。图注(Caption/figure_caption)、choice、equation、blank 同理归 text。
+    const outType = lower === "table" ? "table" : "text";
     // 每行**独立成块**（关键）：展示层的字号是**块级**模型 ——
     // `fontForBlock` 取块的 bbox 高，`fontFromLineHeight(h) = h × 1.03` 即"块高 ≈ 字号"。
     // OXR 的块粒度粗（整段/整题一块 = 多行），塞进一个块里 ⇒ 块高被当成字高 ⇒
@@ -274,7 +299,12 @@ for (const [pageIdx, page] of pages.entries()) {
 
   // 页高按纸宽等比换算（光栅宽高比即纸宽高比），保证 bbox 与 page_size 同口径
   const pageHPt = Number(((A4_WIDTH_PT * h) / (w || 1)).toFixed(1));
-  pdfInfo.push({ page_idx: pageIdx, page_size: [A4_WIDTH_PT, pageHPt], para_blocks: paraBlocks });
+  pdfInfo.push({
+    page_idx: pageIdx,
+    page_size: [A4_WIDTH_PT, pageHPt],
+    para_blocks: paraBlocks,
+    ...(discarded.length > 0 ? { discarded_blocks: discarded } : {}),
+  });
 }
 
 const layout = { pdf_info: pdfInfo };
