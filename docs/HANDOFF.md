@@ -163,6 +163,7 @@ layout.json / content_list.json
 | 目的 | 命令 |
 |---|---|
 | **每天的第一条命令：导入新卷** | `npm run daily -- <pdf>`（解析→导出→OCR→体检一条龙） |
+| **换 OXR 解析引擎（本分支专用）** | `npm run daily -- <pdf> --parser oxr`（免费档，超 20 页/10MB **自动分片**；`src/` 零改动） |
 | 已有解析结果、只重导 | `npm run daily -- <layout.json> --id <docId> --no-ocr` |
 | 只刷新体检摘要（不动产物） | `npm run daily -- <layout.json> --id <docId> --meta-only` |
 | 质量门（改任何代码后必跑） | `npm run check` |

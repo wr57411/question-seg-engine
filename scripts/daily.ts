@@ -41,6 +41,8 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { basename, extname, join, resolve } from "node:path";
+import { convertOxrResponse } from "./oxr-convert.js";
+import { parsePdfWithOxr } from "./oxr-client.js";
 
 type Flags = Record<string, string | true>;
 
@@ -80,6 +82,7 @@ if (!input) {
       "  --kind <quiz|answer>  默认按文件名是否含「答案」判断",
       "  --no-ocr          跳过整页 OCR 补行",
       "  --force-parse     强制重新调用 MinerU 解析（默认幂等）",
+      "  --parser <name>   解析引擎：mineru（默认）| oxr（免费档，超 20 页/10MB 自动分片）",
     ].join("\n"),
   );
   process.exit(2);
@@ -114,12 +117,14 @@ function hasOcrToken(): boolean {
 
 /**
  * 从**产物**推断来源（不读旧 meta —— 旧值会一轮轮传下去，越传越离谱）：
- * `layout.json` 只可能来自 MinerU；`ocr-page-fill.json` 存在即说明补行跑过。
+ * `oxr-response.json` 存在 ⇒ 这卷是 OXR 解析的（分支 `feature/oxr` 专用）；
+ * 否则 `layout.json` 只可能来自 MinerU；`ocr-page-fill.json` 存在即说明补行跑过。
  */
 function inferSource(outDir: string): Meta["source"] {
+  const hasOxr = existsSync(join(outDir, "oxr-response.json"));
   return {
     pdf: existsSync(join(outDir, "origin.pdf")),
-    parser: existsSync(join(outDir, "layout.json")) ? "mineru" : "prebuilt",
+    parser: hasOxr ? "oxr" : existsSync(join(outDir, "layout.json")) ? "mineru" : "prebuilt",
     ocr: existsSync(join(outDir, "ocr-page-fill.json")) ? "page" : "skipped",
   };
 }
@@ -129,7 +134,7 @@ interface Meta {
   label: string;
   kind: "quiz" | "answer";
   importedAt: string;
-  source: { pdf: boolean; parser: "mineru" | "prebuilt"; ocr: "page" | "skipped" };
+  source: { pdf: boolean; parser: "mineru" | "oxr" | "prebuilt"; ocr: "page" | "skipped" };
   stats: {
     pages: number;
     questions: number;
@@ -219,7 +224,7 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
   };
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const abs = resolve(input!);
   if (!existsSync(abs)) {
     console.error(`输入不存在：${abs}`);
@@ -265,7 +270,7 @@ function main(): void {
 
   // ---- ① 拿解析结果 ----
   let layoutPath = join(outDir, "layout.json");
-  let parser: "mineru" | "prebuilt" = "prebuilt";
+  let parser: "mineru" | "oxr" | "prebuilt" = "prebuilt";
 
   if (isPdf) {
     // ⚠️ 命名是硬约定：export-stages 在「layout.json 所在目录」里找 `*_origin.pdf`
@@ -273,7 +278,21 @@ function main(): void {
     // 而页图正是「解析漏了什么」的唯一地面真值（2026-10-27 实测踩过）。
     copyFileSync(abs, join(outDir, `${docId}_origin.pdf`));
     const needParse = flags["force-parse"] === true || !existsSync(layoutPath);
-    if (needParse) {
+    if (needParse && flags["parser"] === "oxr") {
+      // OXR 第二解析源（分支 feature/oxr）。与 MinerU **走完全相同的下游**：
+      // 产出的 layout.json 是同构格式，②导出 / ③OCR补行 / ④体检原样复用 —— 引擎一行不改。
+      console.log("\n[1/4] OXR 解析（免费档；超 20 页或 10MB 自动分片）…");
+      const resp = await parsePdfWithOxr(abs, { onProgress: (m) => console.log(`  ${m}`) });
+      // 原始响应落盘：① 便于事后复现/复核 ② inferSource 靠它判定 parser="oxr"
+      writeFileSync(join(outDir, "oxr-response.json"), JSON.stringify(resp));
+      const conv = await convertOxrResponse(resp, { docId, outDir });
+      writeFileSync(layoutPath, JSON.stringify(conv.layout, null, 1));
+      console.log(
+        `  ${conv.stats.pages} 页 · ${conv.stats.lines} 行 · 图片 ${conv.stats.imageOk}/${conv.stats.imageBlocks} 落盘` +
+          ` · 字号 p50 ${conv.stats.fontSize.p50}pt`,
+      );
+      parser = "oxr";
+    } else if (needParse) {
       console.log("\n[1/4] MinerU 解析（首次或 --force-parse）…");
       // 解析先落到**临时目录**再搬进来：real-pipeline 的 docId 固定取文件名，
       // 直接写 data/out 会在「--id 与文件名不同」时覆盖同名目录（例如重跑样张会盖掉已验收产物）。
@@ -411,7 +430,7 @@ function writeMeta(
 }
 
 try {
-  main();
+  await main();
 } catch (e) {
   console.error(`\n❌ 导入失败：${(e as Error)?.message ?? e}`);
   console.error("   排查顺序：① 是否有 layout.json ② MinerU 凭据/网络 ③ 上面最后一段脚本的报错");
