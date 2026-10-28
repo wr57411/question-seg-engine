@@ -73,6 +73,14 @@ export function medianLineHeightPt(blocks: any[]): number {
   return hs.length ? hs[Math.floor(hs.length / 2)]! : 0;
 }
 
+/**
+ * uvx 可执行路径：默认本机路径，可用 `UVX_BIN` 覆盖。
+ * 换机/CI 不必改代码；找不到 uvx 时 OCR 会失败并被 daily 记录为 ocrError。
+ */
+export function uvxBin(): string {
+  return process.env.UVX_BIN?.trim() || "/Users/john/.local/bin/uvx";
+}
+
 export class OcrMcp {
   private proc: ChildProcessWithoutNullStreams;
   private buf = "";
@@ -80,7 +88,7 @@ export class OcrMcp {
   private nextId = 100;
 
   constructor(token: string) {
-    this.proc = spawn("/Users/john/.local/bin/uvx", ["--from", "paddleocr-mcp", "paddleocr_mcp"], {
+    this.proc = spawn(uvxBin(), ["--from", "paddleocr-mcp", "paddleocr_mcp"], {
       env: {
         ...process.env,
         PADDLEOCR_MCP_MODEL: "PaddleOCR-VL-1.6",

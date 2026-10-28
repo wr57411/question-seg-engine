@@ -158,7 +158,7 @@ interface Meta {
   label: string;
   kind: "quiz" | "answer";
   importedAt: string;
-  source: { pdf: boolean; parser: "mineru" | "oxr" | "prebuilt"; ocr: "page" | "skipped" };
+  source: { pdf: boolean; parser: "mineru" | "oxr" | "prebuilt"; ocr: "page" | "skipped" | "failed" };
   stats: {
     pages: number;
     questions: number;
@@ -178,10 +178,12 @@ interface Meta {
   };
   /** `short` = 顶部工具栏那一枚胶囊的文案（一行放得下）；`issues` = 展开后的完整原因 */
   health: { level: "ok" | "warn" | "fail"; short: string; issues: string[] };
+  /** OCR 补行失败的原因（source.ocr="failed" 时非空；成功/跳过为 null） */
+  ocrError: string | null;
 }
 
 /** 从产物算体检摘要 —— 数字全部来自落盘文件，不从内存里猜 */
-function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: Meta["source"]): Meta {
+function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: Meta["source"], ocrError: string | null = null): Meta {
   const outDir = join(OUT_ROOT, docId);
   const qPath = join(outDir, "questions.json");
   const sPath = join(outDir, "stages.json");
@@ -226,6 +228,7 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
 
   const issues: string[] = [];
   if (questions.length === 0) issues.push("没有切出任何题目（先看阶段 4 质检，多半是版式未识别）");
+  if (ocrError) issues.push(`OCR 补行失败：${ocrError}（成品页仍可用，但漏读行可能未补）`);
   if (needsReview > 0) issues.push(`${needsReview} 题标记为需人工校对（点题号牌看原因）`);
   if (missingNumberGroups > 0) issues.push(`${missingNumberGroups} 个编号组的题号不连续（可能缺题）`);
   if (ocrInputErrors > 0) {
@@ -238,7 +241,9 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
   const short =
     questions.length === 0
       ? "未切出题目"
-      : needsReview > 0
+      : ocrError
+        ? "OCR 失败"
+        : needsReview > 0
         ? `${needsReview} 题待校对`
         : missingNumberGroups > 0
           ? `${missingNumberGroups} 组缺号`
@@ -269,6 +274,7 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
       ocrInputErrors,
     },
     health: { level: questions.length === 0 ? "fail" : issues.length ? "warn" : "ok", short, issues },
+    ocrError,
   };
 }
 
@@ -324,7 +330,7 @@ async function main(): Promise<void> {
   // --meta-only：只刷新体检摘要（产物已就位时用；不重跑导出，不动快照）
   if (flags["meta-only"] === true) {
     // source 从**产物**推断，不读旧 meta（旧 meta 可能带着上一轮的默认值，越传越错）
-    writeMeta(docId, label, kind, inferSource(outDir));
+    writeMeta(docId, label, kind, inferSource(outDir), null);
     return;
   }
 
@@ -424,6 +430,7 @@ async function main(): Promise<void> {
 
   // ---- ③ OCR 整页补行（可选，自己会重导快照）----
   let ocr: Meta["source"]["ocr"] = "skipped";
+  let ocrError: string | null = null;
   if (flags["no-ocr"] === true) {
     console.log("\n[3/4] 跳过 OCR 补行（--no-ocr）");
   } else if (!hasOcrToken()) {
@@ -439,11 +446,13 @@ async function main(): Promise<void> {
     try {
       run("ocr-page-fill.ts", [docId]);
       ocr = "page";
-    } catch {
-      // 不静默：OCR 失败是"少补了一些行"，不是"这份卷坏了"
+    } catch (e) {
+      // 不静默：OCR 失败是「少补了一些行」，不是「这份卷坏了」；但必须写进 meta/体检。
+      ocr = "failed";
+      ocrError = String((e as Error)?.message ?? e).slice(0, 200);
       console.log(
-        "      ⚠️ OCR 补行失败（服务不可用/超时）。快照仍是完整可用的，只是少补了漏读行。\n" +
-          "         稍后可单独重试：npm run stages:ocr-page -- \"" + docId + '"',
+        `      ⚠️ OCR 补行失败：${ocrError}\n` +
+          "         快照仍是完整可用的，只是少补了漏读行；稍后可单独重试：npm run stages:ocr-page -- \"" + docId + '"',
       );
     }
   }
@@ -454,7 +463,7 @@ async function main(): Promise<void> {
     pdf: existsSync(join(outDir, "origin.pdf")),
     parser,
     ocr,
-  });
+  }, ocrError);
 }
 
 /**
@@ -466,9 +475,10 @@ function writeMeta(
   label: string,
   kind: "quiz" | "answer",
   src: Meta["source"],
+  ocrError: string | null = null,
 ): Meta {
   const outDir = join(OUT_ROOT, docId);
-  const meta = buildMeta(docId, label, kind, src);
+  const meta = buildMeta(docId, label, kind, src, ocrError);
   writeFileSync(join(outDir, "meta.json"), JSON.stringify(meta, null, 2));
 
   const s = meta.stats;

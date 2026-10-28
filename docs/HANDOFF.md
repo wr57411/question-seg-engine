@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **280 例** + audit:render + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **281 例** + audit:render + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **420 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -217,6 +217,10 @@ layout.json / content_list.json
   **9 卷**（跳过 `-OXR`），仅默认卷通过；其余 **8 卷失败在残留花括号 / 未覆盖 LaTeX 命令**
   （3卷：2+3），是真问题，不是单卷基线误报。暂为诊断命令，未入 `check`；见 §6-21。
   逐卷清理/按卷标定后再考虑纳入门。
+
+- **OCR 环境可配置（2026-10-28，`DECISIONS §55`）**：`scripts/ocr-lib.ts` 的 uvx 路径支持
+  `UVX_BIN` 覆盖；`daily` OCR 失败写 `meta.ocrError` + `source.ocr:"failed"` + `health.issues`，
+  不再只留 skipped。测试 `tests/ocr-env.test.ts`；check 281/281。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
 
@@ -458,6 +462,10 @@ layout.json / content_list.json
     **残留花括号 / 未覆盖的 LaTeX 命令**（如 3卷 2+3）。字号保真度、重复折叠、墨迹覆盖率多数通过
     ⇒ 不是单卷基线误报，是非基线卷的真实渲染问题。`npm run audit:render:all` 已提供（诊断，
     未入 `check`）；逐卷清理残留 LaTeX 或按卷标定后再考虑纳入门。**未修**。
+22. **OCR 运行环境硬编码 / 失败不可见（已修，2026-10-28）**：`scripts/ocr-lib.ts` 的 uvx 路径
+    改由 `UVX_BIN` 覆盖（默认保留本机路径）；`daily` OCR 失败写 `meta.ocrError`、
+    `source.ocr:"failed"` 与 `health.issues`，`short` 显示「OCR 失败」；不再只剩 skipped。
+    测试 `tests/ocr-env.test.ts`；check 281/281。⚠️ 端到端失败注入未跑（180s 超时成本）。
 
 ## 7. 新接手者的前 30 分钟
 

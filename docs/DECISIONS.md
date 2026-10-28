@@ -1,6 +1,6 @@
 # 切片决策记录（DECISIONS）
 
-> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§54，按时间序；顶部有索引）。
+> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§55，按时间序；顶部有索引）。
 > 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](HANDOFF.md)**；通用约定见 **[AGENTS.md](../AGENTS.md)**。
 
 垂直演进模型的两份交付物：可运行的骨架代码 + 本决策记录。
@@ -57,6 +57,7 @@
 | 52 | **`audit:render` 缺快照退出码 2**：不再假绿；`--allow-missing` 显式跳过 | 2026-10-28 |
 | 53 | **全卷渲染审计 `audit:render:all`**：诊断命令；9 卷仅默认卷通过 | 2026-10-28 |
 | 54 | **展示层解耦门**：自动扫描 viewer/stages/final 的 `../src/` import | 2026-10-28 |
+| 55 | **OCR 环境可配置 + 失败可见**：`UVX_BIN` 覆盖；`meta.ocrError`/`source.ocr=failed` | 2026-10-28 |
 
 ## 1. 公式指标修正：语义正确率替代可编译率
 
@@ -2672,3 +2673,20 @@ vs 公式 x69–179）。绿框此前画在 `win` 上 ⇒ 边框压到公式；�
 CSS/HTML 的 `<script src>` 不由本门覆盖（展示层是 ESM 直接加载，import 是主要耦合面）。
 
 **状态**：已实现。
+
+## 55. OCR 环境可配置 + 失败可见（2026-10-28）
+
+**背景**：`scripts/ocr-lib.ts` 把 `uvx` 路径硬编码为 `/Users/john/.local/bin/uvx`，换机/CI 必坏；
+`daily` 的 OCR 失败只打印一句提示，`meta.source.ocr` 仍是 `"skipped"`，体检胶囊也看不出「跑过但失败」。
+
+**决策**：
+1. `uvxBin()` 支持 `UVX_BIN` 覆盖（trim；默认保留本机路径）；
+2. `daily` OCR 失败时 `ocr="failed"`、记录 `ocrError`（截断 200 字）；
+3. `buildMeta` 写 `meta.ocrError`，并把失败加入 `health.issues`、`short="OCR 失败"`；
+4. 新增 `tests/ocr-env.test.ts` 锁 `UVX_BIN` 覆盖与默认值。
+
+**验证（2026-10-28）**：`npm run check` **281/281**；单测覆盖路径解析。
+⚠️ **端到端未跑**（把 uvx 指向不存在路径会触发 180s 初始化超时，成本高）；meta 失败路径为
+代码审查 + 单测，未在真实失败进程上实测。
+
+**状态**：已实现（路径/状态）；端到端失败注入未做。
