@@ -181,7 +181,7 @@ layout.json / content_list.json
   根因统一为 **OXR 只有块级 bbox、无行级几何**（§2.5 已预告）。
   ⇒ 结论：OXR 内容识别更强，但**排版精度不及 MinerU**，当前定位仍是**第二解析源/交叉核对**。
   ⚠️ `audit:render` 按 docId 单卷审计、**默认不审 OXR** ⇒ 它的"判定项归零"不能当 OXR 证据。
-- **`feature/oxr` 分支本轮修复（2026-10-28 下午，`ca488d2`/`ddb848c`/`841536b` + 本轮 reconstruct 提交，领先 `origin/main` 30，未 push）**：
+- **`feature/oxr` 分支本轮修复（2026-10-28 下午，`ca488d2`/`ddb848c`/`841536b` + 本轮 reconstruct 提交，领先 `origin/main` 以 `git rev-list --count origin/main..HEAD` 为准，未 push）**：
   ① **推翻"OXR 整页失效"误判**：实测 OXR 光学 p2 10 块/1025 字、p3 8 块/1011 字（选项齐全）⇒ 非没读出；
      题号印在页边，MinerU/OXR 双路都没读到；MinerU 靠 OCR 补行切题，而 OXR 卷当时跑 `--no-ocr` 缺
      `ocr-page-fill.json` ⇒ **输入不对等，非 OXR 能力缺陷**（上一轮 `d6419e7` 的结论已推翻）。
@@ -197,9 +197,9 @@ layout.json / content_list.json
      （实跑 `["4","5","1","2","3","4","5","1","2"]`）；corrections 条目 24 → 21。
   ⑥ **本轮已提交改动** `stages/reconstruct.js`：OCR 候选字号改按自身框宽 `clampByWidth`（旧硬编码整页
      基准字号 ⇒ 候选文字超宽溢出行、压到公式）。展示层微调，已实跑质量门 259/259 全绿，**已提交（见 `git log -1`）**。
-  ⚠️ 详细实验记录在 `docs/oxr-evaluation.md` §4.12；`feature/oxr` 领先 `origin/main` **30** commit，未 push。
+  ⚠️ 详细实验记录在 `docs/oxr-evaluation.md` §4.12；`feature/oxr` 领先 `origin/main` 以 `git rev-list --count origin/main..HEAD` 为准，未 push。
 
-- **修正层可信度显式化（2026-10-28，`DECISIONS §48`）**：`corrections/` 184 条中 **63 条 `verified:false`**
+- **修正层可信度显式化（2026-10-28，`DECISIONS §48`，提交 `20fc07c`）**：`corrections/` 184 条中 **63 条 `verified:false`**
   （body-hole 正文补行）**仍应用**，但导出日志、`stages.json.corrections.unverified` 与
   `meta.stats.correctionsUnverified` 都会显示；OCR 输入文件“存在但读不动”写 `ocrInputErrors` 与体检告警，
   不再静默跳过（文件缺失仍是合法状态）。质量门 **272/272**；实跑 2相互作用：17 条未核对、0 条 OCR 输入错误。
