@@ -65,6 +65,24 @@
       "sourcePdf": "books/【4】2023版《高考必刷题合订本（新教材版）》-物理 答案与解析.pdf",
       "status": "worksheet",
       "gold": null
+    },
+    {
+      "docId": "教材基础练 磁场",
+      "class": "A",
+      "pages": 10,
+      "questions": 35,
+      "sourcePdf": "data/batch-inbox/教材基础练 磁场.pdf",
+      "status": "pilot-verified",
+      "gold": "gold/教材基础练 磁场.pilot.json"
+    },
+    {
+      "docId": "物理_教材基础练 电路",
+      "class": "A",
+      "pages": 13,
+      "questions": 34,
+      "sourcePdf": "data/batch-inbox/物理_教材基础练 电路.pdf",
+      "status": "pilot-verified",
+      "gold": "gold/物理_教材基础练 电路.pilot.json"
     }
   ]
 }

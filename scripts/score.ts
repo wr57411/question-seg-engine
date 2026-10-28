@@ -69,11 +69,99 @@ export interface ScoreResult {
 
 const REVIEW_THRESHOLD = 0.01;
 
-/** 归一化：去 LaTeX 命令/定界符/空白/标点，只留字面（用于重合与 CER）。 */
+/** 读一个 `{...}` 组（支持嵌套），返回组内文本与结束位置。 */
+function readBraceGroup(s: string, i: number): { text: string; end: number } | null {
+  if (s[i] !== "{") return null;
+  let depth = 0;
+  for (let j = i; j < s.length; j++) {
+    if (s[j] === "{") depth++;
+    else if (s[j] === "}") {
+      depth--;
+      if (depth === 0) return { text: s.slice(i + 1, j), end: j + 1 };
+    }
+  }
+  return null;
+}
+
+/** 把 `\sqrt{x}` / `\frac{a}{b}` 递归转成 `√x` / `a/b`；不认识的命令留给后面的通用剥离。 */
+function replaceTexGroups(s: string, cmd: "\\sqrt" | "\\frac"): string {
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    const p = s.indexOf(cmd, i);
+    if (p < 0) {
+      out += s.slice(i);
+      break;
+    }
+    out += s.slice(i, p);
+    let j = p + cmd.length;
+    while (j < s.length && /\s/.test(s[j] ?? "")) j++;
+    const g1 = readBraceGroup(s, j);
+    if (!g1) {
+      out += s.slice(p, j);
+      i = j;
+      continue;
+    }
+    if (cmd === "\\sqrt") {
+      out += `√${replaceTexGroups(g1.text, cmd)}`;
+      i = g1.end;
+      continue;
+    }
+    let k = g1.end;
+    while (k < s.length && /\s/.test(s[k] ?? "")) k++;
+    const g2 = readBraceGroup(s, k);
+    if (!g2) {
+      out += s.slice(p, k);
+      i = k;
+      continue;
+    }
+    out += `${replaceTexGroups(g1.text, cmd)}/${replaceTexGroups(g2.text, cmd)}`;
+    i = g2.end;
+  }
+  return out;
+}
+
+const TEX_SYMBOLS: Record<string, string> = {
+  sin: "sin",
+  cos: "cos",
+  tan: "tan",
+  mu: "μ",
+  theta: "θ",
+  alpha: "α",
+  beta: "β",
+  gamma: "γ",
+  Delta: "Δ",
+  delta: "δ",
+  omega: "ω",
+  Omega: "Ω",
+  pi: "π",
+  circ: "°",
+  times: "×",
+  cdot: "·",
+  div: "÷",
+  le: "≤",
+  ge: "≥",
+  approx: "≈",
+  pm: "±",
+  infty: "∞",
+};
+
+/** LaTeX → 可比较的纯文本：分数/根号/希腊字母/运算符都转成人工金标常用写法。 */
+export function latexToPlain(s: string): string {
+  let t = replaceTexGroups(s, "\\sqrt");
+  for (let i = 0; i < 4; i++) {
+    const n = replaceTexGroups(t, "\\frac");
+    if (n === t) break;
+    t = n;
+  }
+  t = t.replace(/\\([A-Za-z]+)/g, (_, name: string) => TEX_SYMBOLS[name] ?? "");
+  return t.replace(/\\[,;! ]/g, "");
+}
+
+/** 归一化：LaTeX 等价形式 + 去空白/定界符/标点/上下标，只留字面（用于重合与 CER）。 */
 export function normForScore(s: string): string {
-  return s
-    .replace(/\\[A-Za-z]+/g, "")
-    .replace(/[\s${}\\]/g, "")
+  return latexToPlain(s)
+    .replace(/[\s${}\\_^]/g, "")
     .replace(/[，。；：、,.;:!?（）()【】《》“”"'']/g, "")
     .toLowerCase();
 }

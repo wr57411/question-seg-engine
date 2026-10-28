@@ -251,12 +251,15 @@ function main(): void {
       console.log(`· ${docId}：上次中断（running），重试`);
     }
     if (last?.status === "failed") {
-      const failedCount = entries.filter((e) => e.hash === hash && e.status === "failed").length;
+      const fails = entries.filter((e) => e.hash === hash && e.status === "failed");
+      // 429 是外部限流，不占「书本自身失败」的重试预算；配额恢复后应能直接重跑。
+      const quotaFails = fails.filter((e) => /HTTP 429/.test(e.error ?? "")).length;
+      const failedCount = fails.length - quotaFails;
       if (failedCount >= opt.retry) {
-        console.log(`· ${docId}：已失败 ${failedCount} 次（--retry ${opt.retry}），跳过`);
+        console.log(`· ${docId}：已失败 ${failedCount} 次（--retry ${opt.retry}，429 不计），跳过`);
         continue;
       }
-      console.log(`· ${docId}：重试（第 ${failedCount + 1} 次）`);
+      console.log(`· ${docId}：重试（第 ${failedCount + 1} 次${quotaFails ? `；另有 ${quotaFails} 次 429` : ""}）`);
     }
     const docLast = lastByDoc.get(docId);
     if (docLast && docLast.hash !== hash) {
@@ -289,6 +292,7 @@ function main(): void {
         hash, docId, input: rel, status: "failed", at: finishedAt, startedAt, finishedAt,
         error: "OXR HTTP 429（限流）；本批停止，剩余书稍后重跑",
       });
+      newFailures++;
       console.error(`\n⏸ ${docId}：OXR 限流（HTTP 429）。本批先停，剩余书未处理；稍后重跑会接着来。`);
       break;
     }

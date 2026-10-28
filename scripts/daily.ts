@@ -147,9 +147,10 @@ function hasOcrToken(): boolean {
  */
 function inferSource(outDir: string): Meta["source"] {
   const hasOxr = existsSync(join(outDir, "oxr-response.json"));
+  const hasFuse = existsSync(join(outDir, "fuse.json"));
   return {
     pdf: existsSync(join(outDir, "origin.pdf")),
-    parser: hasOxr ? "oxr" : existsSync(join(outDir, "layout.json")) ? "mineru" : "prebuilt",
+    parser: hasFuse ? "fuse" : hasOxr ? "oxr" : existsSync(join(outDir, "layout.json")) ? "mineru" : "prebuilt",
     ocr: existsSync(join(outDir, "ocr-page-fill.json")) ? "page" : "skipped",
   };
 }
@@ -159,7 +160,7 @@ interface Meta {
   label: string;
   kind: "quiz" | "answer";
   importedAt: string;
-  source: { pdf: boolean; parser: "mineru" | "oxr" | "prebuilt"; ocr: "page" | "skipped" | "failed" };
+  source: { pdf: boolean; parser: "mineru" | "oxr" | "fuse" | "prebuilt"; ocr: "page" | "skipped" | "failed" };
   stats: {
     pages: number;
     questions: number;

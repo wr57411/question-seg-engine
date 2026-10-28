@@ -48,10 +48,11 @@ const ARABIC_QUESTION = /^([1-9]\d{0,2})\s*\.(?!\s*\d)|^([1-9]\d{0,2})[．、)�
  * `2[鲁科版必修三 P146…]`、`3[多选][人教版…]`、`4 [人教版…]`。8 卷基线扫描 **0 命中**，
  * 新书 OXR **35 命中 / MinerU 25 命中**。
  *
- * 守卫（AND）：数字后必须是 `[`/`【`，或四位年份 —— 不接普通中文/字母，
- * 避免把「10 m 的…」「2 个…」这类正文数字当成题号。
+ * 守卫（AND）：数字后必须是 `[`/`【`，或**四位年份**（后不接数字）—— 不接普通中文/字母，
+ * 避免把「10 m 的…」「2 个…」这类正文数字当成题号。年份后可能没有「年」字
+ * （实测 `4 2024 广西卷`；MinerU 还会粘成 `42024广西卷`），故不要求「年」。
  */
-const BARE_BADGE_QUESTION = /^([1-9]\d{0,2})\s*(?=[\[【]|\d{4}\s*年)/;
+const BARE_BADGE_QUESTION = /^([1-9]\d{0,2})\s*(?=[\[【]|\d{4}(?!\d))/;
 
 /**
  * 括号小题号：（1） / (2) / （3），常见于解答题大题内。
@@ -97,6 +98,16 @@ const SECTION_HEAD = /^第\s*(\d{1,3}|[一二三四五六七八九十]{1,3})\s*�
  * → 同一节里出现多个 `1`，唯一键失效（题册节5 曾并进 4 组、答案册节5 并进 3 组）。
  */
 const SECTION_HEAD_ALT = /^(专题[　\s]*(.{0,26})|全章综合测试\s*(.{0,26})|真题自测[　\s]*(.{0,26}))$/;
+
+/**
+ * 教材类教辅的栏目标题（不是题，也不是正文）：
+ * `教材知识萃取 回归教材，萃精华` / `教材素材变式 多维变式，夯基础`；
+ * 以及 `变式1 磁现象和磁场` 这类小节标题（题号在变式内从 1 重启）。
+ * 实测（2026-10-28《教材基础练 磁场/电路》）：漏掉它们时，栏目标题会被并进上一题
+ * 的题干/选项（电路 p1 选项 D 里混进「教材知识萃取…答案 P046」）。
+ */
+const BAND_HEAD = /^(教材知识萃取|教材素材变式)/;
+const VARIANT_HEAD = /^变式\s*(\d{1,2})[　\s]+(.{1,30})$/;
 
 /**
  * 必刷题页顶的**分组行**：`必刷知识T1~2、4~5、7~8、10、12`
@@ -207,7 +218,7 @@ export function looksLikeAnswerEntry(line: string): boolean {
  * 留在正文时会被上一页跨页未关的题吞进题干/选项（2026-10-07 p4 假第5题实证）。
  * 判定只用于「页顶带的跳过」，不影响正常题目内容。
  */
-const FURNITURE_LINE = /计划用时|必刷(?:知识|方法|考点|题型)|答案\s*[A-Z]?\d+/;
+const FURNITURE_LINE = /计划用时|必刷(?:知识|方法|考点|题型)|答案\s*[A-Z]?\d+|高考基础练|对应练见/;
 
 export function isPageFurniture(text: string): boolean {
   const s = text.trim();
@@ -277,6 +288,20 @@ export function matchFirstLine(line: string): LineMatch {
       const title = (alt[2] ?? alt[3] ?? alt[4] ?? "").trim();
       return { ok: true, kind: "section", captured: "", title: title || s };
     }
+    const band = BAND_HEAD.exec(s);
+    if (band) {
+      return { ok: true, kind: "section", captured: "", title: s };
+    }
+    const variant = VARIANT_HEAD.exec(s);
+    if (variant) {
+      return {
+        ok: true,
+        kind: "section",
+        captured: "",
+        indexNumeral: variant[1] ?? "",
+        title: s.slice((variant[0] ?? "").length).trim(),
+      };
+    }
     const section = CHINESE_SECTION.exec(s);
     if (section) {
       return {
@@ -338,7 +363,7 @@ export function stripQuestionPrefix(line: string): string {
   return line
     .trimStart()
     .replace(/^[1-9]\d{0,2}\s*\.(?!\s*\d)|^[1-9]\d{0,2}\s*[．、)）]/, "")
-    .replace(/^[1-9]\d{0,2}\s*(?=[\[【]|\d{4}\s*年)/, "")
+    .replace(/^[1-9]\d{0,2}\s*(?=[\[【]|\d{4}(?!\d))/, "")
     .replace(/^[（(]\s*\d{1,2}\s*[)）]/, "")
     .trimStart();
 }

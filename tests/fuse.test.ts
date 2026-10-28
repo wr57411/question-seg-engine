@@ -69,3 +69,18 @@ test("fuseDocuments：OXR 缺整行时保留 MinerU 文本，不把邻近文字�
   const q = doc.pages[0]!.blocks.find((b) => b.kind === "text" && b.text.includes("题目"));
   assert.ok(q && q.kind === "text" && q.text === "1. 题目正文 OXR" && q.fromFusion === true);
 });
+
+test("fuseDocuments：同一 bbox 的重复 OXR 块合并，保留更完整文本", () => {
+  const mineru = page([
+    { kind: "text", bbox: [10, 10, 90, 20], text: "2. 题干", firstLine: "2. 题干", lineCount: 1, maxFontSize: 0 },
+  ]);
+  const oxr = page([
+    { kind: "text", bbox: [10, 10, 90, 20], text: "2. 题干", firstLine: "2. 题干", lineCount: 1, maxFontSize: 0 },
+    { kind: "text", bbox: [10, 10, 90, 20], text: "2. 题干 完整版", firstLine: "2. 题干 完整版", lineCount: 1, maxFontSize: 0 },
+  ]);
+  const { doc, stats } = fuseDocuments(mineru, oxr);
+  assert.equal(stats.deduped, 1);
+  assert.equal(doc.pages[0]!.blocks.length, 1);
+  const b = doc.pages[0]!.blocks[0]!;
+  assert.ok(b.kind === "text" && b.text.includes("完整版"));
+});

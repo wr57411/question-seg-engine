@@ -810,10 +810,13 @@ export function injectOcrQuestionLines(doc: ParsedDocument, outDir: string): { i
     const m = matchFirstLine(first);
     if (m.kind !== "question_no") continue; // ① 只补题号行
     const num = m.captured;
+    // 同页同号即视为已存在。**不再用绝对 y 判重**：OCR 候选的 bbox 是生成时的坐标系
+    // （常见 596×852.5），融合作品用 MinerU 坐标系（宽高都放大约 3 倍），绝对 y 差必然 >24
+    // ⇒ 旧判据在融合页上失效，同一题会被补成两道（2026-10-28 电路 p1/p4 实测）。
     const exists = page.blocks.some((b) => {
       if (b.kind !== "text") return false;
       const bm = matchFirstLine(b.firstLine);
-      return bm.kind === "question_no" && bm.captured === num && Math.abs(b.bbox[1] - it.bbox[1]) < 24; // ②
+      return bm.kind === "question_no" && bm.captured === num;
     });
     if (exists) continue;
     page.blocks.push({
@@ -892,12 +895,28 @@ export function injectOcrFullTextLines(doc: ParsedDocument, outDir: string): { i
       const bareNumber = /^\d{1,2}\s*[.．、)）]\s*$/.test(line);
       if (!looksLikeAnswerEntry(line) && !bareNumber) continue;
       const num = m.captured;
+      // 题号可能已被并进上一行/选项，或与年份粘连（`42024…`）：在**整块文本**里查行首题号，
+      // 不只查 firstLine。否则同一题会被 OCR 全文再补一道（新书 p1/p4 实测）。
+      const numPattern = new RegExp(`(^|\\n)\\s*${num}\\s*(?:[.．、)）]|(?=[\\[【]|\\d{4}(?!\\d)))`);
       const exists = page.blocks.some((b) => {
         if (b.kind !== "text") return false;
         const bm = matchFirstLine(b.firstLine);
-        return bm.kind === "question_no" && bm.captured === num;
+        if (bm.kind === "question_no" && bm.captured === num) return true;
+        return numPattern.test(b.text);
       });
       if (exists) continue; // 该页已有同号题切口
+      // 同号题号可能已被并进上一行/选项（firstLine 不是题号形态），但文字已在页内：
+      // 用归一化前缀再查一次，避免把同一题补成两道（2026-10-28 新书 p1 实测）。
+      const keyText = normForMatch(line).slice(0, 16);
+      const existsText =
+        keyText.length >= 8 &&
+        page.blocks.some(
+          (b) => b.kind !== "image" && b.kind !== "formula" && normForMatch(b.text).includes(keyText),
+        );
+      if (existsText) {
+        skipped++;
+        continue;
+      }
       // 显式声明结构类型：`ParsedBlock` 的 text 与 table 共用同一分支，
       // `Extract<…, {kind:"text"}>` 会退化成 never（2026-10-27 踩到）。
       let target: { bbox: BBox; lineCount: number } | null = findBlockByLine(page, lines[i + 1] ?? "");
@@ -961,13 +980,18 @@ function main(): void {
   const outDir = join("data", "out", docId);
   /** OCR 输入文件“存在但读不动”的错误（不静默：写入快照，meta 体检会显示） */
   const ocrInputErrors: string[] = [];
+  // 融合作品：两源已覆盖正文，OCR 题号补行只保留展示候选，**不注入切题流**。
+  // 原因（2026-10-28 电路实测）：OCR 候选 bbox 是 OXR 坐标系，融合页是 MinerU 坐标系，
+  // 绝对坐标判重失效，同一题会被补成多道；且新书的徽标题号常被 OCR 读成正文数字。
+  const isFused = existsSync(join(outDir, "fuse.json"));
   // ⚠️ 先补「OCR 读到的题号行」，再切分 —— 否则整行被上游漏掉的题根本不存在（见函数注释）
-  const injected = injectOcrQuestionLines(doc, outDir);
+  const injected = isFused ? { injected: 0, errors: [] } : injectOcrQuestionLines(doc, outDir);
   ocrInputErrors.push(...injected.errors);
-  if (injected.injected) console.log(`  OCR 补入题号行 ${injected.injected} 处（上游整行漏识别，展示层以候选样式呈现）`);
+  if (isFused) console.log("  OCR 题号补行：融合作品跳过注入（仅展示候选，防重复）");
+  else if (injected.injected) console.log(`  OCR 补入题号行 ${injected.injected} 处（上游整行漏识别，展示层以候选样式呈现）`);
   if (injected.errors.length) console.warn(`  ⚠️ OCR 题号补行输入异常：${injected.errors.join("；")}`);
   // 第二来源：整页 OCR 全文（补「墨迹被吞进更宽 bbox、items 看不见」的整行漏识别，见函数注释）
-  const full = injectOcrFullTextLines(doc, outDir);
+  const full = isFused ? { injected: 0, skipped: 0, errors: [] } : injectOcrFullTextLines(doc, outDir);
   ocrInputErrors.push(...full.errors);
   if (full.injected || full.skipped) {
     console.log(

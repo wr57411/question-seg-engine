@@ -33,7 +33,8 @@
     "gold:worksheet": "tsx scripts/gold-worksheet.ts",
     "batch": "tsx scripts/batch.ts",
     "batch:report": "tsx scripts/batch.ts --report",
-    "fuse:eval": "tsx scripts/fuse-eval.ts"
+    "fuse:eval": "tsx scripts/fuse-eval.ts",
+    "fuse:doc": "tsx scripts/fuse-doc.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

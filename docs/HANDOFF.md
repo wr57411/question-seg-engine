@@ -246,6 +246,13 @@ layout.json / content_list.json
   《教材基础练 磁场》**2→34 题**、《物理_教材基础练 电路》**13→38 题**；
   剩余 4 本待配额恢复后用 `--retry 2 --delay 3000` 补跑。全卷渲染审计两本仍分别 4/9 条
   判定项（OXR 行级 bbox 的墨迹覆盖口径与 MinerU 基线不同，需按 OXR 单独标定）。
+- **严格文本归一化（2026-10-28，`DECISIONS §63`）**：`normForScore` 先把 LaTeX 分数/根号/希腊字母
+  转成人工写法，再删空白/上下标/标点；2相互作用 pilot **S50→100**，新书小金标 **S100**。
+- **F2 融合落盘（2026-10-28，`DECISIONS §64`）**：`npm run fuse:doc -- <docId>` 把 MinerU 几何 +
+  OXR 文本写回正式 `layout.json`（备份 `layout.oxr.json`、写 `fuse.json`、meta parser=fuse），
+  并在融合页出口合并同 bbox 重复块；融合作品跳过 OCR 题号注入（坐标系不同会造重复）。
+  新书小金标：磁场 3/3、电路 4/4，均 **R100/S100/O100**；残留：待复核率 5.7%/38.2%，
+  第 4/6 页同号重复待逐页核对，批量自动双源未接线。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render:baseline && audit:numbering && bank）
 
@@ -291,7 +298,7 @@ layout.json / content_list.json
 |---|---|---|
 | `README.md` | 架构总览、核心机制、快速开始 | 主干有效；个别统计数字是历史时点值，以本文件为准 |
 | **`docs/HANDOFF.md`（本文件）** | 当前状态、风险、红线、交接动作 | 唯一的跨 Agent 入口 |
-| `docs/DECISIONS.md` | **62 条决策全记录**（§1–§62，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
+| `docs/DECISIONS.md` | **64 条决策全记录**（§1–§64，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
 | `tasks/lessons.md` | 3 条工程纪律（验收清单 / 启发式判据 / 逐块匹配） | 每条都有真实事故佐证，短小必读 |
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |

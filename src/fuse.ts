@@ -30,6 +30,8 @@ export interface FusePageStats {
   mineruOnly: number;
   /** 采用 OXR 文本但 MinerU 有较多字未在 OXR 找到（<COVERAGE_MIN）的块数，供复核 */
   lowCoverage: number;
+  /** 融合页内同 bbox/同文本重复块合并数 */
+  deduped: number;
 }
 
 export interface FuseStats {
@@ -41,6 +43,7 @@ export interface FuseStats {
   oxrOnly: number;
   mineruOnly: number;
   lowCoverage: number;
+  deduped: number;
   perPage: FusePageStats[];
   /** OXR 有、MinerU 没有的页（原型不并入） */
   oxrExtraPages: number;
@@ -499,6 +502,58 @@ function computeTrust(m: Stream, o: Stream, mRanges: (Range | null)[]): boolean[
   });
 }
 
+/** 两个 bbox 的交集 / 较小面积（1 = 完全覆盖）。 */
+function bboxOverlap(a: BBox, b: BBox): number {
+  const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
+  const iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const inter = ix * iy;
+  const areaA = Math.max(1, (a[2] - a[0]) * (a[3] - a[1]));
+  const areaB = Math.max(1, (b[2] - b[0]) * (b[3] - b[1]));
+  return inter / Math.min(areaA, areaB);
+}
+
+function textLike(b: ParsedBlock): boolean {
+  return b.kind === "text" || b.kind === "table" || b.kind === "formula";
+}
+
+/**
+ * 融合页出口去重：OXR 多段折行后会产出多个同 bbox、同文本前缀的块
+ * （电路 p1 q2 实测同一 bbox 叠了 5 个）。同 bbox（重叠 ≥0.6）+ 文本相等/前缀相似 ≥0.85
+ * 时保留文本更长的一块；全部保留 fromFusion 信息，只合并重复，不改写文本。
+ */
+function dedupeFusedBlocks(blocks: ParsedBlock[]): { blocks: ParsedBlock[]; dropped: number } {
+  const keep: ParsedBlock[] = [];
+  let dropped = 0;
+  for (const b of blocks) {
+    if (!textLike(b)) {
+      keep.push(b);
+      continue;
+    }
+    const bt = textOf(b).trim();
+    let merged = false;
+    for (let i = 0; i < keep.length; i++) {
+      const a = keep[i]!;
+      if (!textLike(a) || b.kind !== a.kind) continue;
+      if (bboxOverlap(a.bbox, b.bbox) < 0.6) continue;
+      const at = textOf(a).trim();
+      if (!at || !bt) continue;
+      const sim = at === bt ? 1 : fuseSimilarity(at, bt);
+      const prefix = at.startsWith(bt) || bt.startsWith(at);
+      if (sim < 0.85 && !prefix) continue;
+      // 保留更长的一块；等长时保留已带 fromFusion 的一块（文字来源可审计）
+      const bF = "fromFusion" in b && b.fromFusion === true;
+      const aF = "fromFusion" in a && a.fromFusion === true;
+      const bLonger = bt.length > at.length || (bt.length === at.length && bF && !aF);
+      if (bLonger) keep[i] = b;
+      dropped++;
+      merged = true;
+      break;
+    }
+    if (!merged) keep.push(b);
+  }
+  return { blocks: keep, dropped };
+}
+
 /** 页内融合：文字流字符级对齐，文字取 OXR、几何取 MinerU。 */
 function fusePage(mPage: PageInfo, oPage: PageInfo): { page: PageInfo; stats: FusePageStats } {
   const mBlocks = layoutPage(mPage).ordered.map((x: IndexedBlock) => x.block);
@@ -591,8 +646,10 @@ function fusePage(mPage: PageInfo, oPage: PageInfo): { page: PageInfo; stats: Fu
     oxrOnly++;
   }
 
+  const deduped = dedupeFusedBlocks(blocks);
+
   return {
-    page: { index: mPage.index, width: mPage.width, height: mPage.height, blocks },
+    page: { index: mPage.index, width: mPage.width, height: mPage.height, blocks: deduped.blocks },
     stats: {
       page: mPage.index,
       mineru: mPage.blocks.length,
@@ -602,6 +659,7 @@ function fusePage(mPage: PageInfo, oPage: PageInfo): { page: PageInfo; stats: Fu
       oxrOnly,
       mineruOnly,
       lowCoverage,
+      deduped: deduped.dropped,
     },
   };
 }
@@ -616,7 +674,7 @@ export function fuseDocuments(mineru: ParsedDocument, oxr: ParsedDocument): Fuse
     const op = oByPage.get(mp.index);
     if (!op) {
       pages.push(mp);
-      perPage.push({ page: mp.index, mineru: mp.blocks.length, oxr: 0, matched: 0, textChanged: 0, oxrOnly: 0, mineruOnly: mp.blocks.length, lowCoverage: 0 });
+      perPage.push({ page: mp.index, mineru: mp.blocks.length, oxr: 0, matched: 0, textChanged: 0, oxrOnly: 0, mineruOnly: mp.blocks.length, lowCoverage: 0, deduped: 0 });
       continue;
     }
     const r = fusePage(mp, op);
@@ -636,6 +694,7 @@ export function fuseDocuments(mineru: ParsedDocument, oxr: ParsedDocument): Fuse
       oxrOnly: sum("oxrOnly"),
       mineruOnly: sum("mineruOnly"),
       lowCoverage: sum("lowCoverage"),
+      deduped: sum("deduped"),
       perPage,
       oxrExtraPages: oxr.pages.length - usedOxrPages,
     },

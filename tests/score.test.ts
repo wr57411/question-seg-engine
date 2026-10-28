@@ -1,7 +1,7 @@
 // score.test.ts —— 金标准评分器的数学正确性（纯函数，不依赖 data/）。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { scoreQuestions, type GoldDoc } from "../scripts/score.js";
+import { normForScore, scoreQuestions, type GoldDoc } from "../scripts/score.js";
 import type { Question } from "../src/types.js";
 
 function mkQ(
@@ -65,4 +65,12 @@ test("scoreQuestions：部分金标准不算 precision/autoPass，仍算匹配�
   assert.equal(r.precision, null);
   assert.equal(r.optionCompleteness, 0.5);
   assert.equal(r.autoPass, false);
+});
+
+test("normForScore：LaTeX 等价形式与人工纯文本可比较", () => {
+  assert.equal(normForScore("$I = \\frac { n _ { 1 } e } { t }$"), "i=n1e/t");
+  assert.equal(normForScore("$\\frac{\\sqrt{3}}{3}B_{0}$"), "√3/3b0");
+  assert.equal(normForScore("$\\sin37^{\\circ}=0.6$"), "sin37°=06");
+  assert.equal(normForScore("$5\\times10^{18}$"), "5×1018");
+  assert.equal(normForScore("$1.6\\times10^{-19}\\,\\text{C}$"), "16×10-19c");
 });
