@@ -100,6 +100,15 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
       n.title = `OCR 补入行（非引擎原文，请核对）：${n.title}`;
     }
   });
+  // `correction: true` 的块经过**人工已核对的上游错误修正**（`corrections/<docId>.json`）：
+  // 可能是「替换」（字母 O 被读成 0）或「补入」（漏读的图注）。用**琥珀虚线框**与
+  // OCR 候选的青绿框区分开 —— 审阅时必须一眼看出哪块不是上游原文（见 DECISIONS §47）。
+  nodes.forEach((n, i) => {
+    if (n && p.blocks[i] && p.blocks[i].correction) {
+      if (candidateStyle) n.classList.add("blk-corrected");
+      n.title = `人工已核对修正（上游错读/漏读，依据 corrections/）：${n.title}`;
+    }
+  });
   nodes.forEach((n, i) => {
     if (n) n.dataset.bi = String(i); // 块索引 = p.blocks 下标（stages.json 的 i）
   });

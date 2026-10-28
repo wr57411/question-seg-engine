@@ -345,6 +345,10 @@ export function buildStageSnapshot(
         text: clip(b.kind === "image" ? "[图片]" : b.kind === "formula" ? b.latex : b.text, BLOCK_TEXT_LIMIT),
         ...(b.kind === "image" ? { img: b.path } : {}),
         ...(b.kind === "text" && b.fromOcr ? { ocr: true } : {}),
+        // 人工已核对的上游错误修正（corrections/<docId>.json，见 DECISIONS §47）：
+        // 快照带 `correction` 标记，展示层用**琥珀虚线框**区分 —— 审阅者要能一眼看出
+        // "这块不是上游原文，是被改过的"（与 OCR 候选的青绿框区分开）。
+        ...(b.kind === "text" && b.fromCorrection ? { correction: true } : {}),
       })),
       order: layout.ordered.map((e) => e.index),
       questions: questionsByPage.get(page.index) ?? [],
