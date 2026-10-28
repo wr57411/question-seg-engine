@@ -1,0 +1,182 @@
+{
+  "docId": "23必刷题 4 曲线运动",
+  "generatedAt": "2026-10-28T06:22:17.761Z",
+  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "counts": {
+    "replace": 3,
+    "insert": 11,
+    "total": 14
+  },
+  "items": [
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        105.2,
+        414.4,
+        116.9,
+        424.7
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        179.3,
+        414.9,
+        190.3,
+        424.6
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "丙",
+      "bbox": [
+        253.4,
+        415,
+        264.9,
+        424.9
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 4,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        369.2,
+        575,
+        381,
+        586.6
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 4,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        486.7,
+        575.8,
+        497.9,
+        586.7
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        366.9,
+        641.1,
+        377.6,
+        650.8
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        476.6,
+        641.4,
+        487.3,
+        652
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 7,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        349.8,
+        684.4,
+        359.8,
+        694.4
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 7,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        458.9,
+        684.2,
+        470.3,
+        695.7
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 10,
+      "kind": "replace",
+      "blockText": "盘绕经过盘心0点的水平轴在竖直平面内匀",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 11,
+      "kind": "replace",
+      "blockText": "绳一端固定在斜面上的0点，另一端连着一",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 13,
+      "kind": "replace",
+      "blockText": "个过程所用时间为$t _ { 2 }$0点到竖直平面MN、P",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 13,
+      "kind": "insert",
+      "text": "图1",
+      "bbox": [
+        119.2,
+        333.7,
+        132.2,
+        342.9
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 13,
+      "kind": "insert",
+      "text": "图2",
+      "bbox": [
+        202.3,
+        333.7,
+        215.6,
+        342.8
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "docId": "23必刷题 光学",
+  "generatedAt": "2026-10-28T06:22:17.788Z",
+  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "counts": {
+    "replace": 0,
+    "insert": 2,
+    "total": 2
+  },
+  "items": [
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        371.9,
+        282.5,
+        383.1,
+        292.8
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        472.7,
+        282.7,
+        483.8,
+        293.8
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    }
+  ]
+}

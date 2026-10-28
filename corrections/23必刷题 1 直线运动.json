@@ -1,0 +1,177 @@
+{
+  "docId": "23必刷题 1 直线运动",
+  "generatedAt": "2026-10-28T06:22:17.741Z",
+  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "counts": {
+    "replace": 1,
+    "insert": 12,
+    "total": 13
+  },
+  "items": [
+    {
+      "page": 4,
+      "kind": "replace",
+      "blockText": "体从0点由静止开始做匀加速直线运动，途经",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        130.2,
+        350.3,
+        143.8,
+        362.3
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        251.7,
+        350.8,
+        264.9,
+        363.2
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        115.6,
+        672.4,
+        127.7,
+        683.7
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 6,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        222.2,
+        672.4,
+        234.6,
+        684.1
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        368.2,
+        252.2,
+        380.2,
+        263.2
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        475.3,
+        253,
+        486.9,
+        264.4
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        124.2,
+        624,
+        136.1,
+        634.6
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        205,
+        624.6,
+        217.5,
+        635.7
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        368.8,
+        261.9,
+        379.8,
+        271.6
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 11,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        485.3,
+        262.5,
+        496,
+        271.9
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 12,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        116.2,
+        314,
+        129.5,
+        326.2
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 12,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        222.8,
+        314.3,
+        236.1,
+        326.1
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    }
+  ]
+}

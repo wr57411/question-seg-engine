@@ -1,0 +1,103 @@
+{
+  "docId": "动量守恒定律23必刷题",
+  "generatedAt": "2026-10-28T06:22:17.806Z",
+  "basis": "两源交叉核对（scripts/oxr-crosscheck.ts）+ 逐条回原卷核对（docs/oxr-evaluation.md §4.7/§4.9/§4.11）。只收录已核对项；未经核对的候选不得进入本清单。",
+  "counts": {
+    "replace": 0,
+    "insert": 7,
+    "total": 7
+  },
+  "items": [
+    {
+      "page": 1,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        374.9,
+        355.8,
+        386.3,
+        364.8
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 1,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        465.4,
+        355.5,
+        476.1,
+        365.9
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        124.6,
+        246.6,
+        136.1,
+        256.7
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 2,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        230.6,
+        247.2,
+        241.3,
+        257.4
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        107.8,
+        762.1,
+        119.4,
+        773.4
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 5,
+      "kind": "insert",
+      "text": "乙",
+      "bbox": [
+        228.1,
+        762.8,
+        239.7,
+        773.4
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    },
+    {
+      "page": 9,
+      "kind": "insert",
+      "text": "甲",
+      "bbox": [
+        332.5,
+        191,
+        343.3,
+        200.9
+      ],
+      "verified": true,
+      "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
+    }
+  ]
+}

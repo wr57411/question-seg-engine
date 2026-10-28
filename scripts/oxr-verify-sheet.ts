@@ -100,7 +100,13 @@ for (const doc of targets) {
     idx++;
     if (idx < FROM || idx > TO) continue;
     const got = bboxOf(doc, it);
-    const pagePng = join("data", "out", doc, "pages", `page-${String(it.page).padStart(2, "0")}.png`);
+    // 页图命名两种都有：多数卷 `page-01.png`（补零），`光学` 是 `page-1.png`（不补零）
+    const pageDir = join("data", "out", doc, "pages");
+    const pagePng =
+      [
+        join(pageDir, `page-${String(it.page).padStart(2, "0")}.png`),
+        join(pageDir, `page-${it.page}.png`),
+      ].find(existsSync) ?? join(pageDir, `page-${String(it.page).padStart(2, "0")}.png`);
     let img = "";
     let note = "";
     if (!got) {
