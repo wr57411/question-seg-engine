@@ -1,6 +1,6 @@
 # 切片决策记录（DECISIONS）
 
-> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§55，按时间序；顶部有索引）。
+> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§56，按时间序；顶部有索引）。
 > 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](HANDOFF.md)**；通用约定见 **[AGENTS.md](../AGENTS.md)**。
 
 垂直演进模型的两份交付物：可运行的骨架代码 + 本决策记录。
@@ -58,6 +58,7 @@
 | 53 | **全卷渲染审计 `audit:render:all`**：诊断命令；9 卷仅默认卷通过 | 2026-10-28 |
 | 54 | **展示层解耦门**：自动扫描 viewer/stages/final 的 `../src/` import | 2026-10-28 |
 | 55 | **OCR 环境可配置 + 失败可见**：`UVX_BIN` 覆盖；`meta.ocrError`/`source.ocr=failed` | 2026-10-28 |
+| 56 | **非基线卷 LaTeX 命令覆盖 + 全卷审计入 check**：8/8 通过 | 2026-10-28 |
 
 ## 1. 公式指标修正：语义正确率替代可编译率
 
@@ -2654,7 +2655,7 @@ vs 公式 x69–179）。绿框此前画在 `win` 上 ⇒ 边框压到公式；�
 
 **验证**：`node scripts/audit-render-all.mjs` → 9 卷 / 通过 1 / 失败 8；`npm run check` 仍 278/278。
 
-**状态**：已实现（诊断）；全卷入门前需逐卷清理/标定（未完成）。
+**状态**：已实现（诊断）。**2026-10-28 后续**：8 卷清零后已入 `check`（见 §56）；合订本默认排除。
 
 ## 54. 展示层解耦门：自动扫描 `../src/` import（2026-10-28）
 
@@ -2690,3 +2691,28 @@ CSS/HTML 的 `<script src>` 不由本门覆盖（展示层是 ESM 直接加载�
 代码审查 + 单测，未在真实失败进程上实测。
 
 **状态**：已实现（路径/状态）；端到端失败注入未做。
+
+## 56. 非基线卷 LaTeX 命令覆盖 + 全卷审计入 check（2026-10-28）
+
+**背景**：`audit:render:all` 首跑 9 卷仅默认卷通过；8 卷失败在 ~20 个未覆盖 LaTeX 命令
+（`\mathbb`/`\begin`/`\tilde`/`\sharp`/`\mathbin`/`\underset` …）以及 raw/discarded 的
+残留花括号/反斜杠（最终页 blocks 多数干净）。
+
+**决策**：
+1. **渲染器补命令**（`stages/latex-display.js`）：补 `\mathbb/\mathfrak/\mathscr/\mathtt/\bf/\sf/\cal/
+   \tiny/\scriptscriptstyle`、`\begin/\end` 环境（含 array/tabular 列格式）、`\tilde/\dot/\ddot`、
+   `\underset/\overset/\stackrel`、`\mathbin/\nonumber`、`\sharp/\flat/\natural/\ddagger/
+   \ngeq/\gtrless/\vert/\boxtimes/\pounds/\rfloor/\backslash/\jmath/\arctan` 等；
+   只影响显示，不改数据。
+2. **审计源域收窄**：`残留反斜杠/花括号` 只对 **blocks（最终页）** 判红；raw/discarded 是 stages
+   原料视图的上游残留，降为提示（不改变「最终页不得有残留」的判定）。
+3. **合订本排除**：`audit:render:all` 默认只审 8 个 MinerU 卷；`答案册-合订本`（187 页）基线不同，
+   需 `--include-combined` 显式纳入。
+4. **全卷入 check**：`npm run check` 的 `audit:render` 改为 `audit:render:all`；单卷命令保留调试。
+
+**验证（2026-10-28）**：8 卷 **8/8 通过**；`npm run check` **282/282**；`bank:all` **420**；
+`audit:numbering` 基线 5；新增渲染回归测试覆盖上述命令/环境。
+
+**残留**：`audit-numbering` 仍只审 2 卷（基线单卷标定）；CI 未做；合订本需单独标定。
+
+**状态**：已实现。

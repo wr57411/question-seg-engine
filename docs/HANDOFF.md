@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **281 例** + audit:render + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **282 例** + audit:render:all + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **420 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -213,16 +213,16 @@ layout.json / content_list.json
   `--allow-missing` 才显式跳过并打印“未审计”。新 worktree/无 data 时 check 会红（不再假绿），
   先接 `data/` 或 `npm run daily` 生成。
 
-- **全卷渲染审计诊断（2026-10-28，`DECISIONS §53`）**：`npm run audit:render:all` 自动发现
-  **9 卷**（跳过 `-OXR`），仅默认卷通过；其余 **8 卷失败在残留花括号 / 未覆盖 LaTeX 命令**
-  （3卷：2+3），是真问题，不是单卷基线误报。暂为诊断命令，未入 `check`；见 §6-21。
-  逐卷清理/按卷标定后再考虑纳入门。
+- **全卷渲染审计已入 check（2026-10-28，`DECISIONS §56`）**：`audit:render:all` 默认审
+  **8 个 MinerU 卷**（跳过 `-OXR` 与合订本；`--include-combined` 可选），**8/8 通过**；
+  `npm run check` 已改为调用它。残留反斜杠/花括号只对 blocks（最终页）判红，raw/discarded 降为提示；
+  合订本（187 页）默认排除。
 
 - **OCR 环境可配置（2026-10-28，`DECISIONS §55`）**：`scripts/ocr-lib.ts` 的 uvx 路径支持
   `UVX_BIN` 覆盖；`daily` OCR 失败写 `meta.ocrError` + `source.ocr:"failed"` + `health.issues`，
   不再只留 skipped。测试 `tests/ocr-env.test.ts`；check 281/281。
 
-### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
+### 质量门（`npm run check` = typecheck && test && audit:render:all && audit:numbering && bank）
 
 - **判定项 vs 提示项分离**：机器能确定的对错才计入退出码（G8）；被构造保证的不变量不判（死门防范）。
 - 现有判定项：字号保真度（可判块中位 ratio ∈ [0.93,1.07]）、即时重复折叠数、题号审计
@@ -457,11 +457,11 @@ layout.json / content_list.json
     #2 41→10 块、#3 31 块；答案册 166→**167 题**。修正条目进 `corrections/`，可审计、删文件即回滚。
     ⚠️ 这例说明：在答案册上 OXR 的题号切分并非处处弱于 MinerU，§2「排版精度不及」须理解为
     整体观感/公式精度，不涵盖题号切分；交叉核对时**两源互有胜负**，勿预设某源必胜。
-21. **非基线卷渲染审计未过（2026-10-28，`audit:render:all`，诊断）**：
-    9 卷（8 个 MinerU 卷 + 答案册合订本）仅默认卷通过；其余 **8 卷**失败在
-    **残留花括号 / 未覆盖的 LaTeX 命令**（如 3卷 2+3）。字号保真度、重复折叠、墨迹覆盖率多数通过
-    ⇒ 不是单卷基线误报，是非基线卷的真实渲染问题。`npm run audit:render:all` 已提供（诊断，
-    未入 `check`）；逐卷清理残留 LaTeX 或按卷标定后再考虑纳入门。**未修**。
+21. **非基线卷渲染审计未过（已修，2026-10-28；`audit:render:all` 已入 check）**：
+    首跑 9 卷仅默认卷通过；失败为 ~20 个未覆盖命令（`\mathbb`/`\begin`/`\tilde`/`\sharp`/…）+
+    raw/discarded 残留花括号/反斜杠。修法：渲染器补命令（环境/字体/重音/符号）；审计只对 blocks 判残留，
+    raw/discarded 降提示；合订本默认排除（187 页，基线不同）。现 **8/8 通过**；
+    `npm run check` 调用 `audit:render:all`。见 `DECISIONS §56`。
 22. **OCR 运行环境硬编码 / 失败不可见（已修，2026-10-28）**：`scripts/ocr-lib.ts` 的 uvx 路径
     改由 `UVX_BIN` 覆盖（默认保留本机路径）；`daily` OCR 失败写 `meta.ocrError`、
     `source.ocr:"failed"` 与 `health.issues`，`short` 显示「OCR 失败」；不再只剩 skipped。

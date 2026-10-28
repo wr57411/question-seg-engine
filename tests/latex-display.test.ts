@@ -273,3 +273,22 @@ test("prettifyLatex：LaTeX 段内 `~` 是不换行空格，还原为空格", ()
 test("prettifyLatex：同一块内既有公式又有区间号时，两者各按各的规则", () => {
   assert.equal(stripTags(prettifyLatex("必刷考点T3~5 与 $2~\\mathrm{N}$ 的力")), "必刷考点T3~5 与 2 N 的力");
 });
+
+
+test("新增命令覆盖：环境/字体/重音/符号不再裸奔（2026-10-28）", () => {
+  const cases: [string, string][] = [
+    ["$\\tilde{x}+\\dot{y}$", "x"],
+    ["$\\mathbb{R}\\mathbb{N}$", "ℝ"],
+    ["$\\begin{array}{cc}a&b\\end{array}$", "a"],
+    ["$\\mathfrak{g}+\\mathtt{x}+\\smash{y}$", "g"],
+    ["$\\ell\\mid\\AA\\lrcorner\\surd\\arcsin\\land\\exists\\emptyset\\not\\upsilon$", "ℓ"],
+    ["$\\sharp\\flat\\natural\\ddagger\\ngeq\\gtrless\\vert\\boxtimes\\pounds\\rfloor\\backslash\\jmath$", "♯"],
+    ["$\\underset{a}{b}+\\overset{c}{d}$", "b"],
+  ];
+  for (const [src, needle] of cases) {
+    const out = prettifyLatex(src);
+    assert.ok(out.includes(needle), `${src} -> ${out}`);
+    assert.ok(!out.includes("\\"), `${src} 仍有反斜杠：${out}`);
+    assert.ok(!out.includes("{") && !out.includes("}"), `${src} 仍有花括号：${out}`);
+  }
+});

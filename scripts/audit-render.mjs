@@ -280,7 +280,16 @@ const fidelityFail =
 // 每节带 fatal 标志：false = 提示级，只展示不计入退出码
 const sections = [];
 for (const [name] of OUT_PATTERNS) {
-  sections.push([name, outHits[name], true]);
+  if (name === "残留反斜杠" || name === "残留花括号") {
+    // 最终页只画 blocks；raw/discarded 是 stages 的「原料」视图，里面的上游残留
+    // 不应把最终页判红（2026-10-28：3卷/机械能 raw 花括号、4曲线 raw 反斜杠）。
+    const rendered = outHits[name].filter((h) => h.src === "blocks");
+    const others = outHits[name].filter((h) => h.src !== "blocks");
+    sections.push([`${name}（blocks）`, rendered, true]);
+    if (others.length) sections.push([`${name}（raw/discarded，提示）`, others, false]);
+  } else {
+    sections.push([name, outHits[name], true]);
+  }
 }
 sections.push(["选项粘连未分隔", stuckOptions, true]);
 sections.push(["未覆盖的 LaTeX 命令", [...unknownCmds.entries()].map(([c, n]) => ({ shown: `\\${c} ×${n}` })), true]);

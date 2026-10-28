@@ -16,7 +16,7 @@
     "audit:render": "node scripts/audit-render.mjs",
     "test": "node --import tsx --test \"tests/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run audit:render && npm run audit:numbering && npm run bank:all",
+    "check": "npm run typecheck && npm test && npm run audit:render:all && npm run audit:numbering && npm run bank:all",
     "stages:ocr-fill": "tsx scripts/ocr-fill.ts",
     "stages:ocr-page": "tsx scripts/ocr-page-fill.ts",
     "audit:numbering": "tsx scripts/audit-numbering.ts",

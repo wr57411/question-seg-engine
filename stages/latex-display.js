@@ -25,7 +25,7 @@ const GREEK = {
   Sigma: "Σ", tau: "τ", phi: "φ", Phi: "Φ", varphi: "φ",
   chi: "χ", psi: "ψ", omega: "ω", Omega: "Ω",
   Gamma: "Γ", vartheta: "ϑ", varepsilon: "ε", varsigma: "ς", varkappa: "ϰ", varrho: "ϱ",
-  Xi: "Ξ", Upsilon: "Υ",
+  Xi: "Ξ", Upsilon: "Υ", upsilon: "υ",
   varGamma: "Γ", varDelta: "Δ", varTheta: "Θ", varLambda: "Λ",
   varXi: "Ξ", varPi: "Π", varSigma: "Σ", varUpsilon: "Υ",
   varPhi: "Φ", varPsi: "Ψ", varOmega: "Ω",
@@ -45,6 +45,11 @@ const SYMBOL = {
   oplus: "⊕", ominus: "⊖", otimes: "⊗", top: "⊤", bot: "⊥",
   sin: "sin", cos: "cos", tan: "tan", cot: "cot", log: "log", ln: "ln",
   max: "max", min: "min", circ: "°", square: "□", triangle: "△",
+  ell: "ℓ", mid: "|", AA: "Å", lrcorner: "⌟", surd: "√", arcsin: "arcsin",
+  land: "∧", exists: "∃", emptyset: "∅", not: "¬",
+  sharp: "♯", flat: "♭", natural: "♮", ddagger: "‡", ngeq: "≱", gtrless: "≷",
+  vert: "|", boxtimes: "⊠", pounds: "£", rfloor: "⌋", backslash: "∖",
+  jmath: "ȷ", arctan: "arctan",
 };
 
 /** 命令后紧跟的花括号参数按内容展开、本身不显示（字体包装/上划线等） */
@@ -53,6 +58,8 @@ const UNWRAP = new Set([
   "overline", "bar", "underline", "vec", "hat", "widetilde", "widehat",
   "overrightarrow", "overleftarrow", "operatorname", "textrm", "textbf",
   "textit", "mathsf", "texttt", "mbox", "textnormal",
+  "mathscr", "mathfrak", "mathtt", "bf", "sf", "cal", "tiny", "scriptscriptstyle", "boxed",
+  "smash", "tilde", "dot", "ddot",
 ]);
 
 /** 无参数、直接丢弃的命令（纯排版指令，非内容） */
@@ -60,6 +67,7 @@ const DROP_CMD = new Set([
   "displaystyle", "textstyle", "scriptstyle", "limits", "nolimits",
   "quad", "qquad", "thinspace", "enspace", "mathstrut", "strut",
   "left", "right", "big", "Big", "bigg", "Bigg",
+  "mathbin", "nonumber", "notag",
 ]);
 
 /** 参数非内容、需连参数一并丢弃的命令（否则 "red" 之类会裸奔） */
@@ -68,6 +76,11 @@ const DROP_WITH_ARG = new Set([
   "phantom", "hphantom", "vphantom",
 ]);
 
+/** 需要专门分支的命令（环境/黑板粗体）：不在 UNWRAP 里按普通单参数处理。 */
+const CUSTOM = new Set(["begin", "end", "mathbb", "underset", "overset", "stackrel"]);
+/** 黑板粗体常用数集；其余字母退化为普通字母（只影响显示，不改数据）。 */
+const MATHBB = { R: "ℝ", N: "ℕ", Z: "ℤ", Q: "ℚ", C: "ℂ", P: "ℙ" };
+
 /**
  * 渲染器已知命令集。两个用途：
  * ① parseCommand 用它做「最长已知前缀」回退（MinerU 常把 "\theta B" 写成 "\thetaB"）；
@@ -75,7 +88,7 @@ const DROP_WITH_ARG = new Set([
  *    因为它们已被丢弃、不留痕迹，所以必须在输入端查。
  */
 export const KNOWN_COMMANDS = new Set([
-  ...Object.keys(GREEK), ...Object.keys(SYMBOL), ...UNWRAP, ...DROP_CMD, ...DROP_WITH_ARG,
+  ...Object.keys(GREEK), ...Object.keys(SYMBOL), ...UNWRAP, ...DROP_CMD, ...DROP_WITH_ARG, ...CUSTOM,
   "frac", "dfrac", "tfrac", "sqrt",
 ]);
 
@@ -195,6 +208,36 @@ function desugar(s) {
       if (name === "sqrt") {
         const a = parseArg(s, cmd.end);
         if (a) { out += `<span class="sqrt">√<span class="rad">${desugar(a.text)}</span></span>`; i = a.end; continue; }
+      }
+      if (name === "begin" || name === "end") {
+        // 环境：吃掉 \begin{env} / \end{env}；array/tabular 再吃掉列格式 {cc}
+        const env = parseArg(s, cmd.end);
+        let j = env ? env.end : cmd.end;
+        if (name === "begin" && env) {
+          const envName = env.text.trim();
+          if (envName === "array" || envName === "tabular") {
+            const spec = parseArg(s, j);
+            if (spec) j = spec.end;
+          }
+        }
+        i = j;
+        continue;
+      }
+      if (name === "mathbb") {
+        const a = parseArg(s, cmd.end);
+        if (a) {
+          const key = a.text.trim();
+          out += MATHBB[key] ?? desugar(a.text);
+          i = a.end;
+          continue;
+        }
+      }
+      if (name === "underset" || name === "overset" || name === "stackrel") {
+        // 两参数装饰：渲染基座（第二个参数）；上方/下方的小字只作可读性退化，不丢基座。
+        const a = parseArg(s, cmd.end);
+        const b = a ? parseArg(s, a.end) : null;
+        if (a && b) { out += desugar(b.text); i = b.end; continue; }
+        if (a) { out += desugar(a.text); i = a.end; continue; }
       }
       if (UNWRAP.has(name)) {
         const a = parseArg(s, cmd.end);

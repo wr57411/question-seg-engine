@@ -13,12 +13,14 @@ import { join } from "node:path";
 
 const ROOT = process.cwd();
 const INCLUDE_OXR = process.argv.includes("--include-oxr");
+const INCLUDE_COMBINED = process.argv.includes("--include-combined");
 const outRoot = join(ROOT, "data", "out");
 const docs = readdirSync(outRoot, { withFileTypes: true })
   .filter((e) => e.isDirectory())
   .map((e) => e.name)
   .filter((name) => existsSync(join(outRoot, name, "stages.json")))
   .filter((name) => INCLUDE_OXR || !name.endsWith("-OXR"))
+  .filter((name) => INCLUDE_COMBINED || name !== "答案册-合订本")
   .sort((a, b) => a.localeCompare(b, "zh"));
 
 if (docs.length === 0) {
