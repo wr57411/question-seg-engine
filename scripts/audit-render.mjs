@@ -68,17 +68,26 @@ import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediat
 import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasTwoDimensionalMath, renderedTextOf, clampByWidth } from "../stages/font-metrics.js";
 import { crossBlockMerges } from "../stages/block-dedup.js";
 
-const docId = process.argv[2] ?? "23必刷题 2相互作用";
+const ARGS = process.argv.slice(2);
+const ALLOW_MISSING = ARGS.includes("--allow-missing");
+const docArg = ARGS.find((a) => !a.startsWith("--"));
+const docId = docArg ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
 
 let snap;
 try {
   snap = JSON.parse(readFileSync(SNAP, "utf8"));
 } catch {
-  // 快照是运行时产物（data/ 不入库）：新克隆环境没有它，跳过而非报错，
-  // 这样本脚本可以安全接入 npm run check。
-  console.log(`渲染审计：跳过（未找到快照 ${docId}，先运行 npm run stages:export）`);
-  process.exit(0);
+  // 快照是运行时产物（data/ 不入库）。**缺快照 ≠ 通过**：
+  // 旧实现 exit 0，会让 npm run check 在「渲染审计从未运行」时显示全绿（假绿）。
+  // 现在默认 exit 2；离线/无 data 的场景必须显式加 --allow-missing，且打印「未审计」。
+  const msg = `渲染审计：未找到快照 ${docId}（先运行 npm run stages:export）`;
+  if (ALLOW_MISSING) {
+    console.log(`${msg}；--allow-missing 显式跳过（本次未审计 = 未通过）`);
+    process.exit(0);
+  }
+  console.error(`${msg} —— 渲染审计未运行，不能当通过（离线跳过请显式加 --allow-missing）`);
+  process.exit(2);
 }
 
 /** 输出端可疑模式（语法干净但语义可疑） */

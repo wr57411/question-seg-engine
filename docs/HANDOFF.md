@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-28
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **276 例** + audit:render + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **278 例** + audit:render + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **420 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -202,12 +202,16 @@ layout.json / content_list.json
 - **修正层可信度显式化（2026-10-28，`DECISIONS §48`，提交 `20fc07c`）**：`corrections/` 185 条中 **6 条 `disabled`**、**57 条应用且 `verified:false`**
   （body-hole 正文补行）**仍应用**，但导出日志、`stages.json.corrections.unverified` 与
   `meta.stats.correctionsUnverified` 都会显示；OCR 输入文件“存在但读不动”写 `ocrInputErrors` 与体检告警，
-  不再静默跳过（文件缺失仍是合法状态）。质量门 **276/276**；实跑 2相互作用：14 条未核对、0 条 OCR 输入错误。
+  不再静默跳过（文件缺失仍是合法状态）。质量门 **278/278**；实跑 2相互作用：14 条未核对、0 条 OCR 输入错误。
 
 - **依赖补齐（2026-10-28，`undici@8.12.3`）**：`scripts/real-pipeline.ts` 的 MinerU 代理 transport
   依赖 `undici`；此前靠用户级 `/Users/john/node_modules/undici` 解析，换机/干净安装会在加载时报
   `ERR_MODULE_NOT_FOUND`。现进 `devDependencies`，`import.meta.resolve("undici")` 指向项目内；
-  `npm run check` 276/276。日常 `npm run daily` 不再依赖全局包。
+  `npm run check` 278/278。日常 `npm run daily` 不再依赖全局包。
+
+- **渲染审计缺数据不再假绿（2026-10-28，`DECISIONS §52`）**：`audit:render` 缺快照默认 `exit 2`；
+  `--allow-missing` 才显式跳过并打印“未审计”。新 worktree/无 data 时 check 会红（不再假绿），
+  先接 `data/` 或 `npm run daily` 生成。
 
 ### 质量门（`npm run check` = typecheck && test && audit:render && audit:numbering && bank）
 
@@ -432,7 +436,7 @@ layout.json / content_list.json
       - **已处理（2026-10-28）**：6 条重复加 `disabled:true` + 原因，**停用未删**（`DECISIONS §51`）；
         应用且未核对降至 **57 条**；3卷 p2 A 选项两条保留启用。
     ⚠️ 禁止机械自动删条目；删/禁用须逐条批准。
-    现已在导出/体检中显式计数（`DECISIONS §48`）；但这 63 条仍未逐条核对，抽查前不得当成已核对。
+    现已在导出/体检中显式计数（`DECISIONS §48`）；但这 63 条中 6 条 disabled、57 条应用且未核对，抽查前不得当成已核对。
 20. **答案册 p18 MinerU 漏切 #3（已修，2026-10-28；上游解析质量问题，`feature/oxr` 暴露）**：
     原实跑 MinerU p18 题号 `["6","7","1","2"]`（缺 #3），OXR `["6","7","1","2","3"]`（切对）。
     复核发现**不是整行缺失**：MinerU 已有半行 `1 m/s² (2) 5 m (3)`（block i=45），只缺
@@ -446,10 +450,10 @@ layout.json / content_list.json
 
 1. 读根目录 `AGENTS.md` → 本文件 → `README.md`。需要设计/口径依据时再按 §4 取 `DECISIONS.md` 对应章节。
 2. `npm install && npm run check` —— **必须全绿才能动手**；不绿先修门，勿带病开发。
-   ⚠️ **新建/换 worktree 时门会红 2 例**（`tests/contract*.test.ts` 读
-   `data/out/23必刷题 2相互作用/questions.json`）：`data/` 是 git 忽略的运行时产物，
-   新 worktree 里没有。不是代码缺陷 —— 把已有产物接过来即可（软链或复制整个 `data/`），
-   或用 `npm run daily` 重新生成。判据：这 2 例之外的任何红都是真红。
+   ⚠️ **新建/换 worktree 时门会红 2 例 contract + audit:render**（`tests/contract*.test.ts` 读
+   `data/out/23必刷题 2相互作用/questions.json`；`audit:render` 缺快照现在默认 `exit 2`，见 §52）：
+   `data/` 是 git 忽略的运行时产物，新 worktree 里没有。不是代码缺陷 —— 把已有产物接过来即可
+   （软链或复制整个 `data/`），或用 `npm run daily` 重新生成。判据：这 3 类之外的任何红都是真红。
 3. 先看**成品页**（`npm run view` → `/final/?doc=<docId>`）：这就是交付物的样子，
    逐页按原坐标重建、像翻原版书。再看 `npm run stages` 的**对比模式**
    （`?doc=第二章相互作用-答案与解析`）对照原卷页图看 5 分钟——建立「这套系统现在长什么样」的直觉。
