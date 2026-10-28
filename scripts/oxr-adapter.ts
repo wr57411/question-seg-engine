@@ -23,6 +23,11 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+// 折行宽度必须与展示层**同一把尺子**：展示层的 clampByWidth 用的就是
+// `emWidthOf(renderedTextOf(text))`。各自估算（我原先用 CJK 1em / ASCII 0.55em 平均）
+// 必然对不齐 ⇒ 文字横向冲出栏外、压到纸边（实测 p01 右栏）。
+// emWidthOf 是逐字实测的 ASCII 推进表；renderedTextOf 会先把 LaTeX 渲染成符号再量。
+import { emWidthOf, renderedTextOf } from "../stages/font-metrics.js";
 
 /** 试卷纸宽（pt）。与 MinerU layout.json 的 page_size[0] 同口径；150dpi 光栅 1243px ⇒ 596pt */
 const A4_WIDTH_PT = 596;
@@ -100,23 +105,41 @@ function scaleOf(w: number): number {
 }
 
 /**
- * 字符等效宽度（em）：CJK / 全角标点 1.0，ASCII 0.55，空格 0.3。
- * 用来在「没有行级 bbox」时把文本折成物理行 —— 只能用估算，所以下面会迭代自校正。
+ * 字符等效宽度（em）：直接复用展示层 `emWidthOf`（逐字实测表），不自己拍系数。
  */
-function charEm(ch: string): number {
-  const c = ch.codePointAt(0) ?? 32;
-  if (c === 32) return 0.3;
-  if (c < 128) return 0.55;
-  return 1;
+function emOf(s: string): number {
+  return emWidthOf(renderedTextOf(s));
 }
 
-function textEm(s: string): number {
-  let t = 0;
-  for (const ch of s) t += charEm(ch);
-  return t;
+/**
+ * 切成"不可分割"的折行单元。
+ * ⚠️ `$...$` 必须整体算一个 token —— 第一版逐字符折行，切点落在公式中间时
+ * 前导 `$` 被分到上一行，公式失去配对 ⇒ `prettifyLatex` 不进入数学模式 ⇒
+ * 页面直接显示 `\theta`、`\frac{kR}{mg}` 源码（实测 p01「θ应满足」那行）。
+ * 上游原始响应里 `$` 是**全部配对**的（120 块 0 例外），劈开是折行造成的。
+ * 公式宽度按**渲染后文本**量（`renderedTextOf` 会剥掉 `\frac` 等命令的源码体积）。
+ */
+function tokenizeByWidth(text: string): { s: string; em: number }[] {
+  const toks: { s: string; em: number }[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i] ?? "";
+    if (ch === "$") {
+      const j = text.indexOf("$", i + 1);
+      if (j > i) {
+        const seg = text.slice(i, j + 1);
+        toks.push({ s: seg, em: Math.max(1, emOf(seg)) });
+        i = j + 1;
+        continue;
+      }
+    }
+    toks.push({ s: ch, em: Math.max(0.1, emOf(ch)) });
+    i++;
+  }
+  return toks;
 }
 
-/** 按估算宽度把文本折成物理行（保留原有 \n 的强制分段） */
+/** 按渲染宽度把文本折成物理行（保留原有 \n 的强制分段；公式整体不可分） */
 function wrapByWidth(text: string, widthPt: number, fontSize: number): string[] {
   const out: string[] = [];
   for (const para of text.split("\n")) {
@@ -124,14 +147,14 @@ function wrapByWidth(text: string, widthPt: number, fontSize: number): string[] 
     if (t.length === 0) continue;
     let cur = "";
     let w = 0;
-    for (const ch of t) {
-      const cw = charEm(ch) * fontSize;
+    for (const tok of tokenizeByWidth(t)) {
+      const cw = tok.em * fontSize;
       if (w + cw > widthPt && cur.length > 0) {
         out.push(cur);
         cur = "";
         w = 0;
       }
-      cur += ch;
+      cur += tok.s;
       w += cw;
     }
     if (cur.length > 0) out.push(cur);
@@ -219,7 +242,7 @@ for (const [pageIdx, page] of pages.entries()) {
     //   em总数 × 字号 / 块宽 = 行数 = 块高 / (行高比 × 字号)  ⇒  字号² = 块高×块宽/(行高比×em总数)
     const blockHPt = Math.max(bbox[3] - bbox[1], 1);
     const blockWPt = Math.max(bbox[2] - bbox[0], 1);
-    const emTotal = Math.max(textEm(text.replace(/\s+/g, " ").trim()), 1);
+    const emTotal = Math.max(emOf(text.replace(/\s+/g, " ").trim()), 1);
 
     let fontSize = Math.sqrt((blockHPt * blockWPt) / (LINE_HEIGHT_RATIO * emTotal));
     fontSize = Math.min(36, Math.max(5, fontSize));
@@ -231,22 +254,22 @@ for (const [pageIdx, page] of pages.entries()) {
     const lineH = blockHPt / lineCount;
     fontSamples.push(fontSize);
 
-    const lines: OutLine[] = segments.map((seg, i) => {
-      // ⚠️ line 的 bbox 是**墨迹框**不是行距框：展示层拿 bbox 高度当字号用
-      // （HANDOFF §5-9：CJK 墨迹高 ≈ 1em）。第一版这里给的是行高（1.45×字号），
-      // 结果渲染字号被放大 45%，文字横向冲出栏宽压到邻栏（实测截图）。
-      const inkH = fontSize;
-      const y0 = bbox[1] + i * lineH + (lineH - inkH) / 2;
-      return {
-        bbox: [bbox[0], y0, bbox[2], y0 + inkH],
-        font_size: fontSize,
-        spans: [{ content: seg, font_size: fontSize }],
-      };
-    });
-    lineTotal += lines.length;
-
     const outType = lower === "title" ? "title" : lower === "table" ? "table" : "text";
-    paraBlocks.push({ type: outType, bbox, lines });
+    // 每行**独立成块**（关键）：展示层的字号是**块级**模型 ——
+    // `fontForBlock` 取块的 bbox 高，`fontFromLineHeight(h) = h × 1.03` 即"块高 ≈ 字号"。
+    // OXR 的块粒度粗（整段/整题一块 = 多行），塞进一个块里 ⇒ 块高被当成字高 ⇒
+    // 字号放大数倍、文字横向冲出栏宽（实测截图：压到邻栏）。
+    // 故每行一个块，且块 bbox 高取**字号本身**（墨迹口径），行位置仍按行距 lineH 步进。
+    segments.forEach((seg, i) => {
+      const y0 = bbox[1] + i * lineH;
+      const one: [number, number, number, number] = [bbox[0], y0, bbox[2], y0 + fontSize];
+      paraBlocks.push({
+        type: outType,
+        bbox: one,
+        lines: [{ bbox: one, font_size: fontSize, spans: [{ content: seg, font_size: fontSize }] }],
+      });
+      lineTotal++;
+    });
   }
 
   // 页高按纸宽等比换算（光栅宽高比即纸宽高比），保证 bbox 与 page_size 同口径
