@@ -28,7 +28,7 @@ interface Blk {
   kind?: string;
 }
 interface Snap {
-  pages?: { blocks?: Blk[] }[];
+  pages?: { blocks?: Blk[]; questions?: unknown[] }[];
 }
 interface OxrBlock {
   type?: string;
@@ -132,6 +132,8 @@ interface Candidate {
 
 const report: Candidate[] = [];
 const summary: { doc: string; o2zero: number; caption: number; capTotal: number; matched: number }[] = [];
+/** 交叉核对本身的可信度告警（不是修复候选，不下钻 corrections） */
+const warnings: string[] = [];
 
 for (const pair of DOCS) {
   const mPath = join("data", "out", pair.mineru, "stages.json");
@@ -140,7 +142,26 @@ for (const pair of DOCS) {
     console.log(`跳过 ${pair.name}：缺文件`);
     continue;
   }
+
+  /**
+   * ⚠️ 守卫：**OCR 补行不对称**。
+   * 切题严重依赖 `injectOcrFullTextLines`（把「题号独占一行」补成块）——
+   * 光学卷实测（2026-10-28）：题号印在页边/栏底，MinerU 与 OXR **都没读到**，
+   * 全靠 OCR 全文补行才切得开。若 OXR 卷没跑 OCR 补行（如 `--no-ocr`），
+   * 会整页零题 ⇒ 那不是「OXR 失效」，而是**两卷输入不对等**。
+   * 这种情况下的差异**不可解释**，必须显式告警，不能当候选往下推。
+   */
+  const mOcr = existsSync(join("data", "out", pair.mineru, "ocr-page-fill.json"));
+  const oOcr = existsSync(join("data", "out", pair.oxr, "ocr-page-fill.json"));
+  if (mOcr !== oOcr) {
+    warnings.push(
+      `**${pair.name}**：OCR 补行不对称（MinerU ${mOcr ? "有" : "无"} / OXR ${oOcr ? "有" : "无"}）` +
+        ` ⇒ 该卷切题输入不对等，题级差异不可解释，仅作提示。`,
+    );
+  }
+
   const m = JSON.parse(readFileSync(mPath, "utf8")) as Snap;
+  const oSnap = JSON.parse(readFileSync(oPath, "utf8")) as Snap;
   const oxr = oxrPages(pair.response);
   let o2zero = 0;
   let caption = 0;
@@ -150,6 +171,18 @@ for (const pair of DOCS) {
   for (const [pi, mPage] of (m.pages ?? []).entries()) {
     const info = oxr[pi];
     const oxrPage = info?.text ?? "";
+
+    /**
+     * 守卫 ②：OXR 该页**零题**而 MinerU 有题 ⇒ 大概率是题号缺失导致整页不切，
+     * 不是「MinerU 多切」。逐页登记，避免把它误读成 MinerU 的错误。
+     */
+    const mQ = mPage.questions?.length ?? 0;
+    const oQ = oSnap.pages?.[pi]?.questions?.length ?? 0;
+    if (oQ === 0 && mQ > 0) {
+      warnings.push(
+        `${pair.name} p${pi + 1}：OXR 0 题 / MinerU ${mQ} 题 —— 疑题号缺失导致整页不切（非 MinerU 多切）。`,
+      );
+    }
 
     // ---- A 类：MinerU 把字母 O 读成数字 0 ----
     for (const mb of mPage.blocks ?? []) {
@@ -225,6 +258,17 @@ lines.push("| 卷 | A 类 O→0 候选 | B 类图注候选 | OXR caption 总数 
 lines.push("|---|---:|---:|---:|");
 for (const s of summary) lines.push(`| ${s.doc} | **${s.o2zero}** | ${s.caption} | ${s.capTotal} |`);
 lines.push("");
+lines.push("## ⚠️ 交叉核对可信度告警（非修复候选）");
+lines.push("");
+if (warnings.length === 0) {
+  lines.push("（无）");
+} else {
+  for (const w of warnings) lines.push(`- ${w}`);
+  lines.push("");
+  lines.push("> 告警只提示**判据本身可能不成立**（如两卷切题输入不对等），");
+  lines.push("> 不产出修复候选，也不进 `corrections/`。逐条排除后才可下结论。");
+}
+lines.push("");
 lines.push("### 判据");
 lines.push("");
 lines.push("**A 类**（MinerU 把字母 O 读成数字 0）：");
@@ -266,5 +310,9 @@ writeFileSync(join("data", "oxr", "crosscheck.json"), JSON.stringify(report, nul
 console.log("汇总：");
 for (const s of summary) {
   console.log(`  ${s.doc}：O→0 候选 ${s.o2zero}｜图注候选 ${s.caption}（OXR caption 共 ${s.capTotal}）`);
+}
+if (warnings.length) {
+  console.log(`⚠️ 可信度告警 ${warnings.length} 条：`);
+  for (const w of warnings) console.log("   " + w);
 }
 console.log(`✓ data/oxr/crosscheck.md（${report.length} 条候选）`);

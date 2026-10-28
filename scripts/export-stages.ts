@@ -878,8 +878,21 @@ function injectOcrFullTextLines(doc: ParsedDocument, docId: string): { injected:
           skipped++;
           continue;
         }
-        let last = texts[0]!;
-        for (const t of texts) if (t.bbox[3] > last.bbox[3]) last = t;
+        /**
+         * ⚠️ 「最后一个」必须是**阅读顺序的末尾**，不是 y 最大的那个。
+         * 阅读顺序是栏主序（先左栏上→下，再右栏上→下）：当左栏比右栏更长时，
+         * y 最大的块在**左栏**，把题号插到它下面 ⇒ 题号排在右栏内容**之前**，
+         * 整页切题错位。实测（2026-10-28）光学 p1 的 `3.` 印在右栏栏底，
+         * OXR 漏读它、OCR 全文补行又把它插到左栏 `2.` 正下方 ⇒
+         * Q2 只剩一个 `2.`、右栏 17 块全被并进 Q3，p2 无归属块。
+         * ⇒ 取**最右栏**里 y 最大的块，保证题号排在该页阅读顺序的最末；
+         * 无右栏（单栏页）时退回全局 y 最大，行为不变。
+         */
+        const half = (page.width > 0 ? page.width : 596) / 2;
+        const rightCol = texts.filter((t) => t.bbox[0] >= half);
+        const pool = rightCol.length ? rightCol : texts;
+        let last = pool[0]!;
+        for (const t of pool) if (t.bbox[3] > last.bbox[3]) last = t;
         target = last;
         below = true;
       }
