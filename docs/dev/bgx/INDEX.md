@@ -1,8 +1,8 @@
 # BGX 开发治理资料索引
 
-- 更新时间：2026-10-28T18:40:00+08:00
+- 更新时间：2026-10-29T22:00:00+08:00
 - 技能版本：bgx 2.2.0
-- 项目：`question-seg-engine`（当前 worktree：`feature/oxr` @ `841536b`）
+- 项目：`question-seg-engine`（当前 worktree：`feature/oxr` @ `b15f2aa`）
 - 性质：bgx **从属资料索引**；项目唯一跨 Agent 交接入口仍是 [`docs/HANDOFF.md`](../../HANDOFF.md)
 
 ## 本次主题
@@ -26,7 +26,7 @@
 
 ## 状态说明
 
-- 报告与计划已保存；**A/D 已执行并验证**；B 的 T04/T05/T06/T07/T08 已完成；C（T09/T10）未执行。
+- 报告与计划已保存；A/B/D 大部分已执行；C（T09/T10）未执行。
 - 执行阶段修改了 `src/corrections.ts`、`scripts/export-stages.ts`、`scripts/daily.ts`、测试与 DECISIONS/HANDOFF/AGENTS/README；仅本地提交，未推送。
 - `docs/dev/bgx/` 三份资料仍为未跟踪文件（分析资料默认不自动提交）。
 - 执行任何任务前先读本索引 → 对应 PLAN → 报告中的 Gxx 证据；选择后在同一 PLAN 登记台账，不另起第二份执行真相。
