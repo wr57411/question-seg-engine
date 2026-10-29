@@ -276,7 +276,21 @@ class Ctx {
 
     switch (m.kind) {
       case "answer_zone": {
-        // 参考答案区：试题流终止，之后只解析答案条目
+        // 参考答案区：试题流终止，之后只解析答案条目。
+        //
+        // **位置守卫（2026-10-29）**：切进 answers 模式是**不可逆**的破坏性状态变化，
+        // 而「答案及解析」这类词形在**封面/扉页/页脚**上同样出现（本册页脚就是它）。
+        // 没有已收题目就切换，等于把整册正文判成答案续行 —— 实测《答案册-合订本》
+        // p0 封面标题一命中就 0 题（A/B 实测：503→0）。
+        // ⇒ 要求「已有题目」才允许切换；否则只记 review，不改状态。
+        if (this.questions.length === 0 && !this.current) {
+          this.review(
+            blockIndex,
+            `答案区标题出现在首题之前（疑似封面/扉页），不切换状态：「${block.firstLine.trim()}」`,
+            null,
+          );
+          return;
+        }
         this.settleOptions(null);
         this.current = null;
         this.boxList = null;
