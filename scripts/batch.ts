@@ -12,6 +12,10 @@
 // - **失败隔离**：单本 daily 失败只记 failed，不阻塞其它书。
 // - **台账**：`<state>/ledger.jsonl` 逐行追加；报告取每个哈希的最后一条。
 // - **不改 daily 语义**：每本仍调用 `scripts/daily.ts`；批量只是外层编排。
+// - **自动选源（2026-10-29，DECISIONS §75）**：daily 成功后，若该册同时有 MinerU 与 OXR
+//   两源产物，自动跑 `scripts/select-auto.ts` 逐题选源并写回 `questions.json`。
+//   选源失败**不判整本失败**（它只是增强），但会写进台账 `selectError`，不静默。
+//   关掉：`--no-select`（或 `--select off`）。
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -34,6 +38,10 @@ interface Entry {
   questions?: number;
   pages?: number;
   needsReview?: number;
+  /** 自动选源结果（daily 成功且双源齐备时才有） */
+  select?: { pickedOxr: number; pickedMineru: number; escalated: number };
+  /** 自动选源失败原因（不静默，但不判整本失败） */
+  selectError?: string;
 }
 
 interface Options {
@@ -46,6 +54,8 @@ interface Options {
   noOcr: boolean;
   parser: string | null;
   report: boolean;
+  /** 自动选源：daily 成功后按两源逐题选源（默认开） */
+  select: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -58,6 +68,7 @@ function parseArgs(argv: string[]): Options {
     noOcr: false,
     parser: null,
     report: false,
+    select: true,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -69,6 +80,8 @@ function parseArgs(argv: string[]): Options {
     else if (a === "--retry") opt.retry = Number(argv[++i] ?? opt.retry);
     else if (a === "--delay") opt.delay = Number(argv[++i] ?? opt.delay);
     else if (a === "--parser") opt.parser = argv[++i] ?? null;
+    else if (a === "--no-select") opt.select = false;
+    else if (a === "--select") opt.select = (argv[++i] ?? "auto") !== "off";
     else throw new Error(`未知参数：${a}`);
   }
   return opt;
@@ -160,6 +173,39 @@ function runDaily(input: string, docId: string, opt: Options): { ok: boolean; ou
   });
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
   return { ok: r.status === 0, out };
+}
+
+/**
+ * 自动选源：daily 成功后跑 `select-auto.ts`。
+ * 只在**双源齐备**时执行；缺一源就跳过并返回说明（不猜）。
+ * 失败不判整本失败 —— 选源是增强，不是入库前置；但原因必须回传进台账。
+ */
+function runSelect(docId: string): { ran: boolean; note?: string; stats?: Entry["select"]; error?: string } {
+  const hasOxr = existsSync(join(ROOT, "data", "out", `${docId}-OXR`, "questions.json"));
+  const hasMineru =
+    existsSync(join(ROOT, "data", "out", `${docId}-MinerU`, "questions.json")) ||
+    existsSync(join(ROOT, "data", "out", docId, "questions.json"));
+  if (!hasOxr || !hasMineru) {
+    return { ran: false, note: `跳过自动选源：缺${hasOxr ? "" : " OXR"}${hasMineru ? "" : " MinerU"} 源产物` };
+  }
+  const r = spawnSync(process.execPath, ["--import", "tsx", join(ROOT, "scripts", "select-auto.ts"), docId], {
+    cwd: ROOT,
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+    env: process.env,
+  });
+  if (r.status !== 0) {
+    const out = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
+    return { ran: false, error: out.split("\n").slice(-6).join("\n").slice(-500) };
+  }
+  try {
+    const rep = JSON.parse(
+      readFileSync(join(ROOT, "data", "out", docId, "select-report.json"), "utf8"),
+    ) as { pickedOxr: number; pickedMineru: number; escalated: number };
+    return { ran: true, stats: { pickedOxr: rep.pickedOxr, pickedMineru: rep.pickedMineru, escalated: rep.escalated } };
+  } catch {
+    return { ran: true };
+  }
 }
 
 function writeReport(stateDir: string, entries: Entry[]): string {
@@ -297,10 +343,32 @@ function main(): void {
       break;
     }
     if (ok) {
+      // 自动选源（默认开）：双源齐备才跑；失败只记台账，不判整本失败
+      let selectStats: Entry["select"];
+      let selectError: string | undefined;
+      if (opt.select) {
+        const sel = runSelect(docId);
+        if (sel.ran) {
+          selectStats = sel.stats;
+          if (sel.stats) {
+            console.log(
+              `  🧩 自动选源：OXR ${sel.stats.pickedOxr} / MinerU ${sel.stats.pickedMineru}` +
+                `；升级仲裁 ${sel.stats.escalated}`,
+            );
+          }
+        } else if (sel.note) {
+          console.log(`  · ${sel.note}`);
+        } else if (sel.error) {
+          selectError = sel.error;
+          console.warn(`  ⚠️ 自动选源失败（不影响入库，已记台账）：${sel.error.split("\n")[0]}`);
+        }
+      }
       const meta = readMeta(docId);
       appendLedger(ledgerPath, {
         hash, docId, input: rel, status: "done", at: finishedAt, startedAt, finishedAt,
         questions: meta.questions, pages: meta.pages, needsReview: meta.needsReview,
+        ...(selectStats ? { select: selectStats } : {}),
+        ...(selectError ? { selectError } : {}),
       });
       console.log(`  ✅ done：${meta.questions ?? "?"} 题 / ${meta.pages ?? "?"} 页（日志 ${log}）`);
     } else {
