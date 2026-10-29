@@ -30,9 +30,10 @@ export function enc(s: string): string;
 export function paperCanvas(p: any): any;
 export function posStyle(node: any, bbox: number[], w: number, h: number): any;
 export function blockNode(b: any, p: any, canvasW?: number, baseFont?: number | null, mergeCtx?: any, doc?: string): any;
+export function textWidthEm(s: string): number;
 export function tableColWidths(rows: any[], cols: number): number[];
-export function fitTableFont(rows: any[], widths: number[], boxWpx: number, boxHpx: number, startSize: number): number;
-export function tableNode(b: any, p: any, canvasW?: number, baseFont?: number | null): any;
+export function fitTables(root: any): void;
+export function tableNode(b: any, p: any, canvasW?: number, baseFont?: number | null, doc?: string): any;
 export function mergeContext(p: any): any;
 export function appendBlockNodes(
   c: any,

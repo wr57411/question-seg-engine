@@ -21,6 +21,8 @@ interface Stub {
   title: string;
   rowSpan?: number;
   colSpan?: number;
+  src?: string;
+  alt?: string;
   dataset: Record<string, string>;
   classList: { add: (c: string) => void; contains: (c: string) => boolean };
   append: (...n: Stub[]) => void;
@@ -127,4 +129,27 @@ test("appendBlockNodes：表格外的正文块不受影响（几何包含判据�
   const c = makeNode("div");
   const nodes = appendBlockNodes(c, p, 760, 12, null, "d", true) as (Stub | null)[];
   assert.ok(nodes[1], "只部分重叠的块必须保留（否则会丢内容）");
+});
+
+test("tableNode：单元格图片渲染为 <img>，src 指向该卷 images 目录", () => {
+  const b = tableBlock(0, '<table><tr><td>图<img src="curve.jpg"/></td></tr></table>', [0, 0, 200, 100]);
+  const p = { ...page, blocks: [b] };
+  const node = tableNode(b, p, 760, 12, "doc-id") as Stub;
+  const imgs = findAll(node, "img");
+  assert.equal(imgs.length, 1, "表格内的插图必须画出来（对照原卷：不能丢）");
+  assert.match(String(imgs[0]!.src ?? ""), /\/data\/out\/doc-id\/images\/curve\.jpg/);
+});
+
+test("tableNode：字号用页面字号，不因「整表压平文本很长」被 clampByWidth 夹小", () => {
+  // 2026-10-29 实测：表格块 text 是整表压平文本（几十上百字），clampByWidth 会当超长单行
+  // 把字号夹到 3–7px（表9 只剩 3.4px）。表格的宽度约束由列宽+换行负责。
+  const longText = "甲乙丙丁".repeat(60);
+  const b = { ...tableBlock(0, "<table><tr><td>格</td></tr></table>", [0, 0, 600, 300]), text: longText };
+  const p = { ...page, blocks: [b] };
+  const node = tableNode(b, p, 760, 14, "d") as Stub;
+  const table = findAll(node, "table")[0]!;
+  // 桩里的 style 是普通对象，内联样式走 cssText（真实 DOM 里两者等价）
+  const m = /font-size:\s*([\d.]+)px/.exec(String(table.style.cssText ?? ""));
+  const fs = m ? parseFloat(m[1]!) : NaN;
+  assert.ok(fs >= 12, `表格字号不应被压到 12px 以下（实测 ${fs}）`);
 });

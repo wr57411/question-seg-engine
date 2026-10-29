@@ -51,13 +51,64 @@ export function posStyle(node, bbox, w, h) {
 }
 
 /**
- * 表格节点：按块 bbox 落位，内部按上游 HTML 的行/列画真网格（`DECISIONS §76`）。
+ * **挂载后实测适配**（`DECISIONS §76`）：表格内容比框高就把字号往下收，直到装得下。
+ *
+ * 为什么不在建节点时算：`tableNode` 执行时节点还没进文档，`clientHeight` 是 0，
+ * 量不到真实高度。而纯估算（字符数 / 渲染宽度）**永远偏保守** —— 实测把表格字号压到
+ * 正文的 0.45 倍（原卷里表格字与正文接近同号），用户当场指出「这肯定不会有这么小的字」。
+ * ⇒ 初始用页面正文字号，挂载后用真实布局收缩，取到「装得下的最大值」。
+ *
+ * 只缩不放：字号已经由 `fontForBlock` 按页面口径定过，放大就不再忠实。
+ */
+export function fitTables(root) {
+  const nodes = root?.querySelectorAll ? root.querySelectorAll(".blk-table") : [];
+  for (const node of nodes) {
+    const table = node.querySelector("table");
+    if (!table || typeof node.clientHeight !== "number" || node.clientHeight <= 0) continue;
+    let fs = parseFloat(table.style.fontSize) || 12;
+    let guard = 0;
+    while (node.scrollHeight > node.clientHeight + 1 && fs > 6 && guard++ < 60) {
+      fs = Math.max(6, fs - 0.25);
+      table.style.fontSize = `${fs}px`;
+    }
+  }
+}
+
+/** 表格节点：按块 bbox 落位，内部按上游 HTML 的行/列画真网格（`DECISIONS §76`）。
  *
  * 为什么用内联样式：`stages/` 与 `final/` 各有自己的 CSS，但**共用本渲染器**。
  * 把表格样式写成内联，能保证两处一定长得一样（红线「纸面重建只此一处实现」）。
  *
  * 解析不出行时返回 null ⇒ 调用方退回普通文本渲染（**不丢内容**）。
  */
+/**
+ * 单元格文本的**渲染宽度估计**（单位 em，`DECISIONS §76`）。
+ *
+ * 为什么不能按字符数：`$P_{总}=EI=P_{出}+P_{内}$` 在源码里有 20 个字符，渲染出来只有
+ * 约 2em 宽。按字符数会把行数严重高估 ⇒ 字号被压到 6–8px（2026-10-29 用户对照原书指出
+ * 「这肯定不会有这么小的字」，实测确实只有原卷的 1/2 左右）。
+ *
+ * 口径：中文 1em、西文/数字 0.55em、其余标点 0.4em、行内公式整体约 2.2em。
+ * 仍是估计，但误差方向从「系统性高估」变成「大致相当」。
+ */
+export function textWidthEm(s) {
+  let em = 0;
+  for (const part of String(s ?? "").split(/(\$[^$]*\$)/)) {
+    if (!part) continue;
+    if (part.startsWith("$") && part.endsWith("$") && part.length > 1) {
+      em += 2.2;
+      continue;
+    }
+    for (const ch of part) {
+      if (/[\u4e00-\u9fa5]/.test(ch)) em += 1;
+      else if (/[A-Za-z0-9]/.test(ch)) em += 0.55;
+      else if (/\s/.test(ch)) em += 0.3;
+      else em += 0.4;
+    }
+  }
+  return em;
+}
+
 /**
  * 按内容给每列分配宽度比例（`DECISIONS §76`）。
  *
@@ -74,7 +125,7 @@ export function tableColWidths(rows, cols) {
   for (const r of rows) {
     let c = 0;
     for (const cell of r.cells) {
-      const per = Math.max(1, (cell.text || "").length) / cell.colspan;
+      const per = Math.max(1, textWidthEm(cell.text)) / cell.colspan;
       for (let k = 0; k < cell.colspan && c + k < cols; k++) chars[c + k] = Math.max(chars[c + k], per);
       c += cell.colspan;
     }
@@ -86,52 +137,17 @@ export function tableColWidths(rows, cols) {
   return raw.map((n) => (n / sum) * 100);
 }
 
-/**
- * 按「框宽/框高 + 单元格文字量 + 列宽比例」估算能装下的字号（`DECISIONS §76`）。
- *
- * 为什么需要：表格 bbox 是**原卷真实区域**，内容超出就会压到下面的正文
- * （2026-10-29 实测：表4 溢出 69px，直接叠在「教材素材变式…」上）。
- * 不能等渲染后量（`tableNode` 建节点时还没进文档，`clientHeight` 是 0），
- * 所以用字符数做确定性估算，从给定字号往下收敛到装得下为止。
- *
- * 口径：CJK 按 1em/字、行高 1.2、单元格上下 padding 各 1px。
- * 宁可估得保守（字号偏小）也不要溢出压字。
- */
-export function fitTableFont(rows, widths, boxWpx, boxHpx, startSize) {
-  if (!rows.length || !widths.length || boxWpx <= 0 || boxHpx <= 0) return startSize;
-  const totalW = widths.reduce((a, b) => a + b, 0) || 1;
-  for (let fs = startSize; fs > 6; fs -= 0.5) {
-    let total = 0;
-    for (const r of rows) {
-      let rowLines = 1;
-      let c = 0;
-      for (const cell of r.cells) {
-        let frac = 0;
-        for (let k = 0; k < cell.colspan && c + k < widths.length; k++) frac += widths[c + k] / totalW;
-        c += cell.colspan;
-        const cellWpx = boxWpx * frac;
-        const perLine = Math.max(1, Math.floor(cellWpx / fs));
-        const lines = Math.max(1, Math.ceil((cell.text || "").length / perLine));
-        if (lines > rowLines) rowLines = lines;
-      }
-      total += rowLines * fs * 1.2 + 2;
-    }
-    if (total <= boxHpx) return fs;
-  }
-  return 6;
-}
-
-export function tableNode(b, p, canvasW = CANVAS_W, baseFont = null) {
+export function tableNode(b, p, canvasW = CANVAS_W, baseFont = null, doc = "") {
   const { rows, cols } = parseTableHtml(b.html);
   if (!rows.length) return null;
   const node = posStyle(el("div", "blk blk-table kind-table"), b.bbox, p.width, p.height);
   node.title = "上游表格（按 spans[].html 的 rowspan/colspan 还原网格）";
-  const startSize = clampByWidth(fontForBlock(b, p.width, canvasW, baseFont, p.blocks), b, p.width, canvasW);
-  const scale = canvasW / p.width;
-  const boxWpx = (b.bbox[2] - b.bbox[0]) * scale;
-  const boxHpx = (b.bbox[3] - b.bbox[1]) * scale;
+  // 初始用**页面正文字号**（表格字与原卷正文接近同号，2026-10-29 对照原卷实测）。
+  // ⚠️ 不能用 `clampByWidth`：它是「一行文字宽度 vs 块宽」的夹子，而表格块的 `text` 是
+  // **整表压平文本**（几十上百字），会被当成超长单行 ⇒ 字号被夹到 3–7px（实测表9 只剩 3.4px）。
+  // 表格的宽度约束由 `tableColWidths` + 单元格换行负责，高度约束由 `fitTables` 实测负责。
+  const size = baseFont || fontForBlock(b, p.width, canvasW, baseFont, p.blocks) || 12;
   const widths = tableColWidths(rows, cols);
-  const size = fitTableFont(rows, widths, boxWpx, boxHpx, startSize);
   const table = el("table");
   // ⚠️ `white-space:normal` 是必须的：`.blk` 全局 `white-space:nowrap`（行级块按原坐标排一行），
   // 表格继承它就不换行 ⇒ 单元格内容溢出、被 `.canvas{overflow:hidden}` 裁掉右半边
@@ -152,6 +168,14 @@ export function tableNode(b, p, canvasW = CANVAS_W, baseFont = null) {
       if (cell.colspan > 1) td.colSpan = cell.colspan;
       td.style.cssText = "border:1px solid rgba(0,0,0,.35);padding:1px 3px;vertical-align:top;white-space:normal;word-break:break-word;overflow-wrap:anywhere;";
       td.innerHTML = prettifyLatex(cell.text);
+      // 单元格里的插图（上游 `<img src>`）：表格里的曲线图/示意图不能丢（对照原卷 2026-10-29）
+      for (const name of cell.images ?? []) {
+        const img = el("img");
+        img.src = `/data/out/${enc(doc)}/images/${enc(name)}`;
+        img.alt = "表格内插图";
+        img.style.cssText = "max-width:100%;max-height:100%;object-fit:contain;display:block;margin:2px 0;";
+        td.append(img);
+      }
       tr.append(td);
     }
     table.append(tr);
@@ -219,7 +243,7 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
   const nodes = p.blocks.map((b) => {
     if (coveredByTable.has(b.i)) return null;
     if (b.kind === "table" && b.html) {
-      const tn = tableNode(b, p, canvasW, baseFont);
+      const tn = tableNode(b, p, canvasW, baseFont, doc);
       if (tn) return tn;
     }
     return blockNode(b, p, canvasW, baseFont, mergeCtx, doc);
@@ -582,5 +606,9 @@ export function renderPaper(p, opts = {}) {
   if (diagnostics) uncoveredInto(c, p, innerW); // 再画遗漏标记（盖得住候选，符合原顺序）
   // 注意：**不要再次 append(c)** —— c 已经在 wrap 里；重复 append 会把它移出容器，
   // 号牌就又回到被 `.canvas{overflow:hidden}` 裁掉的状态。
+  // 表格字号适配必须在**挂载后**做：节点进文档才有 clientHeight。
+  // 用 rAF 排到下一帧，两个调用方（final / stages）都不用改一行（纸面重建只此一处）。
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => fitTables(wrap));
+
   return { wrap, canvas: c, innerW };
 }

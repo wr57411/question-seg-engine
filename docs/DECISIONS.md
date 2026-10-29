@@ -3328,10 +3328,11 @@ MinerU 把表格作为独立块给出（`type:"table"`、`lines:[]`、网格在*
 `docId / 题数 / (章|组|题号) 序列哈希`，改动前后 `diff` ⇒ **完全一致**（`✅ 全量零差异`）。
 这是本特性的核心风险点（动的是引擎输入），所以列为门而不是"应该没问题"。
 
-**测试**：`tests/table-html.test.ts`（6 例：基本两行三列 / rowspan+colspan / `<eq>`→`$…$` /
-标签与实体 / 空输入 / th 同 td）、`tests/table-render.test.ts`（4 例：网格产出与合并正确 /
-解析失败返回 null / 覆盖行块被跳过 / **只部分重叠的块不被误伤**）。`npm run check` **327/327**、
-渲染审计 8/8、题号审计新增 0 条、配对 420 不变。
+**测试**：`tests/table-html.test.ts`（7 例：两行三列 / rowspan+colspan / `<eq>`→`$…$` /
+标签与实体 / 空输入 / th 同 td / **单元格 `<img>` 单独保留**）、
+`tests/table-render.test.ts`（6 例：网格与合并 / 解析失败返回 null / 覆盖行块被跳过 /
+只部分重叠不误伤 / **单元格图片渲染为 `<img>`** / **字号不被 `clampByWidth` 夹小**）。
+`npm run check` **330/330**、渲染审计 8/8、题号审计新增 0 条、配对 420 不变。
 
 **偏离设计的一处（已确认可省）**：设计文档 Surface 写了「快照题目带 `tables`」，
 实现**未加** —— 渲染从块（`blocks[].html`）取，快照再存一份是无人消费的死数据。
@@ -3348,14 +3349,24 @@ MinerU 把表格作为独立块给出（`type:"table"`、`lines:[]`、网格在*
   本轮用临时册 `data/out/_tablecheck`（由 `电路-MinerU` 的 layout 生成）验证链路：快照 9 个
   table 块全部带 html、24 题里 4 题带 `tables`。
 
-**视觉审板（2026-10-29，Playwright 实测，截图 `docs/design/table-cap/`）**：修掉两个只有看截图才会发现的问题：
-1. **右侧文字被裁** —— `.blk` 全局 `white-space:nowrap`（行级块按原坐标排一行），表格继承它
-   就不换行 ⇒ 单元格内容溢出、被 `.canvas{overflow:hidden}` 切掉右半边。修法：表格与 `td`
-   显式 `white-space:normal` + `overflow-wrap:anywhere`。
-2. **纵向溢出压正文** —— 表4 内容比 bbox 高 **69px**，直接叠在「教材素材变式…」上。
-   修法：新增 `tableColWidths`（按单元格字符数分配列宽，等宽会让宽列挤成多行）
-   + `fitTableFont`（按框宽/框高/文字量确定性收敛字号，下限 6px）。
-   复测 9 张表 **溢出全部归零**、`.blk-line` 与表格区域**重叠 0 处**。
+**视觉审板（2026-10-29，Playwright 实测，截图 `docs/design/table-cap/`）**：
+共四轮，**前三轮修完仍是错的**，每轮都是靠截图（而非测试）发现的：
+
+| 轮 | 现象 | 根因 | 修法 |
+|---|---|---|---|
+| 1 | 表格右半文字被裁 | `.blk` 全局 `white-space:nowrap` 被表格继承 ⇒ 不换行 ⇒ 溢出被 `.canvas{overflow:hidden}` 切 | 表格与 `td` 显式 `white-space:normal` + `overflow-wrap:anywhere` |
+| 2 | 表4 纵向溢出 **69px**，压在「教材素材变式…」上 | 列等宽 ⇒ 宽列内容挤成多行 | 新增 `tableColWidths`（按内容分配列宽） |
+| 3 | 字号只有正文的 **0.45 倍**（用户对照原书：「这肯定不会有这么小的字」） | ① 按**字符数**估宽度：`$P_{总}=EI=…$` 源码 20 字符只渲染约 2em ⇒ 行数严重高估；② 更致命的是表格块走了 `clampByWidth` —— 那是「一行文字 vs 块宽」的夹子，而表格块 `text` 是**整表压平文本**，被当超长单行 ⇒ 表9 只剩 **3.4px** | 新增 `textWidthEm`（中文 1em / 西文 0.55em / 行内公式 2.2em）；表格**不走 `clampByWidth`**，初始用页面正文字号，挂载后由 `fitTables()` 实测收缩 |
+| 4 | 表4 左下格**曲线图不见了**（原书有 P–R 图） | 上游表格 HTML 里是 `<img src="…jpg">`，`cellText` 把标签剥掉了 ⇒ 图片被吞 | 解析器单独抽 `images[]`；渲染为 `<img>`（`object-fit:contain`） |
+
+**最终实测（`_tablecheck` 9 张表）**：表格字号 / 正文字号 = **0.82 ~ 1.02**（原卷里两者接近同号）；
+溢出 **全 0**；`.blk-line` 与表格区域**重叠 0 处**；表4 左下格曲线图正常显示。
+
+**方法教训（已够格写进红线）**：DOM 结构断言全绿 ≠ 页面对。前三轮的 `tests/table-render.test.ts`
+都是通过的，而页面上字小到看不清、图丢了。**唯一发现途径是「截图 + 回原卷对照」**——
+本轮把原卷页图按表格 bbox 裁出来（`tmp/crop-orig.mjs`）并排看，才看出字号和图的问题。
+凡显示层改动，必须走这条，不能只看测试。
+
 另：部分单元格空白是**上游 HTML 本身给了空 `<td>`**，不是渲染丢失（保持忠实，不补猜内容）。
 
 **状态**：已落地并视觉验收（截图证据 `docs/design/table-cap/`）。

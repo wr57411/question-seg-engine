@@ -21,6 +21,8 @@
  * @property {string} text 单元格文本（公式已转成 `$…$`）
  * @property {number} rowspan
  * @property {number} colspan
+ * @property {string[]} images 单元格内插图文件名（上游 `<img src>`）。`cellText` 会剥标签，
+ *   所以图片必须单独抽出来，否则表格里的曲线图/示意图全丢（2026-10-29 对照原卷发现）。
  *
  * @typedef {object} TableRow
  * @property {TableCell[]} cells
@@ -88,10 +90,15 @@ export function parseTableHtml(html) {
       const body = cm[3] ?? "";
       const rs = Number((/rowspan\s*=\s*["']?(\d+)/i.exec(attrs) ?? [])[1] ?? 1);
       const cs = Number((/colspan\s*=\s*["']?(\d+)/i.exec(attrs) ?? [])[1] ?? 1);
+      // 单元格里的插图（上游 HTML 用 `<img src="xxx.jpg">` 表示）：
+      // `cellText` 会把标签剥掉，所以必须**单独抽出来**，否则表格里的曲线图/示意图全丢
+      // （2026-10-29 对照原卷发现：电路 p5 表格左下格的 P–R 曲线图被吞掉）。
+      const images = [...body.matchAll(/<img\b[^>]*\bsrc\s*=\s*["']?([^"'\s>]+)/gi)].map((m) => m[1] ?? "");
       cells.push({
         text: cellText(body),
         rowspan: Number.isFinite(rs) && rs > 0 ? rs : 1,
         colspan: Number.isFinite(cs) && cs > 0 ? cs : 1,
+        images: images.filter(Boolean),
       });
     }
     if (cells.length) rows.push({ cells });

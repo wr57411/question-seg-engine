@@ -55,3 +55,14 @@ test("parseTableHtml：th 与 td 同等对待（表头也是单元格）", () =>
   assert.equal(t.rows.length, 2);
   assert.equal(t.rows[0]!.cells[0]!.text, "表头");
 });
+
+test("parseTableHtml：单元格内的 `<img src>` 单独保留（cellText 会剥标签，图片不能跟着丢）", () => {
+  // 2026-10-29 对照原卷发现：电路 p5 表格左下格的 P–R 曲线图被 cellText 当标签剥掉
+  const t = parseTableHtml(
+    '<table><tr><td>说明<img src="abc123.jpg"/></td><td>无图</td></tr></table>',
+  );
+  assert.equal(t.rows[0]!.cells[0]!.images.length, 1);
+  assert.equal(t.rows[0]!.cells[0]!.images[0], "abc123.jpg");
+  assert.equal(t.rows[0]!.cells[0]!.text, "说明", "文本里不留 img 标签");
+  assert.deepEqual(t.rows[0]!.cells[1]!.images, []);
+});

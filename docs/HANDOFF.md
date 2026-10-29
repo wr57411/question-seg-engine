@@ -6,7 +6,7 @@
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
 - **交接快照日期**：2026-10-29
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **307 例** + audit:render:baseline + audit:numbering
+- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **330 例** + audit:render:baseline + audit:numbering
   + **bank:all**；多册配对 **420 条**，唯一键无重复，内容尺子全部达标 —— 2026-10-29 实跑复验）
 - **快照时的 git HEAD**：`feature/oxr` @ `c5b7eda`（2026-10-29 已 push `origin/feature/oxr`，未推送 0 个）
 - **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
@@ -630,9 +630,12 @@ layout.json / content_list.json
     （不引入 `htmlBBox`，`kind:"table"` 时 `bbox` 即表格框；表格归属改为
     `Question.tables[]`，`stem` 一个字不改）。**硬约束已验**：15 册全量 A/B 题数与题号序列
     **逐字节一致**；`check` 327/327、渲染审计 8/8、配对 420 不变。
-    **仍剩两件**：① **视觉审板待人工**（本机无 playwright）——`npm run view` →
-    `http://localhost:4173/final/?doc=_tablecheck`；② **存量产物未重生成**（见 §76「已知边界」：
-    单跑 `daily --no-ocr` 会因缺少融合/OCR/选源步骤而改变题数，与本特性无关，故不动基线）。
+    **视觉审板已完成（Playwright，四轮，见 §76 表格）**——前三轮修完页面上仍是错的
+    （字只有正文 0.45 倍、单元格曲线图丢失），全靠「截图 + 回原卷对照」才看出来。
+    最终：表格字号/正文 = **0.82~1.02**、溢出 0、与行块重叠 0、曲线图正常。
+    **只剩一件**：**存量产物未重生成**（见 §76「已知边界」：单跑 `daily --no-ocr`
+    会因缺少融合/OCR/选源步骤而改变题数，与本特性无关，故不动基线）。
+    验证用临时册 `data/out/_tablecheck`（含 images，可 `rm -rf` 删）。
 26. **实验题黏连题号 ⇒ 含实验标记的页 62% 切不出题（2026-10-29 量化，P1，未修）**：
     实测全项目主产物 390 页里，含「【实验原理】/【实验步骤】/【实验器材】/【数据处理】/【实验结论】」
     标记的有 **8 页**，其中 **5 页一题都没切出来（62%）**：
