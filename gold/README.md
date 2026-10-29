@@ -66,7 +66,7 @@ npm run check:accuracy          # 同 --gate
 
 ## 新批试点（2026-10-28）
 
-- `gold/教材基础练 磁场.pilot.json`：3 题（p1 第1-3题），从原卷页图转写；complete:false。
-- `gold/物理_教材基础练 电路.pilot.json`：4 题（p1 第1-2题、p2 第3-4题），从原卷页图转写；complete:false。
+- `gold/教材基础练 磁场.pilot.json`：4 题（p1 第1-4题），从原卷页图转写；complete:false。
+- `gold/物理_教材基础练 电路.pilot.json`：6 题（p1 第1-2题、p2 第3-6题），从原卷页图转写；complete:false。
 - 两本已加入 `gold/registry.json`（status=pilot-verified）；融合产出当前对这两份小金标
-  **R100/S100/O100**，但只有 3/4 题，不能当整本准确率。
+  **R100/S100/O100**（磁场 4 题 / 电路 6 题），但仍是部分金标，不能当整本准确率。
