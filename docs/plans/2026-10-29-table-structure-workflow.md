@@ -35,7 +35,7 @@ loop: false
 verify: npm run typecheck
 
 - [ ] **Step 6: 切题零变化断言（关键门）**
-action: 写一次性脚本 `tmp/ab-questions.ts`：对 `data/out/*/layout.json`（跳过 `-OXR`/`-MinerU` 后缀）逐个 `segmentFromLayout`，输出 `docId<TAB>题数<TAB>题号序列的 sha256`，按 docId 排序写 `tmp/ab-after.txt`；然后 `git stash` 本轮改动重跑写 `tmp/ab-before.txt`，`git stash pop`。用 `diff` 比较两文件，**必须完全一致**。任何一行差异 ⇒ 停止并回报，不调阈值。
+action: 写一次性脚本 `npm run audit:ab`：对 `data/out/*/layout.json`（跳过 `-OXR`/`-MinerU` 后缀）逐个 `segmentFromLayout`，输出 `docId<TAB>题数<TAB>题号序列的 sha256`，按 docId 排序写 `tmp/ab-after.txt`；然后 `git stash` 本轮改动重跑写 `tmp/ab-before.txt`，`git stash pop`。用 `diff` 比较两文件，**必须完全一致**。任何一行差异 ⇒ 停止并回报，不调阈值。
 loop: false
 max_iterations: 3
 verify: npx tsx tmp/ab-questions.ts > tmp/ab-after.txt && git stash push -u -- src/ scripts/ stages/ tests/ >/dev/null && npx tsx tmp/ab-questions.ts > tmp/ab-before.txt && git stash pop >/dev/null && diff tmp/ab-before.txt tmp/ab-after.txt && echo "A/B 零差异"

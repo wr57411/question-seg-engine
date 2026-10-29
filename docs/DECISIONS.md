@@ -3325,7 +3325,7 @@ MinerU 把表格作为独立块给出（`type:"table"`、`lines:[]`、网格在*
    解析 `rowspan`/`colspan` 画真网格；被表格 bbox **完整覆盖**的其它行块跳过（几何包含，确定性）。
    `reconstruct.d.ts` 同步补声明（该 `.d.ts` 受 `tests/dts-drift.test.ts` 双向锁）。
 
-**硬约束验证 —— 切题零变化**：新增 `tmp/ab-questions.ts` 对 15 册主产物算
+**硬约束验证 —— 切题零变化**：新增 `scripts/ab-questions.ts`（`npm run audit:ab`）对 15 册主产物算
 `docId / 题数 / (章|组|题号) 序列哈希`，改动前后 `diff` ⇒ **完全一致**（`✅ 全量零差异`）。
 这是本特性的核心风险点（动的是引擎输入），所以列为门而不是"应该没问题"。
 
