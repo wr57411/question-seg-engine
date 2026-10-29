@@ -151,6 +151,8 @@ class Ctx {
   private chapterTitle = "";
   private sectionNo = "";
   private section = "";
+  /** 教材知识萃取参考区：区内「1./2./3.」是表格/参考内容，不是题目（2026-10-29 新书实测） */
+  private extractBand = false;
   /** 章/节标题时间线（按 (页, y) 排序）—— 见 buildHeadingTimeline */
   private headings: {
     page: number;
@@ -225,6 +227,14 @@ class Ctx {
       return;
     }
 
+    // 页内噪声块：答案标记（如 `[答案 P014]`）与被拆出的孤立括号 `()`。
+    // 它们不是正文，但可能出现在页面中部（顶部家具守卫管不到），会粘进题干/选项。
+    // 只跳过**整块恰好是**这些形态的块，不做子串删除，避免误伤正文。
+    if (block.kind === "text") {
+      const t = block.text.trim();
+      if (/^\[?答案\s*[A-Z]?\d+\]?$/.test(t) || /^[（）()\s]+$/.test(t)) return;
+    }
+
     // 方框列表状态防滞留：距上次方框条目超过 BOX_LIST_MAX_IDLE 个块即失效。
     // 为什么需要：状态要跨页存活（实测该方框从 p15 底跨到 p16 顶），所以不能用页界清；
     // 上限取「实测最大间隔 5 个块」的 2.4 倍，既容得下真实间隔，又不会长期滞留。
@@ -283,6 +293,7 @@ class Ctx {
         this.chapterTitle = m.title ?? "";
         this.sectionNo = "";
         this.section = "";
+        this.extractBand = false;
         return;
       }
       case "section": {
@@ -292,6 +303,7 @@ class Ctx {
         this.boxList = null;
         this.sectionNo = m.captured || (m.indexNumeral ?? "");
         this.section = block.text.trim();
+        this.extractBand = /^教材知识萃取/.test(block.text.trim());
         return;
       }
       case "sub_question": {
@@ -306,6 +318,10 @@ class Ctx {
         return;
       }
       case "question_no": {
+        if (this.extractBand) {
+          this.review(blockIndex, `教材知识萃取栏内的编号条目「${m.captured}.」不是题目（参考表格内容）`, this.current);
+          return;
+        }
         // **方框守卫**：`▶N.` 锚点之后、序号恰好 +1、且**不像答案条目**的行，
         // 是方框内的编号条目（不是题）。判据最严（AND 三条件），且**不静默**：
         // 记 ReviewNote，文本并入当前题（不丢内容）。

@@ -101,6 +101,24 @@
       "sourcePdf": "data/batch-inbox/物理_教材基础练万有引力.pdf",
       "status": "pilot-verified",
       "gold": "gold/物理_教材基础练万有引力.pilot.json"
+    },
+    {
+      "docId": "物理_教材基础练 运动和力",
+      "class": "A",
+      "pages": 10,
+      "questions": 21,
+      "sourcePdf": "data/batch-inbox/物理_教材基础练 运动和力.pdf",
+      "status": "pilot-verified",
+      "gold": "gold/物理_教材基础练 运动和力.pilot.json"
+    },
+    {
+      "docId": "物理_教材基础练机械能守恒定律",
+      "class": "A",
+      "pages": 17,
+      "questions": 38,
+      "sourcePdf": "data/batch-inbox/物理_教材基础练机械能守恒定律.pdf",
+      "status": "pilot-verified",
+      "gold": "gold/物理_教材基础练机械能守恒定律.pilot.json"
     }
   ]
 }

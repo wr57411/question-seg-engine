@@ -161,7 +161,9 @@ export function latexToPlain(s: string): string {
 /** 归一化：LaTeX 等价形式 + 去空白/定界符/标点/上下标，只留字面（用于重合与 CER）。 */
 export function normForScore(s: string): string {
   return latexToPlain(s)
-    .replace(/[\s${}\\_^]/g, "")
+    .replace(/[\s${}\\_^~]/g, "")
+    .replace(/²/g, "2")
+    .replace(/³/g, "3")
     .replace(/[，。；：、,.;:!?（）()【】《》“”"'']/g, "")
     .toLowerCase();
 }

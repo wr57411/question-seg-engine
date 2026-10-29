@@ -7,7 +7,7 @@
 > **交接入口（跨 Agent 必读）**：接手指南与当前状态已收敛到
 > **[docs/HANDOFF.md](docs/HANDOFF.md)**（含红线、未闭合风险、文档地图）；
 > 根目录 `AGENTS.md` 是各平台编程 Agent 的通用入口。改口径/阈值前先查
-> `docs/DECISIONS.md`（66 条决策，按时间序）。
+> `docs/DECISIONS.md`（67 条决策，按时间序）。
 > 当前真实数据：题册 15 页 / 83 题，答案册 23 页 / 167 题（详见 HANDOFF §2）。
 
 ## 架构
