@@ -36,6 +36,12 @@ export type ParsedBlock =
       /** 块内最大字号，用于大题标题/题号的启发判定 */
       maxFontSize: number;
       /**
+       * **上游表格 HTML**（`<table><tr><td rowspan colspan>…</table>`），只出现在
+       * `kind:"table"` 的块上。来源是上游 `spans[].html`，展示层据此画真网格
+       * （`DECISIONS §76`）——「按原坐标重建纸面」的同一条原则，不是从空白推断列宽。
+       */
+      html?: string;
+      /**
        * 该块是**从 OCR 候选补进来的**（不是 MinerU 的输出）。
        * 目前只用于「题号行」：MinerU 会整行漏识别，而 OCR 已读对（见 export-stages 的
        * `injectOcrQuestionLines`）。展示层以**候选**样式呈现，绝不当作引擎原文（G1）。
@@ -125,6 +131,14 @@ export interface Question {
   stem: string;
   options: Option[];
   images: ImageRef[];
+  /**
+   * 本题目区域内出现的**表格**（`kind:"table"` 块归属而来，`DECISIONS §76`）。
+   *
+   * 为什么单独存而不是并进 `stem`：表格是**结构**，压平进 stem 就只剩一串文字，
+   * 列边界全丢（实验数据表尤其致命 —— 判分要取「第 3 次的 F 是多少」）。
+   * 这里保留上游 HTML，`stem` 一个字不改 ⇒ 切题结果与改动前逐字节一致。
+   */
+  tables?: { html: string; bbox: BBox; pageIndex: number }[];
   /** 来自参考答案区、按题号对号入座的答案 */
   answer?: string;
   /** 解析：本骨架不拆，预留字段由 LLM/人工补齐 */

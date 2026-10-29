@@ -56,6 +56,18 @@ function rawBlock(b: ParsedBlock): Record<string, unknown> {
   if (b.kind === "image") {
     return { type: "image", bbox: b.bbox, blocks: [{ lines: [{ spans: [{ image_path: b.path }] }] }] };
   }
+  // 表格块（DECISIONS §76）：按上游原结构写回 —— `type:"table"` + **嵌套** blocks[].lines[]，
+  // 网格放 `spans[].html`。不写成这样，`normalize` 的 table 分支就取不到 html（上一轮实测踩过）。
+  if (b.kind === "table" && b.html) {
+    const fontSize = b.maxFontSize || 10;
+    return {
+      type: "table",
+      bbox: b.bbox,
+      blocks: [
+        { lines: [{ bbox: b.bbox, font_size: fontSize, spans: [{ content: b.text, font_size: fontSize, html: b.html }] }] },
+      ],
+    };
+  }
   const fontSize = b.kind === "text" ? b.maxFontSize || 10 : 10;
   const content = b.kind === "formula" ? `$${b.latex}$` : b.text;
   return {

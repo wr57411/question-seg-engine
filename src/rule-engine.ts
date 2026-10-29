@@ -22,6 +22,7 @@ import {
   stripQuestionPrefix,
 } from "./patterns.js";
 import type {
+  BBox,
   ImageRef,
   IndexedBlock,
   Option,
@@ -62,6 +63,8 @@ interface Draft {
   /** 选项键前向断裂（期待 A/B 却先出现 C/D）：组不完整，多半是上游漏检 */
   optGap: boolean;
   images: ImageRef[];
+  /** 本题目区域内出现的表格（`kind:"table"` 块归属而来，DECISIONS §76） */
+  tables: { html: string; bbox: BBox; pageIndex: number }[];
   blockIndexes: number[];
   pageIndex: number;
   firstLineOfQuestion: string;
@@ -224,6 +227,24 @@ class Ctx {
 
     if (this.mode === "answers") {
       this.processAnswerBlock(block, blockIndex);
+      return;
+    }
+
+    /**
+     * **表格块**（`DECISIONS §76`）：只归属当前题，**不参与任何题号/选项判定**。
+     * 为什么必须在这里提前 return：表格块有 `firstLine`，若落到下面的 `matchFirstLine`
+     * 就会被当正文甚至切出新题 —— 切题结果必须与改动前逐字节一致，这是本特性的硬约束。
+     * 归属不到题时**不静默**：记 ReviewNote（实验题黏连题号导致整页 0 题时会出现，
+     * 见 HANDOFF §6-26）。
+     */
+    if (block.kind === "table") {
+      const html = block.html ?? "";
+      if (!this.current) {
+        this.review(blockIndex, "悬空表格：归属不到任何题目（本页无进行中的题）", null);
+        return;
+      }
+      this.current.tables.push({ html, bbox: block.bbox, pageIndex: this.current.pageIndex });
+      this.current.blockIndexes = [...this.current.blockIndexes, blockIndex];
       return;
     }
 
@@ -523,6 +544,7 @@ class Ctx {
       optEvidence: false,
       optGap: false,
       images: [],
+      tables: [],
       blockIndexes: [entry.index],
       pageIndex: entry.pageIndex,
       firstLineOfQuestion: block.text.trim().slice(0, 60),
@@ -598,6 +620,7 @@ function buildQuestion(d: Draft, ctx: Ctx): Question {
     stem: d.stemParts.join("\n").trim(),
     options: d.options,
     images: d.images,
+    ...(d.tables.length ? { tables: d.tables } : {}),
     source: {
       file: ctx.doc.docId,
       pageIndex: d.pageIndex,

@@ -359,6 +359,9 @@ export function buildStageSnapshot(
         // 快照带 `correction` 标记，展示层用**琥珀虚线框**区分 —— 审阅者要能一眼看出
         // "这块不是上游原文，是被改过的"（与 OCR 候选的青绿框区分开）。
         ...(b.kind === "text" && b.fromCorrection ? { correction: true } : {}),
+        // 表格块：带上游 HTML，展示层据此画真网格（DECISIONS §76）。
+        // 引擎不消费它；切题结果与无此字段时逐字节一致（全量 A/B 已验）。
+        ...(b.kind === "table" && b.html ? { html: b.html } : {}),
       })),
       order: layout.ordered.map((e) => e.index),
       questions: questionsByPage.get(page.index) ?? [],

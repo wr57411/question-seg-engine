@@ -215,6 +215,49 @@ function normalizeBlock(rawBlock: unknown): ParsedBlock[] {
  * `inline_equation`（brief 初稿写作 equation_inline），此处同时识别两种，
  * 保证夹具（page 1 block 4/7 含 inline_equation）的 `$..$` 内联被验证。
  */
+/**
+ * 从表格块里取上游 HTML：网格在**嵌套** `blocks[].lines[].spans[].html`。
+ * 取第一个含 `<table` 的串；没有就返回空串（调用方退回按 lines 展开）。
+ */
+function extractTableHtml(pb: Record<string, unknown>): string {
+  for (const nestedRaw of asArray(pb.blocks as unknown)) {
+    for (const lineRaw of asArray(asRecord(nestedRaw).lines as unknown)) {
+      for (const spanRaw of asArray(asRecord(lineRaw).spans as unknown)) {
+        const h = String(asRecord(spanRaw).html ?? "");
+        if (h.includes("<table")) return h;
+      }
+    }
+  }
+  return "";
+}
+
+/**
+ * 表格 HTML → 纯文本（**极简扁平化**，只给搜索/审计兜底，不承担结构还原）：
+ * 单元格按行拼接、行间换行、`<eq>` 转 `$…$`、其余标签剥掉。
+ * 结构还原由展示层的 `stages/table-html.js` 负责（那边要 rowspan/colspan）。
+ */
+function flattenTableText(html: string): string {
+  const rows: string[] = [];
+  for (const rm of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells: string[] = [];
+    for (const cm of (rm[1] ?? "").matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
+      const t = String(cm[2] ?? "")
+        .replace(/<eq>([\s\S]*?)<\/eq>/g, (_, m) => `$${String(m).trim()}$`)
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (t) cells.push(t);
+    }
+    if (cells.length) rows.push(cells.join("\t"));
+  }
+  return rows.join("\n");
+}
+
 export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocument {
   const root = asRecord(layoutRaw);
   const pages = asArray(root.pdf_info as unknown)
@@ -268,6 +311,34 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
           const img = extractLayoutImage(pb);
           if (img) blocks.push(img);
           continue;
+        }
+
+        /**
+         * **表格块**（`DECISIONS §76`）：上游把表格作为独立块给出 —— `type:"table"`、
+         * `lines` 为空、网格在**嵌套** `blocks[].lines[].spans[].html`（带 rowspan/colspan）。
+         * 旧实现走到下面 `lines.length === 0 → continue` 就把它**整块丢了**
+         * （实测 `电路-MinerU` 18 个表格、全项目 17 个，含 6 张实验数据表）。
+         *
+         * 这里产出一个 `kind:"table"` 块，`text` 只做**极简扁平化**（去标签、单元格换行拼接）
+         * 供搜索/审计兜底；结构留在 `html` 里给展示层画网格。
+         * ⚠️ 不复用 `stages/table-html.js`：解耦红线禁止 `src/` 依赖展示层。
+         */
+        if (pbType === "table") {
+          const html = extractTableHtml(pb);
+          if (html) {
+            const text = flattenTableText(html);
+            blocks.push({
+              kind: "table",
+              bbox: toBBox(pb.bbox),
+              text,
+              firstLine: text.split("\n")[0] ?? "",
+              lineCount: Math.max(1, text.split("\n").length),
+              maxFontSize: 0,
+              html,
+            });
+            continue;
+          }
+          // 取不到 html ⇒ 退回旧行为（按 lines 展开），不新增块
         }
 
         const lines = asArray(pb.lines as unknown);

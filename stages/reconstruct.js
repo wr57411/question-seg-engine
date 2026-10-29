@@ -17,6 +17,7 @@ import { baseFontOfPage, clampByWidth, fontForBlock, isVerticalText } from "./fo
 import { contentLabelPlacements } from "./uncovered-layout.js";
 import { mergePlan } from "./block-dedup.js";
 import { stackContents, tagStackPlacements } from "./tag-layout.js";
+import { parseTableHtml } from "./table-html.js";
 
 /** 阶段 1–5 的画布像素宽（与 CSS --canvas-w 一致，用于字号换算） */
 export const CANVAS_W = 760;
@@ -46,6 +47,116 @@ export function posStyle(node, bbox, w, h) {
   node.style.top = `${(y0 / h) * 100}%`;
   node.style.width = `${((x1 - x0) / w) * 100}%`;
   node.style.height = `${((y1 - y0) / h) * 100}%`;
+  return node;
+}
+
+/**
+ * 表格节点：按块 bbox 落位，内部按上游 HTML 的行/列画真网格（`DECISIONS §76`）。
+ *
+ * 为什么用内联样式：`stages/` 与 `final/` 各有自己的 CSS，但**共用本渲染器**。
+ * 把表格样式写成内联，能保证两处一定长得一样（红线「纸面重建只此一处实现」）。
+ *
+ * 解析不出行时返回 null ⇒ 调用方退回普通文本渲染（**不丢内容**）。
+ */
+/**
+ * 按内容给每列分配宽度比例（`DECISIONS §76`）。
+ *
+ * 为什么不用等宽：`table-layout:fixed` 默认等分，但教辅表格列宽差异极大
+ * （「电源的总功率」很窄、公式列很宽）。等分会让宽列内容挤成很多行 ⇒ 纵向溢出
+ * ⇒ 只能靠缩字号解决 ⇒ 字小到看不清。按内容长度分配后，同样高度能装下更大字号。
+ *
+ * 口径：每列取「该列所有单元格的字符数 / colspan」的最大值，再归一化成百分比。
+ * 纯确定性（只看文字量），不猜语义。
+ */
+export function tableColWidths(rows, cols) {
+  if (!rows.length || cols <= 0) return [];
+  const chars = new Array(cols).fill(1);
+  for (const r of rows) {
+    let c = 0;
+    for (const cell of r.cells) {
+      const per = Math.max(1, (cell.text || "").length) / cell.colspan;
+      for (let k = 0; k < cell.colspan && c + k < cols; k++) chars[c + k] = Math.max(chars[c + k], per);
+      c += cell.colspan;
+    }
+  }
+  const total = chars.reduce((a, b) => a + b, 0) || 1;
+  // 下限 8%：太窄的列会把字挤成竖排，反而更高
+  const raw = chars.map((n) => Math.max(8, (n / total) * 100));
+  const sum = raw.reduce((a, b) => a + b, 0);
+  return raw.map((n) => (n / sum) * 100);
+}
+
+/**
+ * 按「框宽/框高 + 单元格文字量 + 列宽比例」估算能装下的字号（`DECISIONS §76`）。
+ *
+ * 为什么需要：表格 bbox 是**原卷真实区域**，内容超出就会压到下面的正文
+ * （2026-10-29 实测：表4 溢出 69px，直接叠在「教材素材变式…」上）。
+ * 不能等渲染后量（`tableNode` 建节点时还没进文档，`clientHeight` 是 0），
+ * 所以用字符数做确定性估算，从给定字号往下收敛到装得下为止。
+ *
+ * 口径：CJK 按 1em/字、行高 1.2、单元格上下 padding 各 1px。
+ * 宁可估得保守（字号偏小）也不要溢出压字。
+ */
+export function fitTableFont(rows, widths, boxWpx, boxHpx, startSize) {
+  if (!rows.length || !widths.length || boxWpx <= 0 || boxHpx <= 0) return startSize;
+  const totalW = widths.reduce((a, b) => a + b, 0) || 1;
+  for (let fs = startSize; fs > 6; fs -= 0.5) {
+    let total = 0;
+    for (const r of rows) {
+      let rowLines = 1;
+      let c = 0;
+      for (const cell of r.cells) {
+        let frac = 0;
+        for (let k = 0; k < cell.colspan && c + k < widths.length; k++) frac += widths[c + k] / totalW;
+        c += cell.colspan;
+        const cellWpx = boxWpx * frac;
+        const perLine = Math.max(1, Math.floor(cellWpx / fs));
+        const lines = Math.max(1, Math.ceil((cell.text || "").length / perLine));
+        if (lines > rowLines) rowLines = lines;
+      }
+      total += rowLines * fs * 1.2 + 2;
+    }
+    if (total <= boxHpx) return fs;
+  }
+  return 6;
+}
+
+export function tableNode(b, p, canvasW = CANVAS_W, baseFont = null) {
+  const { rows, cols } = parseTableHtml(b.html);
+  if (!rows.length) return null;
+  const node = posStyle(el("div", "blk blk-table kind-table"), b.bbox, p.width, p.height);
+  node.title = "上游表格（按 spans[].html 的 rowspan/colspan 还原网格）";
+  const startSize = clampByWidth(fontForBlock(b, p.width, canvasW, baseFont, p.blocks), b, p.width, canvasW);
+  const scale = canvasW / p.width;
+  const boxWpx = (b.bbox[2] - b.bbox[0]) * scale;
+  const boxHpx = (b.bbox[3] - b.bbox[1]) * scale;
+  const widths = tableColWidths(rows, cols);
+  const size = fitTableFont(rows, widths, boxWpx, boxHpx, startSize);
+  const table = el("table");
+  // ⚠️ `white-space:normal` 是必须的：`.blk` 全局 `white-space:nowrap`（行级块按原坐标排一行），
+  // 表格继承它就不换行 ⇒ 单元格内容溢出、被 `.canvas{overflow:hidden}` 裁掉右半边
+  // （2026-10-29 首轮截图实测：第三列文字全部被切）。
+  table.style.cssText = `width:100%;height:100%;border-collapse:collapse;table-layout:fixed;white-space:normal;font-size:${size}px;line-height:1.15;`;
+  const colgroup = el("colgroup");
+  for (const w of widths) {
+    const col = el("col");
+    col.style.width = `${w.toFixed(2)}%`;
+    colgroup.append(col);
+  }
+  table.append(colgroup);
+  for (const r of rows) {
+    const tr = el("tr");
+    for (const cell of r.cells) {
+      const td = el("td");
+      if (cell.rowspan > 1) td.rowSpan = cell.rowspan;
+      if (cell.colspan > 1) td.colSpan = cell.colspan;
+      td.style.cssText = "border:1px solid rgba(0,0,0,.35);padding:1px 3px;vertical-align:top;white-space:normal;word-break:break-word;overflow-wrap:anywhere;";
+      td.innerHTML = prettifyLatex(cell.text);
+      tr.append(td);
+    }
+    table.append(tr);
+  }
+  node.append(table);
   return node;
 }
 
@@ -91,7 +202,28 @@ export function mergeContext(p) {
  *  `candidateStyle=false` ⇒ OCR 补入行**按普通正文样式**渲染（成品页的默认外观），
  *  但 title 仍写明来源（G1 的信息不丢，只是不抢视觉）。 */
 export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", candidateStyle = true) {
-  const nodes = p.blocks.map((b) => blockNode(b, p, canvasW, baseFont, mergeCtx, doc));
+  // ── 表格（DECISIONS §76）──
+  // 表格块自带 bbox（就是表格整块框）。被这个框**完整覆盖**的其它行块，其文本已由网格呈现
+  // ⇒ 不再重复画（否则网格上叠一层压平文字，正是用户看到的「几行乱字」）。
+  // 判据是**几何包含**（确定性），不是"猜哪些块属于表格"。
+  const tableBlocks = p.blocks.filter((b) => b.kind === "table" && b.html);
+  const coveredByTable = new Set();
+  for (const t of tableBlocks) {
+    const [rx0, ry0, rx1, ry1] = t.bbox;
+    for (const b of p.blocks) {
+      if (b === t) continue;
+      const [x0, y0, x1, y1] = b.bbox;
+      if (x0 >= rx0 - 1 && y0 >= ry0 - 1 && x1 <= rx1 + 1 && y1 <= ry1 + 1) coveredByTable.add(b.i);
+    }
+  }
+  const nodes = p.blocks.map((b) => {
+    if (coveredByTable.has(b.i)) return null;
+    if (b.kind === "table" && b.html) {
+      const tn = tableNode(b, p, canvasW, baseFont);
+      if (tn) return tn;
+    }
+    return blockNode(b, p, canvasW, baseFont, mergeCtx, doc);
+  });
   // `ocr: true` 的块是**从 OCR 候选补进来的题号行**（上游整行漏识别，见 export-stages 的
   // injectOcrQuestionLines）⇒ 默认用青绿候选样式渲染，绝不与引擎原文混淆（G1）。
   nodes.forEach((n, i) => {
