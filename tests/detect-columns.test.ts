@@ -49,3 +49,11 @@ test("参数可注入：收紧 minClusterBlocks 后小簇可成第二栏簇", ()
   assert.equal(detectColumns(blocks([...main, ...aside]), 596, { ...DEFAULT_COLUMN_PARAMS, minClusterBlocks: 5 }), 2);
   assert.equal(detectColumns(blocks([...main, ...aside]), 596, { ...DEFAULT_COLUMN_PARAMS, minClusterBlocks: 8 }), 1);
 });
+
+test("双栏 + 居中表格形成第三 x 簇：按首尾簇距仍判两栏", () => {
+  const left = Array.from({ length: 12 }, (_, i) => 100 + i * 2);
+  const middle = Array.from({ length: 12 }, (_, i) => 600 + i * 2);
+  const right = Array.from({ length: 12 }, (_, i) => 1100 + i * 2);
+  // 页宽 2093：前两簇距 500 < 25%×2093=523，首尾簇距 1000 > 523
+  assert.equal(detectColumns(blocks([...left, ...middle, ...right]), 2093), 2);
+});

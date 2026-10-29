@@ -113,7 +113,12 @@ export function detectColumns(
 ): number {
   const centers = detectColumnCenters(entries, pageWidth, params);
   const width = pageWidth > 0 ? pageWidth : 1654;
-  if (centers.length >= 2 && (centers[1] ?? 0) - (centers[0] ?? 0) > width * params.minGapRatio) return 2;
+  // 用**首尾簇**判栏距：居中表格/栏目标签会在左右栏之间形成第三个稠密 x 簇
+  // （2026-10-29《曲线运动》MinerU 页实测 [165,657,1094]，前两簇距 23.5% 被误判单栏，
+  //  整页按 y 排序 ⇒ 右栏选项插进左栏题干）。领域只有两栏；三栏版式不在本项目范围。
+  const first = centers[0] ?? 0;
+  const last = centers[centers.length - 1] ?? 0;
+  if (centers.length >= 2 && last - first > width * params.minGapRatio) return 2;
   return 1;
 }
 

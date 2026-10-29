@@ -15,10 +15,17 @@ import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { OxrResponse } from "./oxr-convert.js";
 
-const FREE_ENDPOINT = "https://free-oxr.somark.cn/api/v1/parse/sync";
-/** 免费档硬限制 */
-const MAX_BYTES = 10 * 1024 * 1024;
-const MAX_PAGES = 20;
+/**
+ * 解析通道：默认免费档；设置 OXR_BASE_URL + OXR_API_KEY 即走 SoMark 正式版。
+ * 正式版 schema 与免费版不同（小写类型/更细粒度），转换层已兼容。
+ */
+const BASE_URL = (process.env.OXR_BASE_URL ?? "https://free-oxr.somark.cn/api/v1").replace(/\/$/, "");
+const API_KEY = process.env.OXR_API_KEY ?? "dummy";
+const FORMAL = !BASE_URL.includes("free-oxr");
+const ENDPOINT = `${BASE_URL}/parse/sync`;
+/** 免费档硬限制；正式版单文件上限 200MB、无 20 页限制 */
+const MAX_BYTES = FORMAL ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
+const MAX_PAGES = FORMAL ? 2000 : 20;
 /** 单片上传超时（免费档排队，实测 15 页约 2 分钟） */
 const TIMEOUT_MS = 420_000;
 
@@ -57,12 +64,12 @@ async function parseOne(pdfPath: string, retries: number): Promise<Page[]> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const form = new FormData();
-      form.append("api_key", "dummy"); // 免费档必须存在但不校验
+      form.append("api_key", API_KEY);
       form.append("file", new Blob([readFileSync(pdfPath)], { type: "application/pdf" }), basename(pdfPath));
-      form.append("formats[]", "json");
+      form.append(FORMAL ? "output_formats[]" : "formats[]", "json");
       form.append("keep_header_footer", "false");
 
-      const resp = await fetch(FREE_ENDPOINT, {
+      const resp = await fetch(ENDPOINT, {
         method: "POST",
         body: form,
         signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -96,7 +103,10 @@ export async function parsePdfWithOxr(pdfPath: string, opts: ParseOptions = {}):
   const retries = opts.retries ?? 2;
   const total = pdfPageCount(pdfPath);
   const bytes = statSync(pdfPath).size;
-  log(`原卷 ${total} 页 / ${(bytes / 1024 / 1024).toFixed(1)}MB（免费档限 ${MAX_PAGES} 页 / 10MB）`);
+  log(
+    `原卷 ${total} 页 / ${(bytes / 1024 / 1024).toFixed(1)}MB` +
+      `（${FORMAL ? "正式版" : `免费档限 ${MAX_PAGES} 页 / 10MB`}）`,
+  );
 
   const needsSplit = total > MAX_PAGES || bytes > MAX_BYTES;
   if (!needsSplit) {
