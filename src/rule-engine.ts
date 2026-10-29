@@ -24,6 +24,7 @@ import {
   stripQuestionPrefix,
 } from "./patterns.js";
 import type {
+  Band,
   BBox,
   ImageRef,
   IndexedBlock,
@@ -166,6 +167,14 @@ class Ctx {
    * 遇到章/节标题或卷尾即清空。
    */
   private bandTitle = "";
+  /** 教辅栏目板块条目（`DECISIONS §78`）；由 `buildBands()` 在收尾时统一生成 */
+  private bands: Band[] = [];
+  /** 板块边界标记（按全局块序）：`band` 开板块、`end` 关板块 */
+  private bandMarks: { index: number; type: "band" | "end"; title?: string }[] = [];
+  /** 全局块索引 → (页, 页内下标, 文本)，供板块条目按页归组 */
+  private blockSlots = new Map<number, { page: number; within: number; text: string }>();
+  /** 每页已处理块数（算页内下标用） */
+  private pageSeen = new Map<number, number>();
   /** 章/节标题时间线（按 (页, y) 排序）—— 见 buildHeadingTimeline */
   private headings: {
     page: number;
@@ -239,6 +248,17 @@ class Ctx {
       this.processAnswerBlock(block, blockIndex);
       return;
     }
+
+    // **板块归组记账**（`DECISIONS §78`）：只记录 (页, 页内下标, 文本)，不改任何切题判定。
+    // 页内下标按「本页已处理块数」递增 —— 与 `stages.json` 的 `pages[].blocks` 同序
+    // （两者都走 `layoutPage()` 的阅读顺序）。答案区块不记账：板块不会跨进答案区。
+    const withinPage = this.pageSeen.get(entry.pageIndex) ?? 0;
+    this.pageSeen.set(entry.pageIndex, withinPage + 1);
+    this.blockSlots.set(blockIndex, {
+      page: entry.pageIndex,
+      within: withinPage,
+      text: block.kind === "text" || block.kind === "table" ? block.text : "",
+    });
 
     /**
      * **表格块**（`DECISIONS §76`）：只归属当前题，**不参与任何题号/选项判定**。
@@ -318,7 +338,13 @@ class Ctx {
           ? Number(this.current.number) + 1
           : null
         : 1;
-      const glued = matchGluedQuestionNumber(block.firstLine, expected);
+      // 板块内的知识小标题不能走黏连通道（`DECISIONS §78`）：
+      // `1伏安法测电源电动势和内阻` 与真题 `1小天同学用如图1所示…` 形状同族，
+      // 靠 isBandSubheading 的「有句读即不是小标题」区分 —— 后者带句号，仍然切题。
+      const glued =
+        this.bandTitle && isBandSubheading(block.text)
+          ? null
+          : matchGluedQuestionNumber(block.firstLine, expected);
       if (glued !== null) {
         this.settleOptions(null);
         // 剥掉行首题号（`2为了…` → `为了…`），其余文本原样进题干
@@ -372,6 +398,7 @@ class Ctx {
         this.section = "";
         this.extractBand = false;
         this.bandTitle = "";
+        this.bandMarks.push({ index: blockIndex, type: "end" });
         return;
       }
       case "section": {
@@ -384,10 +411,12 @@ class Ctx {
         // 而节号参与「题号唯一键」⇒ 后面同号题会跨节错配（`DECISIONS §78`）。
         if (m.band) {
           this.bandTitle = (m.title ?? block.text).trim();
+          this.bandMarks.push({ index: blockIndex, type: "band", title: this.bandTitle });
           this.extractBand = /^教材知识萃取/.test(block.text.trim());
           return;
         }
         this.bandTitle = "";
+        this.bandMarks.push({ index: blockIndex, type: "end" });
         this.sectionNo = m.captured || (m.indexNumeral ?? "");
         this.section = block.text.trim();
         this.extractBand = /^教材知识萃取/.test(block.text.trim());
@@ -655,12 +684,54 @@ class Ctx {
     }
   }
 
+  /**
+   * 由 `bandMarks` 切出板块区间并生成 `Band`（`DECISIONS §78`）。
+   *
+   * 区间 = [本板块头块, 下一个结构头块)。区间内的块**全部**归本板块 —— 包括被题目
+   * 认领的块：板块只回答「这一段属于哪个栏目」，不与题目争所有权。
+   * 跨页的板块按页拆成多条、共享 `bandKey`（快照与 viewer 都按页消费）。
+   */
+  private buildBands(): Band[] {
+    const out: Band[] = [];
+    let seq = 0;
+    for (let i = 0; i < this.bandMarks.length; i++) {
+      const m = this.bandMarks[i]!;
+      if (m.type !== "band") continue;
+      // 上界：下一个结构头；没有后继标记时用「本册块总数」收口
+      // （不能用 MAX_SAFE_INTEGER —— 那会让循环从板块头一路跑到无穷大，实测直接把进程跑死）
+      const stop = this.bandMarks[i + 1]?.index ?? this.stats.totalBlocks;
+      const bandKey = `${this.doc.docId}:band${++seq}`;
+      const byPage = new Map<number, { idx: number[]; text: string[] }>();
+      for (let g = m.index; g < stop; g++) {
+        const slot = this.blockSlots.get(g);
+        if (!slot) continue;
+        const bucket = byPage.get(slot.page) ?? { idx: [], text: [] };
+        bucket.idx.push(slot.within);
+        if (slot.text) bucket.text.push(slot.text);
+        byPage.set(slot.page, bucket);
+      }
+      for (const [page, b] of [...byPage.entries()].sort((a, z) => a[0] - z[0])) {
+        out.push({
+          id: `${bandKey}:p${page}`,
+          bandKey,
+          title: m.title ?? "",
+          pageIndex: page,
+          blockIndexes: b.idx,
+          text: b.text.join("\n"),
+          status: "needs_review",
+        });
+      }
+    }
+    return out;
+  }
+
   result(questions: Question[]): SegmentationResult {
     this.stats.questions = questions.length;
     this.stats.reviewCount = this.reviews.length;
     return {
       docId: this.doc.docId,
       questions,
+      bands: this.buildBands(),
       reviews: this.reviews,
       stats: this.stats,
       answerEntries: this.answers,

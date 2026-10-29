@@ -15,6 +15,8 @@ const state = {
   answersVisible: false,
   filter: "all",
   questions: [],
+  /** 教辅栏目板块条目（`bands.json`，可选增强：缺文件时为空数组，不影响主列表） */
+  bands: [],
   reviewMode: false, // true 时显示质检队列视图（showReview），false 显示主列表（showOverview）
 };
 
@@ -24,10 +26,19 @@ const icon = (id, cls = "icon") =>
 
 /* ---------------- 数据加载（doc 容错：失败时回退默认一次，并给出明确提示） ---------------- */
 async function load() {
-  return loadWithFallback(
+  const res = await loadWithFallback(
     async (doc) => fetch(`../data/out/${encodeURIComponent(doc)}/questions.json`),
     DOC,
   );
+  // 栏目板块（`DECISIONS §78`）是**可选增强**：老产物没有 bands.json，
+  // 缺文件/坏 JSON 都不该让题目列表打不开 ⇒ 静默降级为空数组。
+  try {
+    const r = await fetch(`../data/out/${encodeURIComponent(res.effectiveDoc)}/bands.json`);
+    state.bands = r.ok ? await r.json() : [];
+  } catch {
+    state.bands = [];
+  }
+  return res;
 }
 
 /* ---------------- 契约适配 ---------------- */
@@ -200,6 +211,28 @@ function updateStats() {
   }
 }
 
+/* ---------------- 渲染：栏目板块卡（DECISIONS §78） ---------------- */
+/**
+ * 板块条目不冒充题目：标题栏显示「板块」而不是题号，也不进 Total/ok/review 计数。
+ * 目的只有一个 —— 让「教材实验 10 长度的测量」这类栏目里的内容在按题浏览时也能找到，
+ * 而不是像以前那样要么被切成假题、要么彻底消失。
+ */
+function renderBandCard(b) {
+  const card = document.createElement("article");
+  card.className = "card band-card";
+  card.id = `band-${String(b.id).replace(/[^\w:-]/g, "_")}`;
+  const preview = (b.text || "").slice(0, 360);
+  card.innerHTML = `
+    <header class="card-head">
+      <span class="q-id">板块</span>
+      <span class="q-section">${escapeHtml(b.title)}</span>
+      <span class="q-type">p${b.pageIndex + 1}</span>
+    </header>
+    <p class="band-note">本页栏目内容（${(b.blockIndexes || []).length} 块）不是独立题目，按栏目归属展示。</p>
+    ${preview ? `<p class="stem band-text">${escapeHtml(preview)}${(b.text || "").length > preview.length ? "…" : ""}</p>` : ""}`;
+  return card;
+}
+
 function applyFilter() {
   const flow = $("#paper");
   const vis = state.questions.filter((q) => state.filter === "all" || q.type === state.filter);
@@ -219,8 +252,30 @@ function applyFilter() {
     flow.appendChild(empty);
     return;
   }
-  // 骨架屏保留至首屏渲染完成即可
-  vis.forEach((q, i) => flow.appendChild(renderCard(q, i)));
+  // 板块卡按页插在题目流里。同页的板块**排在该页题目之后**：
+  // questions.json 里没有「题目在本页的块位置」，硬把板块放在页首会把它前面的题推到后面
+  // （实测 p1 三张板块卡把第 1 题挤到了第三张卡下面）。宁可顺序粗一点，也不能打乱题目顺序。
+  const bands = [...(state.bands || [])].sort((a, b) => a.pageIndex - b.pageIndex);
+  const placed = new Set();
+  const placeBandsBefore = (page) => {
+    for (const b of bands) {
+      if (!placed.has(b.id) && b.pageIndex < page) {
+        flow.appendChild(renderBandCard(b));
+        placed.add(b.id);
+      }
+    }
+  };
+  vis.forEach((q, i) => {
+    const pm = /:p(\d+):/.exec(q.id || "");
+    placeBandsBefore(pm ? Number(pm[1]) : -1);
+    flow.appendChild(renderCard(q, i));
+  });
+  for (const b of bands) {
+    if (!placed.has(b.id)) {
+      flow.appendChild(renderBandCard(b));
+      placed.add(b.id);
+    }
+  }
   renderToc();
   // 重建卡片是全新的 DOM：按 state 统一回填答案可见性，并重新渲染 KaTeX 公式
   applyAnswerVisibility();

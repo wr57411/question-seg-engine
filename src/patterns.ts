@@ -119,7 +119,7 @@ const SECTION_HEAD_ALT = /^(专题[　\s]*(.{0,26})|全章综合测试\s*(.{0,26
  * 的题干/选项（电路 p1 选项 D 里混进「教材知识萃取…答案 P046」）。
  */
 const BAND_HEAD =
-  /^[☑□▶■●◆◇○•·\-—]?\s*(教材知识萃取|教材素材变式|教材实验\s*\d+|教材知识\s*\d+|教材模型\s*\d+|教材模型攻略)/;
+  /^[☑□▶■●◆◇○•·\-—]?\s*(教材知识萃取|教材素材变式|教材实验\s*\d+|教材知识\s*\d+|教材模型\s*\d+|教材模型攻略|大单元素养聚焦|素养演练|单元设计)/;
 const VARIANT_HEAD = /^[☑□▶■●◆◇○•·\-—]?\s*变式\s*(\d{1,2})[　\s]+(.{1,30})$/;
 
 /**
@@ -351,6 +351,18 @@ export function matchFirstLine(line: string): LineMatch {
 
   const arabic = ARABIC_QUESTION.exec(s);
   if (arabic) {
+    /**
+     * **折行残片守卫**（`DECISIONS §78`）：`1)条刻线的总长度相等。常见的几种卡尺分类`
+     * 是原文 `(n-1)条刻线…` 被 PDF 折断后的尾巴，不是题号。
+     *
+     * 判据只有一条：分隔符后**紧跟量词/标签字**（与 `§77` 的 `GLUED_NOT_QUESTION_CHARS`
+     * 同一份语义；此处内联，避免跨定义顺序引用）。真题号后面接的是「下列/如图/某」这类
+     * 起句字，不会是「条/个/种/题/页」。
+     * 宁漏不误：真出现 `1)条…` 的真题会退回题干，不会凭空造题。
+     */
+    const tail =
+      /^[1-9]\d{0,2}\s*[．、)）]([题个种条根块只张段次名位台辆本页章节道项分度所示米秒])/.exec(s);
+    if (tail) return { ok: false, kind: "other" };
     return { ok: true, kind: "question_no", captured: arabic[1] ?? arabic[2] ?? "" };
   }
 

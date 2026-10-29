@@ -179,9 +179,43 @@ export interface SegmentationStats {
   columnsPerPage: number[];
 }
 
+/**
+ * **教辅栏目板块条目**（`DECISIONS §78`）：`教材实验 10 长度的测量…` / `教材知识萃取 …` /
+ * `教材素材变式 …` 这类栏目下的内容归属。
+ *
+ * 为什么单独一个结构、不塞进 `Question`：
+ * 1) 板块**没有题号**。`audit-numbering` 的 N1（纯数字）与 N6（1–99）**不可豁免**，
+ *    编一个号进去必然判红，还会污染 `(章, 节, 题号)` 唯一键与 `bank` 配对；
+ * 2) 板块是**结构容器**，一个板块内可能既有真题、也有知识条目 —— 它不抢题目的所有权。
+ *
+ * 块被题目认领时**同时**属于板块（双重引用）：板块只增加「这一段属于哪个栏目」的信息，
+ * 不改变任何切题判定。
+ */
+export interface Band {
+  /** 条目唯一键：`<docId>:p<pageIndex>:b<page 内序号>` */
+  id: string;
+  /** 同一板块跨页时共享的键：`<docId>:band<自增>` —— 用来把跨页的多条拼回一个板块 */
+  bandKey: string;
+  /** 板块头原文（含栏目标题，如 `教材实验 10 长度的测量及其测量工具的选取`） */
+  title: string;
+  /** 本条目所属页（0 基） */
+  pageIndex: number;
+  /**
+   * 归属本板块的块索引（**该页内的下标**，与 `stages.json` 的 `pages[].blocks` 直接对齐）。
+   * 引擎内部用的是全局块序，`buildBands()` 落库前已换算成页内下标。
+   */
+  blockIndexes: number[];
+  /** 本条目覆盖的文字（拼接，供检索/预览；不含图片） */
+  text: string;
+  /** 板块内容不保证被切成了正确题目 ⇒ 一律待人确认，不静默算「已通过」 */
+  status: "needs_review";
+}
+
 export interface SegmentationResult {
   docId: string;
   questions: Question[];
+  /** 教辅栏目板块条目（见 `Band`）；没有栏目头的册为空数组 */
+  bands: Band[];
   reviews: ReviewNote[];
   stats: SegmentationStats;
   /** 答案区原始条目（供调试/演进） */

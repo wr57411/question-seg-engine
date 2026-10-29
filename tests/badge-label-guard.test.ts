@@ -44,3 +44,16 @@ test("徽标题号回归：数字紧跟方括号仍是题号", () => {
   assert.equal(m.ok && m.kind, "question_no");
   assert.equal(m.ok && m.captured, "2");
 });
+
+// 折行残片（`DECISIONS §78`）：`1)条刻线的总长度相等。…` 是原文 `(n-1)条刻线…` 被折断的尾巴。
+// 判据：分隔符后紧跟量词/标签字（与 §77 的 GLUED_NOT_QUESTION_CHARS 同一份语义）。
+test("折行残片：「1)条刻线的总长度相等」不是题号", () => {
+  const m = matchFirstLine("1)条刻线的总长度相等。常见的几种卡尺分类");
+  assert.notEqual(m.ok && m.kind, "question_no");
+});
+
+test("折行残片守卫不漏真题：「1）下列说法正确的是」仍是题号", () => {
+  const m = matchFirstLine("1）下列说法正确的是");
+  assert.equal(m.ok && m.kind, "question_no");
+  assert.equal(m.ok && m.captured, "1");
+});

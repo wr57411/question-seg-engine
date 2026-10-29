@@ -365,3 +365,28 @@ body.review-mode .review-btn.is-active { background: var(--cinnabar); border-col
   .main { margin: 0; }
   .card { box-shadow: none; page-break-inside: avoid; }
 }
+
+/* 栏目板块卡（DECISIONS §78）：内容是栏目归属，不是题目 —— 视觉上要弱于题目卡，
+   否则用户会把「板块」当成又一种题号。 */
+.card.band-card {
+  border-left: 3px solid rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.015);
+}
+.band-card .q-id {
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+.band-note {
+  margin: 2px 0 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.band-text {
+  opacity: 0.85;
+}
+
+/* 骨架条：`hidden` 属性只有 UA 的 display:none，会被上面的 display:flex 覆盖 ——
+   实测每本册的题目列表顶部都固定挂着 3 张空白卡（2026-10-29）。这里显式收口。 */
+.skeleton-strip[hidden] {
+  display: none;
+}
