@@ -70,3 +70,12 @@ npm run check:accuracy          # 同 --gate
 - `gold/物理_教材基础练 电路.pilot.json`：6 题（p1 第1-2题、p2 第3-6题），从原卷页图转写；complete:false。
 - 两本已加入 `gold/registry.json`（status=pilot-verified）；融合产出当前对这两份小金标
   **R100/S100/O100**（磁场 4 题 / 电路 6 题），但仍是部分金标，不能当整本准确率。
+
+
+## MinerU-only 新书试点（2026-10-29）
+
+- `gold/物理_教材基础练 曲线运动.pilot.json`：3 题（p1 第2-4题），页图转写；complete:false。
+- `gold/物理_教材基础练万有引力.pilot.json`：3 题（p1 第1题、p2 第2-3题），页图转写；complete:false。
+- 用途：在 OXR 429 时先量 MinerU-only 是否可用。结果：两本 recall 均 **2/3**（各漏一道徽标题），
+  曲线运动匹配题 strict/选项 **0%**（文本/选项不可用），万有引力匹配题 strict/选项 **100%**。
+  ⇒ MinerU-only 不足以验收；OXR 恢复后走 `fuse:doc`。

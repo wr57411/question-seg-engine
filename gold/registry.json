@@ -83,6 +83,24 @@
       "sourcePdf": "data/batch-inbox/物理_教材基础练 电路.pdf",
       "status": "pilot-verified",
       "gold": "gold/物理_教材基础练 电路.pilot.json"
+    },
+    {
+      "docId": "物理_教材基础练 曲线运动",
+      "class": "A",
+      "pages": 18,
+      "questions": 56,
+      "sourcePdf": "data/batch-inbox/物理_教材基础练 曲线运动.pdf",
+      "status": "pilot-verified",
+      "gold": "gold/物理_教材基础练 曲线运动.pilot.json"
+    },
+    {
+      "docId": "物理_教材基础练万有引力",
+      "class": "A",
+      "pages": 9,
+      "questions": 25,
+      "sourcePdf": "data/batch-inbox/物理_教材基础练万有引力.pdf",
+      "status": "pilot-verified",
+      "gold": "gold/物理_教材基础练万有引力.pilot.json"
     }
   ]
 }
