@@ -1,21 +1,24 @@
 // scripts/fuse-doc.ts —— 两源融合落盘（MinerU 几何 + OXR 文本）。
 //
-// 用法：
-//   tsx scripts/fuse-doc.ts <docId> [--mineru <dir>] [--oxr <dir>] [--no-export] [--no-meta]
-// 默认：OXR 目录 data/out/<docId>，MinerU 目录 data/out/<docId>-MinerU。
+// 用法（OXR 主产物）：
+//   tsx scripts/fuse-doc.ts <docId> [--mineru <dir>] [--oxr <dir>] [--out <dir>] [--no-export] [--no-meta]
+//   npm run fuse:doc -- "教材基础练 磁场"
+//
+// 用法（MinerU 主产物 + OXR 第二源）：
+//   npm run fuse:doc -- "<docId>" --mineru "data/out/<docId>" --oxr "data/out/<docId>-OXR" --out "data/out/<docId>"
 //
 // 行为：
 // 1. 读两源 layout.json → fuseDocuments；
-// 2. 备份 OXR layout 为 layout.oxr.json（只备份一次），写回融合后的 layout.json；
-//    把 MinerU images 复制进 OXR 目录（融合块的图片路径来自 MinerU）；
+// 2. 备份输出目录原主产物（OXR 主 → layout.oxr.json；MinerU 主 → layout.mineru.json，只备份一次）；
+//    写融合后的 layout.json；把 MinerU images 复制到输出目录（融合块图片来自 MinerU）；
 // 3. 写 fuse.json（统计/来源/时间，可审计）；
 // 4. 默认重导快照 + 刷新 meta（parser=fuse）。
+import { basename, join, resolve } from "node:path";
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, resolve } from "node:path";
 import { fuseDocuments } from "../src/fuse.js";
 import { normalizeLayout } from "../src/normalize.js";
-import type { ParsedBlock, ParsedDocument } from "../src/types.js";
+import type { ParsedBlock } from "../src/types.js";
 
 const args = process.argv.slice(2);
 const docId = args[0] ?? "";
@@ -24,21 +27,29 @@ const flag = (name: string): string | undefined => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 if (!docId) {
-  console.error("用法：tsx scripts/fuse-doc.ts <docId> [--mineru <dir>] [--oxr <dir>] [--no-export] [--no-meta]");
-  process.exit(2);
-}
-const oxrDir = resolve(flag("--oxr") ?? join("data", "out", docId));
-const mineruDir = resolve(flag("--mineru") ?? join("data", "out", `${docId}-MinerU`));
-const backup = join(oxrDir, "layout.oxr.json");
-const oxrLayout = existsSync(backup) ? backup : join(oxrDir, "layout.json");
-const mineruLayout = join(mineruDir, "layout.json");
-if (!existsSync(oxrLayout) || !existsSync(mineruLayout)) {
-  console.error(`缺 layout：\n  OXR ${oxrLayout}\n  MinerU ${mineruLayout}`);
+  console.error(
+    "用法：tsx scripts/fuse-doc.ts <docId> [--mineru <dir>] [--oxr <dir>] [--out <dir>] [--no-export] [--no-meta]",
+  );
   process.exit(2);
 }
 
-const oxr = normalizeLayout(JSON.parse(readFileSync(oxrLayout, "utf8")), docId);
-const mineru = normalizeLayout(JSON.parse(readFileSync(mineruLayout, "utf8")), `${docId}-MinerU`);
+const oxrDir = resolve(flag("--oxr") ?? join("data", "out", docId));
+const mineruDir = resolve(flag("--mineru") ?? join("data", "out", `${docId}-MinerU`));
+const outDir = resolve(flag("--out") ?? oxrDir);
+const outId = flag("--id") ?? basename(outDir);
+const oxrPrimary = outDir === oxrDir;
+const mineruPrimary = outDir === mineruDir;
+
+const oxrBackup = join(oxrDir, "layout.oxr.json");
+const oxrSource = existsSync(oxrBackup) ? oxrBackup : join(oxrDir, "layout.json");
+const mineruSource = join(mineruDir, "layout.json");
+if (!existsSync(oxrSource) || !existsSync(mineruSource)) {
+  console.error(`缺 layout：\n  OXR ${oxrSource}\n  MinerU ${mineruSource}`);
+  process.exit(2);
+}
+
+const oxr = normalizeLayout(JSON.parse(readFileSync(oxrSource, "utf8")), docId);
+const mineru = normalizeLayout(JSON.parse(readFileSync(mineruSource, "utf8")), `${docId}-MinerU`);
 const fused = fuseDocuments(mineru, oxr);
 
 function rawBlock(b: ParsedBlock): Record<string, unknown> {
@@ -62,22 +73,33 @@ const raw = {
   })),
 };
 
-if (!existsSync(backup)) copyFileSync(oxrLayout, backup);
-writeFileSync(oxrLayout, JSON.stringify(raw, null, 1));
+const backupName = oxrPrimary ? "layout.oxr.json" : mineruPrimary ? "layout.mineru.json" : "layout.source.json";
+const backup = join(outDir, backupName);
+if (!existsSync(backup)) {
+  const original = oxrPrimary ? oxrSource : mineruPrimary ? mineruSource : join(outDir, "layout.json");
+  if (!existsSync(original)) {
+    console.error(`缺输出目录原主产物：${original}`);
+    process.exit(2);
+  }
+  copyFileSync(original, backup);
+}
+writeFileSync(join(outDir, "layout.json"), JSON.stringify(raw, null, 1));
 
-if (existsSync(join(mineruDir, "images"))) {
-  mkdirSync(join(oxrDir, "images"), { recursive: true });
-  cpSync(join(mineruDir, "images"), join(oxrDir, "images"), { recursive: true });
+if (outDir !== mineruDir && existsSync(join(mineruDir, "images"))) {
+  mkdirSync(join(outDir, "images"), { recursive: true });
+  cpSync(join(mineruDir, "images"), join(outDir, "images"), { recursive: true });
 }
 
 writeFileSync(
-  join(oxrDir, "fuse.json"),
+  join(outDir, "fuse.json"),
   JSON.stringify(
     {
-      docId,
+      docId: outId,
       generatedAt: new Date().toISOString(),
-      mineruLayout,
-      oxrLayout: backup,
+      mineruLayout: mineruSource,
+      oxrLayout: oxrSource,
+      outLayout: join(outDir, "layout.json"),
+      backup,
       stats: fused.stats,
     },
     null,
@@ -85,21 +107,22 @@ writeFileSync(
   ),
 );
 console.log(
-  `✓ 融合 ${docId}：页 ${fused.stats.pages} · 对齐 ${fused.stats.matched} · 改文 ${fused.stats.textChanged}` +
-    ` · OXR独有 ${fused.stats.oxrOnly} · MinerU独有 ${fused.stats.mineruOnly} · 低覆盖 ${fused.stats.lowCoverage}`,
+  `✓ 融合 ${outId}：页 ${fused.stats.pages} · 对齐 ${fused.stats.matched} · 改文 ${fused.stats.textChanged}` +
+    ` · OXR独有 ${fused.stats.oxrOnly} · MinerU独有 ${fused.stats.mineruOnly} · 低覆盖 ${fused.stats.lowCoverage}` +
+    ` · 去重 ${fused.stats.deduped}`,
 );
 
 if (!args.includes("--no-export")) {
-  execFileSync(process.execPath, ["--import", "tsx", join("scripts", "export-stages.ts"), docId, oxrLayout], {
+  execFileSync(process.execPath, ["--import", "tsx", join("scripts", "export-stages.ts"), outId, join(outDir, "layout.json")], {
     stdio: "inherit",
   });
 }
 if (!args.includes("--no-meta")) {
-  const origin = [join(oxrDir, `${docId}_origin.pdf`), join(oxrDir, "origin.pdf")].find((p) => existsSync(p));
+  const origin = [join(outDir, `${outId}_origin.pdf`), join(outDir, "origin.pdf")].find((p) => existsSync(p));
   if (origin) {
     execFileSync(
       process.execPath,
-      ["--import", "tsx", join("scripts", "daily.ts"), origin, "--id", docId, "--meta-only"],
+      ["--import", "tsx", join("scripts", "daily.ts"), origin, "--id", outId, "--meta-only"],
       { stdio: "inherit" },
     );
   } else {
