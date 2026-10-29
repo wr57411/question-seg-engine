@@ -1124,7 +1124,18 @@ function main(): void {
       });
       originPages = readdirSync(pagesDir).filter((f) => f.endsWith(".png")).length;
     } catch {
-      console.log("  pdftoppm 不可用或渲染失败，原卷对照降级为 PDF 内嵌");
+      // pdftoppm 不可用、或运行环境禁止执行它时，**不要直接放弃原卷对照**：
+      // 上一轮渲染好的页图如果张数与本次解析页数一致，说明它们仍对应当前 PDF，可以复用
+      // （否则展示层降级成 PDF 内嵌，浏览器里可能整块空白 —— 2026-10-29 实测）。
+      // 张数不一致 ⇒ 可能是旧 PDF 的页图，**宁可不显示也不能错配**（对照源错了比没有更坏）。
+      const pagesDir = join(outDir, "pages");
+      const have = existsSync(pagesDir) ? readdirSync(pagesDir).filter((f) => f.endsWith(".png")).length : 0;
+      if (have > 0 && have === doc.pages.length) {
+        originPages = have;
+        console.log(`  pdftoppm 不可用或渲染失败，复用已有原卷页图 ${have} 张（张数与本次解析页数一致）`);
+      } else {
+        console.log("  pdftoppm 不可用或渲染失败，原卷对照降级为 PDF 内嵌");
+      }
     }
   }
 
