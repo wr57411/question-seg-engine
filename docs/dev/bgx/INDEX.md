@@ -2,7 +2,7 @@
 
 - 更新时间：2026-10-29T14:55:00+08:00
 - 技能版本：bgx 2.2.0
-- 项目：`question-seg-engine`（当前 worktree：`feature/oxr` @ `c5b7eda`，工作区干净）
+- 项目：`question-seg-engine`（当前 worktree：`feature/oxr` @ `b4df121`，工作区干净，已推送）
 - 性质：bgx **从属资料索引**；项目唯一跨 Agent 交接入口仍是 [`docs/HANDOFF.md`](../../HANDOFF.md)
 
 ## 本次主题
@@ -93,6 +93,29 @@
 **待授权**：本轮代码+文档改动**未提交**（`src/patterns.ts`、`src/rule-engine.ts`、
 `tests/answer-zone-guard.test.ts`、`docs/DECISIONS.md`、`docs/HANDOFF.md`、`AGENTS.md`、
 `README.md`、本索引）。产物 `data/out/答案册-合订本/*` 已重生成（git 忽略，不入库）。
+
+## 2026-10-29 交接前收尾（用户「ok」授权 ①–⑥）
+
+用户列出交接前剩余 6 项，本轮处理结果：
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| ① 提交本轮改动 | 完成，2 提交 | `6f002b6` fix(engine) + `f80ed5a` docs |
+| ② §6-23 跨书误配 56 条 | **完成** | `bank-bindings.json` 显式绑定 + `scripts/pair-quality.ts` 内容尺子；配对 476→420；反向验证退出码 1 |
+| ③ 曲线 p3#1 选错根因 | **完成（归因更正）** | 实际是 `运动和力 p3#1`（旧日志 `doc.slice(0,6)` 截断同名）；根因是「都过结构校验 ⇒ 选 OXR」在**两源不同题**时等于掷硬币 |
+| ④ 8% 仲裁率复验 | **完成（换口径）** | 新增 `audit:arbitration`：826 个对齐键上**需介入 10.0%**（一致 90.0%）；36 题金标无法扩样，改为全量可测口径 |
+| ⑤ 成品页表格/页眉 | **未修，已定位（P1）** | 根因不在渲染层：MinerU 的 `type:"table"` 块（`lines:[]`，网格在 `blocks[].lines[].spans[].html`）被 `normalize` **整块丢弃**。见 HANDOFF §6-25 |
+| ⑥ batch 自动选源接线 | **完成** | `scripts/select-auto.ts` 逐题选源 + batch 接线；金标 88.9% vs 按书 80.6%，**选源错 0** |
+
+提交：`6f002b6` / `f80ed5a` / `64af281` / `b7dc387` / `ff5f2c3` / `b4df121`，已推送 `origin/feature/oxr`，未推送 0。
+质量门：`npm run check` **317/317**、渲染审计 8/8、配对 420 条内容尺子全达标。
+决策记录新增 §71–§75；HANDOFF 新增 §6-25（表格块丢失）。
+
+**⑤ 为什么没做完**：正确修法要动 `normalize` 的切题输入（表格文字从「无」变「有」），
+按项目红线必须走全量题数 A/B + 8 卷渲染审计 + 逐页截图审板。本轮试过「只改显示层 +
+融合回填」的捷径，实测数据链路走不通（融合产物里根本没有 table 块），且重跑 `电路`
+融合让题数 33→31 ⇒ 判定必须单独立项。**代码与产物已全部回滚，工作区干净**（避免留下
+半接线的死代码）。待做四步写在 HANDOFF §6-25。
 
 ## 历史
 
