@@ -19,6 +19,11 @@ export interface TextMatch {
   title?: string;
   /** 选项键，如 "A" */
   optionKey?: string;
+  /**
+   * 该 `section` 是**教辅栏目板块头**（`教材实验 10 …` / `教材知识萃取 …` / `教材素材变式 …`），
+   * 不是章/节。区别很重要：节号参与「题号唯一键」，板块头不能覆盖它（`DECISIONS §78`）。
+   */
+  band?: boolean;
 }
 
 export type LineMatch = TextMatch | { ok: false; kind: "other" };
@@ -51,8 +56,15 @@ const ARABIC_QUESTION = /^([1-9]\d{0,2})\s*\.(?!\s*\d)|^([1-9]\d{0,2})[．、)�
  * 守卫（AND）：数字后必须是 `[`/`【`，或**四位年份**（后不接数字）—— 不接普通中文/字母，
  * 避免把「10 m 的…」「2 个…」这类正文数字当成题号。年份后可能没有「年」字
  * （实测 `4 2024 广西卷`；MinerU 还会粘成 `42024广西卷`），故不要求「年」。
+ *
+ * `题` 必须在排除名单里（2026-10-29 实测）：出处标注在折行处会留下
+ * `5 题设问变式] 如图是…` 这样的残片，行首「5 + 空格 + 题」会命中，
+ * 于是上一题题干被截成 `3[鲁科版必修三 P115 第`（14 字），正文被搬进一道
+ * 假的第 5 题、并与真正的第 5 题同号。全 15 册扫描该形态 3 处，全是这种残片。
+ * 与 `§77` 的 `GLUED_NOT_QUESTION_CHARS` 同口径：数字后接「题」是标签的一部分。
  */
-const BARE_BADGE_QUESTION = /^([1-9]\d{0,2})\s*(?=[\[【「]|\d{4}(?!\d))|^([1-9]\d{0,2})\s+(?!个|种|条|根|块|只|次|段|米|秒|名|位|张|台|辆|本|页|道|项)[\u4e00-\u9fa5]/;
+const BARE_BADGE_QUESTION =
+  /^([1-9]\d{0,2})\s*(?=[\[【「]|\d{4}(?!\d))|^([1-9]\d{0,2})\s+(?!个|种|条|根|块|只|次|段|米|秒|名|位|张|台|辆|本|页|道|项|题)[\u4e00-\u9fa5]/;
 
 /**
  * 括号小题号：（1） / (2) / （3），常见于解答题大题内。
@@ -106,7 +118,8 @@ const SECTION_HEAD_ALT = /^(专题[　\s]*(.{0,26})|全章综合测试\s*(.{0,26
  * 实测（2026-10-28《教材基础练 磁场/电路》）：漏掉它们时，栏目标题会被并进上一题
  * 的题干/选项（电路 p1 选项 D 里混进「教材知识萃取…答案 P046」）。
  */
-const BAND_HEAD = /^[☑□▶■●◆◇○•·\-—]?\s*(教材知识萃取|教材素材变式|教材知识\s*\d+|教材模型\s*\d+|教材模型攻略)/;
+const BAND_HEAD =
+  /^[☑□▶■●◆◇○•·\-—]?\s*(教材知识萃取|教材素材变式|教材实验\s*\d+|教材知识\s*\d+|教材模型\s*\d+|教材模型攻略)/;
 const VARIANT_HEAD = /^[☑□▶■●◆◇○•·\-—]?\s*变式\s*(\d{1,2})[　\s]+(.{1,30})$/;
 
 /**
@@ -300,7 +313,7 @@ export function matchFirstLine(line: string): LineMatch {
     }
     const band = BAND_HEAD.exec(s);
     if (band) {
-      return { ok: true, kind: "section", captured: "", title: s };
+      return { ok: true, kind: "section", captured: "", title: s, band: true };
     }
     const variant = VARIANT_HEAD.exec(s);
     if (variant) {
@@ -424,8 +437,38 @@ export function stripQuestionPrefix(line: string): string {
     .trimStart();
 }
 
-/** 剥离块首的选项前缀，返回选项文本 */
-export function stripOptionPrefix(line: string): string {
+/**
+ * 教辅栏目**板块内的知识小标题**（不是题号）——`DECISIONS §78`。
+ *
+ * 实测（2026-10-29《教材基础练 电路》p6 原卷页图）：栏目「教材实验 10 长度的测量」下面是
+ * `1. 游标卡尺` + 【工作原理】+【读数方法】、`2. 螺旋测微器` + 【工作原理】…
+ * 它们是**讲解条目**，不是题。当前引擎把它们当成题号 1、2，于是：
+ *   ① 题库混进假题；② 同组题号重号；③ 「2. 螺旋测微器」那道假题一路延伸到 p7/p9/p10，
+ *   把三页实验内容全吞进去。
+ *
+ * 判据取最严（AND，任一不满足即「是题」）：
+ *   - 剥离题号后首行**没有句读**（`。，；：！？`）—— 题干是句子，小标题不是；
+ *   - 分支 A：整块就是一行，且 ≤ 8 字（`游标卡尺` 4、`螺旋测微器` 5；`下列说法正确的是` 9 被挡）；
+ *   - 分支 B：块内有 `【…】` 小标题，且首行 ≤ 18 字（`安阻法、伏阻法测电源电动势和内阻` 16）。
+ * 宁可漏判（把知识条目当题）也不误判（把真题当知识条目）——漏判只是继续脏，误判是丢题。
+ *
+ * ⚠️ 调用方还必须保证「处于教辅栏目板块内」——本函数只看块的形状，不看上下文。
+ */
+export function isBandSubheading(text: string): boolean {
+  const lines = text
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const first = lines[0];
+  if (!first) return false;
+  const head = stripQuestionPrefix(first).trim();
+  if (!head) return false;
+  if (/[。，,；;：:！!？?]/.test(head)) return false;
+  if (lines.length === 1) return head.length <= 8;
+  return head.length <= 18 && /【[^】]{1,12}】/.test(text);
+}
+
+/** 剥离块首的选项前缀，返回选项文本 */export function stripOptionPrefix(line: string): string {
   return line.trimStart().replace(/^[A-Ha-h]\s*[.．、)）:：]/, "").trimStart();
 }
 

@@ -10,6 +10,7 @@
  */
 import { layoutPage } from "./layout.js";
 import {
+  isBandSubheading,
   isPageFurniture,
   looksLikeAnswerEntry,
   matchAnswerEntry,
@@ -159,6 +160,12 @@ class Ctx {
   private section = "";
   /** 教材知识萃取参考区：区内「1./2./3.」是表格/参考内容，不是题目（2026-10-29 新书实测） */
   private extractBand = false;
+  /**
+   * 当前所处的**教辅栏目板块**标题（`教材实验 10 …` / `教材素材变式 …` / `教材知识 N …`）；
+   * 空串 = 不在板块内。用于抑制板块内的知识编号被当成题号（`DECISIONS §78`）。
+   * 遇到章/节标题或卷尾即清空。
+   */
+  private bandTitle = "";
   /** 章/节标题时间线（按 (页, y) 排序）—— 见 buildHeadingTimeline */
   private headings: {
     page: number;
@@ -364,6 +371,7 @@ class Ctx {
         this.sectionNo = "";
         this.section = "";
         this.extractBand = false;
+        this.bandTitle = "";
         return;
       }
       case "section": {
@@ -371,6 +379,15 @@ class Ctx {
         this.settleOptions(null);
         this.current = null;
         this.boxList = null;
+        // **教辅栏目板块头**（`教材实验 10 …` 等）不是节：它没有节号，
+        // 若照节处理会把 sectionNo 清成空串、把 section 覆盖成栏目名，
+        // 而节号参与「题号唯一键」⇒ 后面同号题会跨节错配（`DECISIONS §78`）。
+        if (m.band) {
+          this.bandTitle = (m.title ?? block.text).trim();
+          this.extractBand = /^教材知识萃取/.test(block.text.trim());
+          return;
+        }
+        this.bandTitle = "";
         this.sectionNo = m.captured || (m.indexNumeral ?? "");
         this.section = block.text.trim();
         this.extractBand = /^教材知识萃取/.test(block.text.trim());
@@ -390,6 +407,21 @@ class Ctx {
       case "question_no": {
         if (this.extractBand) {
           this.review(blockIndex, `教材知识萃取栏内的编号条目「${m.captured}.」不是题目（参考表格内容）`, this.current);
+          return;
+        }
+        // **教辅栏目板块内的知识编号**不是题号（`DECISIONS §78`）：
+        // 原卷上 `1. 游标卡尺` / `2. 螺旋测微器` 是讲解条目（后跟【工作原理】【读数方法】），
+        // 被切成题会让题库混进假题、同组题号重号，且最后一道假题会跨页吞掉 p7/p9/p10 的正文。
+        // 判据见 `patterns.isBandSubheading`（最严 AND，宁可漏判）。
+        // 不丢内容：块照常并入当前题；无当前题时块仍在快照 blocks 里（成品页照旧按块渲染）。
+        if (this.bandTitle && isBandSubheading(block.text)) {
+          this.settleOptions(null);
+          this.appendToCurrent(block.text, blockIndex);
+          this.review(
+            blockIndex,
+            `教辅栏目「${this.bandTitle}」内的编号条目「${m.captured}.」不是题目（知识小标题，非题干）`,
+            this.current,
+          );
           return;
         }
         // **方框守卫**：`▶N.` 锚点之后、序号恰好 +1、且**不像答案条目**的行，
