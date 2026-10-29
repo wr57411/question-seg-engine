@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { normalizeLayout } from "../src/normalize.js";
 import { ruleStrategy } from "../src/strategy.js";
-import { scoreQuestions, type GoldDoc } from "../scripts/score.ts";
+import { scoreQuestions, type GoldDoc } from "./score.js";
 import type { Question } from "../src/types.js";
 
 const DOCS = [
