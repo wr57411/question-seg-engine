@@ -15,6 +15,7 @@ import {
   matchAnswerEntry,
   matchBoxListItem,
   matchFirstLine,
+  matchGluedQuestionNumber,
   nextKey,
   splitConjoinedOptions,
   startsWithQuestionNumber,
@@ -125,6 +126,8 @@ class Ctx {
     formulaBlocks: 0,
     /** 行内公式对数（$...$ 出现对数，同样纳入抽检分母） */
     inlineFormulas: 0,
+    /** 按「题号黏正文」规则切出的题数（DECISIONS §77；0 表示本册没有这种形态） */
+    gluedQuestions: 0,
     columnsPerPage: [] as number[],
   };
 
@@ -288,6 +291,38 @@ class Ctx {
     }
 
     const m = matchFirstLine(block.firstLine);
+
+    /**
+     * **题号黏正文**（`DECISIONS §77`）：`2为了减少阻力…` —— 数字紧跟汉字，无分隔符。
+     * 只在「形状完全没匹配上 + 序号恰好接上一题」时才认，判据见
+     * `patterns.ts` 的 `matchGluedQuestionNumber`。
+     * 为什么要在这里补：实验题整类切不出来（含实验标记 8 页里 5 页 0 题），
+     * 而实验题的题号常常就长这样。
+     */
+    if (m.kind === "other" && !this.extractBand && !this.boxList) {
+      /**
+       * 期望题号：
+       * - 有当前题 ⇒ 上一题 + 1（序号连续，最强的信号）；
+       * - **无当前题**（刚过章/节标题，或本册首题）⇒ 只认 `1`（节内题号从 1 重启）。
+       *   少了这条，节边界上的黏连题号（`1小天同学用如图1所示…`）永远切不出来。
+       */
+      const expected = this.current
+        ? /^\d{1,2}$/.test(this.current.number)
+          ? Number(this.current.number) + 1
+          : null
+        : 1;
+      const glued = matchGluedQuestionNumber(block.firstLine, expected);
+      if (glued !== null) {
+        this.settleOptions(null);
+        // 剥掉行首题号（`2为了…` → `为了…`），其余文本原样进题干
+        const stripped = block.firstLine.trimStart().replace(/^\d{1,2}/, "");
+        const restText = block.text.trimStart().replace(/^\d{1,2}/, "");
+        this.openDraft(glued, { text: restText }, entry);
+        this.stats.gluedQuestions = (this.stats.gluedQuestions ?? 0) + 1;
+        this.review(blockIndex, `题号黏正文：按「第 ${glued} 题」切分（原行「${stripped.slice(0, 24)}…」）`, this.current);
+        return;
+      }
+    }
 
     // 方框内编号列表的锚点 `▶1. …`（方法技巧/易错警示方框）：记下起始编号，
     // 后续「序号恰好 +1」的行按方框条目处理（见 patterns.ts 的 BOX_LIST_BULLET）。

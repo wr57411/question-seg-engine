@@ -369,6 +369,52 @@ export function matchAnswerEntry(line: string): { number: string; text: string }
  * 分支 1 与 ARABIC_QUESTION 同款：数字与半角点间空格容忍、负前瞻跳空白后断言非数字、
  * 首位数字 1-9，保证「判定层接受的题号形态，剥离层一定剥得掉」（"1 . 设" 剥为 "设"），
  * 也保证「判定层拒的（`0.$5…`），剥离层一个字都不动」（题干原文必须原样保留）。 */
+/**
+ * **题号黏正文**识别（`DECISIONS §77`）：`2为了减少阻力对实验结果的影响…`
+ *
+ * 为什么单独一个函数而不是放宽 `ARABIC_QUESTION`：`ARABIC_QUESTION` 只认
+ * `N.` / `N、` / `N[` 等**有分隔符**的形态。而实验题的题号常直接黏在正文前
+ * （实测 `机械能守恒` p13：`2为了减少阻力…`），既没点也没空格 ⇒ 整道实验题切不出来
+ * （含实验标记的 8 页里 5 页 0 题，62%）。
+ *
+ * 为什么不能只靠形状：全量扫描「数字紧跟汉字」有 247 行，绝大多数是**续行**
+ * （`30m,汽车减速…`、`45°时…`、`2m的货车…`）或**表格/栏目**内容
+ * （`10分度、20分度`、`2必刷考点`）。放宽形状必然造出大量假题。
+ *
+ * ⇒ 判据取最严（AND，任一不满足即不认）：
+ *   1. 行首是 1~2 位数字，**紧跟**一个汉字（无空格、无标点、无单位字母）；
+ *   2. 该数字**必须等于上一题题号 + 1**（序号连续 —— 这是最强的信号，
+ *      续行里的 `30m`/`45°`/`2m` 几乎不可能恰好等于上一题 +1）；
+ *   3. 整行长度 ≥ 12（真题干是长句；`1所示`、`2所受…` 这类续行碎片更短）；
+ *   4. 调用方保证：不在答案区、不在方框列表、不在教材知识萃取区、有当前题目。
+ * @param line 块首行（已 trimStart）
+ * @param expectedNext 期望的下一题题号（上一题 + 1）；未知时传 null
+ * @returns 题号字符串；不满足判据返回 null
+ */
+/**
+ * 「数字紧跟它 ⇒ 不是题号」的字：量词、标签字、比较/连接词。
+ * 只收高置信的，宁可漏切也不造出假题（假题会污染题库与配对）。
+ */
+const GLUED_NOT_QUESTION_CHARS = /^[题个种条根块只张段次名位台辆本页章节道项分度所示米秒克牛伏安欧瓦焦倍比之与和及的了是有在]$/;
+
+export function matchGluedQuestionNumber(line: string, expectedNext: number | null): string | null {
+  if (expectedNext === null || !Number.isFinite(expectedNext) || expectedNext < 1) return null;
+  const s = line.trimStart();
+  const m = /^([1-9]\d{0,1})([\u4e00-\u9fa5])/.exec(s);
+  if (!m) return null;
+  const num = Number(m[1]);
+  if (num !== expectedNext) return null;
+  // 紧跟字守卫：数字后面接的是**量词/标签字**时，这个数字不是题号。
+  // 实测反例（磁场 p4）：原文 `3题模型变式]如图所示…` —— 「3」是标签「第3题」的一部分，
+  // 按题号切出来的题干以「题模型变式]」开头（标签残片），属于误报。
+  // 名单只收「数字后接它必然不是题号」的字，宁漏不误。
+  if (GLUED_NOT_QUESTION_CHARS.test(m[2] ?? "")) return null;
+  // 长度守卫：真题干是长句。12 是实测下界（最短的真例 `2宇宙中存在一些…` 远长于 12；
+  // 而 `1所示，粒子运动时间最长时轨` 这类续行碎片被这条挡住）
+  if (s.length < 12) return null;
+  return m[1] ?? null;
+}
+
 export function stripQuestionPrefix(line: string): string {
   return line
     .trimStart()
