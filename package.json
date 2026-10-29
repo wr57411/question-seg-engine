@@ -24,6 +24,7 @@
     "audit:attribution": "tsx scripts/audit-attribution.ts",
     "report:generalization": "tsx scripts/generalization.ts",
     "bank:all": "tsx scripts/bank-all.ts",
+    "audit:pair": "tsx scripts/pair-quality.ts",
     "audit:render:all": "node scripts/audit-render-all.mjs",
     "audit:render:baseline": "node scripts/audit-render-all.mjs --baseline",
     "view:lan": "HOST=0.0.0.0 tsx scripts/view-server.ts",
