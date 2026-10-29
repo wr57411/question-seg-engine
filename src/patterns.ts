@@ -52,7 +52,7 @@ const ARABIC_QUESTION = /^([1-9]\d{0,2})\s*\.(?!\s*\d)|^([1-9]\d{0,2})[．、)�
  * 避免把「10 m 的…」「2 个…」这类正文数字当成题号。年份后可能没有「年」字
  * （实测 `4 2024 广西卷`；MinerU 还会粘成 `42024广西卷`），故不要求「年」。
  */
-const BARE_BADGE_QUESTION = /^([1-9]\d{0,2})\s*(?=[\[【]|\d{4}(?!\d))/;
+const BARE_BADGE_QUESTION = /^([1-9]\d{0,2})\s*(?=[\[【「]|\d{4}(?!\d))|^([1-9]\d{0,2})\s+(?!个|种|条|根|块|只|次|段|米|秒|名|位|张|台|辆|本|页|道|项)[\u4e00-\u9fa5]/;
 
 /**
  * 括号小题号：（1） / (2) / （3），常见于解答题大题内。
@@ -106,8 +106,8 @@ const SECTION_HEAD_ALT = /^(专题[　\s]*(.{0,26})|全章综合测试\s*(.{0,26
  * 实测（2026-10-28《教材基础练 磁场/电路》）：漏掉它们时，栏目标题会被并进上一题
  * 的题干/选项（电路 p1 选项 D 里混进「教材知识萃取…答案 P046」）。
  */
-const BAND_HEAD = /^(教材知识萃取|教材素材变式|教材知识\s*\d+)/;
-const VARIANT_HEAD = /^变式\s*(\d{1,2})[　\s]+(.{1,30})$/;
+const BAND_HEAD = /^[☑□▶■●◆◇○•·\-—]?\s*(教材知识萃取|教材素材变式|教材知识\s*\d+|教材模型\s*\d+|教材模型攻略)/;
+const VARIANT_HEAD = /^[☑□▶■●◆◇○•·\-—]?\s*变式\s*(\d{1,2})[　\s]+(.{1,30})$/;
 
 /**
  * 必刷题页顶的**分组行**：`必刷知识T1~2、4~5、7~8、10、12`
@@ -333,7 +333,7 @@ export function matchFirstLine(line: string): LineMatch {
 
   const badge = BARE_BADGE_QUESTION.exec(s);
   if (badge) {
-    return { ok: true, kind: "question_no", captured: badge[1] ?? "" };
+    return { ok: true, kind: "question_no", captured: badge[1] ?? badge[2] ?? "" };
   }
 
   const opt = OPTION_LINE.exec(s);
@@ -363,7 +363,7 @@ export function stripQuestionPrefix(line: string): string {
   return line
     .trimStart()
     .replace(/^[1-9]\d{0,2}\s*\.(?!\s*\d)|^[1-9]\d{0,2}\s*[．、)）]/, "")
-    .replace(/^[1-9]\d{0,2}\s*(?=[\[【]|\d{4}(?!\d))/, "")
+    .replace(/^[1-9]\d{0,2}\s*(?=[\[【「]|\d{4}(?!\d))|^[1-9]\d{0,2}\s+(?=(?!个|种|条|根|块|只|次|段|米|秒|名|位|张|台|辆|本|页|道|项)[\u4e00-\u9fa5])/, "")
     .replace(/^[（(]\s*\d{1,2}\s*[)）]/, "")
     .trimStart();
 }

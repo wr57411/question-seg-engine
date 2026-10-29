@@ -106,7 +106,7 @@
       "docId": "物理_教材基础练 运动和力",
       "class": "A",
       "pages": 10,
-      "questions": 21,
+      "questions": 24,
       "sourcePdf": "data/batch-inbox/物理_教材基础练 运动和力.pdf",
       "status": "pilot-verified",
       "gold": "gold/物理_教材基础练 运动和力.pilot.json"

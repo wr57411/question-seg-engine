@@ -164,7 +164,7 @@ export function normForScore(s: string): string {
     .replace(/[\s${}\\_^~]/g, "")
     .replace(/²/g, "2")
     .replace(/³/g, "3")
-    .replace(/[，。；：、,.;:!?（）()【】《》“”"'']/g, "")
+    .replace(/[，。；：、,.;:!?（）()【】《》“”"''「」]/g, "")
     .toLowerCase();
 }
 
