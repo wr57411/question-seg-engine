@@ -48,11 +48,16 @@
   <div class="notice" id="notice" hidden></div>
   <div class="hits" id="hits" hidden aria-label="搜索结果"></div>
   <div class="toast" id="toast" hidden></div>
+  <div class="pick-undo" id="pick-undo" hidden>
+    <span id="pick-undo-text"></span>
+    <button id="pick-undo-btn" type="button">撤销</button>
+  </div>
   <main id="book" aria-label="重建纸面"></main>
 
   <section class="pick-tray" id="pick-tray" hidden aria-label="挑题托盘">
     <div class="pick-head">
       <span class="pick-title" id="pick-title">未选题</span>
+      <button class="pick-same" id="pick-same" type="button" disabled>同上题</button>
       <button class="pick-close" id="pick-close" type="button">收起</button>
     </div>
     <div class="pick-lanes" id="pick-rows" hidden>

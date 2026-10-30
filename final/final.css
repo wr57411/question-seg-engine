@@ -94,12 +94,16 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pick-title .muted { color: var(--ink-soft); }
-.pick-close {
+.pick-same, .pick-close {
   flex: none; min-height: 36px; padding: 0 12px;
   border: 1px solid var(--line); border-radius: 3px;
   background: transparent; color: var(--ink-soft);
   font-family: var(--sans); font-size: 12.5px; cursor: pointer;
 }
+.pick-same {
+  border-color: var(--ink); color: var(--ink);
+}
+.pick-same:disabled { opacity: .35; cursor: default; border-color: var(--line); }
 .pick-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; }
 .pick-lanes[hidden] { display: none; }
 .pick-lane { display: flex; align-items: center; gap: 7px; min-width: 0; height: 44px; }
@@ -456,6 +460,25 @@ body.pick-mode .q-chip .teach-badge { opacity: 1; }
 .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
 /* 挑题托盘常驻时，提示条要浮在托盘上方，不能压在类别 chip 上 */
 body.pick-mode #toast { bottom: calc(112px + env(safe-area-inset-bottom)); }
+
+.pick-undo {
+  position: fixed; left: 50%; bottom: calc(112px + env(safe-area-inset-bottom));
+  transform: translateX(-50%); z-index: 61;
+  display: flex; align-items: center; gap: 10px;
+  max-width: 92vw; padding: 5px 6px 5px 14px;
+  background: #2f2b25; color: #fff; border-radius: 999px;
+  box-shadow: 0 8px 22px rgba(43, 42, 38, .25);
+  font-family: var(--sans); font-size: 13px;
+}
+.pick-undo[hidden] { display: none; }
+.pick-undo button {
+  flex: none; min-height: 36px; padding: 0 12px;
+  border: 0; border-radius: 999px; background: #fff; color: var(--ink);
+  font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+@media (pointer: coarse) {
+  .pick-same, .pick-close, .pick-undo button { min-height: 44px; }
+}
 
 /* ── 命中高亮（2s 后自动褪去，由 JS 移除 class） ── */
 @keyframes chipHit {

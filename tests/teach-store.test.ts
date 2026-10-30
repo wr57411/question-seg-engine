@@ -15,6 +15,7 @@ import {
   normalizeTeachBindings,
   normalizeTeachList,
   orderByRecent,
+  replaceBinding,
   sameAsPrevious,
   toggleCategory,
   toggleTopic,
@@ -124,6 +125,20 @@ test("新建：id 碰撞时重试，仍碰撞则拒绝", () => {
   const bad = addTeachItem(list, "另一个", "tp", () => "tp-dup");
   assert.equal(bad.created, false);
   assert.ok(bad.error);
+});
+
+test("撤销：replaceBinding 精确恢复/删除，不动其它题", () => {
+  let s = toggleTopic(emptyTeachBindings(), "q1", "tp-1", anchor);
+  s = toggleCategory(s, "q1", "ct-1", anchor);
+  const saved = s.bindings.find((b) => b.questionId === "q1")!;
+  s = toggleTopic(s, "q1", "tp-1", anchor); // q1 只剩类别
+  s = toggleTopic(s, "q2", "tp-9", anchor); // 另一题
+  s = replaceBinding(s, "q1", saved);
+  assert.deepEqual(assignmentFor(s, "q1"), { topicIds: ["tp-1"], categoryIds: ["ct-1"] });
+  assert.deepEqual(assignmentFor(s, "q2"), { topicIds: ["tp-9"], categoryIds: [] }, "其它题不受影响");
+  s = replaceBinding(s, "q1", null);
+  assert.equal(s.bindings.some((b) => b.questionId === "q1"), false);
+  assert.equal(s.bindings.some((b) => b.questionId === "q2"), true);
 });
 
 test("最近使用：移到最前、去重、截断；清单按最近重排", () => {

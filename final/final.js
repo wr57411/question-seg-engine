@@ -31,11 +31,14 @@ import {
   addTeachItem,
   assignmentFor,
   badgeCounts,
+  bindingFor,
   emptyTeachBindings,
   loadTeachBindings,
   loadTeachLibrary,
   moveToFront,
   orderByRecent,
+  replaceBinding,
+  sameAsPrevious,
   saveTeach,
   saveTeachBindings,
   toggleCategory,
@@ -74,6 +77,8 @@ const state = {
   teach: null, // {topics, categories, bindings, error}
   recent: { topics: [], categories: [] }, // 最近使用的专题/类别（本机 localStorage）
   creating: null, // 'topics' | 'categories' | null：托盘内联新建
+  lastClassified: null, // 本会话最近一次已归类题 {doc, questionId, assignment, label}
+  undo: null, // 最近一次可撤销动作 {doc, qid, pageIndex, prevBinding, nextBinding}
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
@@ -205,6 +210,7 @@ function updatePickTray() {
   renderPickRows();
   if (!state.picked) {
     title.textContent = state.pickMode ? "先点一道题" : "未选题";
+    updateSameButton();
     return;
   }
   const { q, p } = state.picked;
@@ -213,6 +219,7 @@ function updatePickTray() {
   title.textContent = `p${p.index + 1} · 第${q.number}题${counts}`;
   const full = state.byId?.get(q.id);
   title.title = String(full?.stem ?? "").split("\n")[0]?.trim().slice(0, 80) ?? "";
+  updateSameButton();
 }
 
 function renderPickRows() {
@@ -268,7 +275,7 @@ function togglePick(kind, id, name) {
   const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
   const next = kind === "topics" ? toggleTopic(before, q.id, id, anchor) : toggleCategory(before, q.id, id, anchor);
   bumpRecent(kind, id);
-  commitTeach(next, `${on ? "已移出" : "已放入"}：${name}`, before, p);
+  commitTeach(next, `${on ? "已移出" : "已放入"}：${name}`, before, { qid: q.id, pageIndex: p.index });
 }
 
 function clearTeachNotice() {
@@ -281,14 +288,107 @@ function clearTeachNotice() {
   }
 }
 
+const cloneBinding = (b) =>
+  b
+    ? {
+        questionId: b.questionId,
+        topicIds: [...b.topicIds],
+        categoryIds: [...b.categoryIds],
+        ...(b.anchor ? { anchor: { ...b.anchor } } : {}),
+      }
+    : null;
+
+function assignmentLabel(a) {
+  const names = [
+    ...a.topicIds.map((id) => state.teach?.topics.find((t) => t.id === id)?.name ?? id),
+    ...a.categoryIds.map((id) => state.teach?.categories.find((c) => c.id === id)?.name ?? id),
+  ];
+  return names.join(" · ");
+}
+
+function updateSameButton() {
+  const btn = $("pick-same");
+  if (!btn) return;
+  const prev = state.lastClassified;
+  const cur = state.picked;
+  const can = !!(prev && cur && prev.doc === state.doc && prev.questionId !== cur.q.id);
+  btn.disabled = !can;
+  btn.title = can ? `复制「${prev.label}」到本题` : "先给另一道题归类后才能同上题";
+}
+
+function rememberClassified(qid, assignment) {
+  if (assignment.topicIds.length || assignment.categoryIds.length) {
+    state.lastClassified = {
+      doc: state.doc,
+      questionId: qid,
+      assignment: { topicIds: [...assignment.topicIds], categoryIds: [...assignment.categoryIds] },
+      label: assignmentLabel(assignment),
+    };
+  } else if (state.lastClassified?.questionId === qid) {
+    state.lastClassified = null;
+  }
+  updateSameButton();
+}
+
+let undoTimer = null;
+function showUndo(label, action) {
+  state.undo = action;
+  $("pick-undo-text").textContent = label;
+  $("pick-undo").hidden = false;
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => hideUndo(), 5000);
+  const t = $("toast");
+  if (t) {
+    t.hidden = true;
+    t.classList.remove("on");
+  }
+}
+
+function hideUndo() {
+  clearTimeout(undoTimer);
+  state.undo = null;
+  const box = $("pick-undo");
+  if (box) box.hidden = true;
+}
+
+function undoLast() {
+  const a = state.undo;
+  if (!a) return;
+  hideUndo();
+  if (state.doc !== a.doc) {
+    flash("换卷后不能撤销");
+    return;
+  }
+  if (state.lastClassified?.questionId === a.qid) state.lastClassified = null;
+  const before = state.teach.bindings;
+  const next = replaceBinding(before, a.qid, a.prevBinding);
+  commitTeach(next, "已撤销", before, { qid: a.qid, pageIndex: a.pageIndex }, { undoable: false, remember: false });
+  flash("已撤销");
+  updateSameButton();
+}
+
+function applySameAsPrevious() {
+  if (!state.picked || !state.lastClassified) return;
+  const { q, p } = state.picked;
+  const prev = state.lastClassified;
+  if (prev.doc !== state.doc || prev.questionId === q.id) return;
+  const before = state.teach.bindings;
+  const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
+  const next = sameAsPrevious(before, q.id, prev.assignment, anchor);
+  commitTeach(next, `同上题：${prev.label}`, before, { qid: q.id, pageIndex: p.index });
+}
+
 let teachSaveChain = Promise.resolve();
-function commitTeach(next, label, prev, p) {
+function commitTeach(next, label, prev, ctx, opts = {}) {
+  const { qid, pageIndex } = ctx;
   state.teach = { ...state.teach, bindings: next };
   updatePickTray();
-  repaintPage(p.index);
-  flash(label);
+  repaintPage(pageIndex);
+  if (opts.undoable === false) flash(label);
 
   const doc = state.doc;
+  const prevBinding = cloneBinding(bindingFor(prev, qid));
+  const nextBinding = cloneBinding(bindingFor(next, qid));
   const payload = JSON.parse(JSON.stringify(next));
   const nextRef = next;
   teachSaveChain = teachSaveChain
@@ -296,13 +396,18 @@ function commitTeach(next, label, prev, p) {
       const r = await saveTeachBindings(doc, payload);
       if (r.ok) {
         clearTeachNotice();
+        if (opts.remember !== false) rememberClassified(qid, assignmentFor(next, qid));
+        if (opts.undoable !== false && JSON.stringify(prevBinding) !== JSON.stringify(nextBinding)) {
+          showUndo(label, { doc, qid, pageIndex, prevBinding, nextBinding });
+        }
         return;
       }
+      hideUndo();
       const rolledBack = state.doc === doc && state.teach?.bindings === nextRef;
       if (rolledBack) {
         state.teach = { ...state.teach, bindings: prev };
         updatePickTray();
-        repaintPage(p.index);
+        repaintPage(pageIndex);
       }
       notice(
         [`教学归类未能保存：${r.error ?? "未知错误"}${rolledBack ? "（本次改动已回退）" : "（后续改动仍在，未回退）"}`],
@@ -310,6 +415,7 @@ function commitTeach(next, label, prev, p) {
       );
     })
     .catch((e) => {
+      hideUndo();
       notice([`教学归类保存异常：${String(e).slice(0, 100)}`], "err");
     });
 }
@@ -386,7 +492,7 @@ async function submitCreate(e) {
   const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
   const next =
     kind === "topics" ? toggleTopic(before, q.id, res.item.id, anchor) : toggleCategory(before, q.id, res.item.id, anchor);
-  commitTeach(next, `已放入：${res.item.name}`, before, p);
+  commitTeach(next, `已放入：${res.item.name}`, before, { qid: q.id, pageIndex: p.index });
   revealChip(kind, res.item.id);
 }
 
@@ -449,6 +555,7 @@ function setPickMode(on) {
     updatePickTray();
   } else {
     closeCreate();
+    hideUndo();
     clearPickSelection();
   }
 }
@@ -870,6 +977,8 @@ async function loadDoc(doc) {
     $("detail").hidden = true; // 换卷时关掉面板，避免标签区指着上一卷的题目
     state.sheet = null;
     state.picked = null;
+    state.lastClassified = null;
+    hideUndo();
     closeCreate();
     updatePickTray();
     await loadQuestions(doc);
@@ -1161,6 +1270,8 @@ function initBar() {
 
   $("t-pick").addEventListener("click", () => setPickMode(!state.pickMode));
   $("pick-close").addEventListener("click", () => setPickMode(false));
+  $("pick-same").addEventListener("click", applySameAsPrevious);
+  $("pick-undo-btn").addEventListener("click", undoLast);
   $("pick-add-topics").addEventListener("click", () => openCreate("topics"));
   $("pick-add-categories").addEventListener("click", () => openCreate("categories"));
   $("pick-create").addEventListener("submit", (e) => void submitCreate(e));

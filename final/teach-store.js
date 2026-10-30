@@ -154,6 +154,28 @@ export function sameAsPrevious(state, questionId, prev, anchor) {
 }
 
 /**
+ * 用给定 binding 精确替换某题（含 anchor），用于撤销；binding=null 或空集合则删除该题。
+ * @param {TeachBindings} state
+ * @param {string} questionId
+ * @param {TeachBinding | null} binding
+ * @returns {TeachBindings}
+ */
+export function replaceBinding(state, questionId, binding) {
+  const rest = state.bindings.filter((b) => b.questionId !== questionId);
+  if (binding && (binding.topicIds.length || binding.categoryIds.length)) {
+    /** @type {TeachBinding} */
+    const next = {
+      questionId,
+      topicIds: [...new Set(binding.topicIds)],
+      categoryIds: [...new Set(binding.categoryIds)],
+    };
+    if (binding.anchor) next.anchor = binding.anchor;
+    rest.push(next);
+  }
+  return { ...state, bindings: rest };
+}
+
+/**
  * 最近使用排序：把 id 移到最前并截断。
  * @param {string[]} list
  * @param {string} id

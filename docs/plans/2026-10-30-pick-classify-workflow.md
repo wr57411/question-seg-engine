@@ -34,7 +34,7 @@ loop: until tests pass
 max_iterations: 3
 verify: node --import tsx --test tests/teach-store.test.ts
 
-- [ ] **Step 5: 同上题 + 撤销 + 写失败回滚（ticket 004）**
+- [x] **Step 5: 同上题 + 撤销 + 写失败回滚（ticket 004）**
 action: `teach-store` 增加 `sameAsPrevious`（替换语义）、动作快照与 `undoLast`；`final.js` 增加「同上题」按钮（无上一题/当前就是上一题时禁用）、5 秒撤销条、错误提示条；写入失败时 chip 与角标恢复写前状态；补 `tests/teach-store.test.ts` 与失败注入。
 loop: until tests pass
 max_iterations: 3
