@@ -381,17 +381,113 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
           blocks.push(block);
         }
       }
+      // **跨行折断回接**（`DECISIONS §85`）：放在这里是因为 leak 行已被挑走
+      // （`continue` 进 leaks、不进 blocks），此刻 blocks 里剩下的才是本页真正相邻的行。
+      const joined = joinBrokenBracketLines(blocks, pageWidth, pageHeight);
       return {
         index: asInt(rec.page_idx) ?? 0,
         width: asNumber(size?.[0]) ?? 1654,
         height: pageHeight,
-        blocks,
+        blocks: joined,
         leaks,
       } satisfies PageInfo & { leaks: ParsedBlock[] };
     })
     .sort((a, b) => a.index - b.index);
   const withLeaks = pages as (PageInfo & { leaks: ParsedBlock[] })[];
   return { docId, pages: dropCrossPageLeaks(withLeaks) };
+}
+
+/**
+ * **跨行折断回接**（`DECISIONS §85`）：把「上一行没收括号、下一行以 `数字)` 开头」的两行接回去。
+ *
+ * 现象（2026-10-30 实测，电路册 p6）：
+ * ```
+ * 行A: 是游标尺上的n条刻线的总长度与主尺上(n-      ← 行尾 `(n-`
+ * 行B: 1)条刻线的总长度相等。常见的几种卡尺分类     ← 行首 `1)`
+ * ```
+ * 原文是 `(n-1)条刻线`，被版面折开。切题层看到行 B 的 `1)` 就当题号 ——
+ * `§78` 用「量词黑名单」挡住了它，但那是**猜**：一旦正文改成 `1)滑块…` 就会漏。
+ * 真正的证据是结构性的：**行 A 的 `(` 没闭合，它一定在下面闭合**。
+ *
+ * 判据（三条 AND，缺一不可）：
+ * 1. 上一块最后一行**左括号多于右括号**（`(`/`（` > `)`/`）`）；
+ * 2. 本块首行以 `数字)` / `数字）` 开头；
+ * 3. **几何守卫**：本块在上一块正下方、行距很小、水平区间有重叠（同栏紧邻）。
+ *
+ * 为什么必须三条：只有 ① 时全项目命中 168 处，其中绝大多数是括号内正文的正常折行
+ * （`(不计空气阻` + `力,g取10…`）—— 那些合并会把整页段落结构并掉，是实打实的回归。
+ * ①+② 只剩 **2 处**，且都是真折断（电路 p6、答案册 p155 的 `(3+` + `57)K`）。
+ *
+ * 合并后文本**不加换行**（原文是同一句被折断，不是两段），`lineCount` 随之取 1，
+ * 保证 `lineCount` 与 `text.split("\n").length` 始终一致。
+ */
+function joinBrokenBracketLines(
+  blocks: ParsedBlock[],
+  pageWidth: number,
+  pageHeight: number,
+): ParsedBlock[] {
+  const out: ParsedBlock[] = [];
+  for (const b of blocks) {
+    const prev = out[out.length - 1];
+    if (
+      prev &&
+      prev.kind === "text" &&
+      b.kind === "text" &&
+      isBrokenTail(prev) &&
+      startsWithNumberClose(b) &&
+      isAdjacentBelow(prev, b, pageWidth, pageHeight)
+    ) {
+      out[out.length - 1] = {
+        ...prev,
+        bbox: [
+          Math.min(prev.bbox[0], b.bbox[0]),
+          prev.bbox[1],
+          Math.max(prev.bbox[2], b.bbox[2]),
+          b.bbox[3],
+        ] as BBox,
+        text: prev.text + b.text,
+        firstLine: prev.firstLine,
+        lineCount: 1,
+      };
+      continue;
+    }
+    out.push(b);
+  }
+  return out;
+}
+
+/** 上一块最后一行有未闭合左括号 ⇒ 它的闭合一定在下面。 */
+function isBrokenTail(b: ParsedBlock): boolean {
+  if (b.kind !== "text") return false;
+  const lastLine = b.text.split("\n").pop() ?? "";
+  const open = (lastLine.match(/[（(]/g) ?? []).length;
+  const close = (lastLine.match(/[）)]/g) ?? []).length;
+  return open > close;
+}
+
+/** 本块首行以 `数字)` / `数字）` 开头（折断后掉下来的闭合段）。 */
+function startsWithNumberClose(b: ParsedBlock): boolean {
+  if (b.kind !== "text") return false;
+  return /^\d{1,3}\s*[)）]/.test(b.firstLine.trim());
+}
+
+/**
+ * 几何守卫：本块紧贴上一块下方、同栏。
+ *
+ * - bbox 约定 `[x0, y0, x1, y1]`，**y 向下增长**（与 `isCrossPageLeakShape` 一致）；
+ * - 行距上限取页高 3%：实测折断处行距 38 / 页高 2994 ≈ 1.3%，留余量但不跨段；
+ * - 水平区间必须有重叠：双栏版面里左栏末行与右栏首行垂直相近，靠这一条挡掉。
+ */
+function isAdjacentBelow(
+  prev: ParsedBlock,
+  next: ParsedBlock,
+  pageWidth: number,
+  pageHeight: number,
+): boolean {
+  const gap = next.bbox[1] - prev.bbox[3];
+  if (gap < -2 || gap > Math.max(pageHeight * 0.03, 8)) return false;
+  const overlap = Math.min(prev.bbox[2], next.bbox[2]) - Math.max(prev.bbox[0], next.bbox[0]);
+  return overlap > Math.min(pageWidth * 0.1, 40);
 }
 
 /**
