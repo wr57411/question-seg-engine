@@ -89,29 +89,56 @@
 .pick-tray[hidden] { display: none; }
 .pick-head { display: flex; align-items: center; gap: 10px; height: 44px; min-width: 0; }
 .pick-title {
-  flex: 1 1 auto; min-width: 0;
-  font-family: var(--sans); font-size: 13px; color: var(--ink);
+  flex: 0 0 auto; max-width: 150px; min-width: 0;
+  font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pick-title .muted { color: var(--ink-soft); }
-.pick-combo, .pick-same, .pick-close {
-  flex: none; min-height: 36px; padding: 0 12px;
+.pick-same, .pick-close {
+  flex: none; min-height: 36px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: 3px;
   background: transparent; color: var(--ink-soft);
-  font-family: var(--sans); font-size: 12.5px; cursor: pointer;
+  font-family: var(--sans); font-size: 12px; cursor: pointer;
 }
-.pick-combo, .pick-same {
-  border-color: var(--ink); color: var(--ink);
-}
-.pick-combo:disabled, .pick-same:disabled { opacity: .35; cursor: default; border-color: var(--line); }
+.pick-same { border-color: var(--ink); color: var(--ink); }
+.pick-same:disabled { opacity: .35; cursor: default; border-color: var(--line); }
 .pick-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; }
 .pick-lanes[hidden] { display: none; }
 
-/* 常用组合：贴在托盘上方的短列表；默认不占托盘高度 */
+/* 常驻组合条：默认 3 个槽；更多横滑；长按拖动排序 */
+.combo-strip {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; padding: 2px 0; scrollbar-width: thin;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  touch-action: pan-x;
+}
+.combo-strip.dragging { touch-action: none; }
+.combo-chip {
+  flex: 0 0 calc((100% - 12px) / 3); min-width: 0; height: 40px;
+  padding: 0 8px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper-card); color: var(--ink);
+  font-family: var(--sans); font-size: 12px; line-height: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
+}
+.combo-chip.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.combo-chip.dragging { opacity: .65; transform: scale(1.03); }
+.combo-empty-chip {
+  flex: 0 0 calc((100% - 12px) / 3); height: 40px; display: flex; align-items: center; justify-content: center;
+  padding: 0 6px; border: 1px dashed var(--line); border-radius: 999px;
+  color: var(--ink-soft); font-family: var(--sans); font-size: 11px;
+}
+.combo-add-chip {
+  flex: none; width: 40px; height: 40px; padding: 0;
+  border: 1px dashed var(--line); border-radius: 50%;
+  background: transparent; color: var(--ink); font-size: 19px; line-height: 1; cursor: pointer;
+}
+.combo-add-chip:disabled { opacity: .35; cursor: default; }
+
+/* 保存组合的小浮层（只用于起名，不承载选择） */
 .combo-pop {
-  position: absolute; left: 12px; right: 12px; bottom: calc(100% + 8px); z-index: 60;
-  display: flex; flex-direction: column; gap: 6px;
-  max-height: min(52vh, 430px); padding: 8px 10px 10px;
+  position: absolute; right: 12px; bottom: calc(100% + 8px); z-index: 60;
+  width: min(400px, calc(100% - 24px));
+  display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px;
   background: var(--paper); border: 1.5px solid var(--line); border-radius: 8px;
   box-shadow: 0 14px 34px rgba(43, 42, 38, .22);
 }
@@ -122,24 +149,7 @@
   min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 3px;
   background: transparent; color: var(--ink-soft); font-family: var(--sans); font-size: 12.5px; cursor: pointer;
 }
-.combo-list { display: grid; gap: 4px; overflow-y: auto; min-height: 0; }
-.combo-row {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  min-height: 52px; padding: 7px 10px; text-align: left;
-  border: 1px solid var(--line); border-radius: 7px; background: var(--paper-card);
-  color: var(--ink); font-family: var(--sans); cursor: pointer;
-}
-.combo-row.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
-.combo-name { font-size: 14px; font-weight: 600; }
-.combo-sum { font-size: 12px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.combo-empty { margin: 2px 0; color: var(--ink-soft); font-size: 12.5px; line-height: 1.6; }
-.combo-add {
-  min-height: 44px; border: 1px dashed var(--line); border-radius: 7px;
-  background: transparent; color: var(--ink); font-family: var(--sans); font-size: 13px; cursor: pointer;
-}
-.combo-add:disabled { opacity: .4; cursor: default; }
 .combo-form { display: flex; gap: 6px; align-items: center; }
-.combo-form[hidden] { display: none; }
 .combo-name {
   flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: 6px; background: var(--paper);
@@ -152,7 +162,12 @@
 .combo-save { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .combo-hint { margin: 0; color: var(--cinnabar); font-size: 12.5px; }
 @media (pointer: coarse) {
-  .pick-combo, .pick-same, .pick-close, .combo-close { min-height: 44px; }
+  .pick-same, .pick-close, .combo-close { min-height: 44px; }
+  .combo-chip, .combo-empty-chip, .combo-add-chip { height: 44px; }
+}
+@media (max-width: 560px) {
+  .pick-title { max-width: 84px; }
+  .combo-chip, .combo-empty-chip { flex-basis: calc((100% - 6px) / 2); }
 }
 .pick-lane { display: flex; align-items: center; gap: 7px; min-width: 0; height: 44px; }
 .pick-lane-label { flex: none; width: 26px; color: var(--ink-soft); font-family: var(--sans); font-size: 12px; }

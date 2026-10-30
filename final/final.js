@@ -210,24 +210,18 @@ function updatePickTray() {
   const title = $("pick-title");
   if (!title) return;
   renderPickRows();
+  renderComboStrip();
   if (!state.picked) {
     title.textContent = state.pickMode ? "先点一道题" : "未选题";
     updateSameButton();
-    updateComboButton();
-    const pop = $("combo-pop");
-    if (pop && !pop.hidden) renderComboList();
+    closeComboPop();
     return;
   }
   const { q, p } = state.picked;
-  const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), q.id);
-  const counts = a.topicIds.length || a.categoryIds.length ? ` · 已归 ${a.topicIds.length} 专题 / ${a.categoryIds.length} 类别` : "";
-  title.textContent = `p${p.index + 1} · 第${q.number}题${counts}`;
+  title.textContent = `p${p.index + 1} · 第${q.number}题`;
   const full = state.byId?.get(q.id);
   title.title = String(full?.stem ?? "").split("\n")[0]?.trim().slice(0, 80) ?? "";
   updateSameButton();
-  updateComboButton();
-  const pop = $("combo-pop");
-  if (pop && !pop.hidden) renderComboList();
 }
 
 function renderPickRows() {
@@ -335,84 +329,68 @@ function currentAssignment() {
   return assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), state.picked.q.id);
 }
 
-function updateComboButton() {
-  const btn = $("pick-combo");
+function updateComboAdd() {
+  const btn = $("combo-add");
   if (!btn) return;
-  btn.disabled = !state.picked;
-  btn.title = state.picked ? "常用组合：点一条套到当前题" : "先点一道题";
+  const a = currentAssignment();
+  btn.disabled = !state.picked || (!a.topicIds.length && !a.categoryIds.length);
+  btn.title = btn.disabled ? "先给当前题归类，再存为组合" : "把当前题存为组合";
 }
 
-function renderComboList() {
-  const listBox = $("combo-list");
-  const empty = $("combo-empty");
-  const add = $("combo-add");
-  if (!listBox || !empty || !add) return;
-  const combos = state.teach?.combos ?? [];
+function renderComboStrip() {
+  const strip = $("combo-strip");
+  if (!strip) return;
+  updateComboAdd();
+  if (!state.picked) {
+    strip.hidden = true;
+    strip.replaceChildren();
+    return;
+  }
+  strip.hidden = false;
   const a = currentAssignment();
-  const row = (combo) => {
-    const b = el("button", "combo-row" + (comboMatches(combo, a) ? " on" : ""));
+  const combos = state.teach?.combos ?? [];
+  /** @type {HTMLElement[]} */
+  const nodes = combos.map((combo) => {
+    const b = el("button", "combo-chip" + (comboMatches(combo, a) ? " on" : ""));
     b.type = "button";
     b.dataset.id = combo.id;
-    b.append(el("span", "combo-name", combo.name), el("span", "combo-sum", comboSummary(combo)));
-    b.title = `套用组合：${combo.name}`;
-    b.addEventListener("click", () => applyCombo(combo));
+    b.textContent = combo.name;
+    b.title = `${combo.name}：${comboSummary(combo)}（长按拖动排序）`;
+    b.addEventListener("click", () => {
+      if (suppressComboClick) return;
+      applyCombo(combo);
+    });
     return b;
-  };
-  listBox.replaceChildren(...combos.map(row));
-  empty.hidden = combos.length > 0;
-  add.disabled = !state.picked || (!a.topicIds.length && !a.categoryIds.length);
-}
-
-function closeComboForm() {
-  const form = $("combo-form");
-  const add = $("combo-add");
-  const hint = $("combo-hint");
-  if (form) form.hidden = true;
-  if (add) add.hidden = false;
-  if (hint) hint.hidden = true;
+  });
+  if (!nodes.length) nodes.push(el("span", "combo-empty-chip", "暂无组合"));
+  strip.replaceChildren(...nodes);
 }
 
 function closeComboPop() {
   const pop = $("combo-pop");
   if (pop) pop.hidden = true;
-  closeComboForm();
-}
-
-function toggleComboPop() {
-  if (!state.picked) {
-    flash("先点一道题");
-    return;
-  }
-  const pop = $("combo-pop");
-  if (!pop) return;
-  pop.hidden = !pop.hidden;
-  if (!pop.hidden) {
-    const t = $("toast");
-    if (t) {
-      t.hidden = true;
-      t.classList.remove("on");
-    }
-    renderComboList();
-    closeComboForm();
-  }
+  const hint = $("combo-hint");
+  if (hint) hint.hidden = true;
+  const input = $("combo-name");
+  if (input) input.value = "";
 }
 
 function openComboForm() {
   const a = currentAssignment();
-  const hint = $("combo-hint");
   if (!state.picked || (!a.topicIds.length && !a.categoryIds.length)) {
-    if (hint) {
-      hint.hidden = false;
-      hint.textContent = "当前题还没有专题/类别，先归类再存组合";
-    }
+    flash("先给当前题归类，再存组合");
     return;
   }
-  const form = $("combo-form");
-  const add = $("combo-add");
+  const pop = $("combo-pop");
   const input = $("combo-name");
-  if (!form || !input) return;
-  form.hidden = false;
-  add.hidden = true;
+  const hint = $("combo-hint");
+  if (!pop || !input) return;
+  const t = $("toast");
+  if (t) {
+    t.hidden = true;
+    t.classList.remove("on");
+  }
+  pop.hidden = false;
   if (hint) hint.hidden = true;
   input.value = "";
   input.focus();
@@ -439,8 +417,8 @@ async function submitCombo(e) {
     return;
   }
   state.teach = { ...state.teach, combos: res.list };
-  closeComboForm();
-  renderComboList();
+  closeComboPop();
+  renderComboStrip();
 }
 
 function applyCombo(combo) {
@@ -456,17 +434,128 @@ function applyCombo(combo) {
   const cur = currentAssignment();
   if (comboMatches({ ...combo, topicIds: validTopics, categoryIds: validCategories }, cur)) {
     flash(`已经是「${combo.name}」`);
-    closeComboPop();
     return;
   }
   const before = state.teach.bindings;
   const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
   const next = sameAsPrevious(before, q.id, { topicIds: validTopics, categoryIds: validCategories }, anchor);
   commitTeach(next, `应用组合：${combo.name}`, before, { qid: q.id, pageIndex: p.index });
-  closeComboPop();
   if (missing) {
     notice([`组合「${combo.name}」有 ${missing} 项专题/类别已不存在，已跳过`], "warn");
   }
+}
+
+/* ── 组合条拖动排序：长按 380ms 进入拖动，松手写回 combos.json ── */
+let suppressComboClick = false;
+let comboPress = null;
+let comboTimer = null;
+let comboDrag = null;
+
+function comboOrder() {
+  const strip = $("combo-strip");
+  if (!strip) return [];
+  return [...strip.querySelectorAll(".combo-chip")].map((b) => b.dataset.id);
+}
+
+function bindComboDrag() {
+  const strip = $("combo-strip");
+  if (!strip) return;
+  const finish = () => {
+    clearTimeout(comboTimer);
+    comboTimer = null;
+    if (!comboDrag) {
+      comboPress = null;
+      return;
+    }
+    const drag = comboDrag;
+    comboDrag = null;
+    drag.chip.classList.remove("dragging");
+    strip.classList.remove("dragging");
+    try {
+      strip.releasePointerCapture(drag.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const ids = comboOrder();
+    setTimeout(() => (suppressComboClick = false), 350);
+    if (JSON.stringify(ids) === JSON.stringify(drag.before)) return;
+    const prev = state.teach?.combos ?? [];
+    const byId = new Map(prev.map((c) => [c.id, c]));
+    const next = ids.map((id) => byId.get(id)).filter(Boolean);
+    if (next.length !== prev.length) return;
+    state.teach = { ...state.teach, combos: next };
+    renderComboStrip();
+    saveTeach("combos", { version: 1, updatedAt: new Date().toISOString(), combos: next }).then((r) => {
+      if (r.ok) return;
+      state.teach = { ...state.teach, combos: prev };
+      renderComboStrip();
+      notice([`组合排序未保存：${r.error ?? "未知错误"}`], "err");
+    });
+  };
+
+  strip.addEventListener("pointerdown", (e) => {
+    if (!state.picked) return;
+    const chip = /** @type {HTMLElement} */ (e.target).closest?.(".combo-chip");
+    if (!chip) return;
+    clearTimeout(comboTimer);
+    comboPress = { chip, x: e.clientX, y: e.clientY, pointerId: e.pointerId };
+    comboTimer = setTimeout(() => {
+      if (!comboPress) return;
+      comboDrag = { ...comboPress, before: comboOrder() };
+      comboPress = null;
+      comboDrag.chip.classList.add("dragging");
+      strip.classList.add("dragging");
+      suppressComboClick = true;
+      try {
+        strip.setPointerCapture(comboDrag.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }, 380);
+  });
+
+  strip.addEventListener("pointermove", (e) => {
+    if (comboDrag) {
+      e.preventDefault();
+      const chip = comboDrag.chip;
+      const chips = [...strip.querySelectorAll(".combo-chip")];
+      let before = null;
+      for (const c of chips) {
+        if (c === chip) continue;
+        const r = c.getBoundingClientRect();
+        if (e.clientX < r.left + r.width / 2) {
+          before = c;
+          break;
+        }
+      }
+      if (before) {
+        if (chip.nextElementSibling !== before) strip.insertBefore(chip, before);
+      } else if (strip.lastElementChild !== chip) {
+        strip.appendChild(chip);
+      }
+      return;
+    }
+    if (!comboPress) return;
+    if (Math.abs(e.clientX - comboPress.x) > 8 || Math.abs(e.clientY - comboPress.y) > 8) {
+      clearTimeout(comboTimer);
+      comboTimer = null;
+      comboPress = null;
+      suppressComboClick = true;
+      setTimeout(() => (suppressComboClick = false), 350);
+    }
+  });
+
+  strip.addEventListener("pointerup", finish);
+  strip.addEventListener("pointercancel", () => {
+    clearTimeout(comboTimer);
+    comboTimer = null;
+    comboPress = null;
+    if (comboDrag) {
+      comboDrag.chip.classList.remove("dragging");
+      strip.classList.remove("dragging");
+      comboDrag = null;
+    }
+  });
 }
 
 function rememberClassified(qid, assignment) {
@@ -648,6 +737,7 @@ async function submitCreate(e) {
   commitTeach(next, `已放入：${res.item.name}`, before, { qid: q.id, pageIndex: p.index });
   revealChip(kind, res.item.id);
 }
+
 
 function bindKeyboardLift() {
   const vv = window.visualViewport;
@@ -1427,15 +1517,14 @@ function initBar() {
   $("pick-close").addEventListener("click", () => setPickMode(false));
   $("pick-same").addEventListener("click", applySameAsPrevious);
   $("pick-undo-btn").addEventListener("click", undoLast);
-  $("pick-combo").addEventListener("click", () => toggleComboPop());
   $("combo-close").addEventListener("click", closeComboPop);
   $("combo-add").addEventListener("click", openComboForm);
   $("combo-form").addEventListener("submit", (e) => void submitCombo(e));
-  $("combo-cancel").addEventListener("click", closeComboForm);
+  $("combo-cancel").addEventListener("click", closeComboPop);
   document.addEventListener("click", (e) => {
     const pop = $("combo-pop");
     if (!pop || pop.hidden) return;
-    if (e.target.closest?.("#combo-pop") || e.target.closest?.("#pick-combo")) return;
+    if (e.target.closest?.("#combo-pop") || e.target.closest?.("#combo-add")) return;
     closeComboPop();
   });
   document.addEventListener("keydown", (e) => {
@@ -1446,6 +1535,7 @@ function initBar() {
   $("pick-create").addEventListener("submit", (e) => void submitCreate(e));
   $("pick-create-cancel").addEventListener("click", closeCreate);
   bindPickPointer();
+  bindComboDrag();
   bindKeyboardLift();
 }
 

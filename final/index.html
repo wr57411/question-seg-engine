@@ -57,20 +57,18 @@
   <section class="pick-tray" id="pick-tray" hidden aria-label="挑题托盘">
     <div class="pick-head">
       <span class="pick-title" id="pick-title">未选题</span>
-      <button class="pick-combo" id="pick-combo" type="button" disabled>组合</button>
+      <div class="combo-strip" id="combo-strip" role="group" aria-label="常用组合（长按拖动排序）"></div>
+      <button class="combo-add-chip" id="combo-add" type="button" aria-label="把当前题存为组合" disabled>＋</button>
       <button class="pick-same" id="pick-same" type="button" disabled>同上题</button>
       <button class="pick-close" id="pick-close" type="button">收起</button>
     </div>
 
     <div class="combo-pop" id="combo-pop" hidden>
       <div class="combo-head">
-        <strong>常用组合</strong>
+        <strong>保存常用组合</strong>
         <button class="combo-close" id="combo-close" type="button">收起</button>
       </div>
-      <div class="combo-list" id="combo-list"></div>
-      <p class="combo-empty" id="combo-empty" hidden>还没有组合。把当前题的专题+类别存成一个，下次一拍即用。</p>
-      <button class="combo-add" id="combo-add" type="button">＋ 把当前题存为组合</button>
-      <form class="combo-form" id="combo-form" hidden>
+      <form class="combo-form" id="combo-form">
         <input class="combo-name" id="combo-name" type="text" maxlength="60"
           autocomplete="off" placeholder="给组合起个名字（如：曲线基础）" aria-label="组合名称" />
         <button class="combo-save" id="combo-save" type="submit">保存组合</button>

@@ -10,8 +10,8 @@
 - [ ] 数据层：`data/out/teach/combos.json`（全局清单）；服务端 scope=combos，路径/形状/唯一性守卫
 - [ ] 逻辑层：`final/teach-store.js` 的 `normalizeCombos` / `addCombo` / `comboMatches`；
   套用走 `sameAsPrevious`（替换当前题归属），复用撤销
-- [ ] UI层：托盘标题栏「组合」按钮；上方浮层列出组合名+“专题·类别”摘要；点一条即套用；
-  「＋ 把当前题存为组合」→ 自定义名字输入；当前题无归类时禁用
+- [ ] UI层：托盘标题栏**常驻组合条**（默认露 3 槽、12px 小字、超出横滑）；点 chip 即套用；
+  「＋」起名小浮层；**长按 chip 380ms 拖动排序**并写回 combos.json；当前题无归类时 ＋ 禁用
 - [ ] 测试：store/guard 单测；浏览器在**独立数据副本**上建组合/套用/撤销/刷新持久化
 
 ## 验收标准
