@@ -201,3 +201,63 @@ verify: test -z "$(git status --porcelain)" && [ "$(git branch --show-current)" 
   Step 13 真机（human gate）；Step 14/15 全量门 + 合回 main。
 - **接手第一步**：读本文件前文 + `AGENTS.md` + `docs/HANDOFF.md`；`npm run check` 全绿；
   在 `feat/pick-classify` 上 `owner claim` 当前 run；从 Step 6 继续，**不要重跑会写真实 teach 的冒烟**。
+
+## 交接 2（2026-10-30 第二次暂停：软删除做到一半，换 Agent 续做）
+
+### 已测完并已提交的部分（可以放心当基线）
+
+分支 `feat/pick-classify`，最新提交 `fd27984`；HOTL run `pick-classify-20261030T024035Z-9fa769d0a516`
+Step 1–7 全部 `pass`（Step 6 托盘搜索、Step 7 专题/类别管理）。`npm run check` 退出码 0（实测，非管道尾码）。
+证据：`tests/teach-manage.test.ts` 8 条、`tests/teach-store.test.ts` 14 条、
+`tmp/combo-manage-smoke.mjs` / `tmp/search-smoke.mjs` / `tmp/manage-topics-smoke.mjs` 三套副本冒烟 EXIT=0、
+`tmp/manage-live-check.mjs` 真实页只读核对（跑完比对 `data/out/teach` 全目录 hash+mtime 证明零写入）。
+
+### 半成品：软删除「下架 / 恢复」（用户 2026-10-30 拍板：删除要软删，题上不动）
+
+这一半**未测、界面未接**，单独一笔 WIP 提交固化。已经落到位的：
+
+- 数据合同：`topics.json` / `categories.json` / `combos.json` 的条目可带 `retired: true` + `retiredAt`；
+  `scripts/teach-write-guards.ts` 已放行这两个字段（`retired` 只允许 true，别的值仍拒）。
+- 服务端 `scripts/teach-manage.ts`：`planTeachManage` 新增 `retire` / `restore` 两个 action，
+  **只改清单一个文件**，不碰任何 bindings、不碰 combos；返回 `stillAssigned`（题上还挂着几题）。
+  原来的 `delete`（跨所有卷级联摘引用）保留且仍有测试，但界面不再用它 —— 留给将来「彻底清除」。
+- 数据层 `final/teach-store.js`：`normalizeTeachList` / `normalizeCombos` 带出 `retired`；
+  新增 `splitRetired(list)`、`retireCombo`、`restoreCombo`；
+  `addTeachItem` 复用同名时若那一项已下架，会摘掉标记并返回 `revived: true`。
+- 界面 `final/final.js` 已过滤下架项的四处：托盘 chip、组合条、`applyCombo`（下架成员跳过并明说）、
+  `comboSummary`（显示「某某（已下架）」）。
+
+### 接手必做的四件事（顺序即依赖）
+
+1. **拼面板**：`.scratch/pick-classify/handoff/soft-delete-panel-block.js`（随本次 WIP 提交进版本库）
+   是写好的新面板块，
+   替换 `final/final.js` 第 632–829 行区间（行号按提交 `fd27984`+WIP 计，拼前先 grep 定位）（`renderManageList` → `commitManageDelete`），
+   把「删除 + 两步确认」换成「下架（一次点）+ 已下架分区 + 恢复」。
+   ⚠️ 里面 `el("div", "mg-acts", null)` 那行要改成先建 div 再 `append` 子节点：
+   `stages/reconstruct.js` 的 `el(tag, cls, text)` 判的是 `text !== undefined`，传 null 会把文本设成 "null"。
+2. **补落盘**：`final.js` 的 `applyCreate` 现在只在 `res.created` 时写清单；
+   要改成 `res.created || res.revived`，否则「重建同名 = 复活下架项」只改内存，刷新又变回下架。
+3. **补测试**：`planTeachManage` 的 retire/restore（只写清单、不碰 bindings、重复下架要报错、
+   恢复未下架项要报错）；`splitRetired` / `retireCombo` / `restoreCombo` / `addTeachItem` 复活路径；
+   然后把 `tmp/manage-topics-smoke.mjs` 的断言从「删除后 bindings 被摘干净」改成
+   「下架后 bindings 一字不动、挑题时选不到、恢复后又能选、题上归类始终保留」。
+4. **Step 8 导出/审计必须跳过 `retired`**：`scripts/topic-export.ts` 与 `scripts/audit-topic.ts`
+   接 teach 数据时，下架项既不能出现在专题页清单里，也不能被算进统计；
+   专题页 `/topic/` 的类别筛选同样要过滤。否则下架项会冒充在用。
+
+### 仍然有效的红线（本轮又踩过的地方）
+
+- 绝不用 `fixtures/teach-seed` 覆盖 `data/out/teach`；会写 teach 的浏览器测试只能跑
+  `tmp/pick-test-app`（APFS 副本）+ 端口 4175 + `.test-root` 标记（见 `tasks/lessons.md` L5）。
+- 真实服务在 **4174**（`PORT=4174 nohup node --import tsx scripts/view-server.ts`，日志 `tmp/view-4174.log`）；
+  **改了 `scripts/` 必须重启才生效**（新端点 `/api/teach-usage`、`/api/teach-manage` 已经过重启验证）。
+- HOTL 租约很短（几分钟），每次 `step start/verify` 前先 `owner heartbeat`，过期就 `owner takeover --reason`。
+- 只本地提交，不 push、不部署。
+
+### 下一位的第一步
+
+`git log --oneline -3` 确认在 `feat/pick-classify`；`npm run check` 建基线；
+读本节 + 上面「交接要点」；按 1→2→3 做完软删除这一片，再进 Step 8。
+另外两件已拍板未开工的：**题册下拉折叠**（同一章的 `-OXR`/`-MinerU` 实验版收进「旧版/实验版」分组，
+默认只显示正式版；实测四对变体题干只能对上 70%–90%，所以不做跨版本同步，避免张冠李戴）；
+以及旧数据迁移（Step 10/11，human gate，先 dry-run 给用户看影响面）。

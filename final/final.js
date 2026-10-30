@@ -48,9 +48,12 @@ import {
   removeCombo,
   renameCombo,
   replaceBinding,
+  restoreCombo,
+  retireCombo,
   sameAsPrevious,
   saveTeach,
   saveTeachBindings,
+  splitRetired,
   toggleCategory,
   toggleTopic,
 } from "./teach-store.js";
@@ -261,9 +264,11 @@ function renderPickRows() {
     return;
   }
   const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), state.picked.q.id);
+  const rawTopics = state.teach?.topics ?? [];
+  const rawCats = state.teach?.categories ?? [];
   const all = {
-    topics: orderByRecent(state.teach?.topics ?? [], state.recent.topics),
-    categories: orderByRecent(state.teach?.categories ?? [], state.recent.categories),
+    topics: orderByRecent(splitRetired(rawTopics).active, state.recent.topics),
+    categories: orderByRecent(splitRetired(rawCats).active, state.recent.categories),
   };
   const searching = state.search.on && !!state.search.q.trim();
   const view = searching
@@ -301,7 +306,9 @@ function renderPickRows() {
     hint.hidden = false;
     hint.textContent = state.teach?.error
       ? `教学归类读取失败：${state.teach.error}`
-      : "还没有专题/类别（点每行末尾的 ＋ 新建）";
+      : rawTopics.length || rawCats.length
+        ? "专题和类别都下架了（去「管理」里恢复，或点 ＋ 新建）"
+        : "还没有专题/类别（点每行末尾的 ＋ 新建）";
   } else {
     hint.hidden = true;
     hint.textContent = "";
@@ -393,8 +400,14 @@ function updateSameButton() {
 }
 
 function comboSummary(combo) {
-  const t = combo.topicIds.map((id) => state.teach?.topics.find((x) => x.id === id)?.name ?? "已删除专题");
-  const c = combo.categoryIds.map((id) => state.teach?.categories.find((x) => x.id === id)?.name ?? "已删除类别");
+  const t = combo.topicIds.map((id) => {
+    const x = state.teach?.topics.find((v) => v.id === id);
+    return x ? (x.retired ? `${x.name}（已下架）` : x.name) : "已删除专题";
+  });
+  const c = combo.categoryIds.map((id) => {
+    const x = state.teach?.categories.find((v) => v.id === id);
+    return x ? (x.retired ? `${x.name}（已下架）` : x.name) : "已删除类别";
+  });
   return [...t, ...c].join(" · ");
 }
 
@@ -427,7 +440,7 @@ function renderComboStrip() {
     return;
   }
   const a = currentAssignment();
-  const combos = state.teach?.combos ?? [];
+  const combos = splitRetired(state.teach?.combos ?? []).active;
   /** @type {HTMLElement[]} */
   const nodes = combos.map((combo) => {
     const b = el("button", "combo-chip" + (comboMatches(combo, a) ? " on" : ""));
@@ -533,11 +546,12 @@ async function submitCombo(e) {
 function applyCombo(combo) {
   if (!state.picked || !state.teach) return;
   const { q, p } = state.picked;
-  const validTopics = combo.topicIds.filter((id) => state.teach.topics.some((t) => t.id === id));
-  const validCategories = combo.categoryIds.filter((id) => state.teach.categories.some((c) => c.id === id));
+  const live = (/** @type {'topics'|'categories'} */ k, id) => state.teach?.[k].some((x) => x.id === id && !x.retired);
+  const validTopics = combo.topicIds.filter((id) => live("topics", id));
+  const validCategories = combo.categoryIds.filter((id) => live("categories", id));
   const missing = combo.topicIds.length + combo.categoryIds.length - validTopics.length - validCategories.length;
   if (!validTopics.length && !validCategories.length) {
-    notice([`组合「${combo.name}」里的专题/类别都已不存在，不能套用`], "err");
+    notice([`组合「${combo.name}」里的专题/类别都已下架或不存在，不能套用`], "err");
     return;
   }
   const cur = currentAssignment();

@@ -17,7 +17,13 @@ const NAME_MAX_LEN = 60;
 const ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 
 export type TeachKind = "topics" | "categories";
-export type ManageAction = "rename" | "delete";
+/**
+ * rename   改名（按 id 更新，一题归属都不动）
+ * retire   **下架**（软删除）：清单里标 retired，题目上的归属一个都不摘，可 restore 恢复
+ * restore  恢复下架项
+ * delete   彻底清除（跨所有卷摘引用）——服务端已实现并有测试，**界面暂未开放**
+ */
+export type ManageAction = "rename" | "retire" | "restore" | "delete";
 type Rec = Record<string, unknown>;
 
 const isRec = (v: unknown): v is Rec => !!v && typeof v === "object" && !Array.isArray(v);
@@ -34,7 +40,9 @@ export interface ManageRequest {
 export function validateManageRequest(body: unknown): string | null {
   if (!isRec(body)) return "请求必须是 JSON 对象";
   if (body.kind !== "topics" && body.kind !== "categories") return "kind 只能是 topics / categories";
-  if (body.action !== "rename" && body.action !== "delete") return "action 只能是 rename / delete";
+  if (body.action !== "rename" && body.action !== "retire" && body.action !== "restore" && body.action !== "delete") {
+    return "action 只能是 rename / retire / restore / delete";
+  }
   if (!isStr(body.id) || !ID_RE.test(body.id)) return `id 只能是字母/数字/-/_（≤${ID_MAX_LEN}）`;
   if (body.action === "rename" && (!isStr(body.name) || !body.name.trim() || body.name.trim().length > NAME_MAX_LEN)) {
     return `改名必须给非空名字（≤${NAME_MAX_LEN}）`;
@@ -73,8 +81,10 @@ export type ManagePlan =
       listPayload: Rec;
       combosPayload: Rec | null;
       bindingsFiles: BindingsFile[];
-      /** 改名后的新名字 / 被删项的名字（供提示） */
+      /** 下架/恢复/改名后的新名字；彻底清除时被清掉的组合数见 combosDropped */
       itemName: string;
+      /** 这一项现在还在多少题上挂着（下架时如实告诉用户"题上没动"） */
+      stillAssigned: number;
     };
 
 function listArray(list: unknown, kind: TeachKind): Rec[] | null {
@@ -170,6 +180,37 @@ export function planTeachManage(input: ManageInput): ManagePlan {
       combosPayload: null,
       bindingsFiles: [],
       itemName: clean,
+      stillAssigned: affected + staleAffected,
+    };
+  }
+
+  /**
+   * 下架 / 恢复（软删除，用户 2026-10-30 拍板的口径）：
+   * 只给清单项打 retired 标记，**题目上的归属一个都不摘**、组合也不动——
+   * 所以恢复就是去掉标记，不存在"还原到哪些题"的难题。
+   */
+  if (input.action === "retire" || input.action === "restore") {
+    const retiring = input.action === "retire";
+    const already = item.retired === true;
+    if (retiring && already) return { ok: false, error: `「${itemName}」已经是下架状态` };
+    if (!retiring && !already) return { ok: false, error: `「${itemName}」没有下架记录，无需恢复` };
+    const nextItem: Rec = retiring ? { ...item, retired: true, retiredAt: input.now } : { ...item };
+    if (!retiring) {
+      delete nextItem.retired;
+      delete nextItem.retiredAt;
+    }
+    const nextItems = items.map((t, i) => (i === idx ? nextItem : t));
+    return {
+      ok: true,
+      affected,
+      staleAffected,
+      combosChanged: 0,
+      combosDropped: 0,
+      listPayload: { ...(isRec(input.list) ? input.list : {}), version: 1, updatedAt: input.now, [input.kind]: nextItems },
+      combosPayload: null,
+      bindingsFiles: [],
+      itemName,
+      stillAssigned: affected + staleAffected,
     };
   }
 
@@ -255,5 +296,6 @@ export function planTeachManage(input: ManageInput): ManagePlan {
     combosPayload,
     bindingsFiles,
     itemName,
+    stillAssigned: 0, // 彻底清除是真的把引用摘干净了
   };
 }

@@ -71,6 +71,9 @@ function validateList(scope: "topics" | "categories", list: unknown): string | n
     if (!isStr(id) || !id.trim() || id.length > ID_MAX_LEN) return `${scope}.id 必须是非空字符串（≤${ID_MAX_LEN}）`;
     if (!isStr(name) || !name.trim() || name.length > NAME_MAX_LEN) return `${scope}.name 必须是非空字符串（≤${NAME_MAX_LEN}）`;
     if (raw.createdAt !== undefined && !isStr(raw.createdAt)) return `${scope}.createdAt 必须是字符串`;
+    // 软删除（下架）标记：retired 只能是 true，retiredAt 是时间字符串
+    if (raw.retired !== undefined && raw.retired !== true) return `${scope}.retired 只能是 true（不下架就不写这个字段）`;
+    if (raw.retiredAt !== undefined && !isStr(raw.retiredAt)) return `${scope}.retiredAt 必须是字符串`;
     if (ids.has(id)) return `${scope}.id 重复：${id}`;
     if (names.has(name.trim())) return `${scope}.name 重复：${name.trim()}`;
     ids.add(id);
@@ -132,6 +135,8 @@ function validateCombos(list: unknown): string | null {
     if (!isStr(id) || !id.trim() || id.length > ID_MAX_LEN) return `combos.id 必须是非空字符串（≤${ID_MAX_LEN}）`;
     if (!isStr(name) || !name.trim() || name.length > NAME_MAX_LEN) return `combos.name 必须是非空字符串（≤${NAME_MAX_LEN}）`;
     if (raw.createdAt !== undefined && !isStr(raw.createdAt)) return "combos.createdAt 必须是字符串";
+    if (raw.retired !== undefined && raw.retired !== true) return "combos.retired 只能是 true";
+    if (raw.retiredAt !== undefined && !isStr(raw.retiredAt)) return "combos.retiredAt 必须是字符串";
     if (ids.has(id)) return `combos.id 重复：${id}`;
     if (names.has(name.trim())) return `combos.name 重复：${name.trim()}`;
     for (const key of ["topicIds", "categoryIds"] as const) {

@@ -126,6 +126,15 @@ layout.json / content_list.json
   截图证据 `tmp/review-topic/`（6 张，含 needs_review 徽标）；种子可复现：
   `cp fixtures/topic-seed/*.json data/out/tags/`（覆盖同名文件，已有 `library.json` 先备份）。
   **为什么不用 `教材基础练` 当种子：bank 把不同系列的书配到了一起**（见 §6 第 17 条）。
+- **挑题与归类 v2 在分支上（2026-10-30，`feat/pick-classify`，未合回 main）**：iPad 成品页「挑题」模式
+  → 点整道题 → 底部托盘点专题/类别 chip 立即写入（第二条写路径 `POST /api/teach`）→ 纸面号牌上 `N·M` 角标；
+  已做：内联新建、同上题、撤销、写失败回滚、常用组合（常驻 3 槽/横滑/长按拖动/改名/两步删除）、
+  托盘搜索（与组合条共用一行，搜不到可直接新建并打上）、管理面板（改名/删除，跨所有卷级联，
+  新端点 `GET /api/teach-usage`、`POST /api/teach-manage`）。
+  **正在做的一半**：删除改软删除（下架/恢复，题上不动）—— 数据层与服务端已就位并过全量门，
+  界面未接、未测，接手清单见 `docs/plans/2026-10-30-pick-classify-workflow.md` 末尾「交接 2」。
+  用户真实数据在 `data/out/teach/`（3 专题 / 2 类别 / 1 组合 / 5 题归属），
+  **测试只能用 `tmp/pick-test-app` 副本 + 端口 4175**（教训见 `tasks/lessons.md` L5）。
   ⚠️ 标签在面板里新建时绑定只存 `tagId`，专题约定写在**标签库的名字**上 ⇒
   `topic:export` 必须先按 `data/out/tags/library.json` 把 id 解析回名字（已实现并单测）；
   标签绑定的 anchor（页码/题号/首行）与当前题不符 ⇒ 导出红（防切分变化后标签静默漂移）；
@@ -253,7 +262,7 @@ layout.json / content_list.json
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |
 | `docs/specs/2026-10-30-topic-knowledge-base-spec.md` | 专题知识库需求 / 数据合同 / 阶段规划（S01 MVP） | 2026-10-30 实施完成；种子与答案池风险见 §2 / §6-17 |
-| `docs/specs/2026-10-30-pick-and-classify.md` | **iPad 挑题与归类 v2**：专题/类别/业务标签三套清单、挑题模式、托盘、迁移与验收 | 已对齐待实施；术语见 `CONTEXT.md`，决策见 `docs/adr/0001-…` |
+| `docs/specs/2026-10-30-pick-and-classify.md` | **iPad 挑题与归类 v2**：专题/类别/业务标签三套清单、挑题模式、托盘、迁移与验收 | **分支 `feat/pick-classify` 实施中**（Step 1–7 完成：挑题、归类、新建、同上题/撤销、组合、搜索、管理改名删除）；未合回 main，半成品与接手清单见 `docs/plans/2026-10-30-pick-classify-workflow.md` 末尾「交接 2」 |
 | `docs/PRD-viewer.md` | viewer 的产品需求（设计输入稿） | 状态为「待设计验证」，实现以 viewer/ 实际为准 |
 | `docs/real-api-notes.md` | MinerU API 字段事实 | 字段争议以它为准 |
 | `docs/第二章答案-结构化提取.md` | 答案册首跑报告 | 含首尾边界与 46 处待校对的如实说明 |

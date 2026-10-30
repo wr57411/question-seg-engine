@@ -14,10 +14,10 @@
 const TEACH_ROOT = "/data/out/teach";
 
 /**
- * @typedef {{ id: string, name: string }} TeachItem
+ * @typedef {{ id: string, name: string, retired?: true, retiredAt?: string }} TeachItem
  * @typedef {{ questionId: string, topicIds: string[], categoryIds: string[], anchor?: Record<string, unknown> }} TeachBinding
  * @typedef {{ version: 1, updatedAt: string | null, bindings: TeachBinding[], stale: TeachBinding[] }} TeachBindings
- * @typedef {{ id: string, name: string, topicIds: string[], categoryIds: string[] }} TeachCombo
+ * @typedef {{ id: string, name: string, topicIds: string[], categoryIds: string[], retired?: true, retiredAt?: string }} TeachCombo
  * @typedef {{ topics: TeachItem[], categories: TeachItem[], combos: TeachCombo[] }} TeachLibrary
  */
 
@@ -45,7 +45,14 @@ export function normalizeTeachList(raw, key) {
     const name = str(t.name);
     if (!id || !name || seen.has(id)) continue;
     seen.add(id);
-    out.push({ id, name });
+    /** @type {TeachItem} */
+    const item = { id, name };
+    // 下架（软删除）标记要带出来：清单里还在，但挑题时不再出现
+    if (t.retired === true) {
+      item.retired = true;
+      if (str(t.retiredAt)) item.retiredAt = str(t.retiredAt);
+    }
+    out.push(item);
   }
   return out;
 }
@@ -195,13 +202,20 @@ export function moveToFront(list, id, max = 12) {
  * @param {string} name
  * @param {'tp'|'ct'} prefix
  * @param {(prefix: string) => string} [idGen]
- * @returns {{ list: TeachItem[], item: TeachItem | null, created: boolean, error?: string }}
+ * @returns {{ list: TeachItem[], item: TeachItem | null, created: boolean, revived?: boolean, error?: string }}
  */
 export function addTeachItem(list, name, prefix, idGen) {
   const clean = String(name ?? "").trim();
   if (!clean) return { list, item: null, created: false, error: "名字不能为空" };
   const existing = list.find((t) => t.name.trim() === clean);
-  if (existing) return { list, item: existing, created: false };
+  if (existing) {
+    if (!existing.retired) return { list, item: existing, created: false };
+    // 又建同名 = 想重新用它：把下架标记摘掉（revived，调用方必须落盘，否则下次刷新又是下架态）
+    const item = { ...existing };
+    delete item.retired;
+    delete item.retiredAt;
+    return { list: list.map((t) => (t.id === existing.id ? item : t)), item, created: false, revived: true };
+  }
   const gen = idGen ?? ((p) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
   let id = gen(prefix);
   let guard = 0;
@@ -226,7 +240,13 @@ export function normalizeCombos(raw) {
     const categoryIds = Array.isArray(c.categoryIds) ? c.categoryIds.filter((x) => typeof x === "string") : [];
     if (!topicIds.length && !categoryIds.length) continue;
     seen.add(id);
-    out.push({ id, name, topicIds, categoryIds });
+    /** @type {TeachCombo} */
+    const combo = { id, name, topicIds, categoryIds };
+    if (c.retired === true) {
+      combo.retired = true;
+      if (str(c.retiredAt)) combo.retiredAt = str(c.retiredAt);
+    }
+    out.push(combo);
   }
   return out;
 }
@@ -287,8 +307,8 @@ export function renameCombo(list, id, name) {
 }
 
 /**
- * 删除组合：只删这套预设本身。
- * 已经按它归好类的题**不受影响**——归属写在 bindings 里，与组合无关。
+ * 删除组合（**彻底清除**原语：界面暂未开放，界面上用的是 retireCombo 下架）。
+ * 只删这套预设本身；已经按它归好类的题的归属写在 bindings 里，与组合无关。
  * @param {TeachCombo[]} list @param {string} id
  * @returns {{ list: TeachCombo[], item: TeachCombo | null, error?: string }}
  */
@@ -296,6 +316,49 @@ export function removeCombo(list, id) {
   const cur = list.find((c) => c.id === id);
   if (!cur) return { list, item: null, error: "组合不存在，可能已经删过了" };
   return { list: list.filter((c) => c.id !== id), item: cur };
+}
+
+/**
+ * 下架组合（软删除）：清单里留着、挑题时不再出现，随时可 restoreCombo 恢复。
+ * @param {TeachCombo[]} list @param {string} id @param {string} [now]
+ * @returns {{ list: TeachCombo[], item: TeachCombo | null, error?: string }}
+ */
+export function retireCombo(list, id, now) {
+  const cur = list.find((c) => c.id === id);
+  if (!cur) return { list, item: null, error: "组合不存在，可能已经删过了" };
+  if (cur.retired) return { list, item: null, error: `「${cur.name}」已经是下架状态` };
+  const item = { ...cur, retired: /** @type {const} */ (true), retiredAt: now ?? new Date().toISOString() };
+  return { list: list.map((c) => (c.id === id ? item : c)), item };
+}
+
+/** 恢复已下架的组合。 @param {TeachCombo[]} list @param {string} id */
+export function restoreCombo(list, id) {
+  const cur = list.find((c) => c.id === id);
+  if (!cur) return { list, item: null, error: "组合不存在" };
+  if (!cur.retired) return { list, item: null, error: `「${cur.name}」没有下架记录，无需恢复` };
+  const item = { ...cur };
+  delete item.retired;
+  delete item.retiredAt;
+  return { list: list.map((c) => (c.id === id ? item : c)), item };
+}
+
+/**
+ * 把清单拆成「在用」与「已下架」两堆（顺序各自保持）。
+ * 挑题托盘、搜索、组合套用只看「在用」；管理面板两堆都列。
+ * @template {{retired?: true}} T
+ * @param {T[]} list
+ * @returns {{ active: T[], retired: T[] }}
+ */
+export function splitRetired(list) {
+  /** @type {T[]} */
+  const active = [];
+  /** @type {T[]} */
+  const retired = [];
+  for (const item of list ?? []) {
+    if (item && item.retired) retired.push(item);
+    else active.push(item);
+  }
+  return { active, retired };
 }
 
 /** @param {TeachItem[]} items @param {string[]} recent @returns {TeachItem[]} */
