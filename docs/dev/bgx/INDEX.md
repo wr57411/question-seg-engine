@@ -41,6 +41,8 @@
 - C 已开工：`stages/uncovered-layout.js` 清零并纳管（**5/11**）；`view:test` 在本机无 IAB 时 SKIP，
   用 Chrome headless 截图/DOM 替代（平板 1024 → `paper-wrap`×13；375 实际视口 500，测不到 <500 分支，`§88.3` 已知）。
   剩余顺序：`reconstruct.js`（80）→ `stages.js`（144）/ `entry-paper.js`（49）/ `tag-panel.js`（16）/ `viewer.js`（40）/ `final.js`（192）。
+- §6-6 检测侧护栏已加：`npm run audit:suspicious`（S1 行首 `N.$数字` / S2 题干以 `$数字` 开头），已入 `check`；
+  14 册 **0 命中**，反向验证通过（假 fixture ⇒ exit 1）；**不改切题判据、不动数据**（`DECISIONS §93`）。
 
 **先读 [`docs/HANDOFF.md`](../../HANDOFF.md) §0「本次交接要点」**——一页给出：现状、本轮 7 项完成表、
 下一步建议（按性价比）、未闭合清单、接手第一件事。本节只记 bgx 侧的治理记录，不复制正文。
