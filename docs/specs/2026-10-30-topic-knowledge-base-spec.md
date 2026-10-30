@@ -56,8 +56,9 @@
 - **漂移/失效判据**：页码/题号必须一致；首行有效字符 ≥6 时还要包含匹配，不符 ⇒ 红。
   首行为空或 <6 个有效字符（题号独占一行、图题等）⇒ **告警**（只能核对页码+题号，页面可见，
   不阻断整本书；重打标仍是同样短首行，不能当阻断理由）。专题标签在 `stale`、库缺 id、
-  库文件丢失、库 id 重复 ⇒ 导出/审计均红（不允许专题静默少题）。
-  改名/摘掉 `#` 导致旧条目消失 ⇒ 导出告警（状态文件 + 页面提示条），不阻断（改名是合法操作）。
+  库文件丢失、库 id 重复、**整个专题消失** ⇒ 导出/审计均红（不允许专题静默少题；
+  整专题消失时不覆盖旧 index）。部分条目减少 / 改名后题搬到别的专题 ⇒ 导出告警
+  （状态文件 + 页面提示条），不阻断（改名是合法操作）。
 - **手工通道（D03 暂定）**：`data/out/topics/<slug>.topic.json`，手写题单 `{name, items:[{doc, number, level}]}`。
 - **导出产物**：`data/out/topics/index.json` —— 展示层唯一消费源。
   `{version, generatedAt, topics:[{slug, name, items:[{doc, number, page, questionId, level, stem, options[], images[], answerKey, answerText, answerDoc, answerImages[], status, confidence, reviewFlags[], sources[]}]}], stats}`。

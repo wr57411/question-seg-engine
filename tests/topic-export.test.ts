@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildTopicIndex, disappearedWarnings, parseTopicTag, writeTopicIndex } from "../scripts/topic-export.js";
+import { buildTopicIndex, disappearedCheck, parseTopicTag, writeTopicIndex } from "../scripts/topic-export.js";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -395,8 +395,47 @@ test("改名/摘掉 # 导致旧条目消失 ⇒ 告警（不阻断，但不静�
 
   const next = buildTopicIndex(fx.root);
   assert.ok(next.index);
-  const warnings = disappearedWarnings(fx.root, next.index);
-  assert.ok(warnings.some((w) => w.includes("专题条目消失") && w.includes("quizA:old")), warnings.join("\n"));
+  const diff = disappearedCheck(fx.root, next.index);
+  assert.deepEqual(diff.errors, []);
+  assert.ok(diff.warnings.some((w) => w.includes("专题条目减少") && w.includes("quizA:old")), diff.warnings.join("\n"));
+});
+
+test("整个专题消失（改名摘掉 #）⇒ 必红，不能悄悄覆盖旧 index", () => {
+  const fx = makeFixture();
+  const first = buildTopicIndex(fx.root);
+  assert.ok(first.index);
+  writeTopicIndex(fx.root, first.index);
+  const old = JSON.parse(readFileSync(join(fx.root, "data", "out", "topics", "index.json"), "utf8"));
+  old.topics.push({
+    slug: "已删专题",
+    name: "已删专题",
+    items: [
+      {
+        doc: "quizA",
+        number: "9",
+        page: 1,
+        questionId: "quizA:only-in-old",
+        level: "基础",
+        stem: "旧专题题",
+        options: [],
+        images: [],
+        answerKey: "A",
+        answerText: "旧",
+        answerDoc: "answerA",
+        answerImages: [],
+        status: "ok",
+        confidence: 1,
+        reviewFlags: [],
+        sources: ["tag"],
+      },
+    ],
+  });
+  writeFileSync(join(fx.root, "data", "out", "topics", "index.json"), JSON.stringify(old, null, 1));
+
+  const next = buildTopicIndex(fx.root);
+  assert.ok(next.index);
+  const diff = disappearedCheck(fx.root, next.index);
+  assert.ok(diff.errors.some((e) => e.startsWith("专题消失：") && e.includes("已删专题")), diff.errors.join("\n"));
 });
 
 test("CLI：有缺答案 ⇒ 退出码 1 且不写 index.json", () => {

@@ -44,7 +44,7 @@ action: 起 main 的 view-server（PORT=4174，避开 worktree 的 4173），用
 loop: false
 verify: test $(ls tmp/review-topic/*.png 2>/dev/null | wc -l) -ge 4
 
-- [ ] **Step 8: 文档登记 + 提交**
+- [x] **Step 8: 文档登记 + 提交**
 action: HANDOFF §3 命令表加 `topic:export` / `audit:topic` / `topic/` 页 URL，§4 文档地图登记 SPEC；npm run check 全绿确认；全部改动提交到 main 本地（不推送）。
 loop: false
 verify: npm run check

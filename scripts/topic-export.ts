@@ -260,11 +260,12 @@ function anchorCheck(q: RawQuestion, anchor: RawAnchor | undefined): { problem: 
   const page = typeof anchor.page === "number" && Number.isFinite(anchor.page) ? anchor.page : null;
   const number = asStr(anchor.number);
   const firstText = asStr(anchor.firstText);
+  const remedy = "（要接受新位置：先摘光该题所有标签再重打，或改用题单）";
   if (page !== null && pageOf(q) !== page) {
-    return { problem: `anchor 记的是 p${page}，当前是 p${pageOf(q)}`, warning: null };
+    return { problem: `anchor 记的是 p${page}，当前是 p${pageOf(q)}${remedy}`, warning: null };
   }
   if (number && asStr(q.number) !== number) {
-    return { problem: `anchor 记的是第 ${number} 题，当前是第 ${asStr(q.number) || "?"} 题`, warning: null };
+    return { problem: `anchor 记的是第 ${number} 题，当前是第 ${asStr(q.number) || "?"} 题${remedy}`, warning: null };
   }
   if (!firstText.trim()) return { problem: null, warning: "缺少 firstText（只能核对页码+题号）" };
   let a = normText(firstText);
@@ -277,7 +278,7 @@ function anchorCheck(q: RawQuestion, anchor: RawAnchor | undefined): { problem: 
   }
   if (!stem.slice(0, 160).includes(probe) && !a.includes(stem.slice(0, 10))) {
     return {
-      problem: `anchor 首行「${firstText}」与当前题干「${asStr(q.stem).slice(0, 24)}…」对不上`,
+      problem: `anchor 首行「${firstText}」与当前题干「${asStr(q.stem).slice(0, 24)}…」对不上${remedy}`,
       warning: null,
     };
   }
@@ -733,20 +734,51 @@ function readOldIndexPairs(root: string): Set<string> | null {
   }
 }
 
-/** 新旧 index 的条目差：旧有新无 ⇒ 提示「可能改名/摘掉 #」，不阻断（改名是合法操作）。 */
-export function disappearedWarnings(root: string, index: TopicIndex): string[] {
+/**
+ * 新旧 index 对比：
+ * - **整个专题消失**（旧专题的题没有出现在任何新专题）⇒ error（改名时摘掉 `#` 是常见误操作，
+ *   不能让专题悄悄没了；报错则不覆盖旧 index，页面/审计都会红）；
+ * - 单个专题少了几条、或改名后题搬到别的专题 ⇒ warning（部分删题/改名是合法操作）。
+ */
+export function disappearedCheck(root: string, index: TopicIndex): { errors: string[]; warnings: string[] } {
   const oldPairs = readOldIndexPairs(root);
-  if (!oldPairs) return [];
-  const newPairs = new Set<string>();
-  for (const t of index.topics) for (const item of t.items) newPairs.add(`${t.name}\u0000${item.questionId}`);
-  const gone = [...oldPairs].filter((k) => !newPairs.has(k));
-  if (!gone.length) return [];
-  const shown = gone.slice(0, 10).map((k) => {
-    const [topic, qid] = k.split("\u0000");
-    return `「${topic}」的 ${qid}`;
-  });
-  const more = gone.length > shown.length ? `；另有 ${gone.length - shown.length} 条` : "";
-  return [`专题条目消失：旧 index 里有 ${gone.length} 条不在新 index（标签改名/摘掉 #/删除？）：${shown.join("、")}${more}`];
+  if (!oldPairs) return { errors: [], warnings: [] };
+  const oldByTopic = new Map<string, Set<string>>();
+  for (const key of oldPairs) {
+    const [topic, qid] = key.split("\u0000");
+    if (!topic || !qid) continue;
+    const set = oldByTopic.get(topic) ?? new Set<string>();
+    set.add(qid);
+    oldByTopic.set(topic, set);
+  }
+  const newByTopic = new Map<string, Set<string>>();
+  for (const t of index.topics) newByTopic.set(t.name, new Set(t.items.map((x) => x.questionId)));
+  const allNew = new Set<string>();
+  for (const set of newByTopic.values()) for (const qid of set) allNew.add(qid);
+
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  for (const [topic, oldQids] of oldByTopic) {
+    const newQids = newByTopic.get(topic);
+    if (!newQids) {
+      const missing = [...oldQids].filter((qid) => !allNew.has(qid));
+      if (missing.length) {
+        errors.push(
+          `专题消失：旧「${topic}」有 ${missing.length} 题没有出现在任何新专题（改名时摘掉 #？）⇒ 不覆盖旧 index；如确要删除该专题，先清空/改名旧 index 再导出`,
+        );
+      } else {
+        warnings.push(`专题改名/合并：旧「${topic}」的题已出现在其它专题`);
+      }
+      continue;
+    }
+    const gone = [...oldQids].filter((qid) => !newQids.has(qid));
+    if (gone.length) {
+      const shown = gone.slice(0, 6).join("、");
+      const more = gone.length > 6 ? `；另有 ${gone.length - 6} 条` : "";
+      warnings.push(`专题条目减少：「${topic}」少 ${gone.length} 题（${shown}${more}）`);
+    }
+  }
+  return { errors, warnings };
 }
 
 /** 磁盘上现有 index.json 的 generatedAt（没有/读不了 ⇒ null） */
@@ -785,9 +817,40 @@ function main(): void {
     for (const e of errors) console.log(`  - ${e}`);
     process.exit(1);
   }
-  const allWarnings = [...new Set([...warnings, ...disappearedWarnings(root, index)])];
+  const diff = disappearedCheck(root, index);
+  if (diff.errors.length) {
+    const at = new Date().toISOString();
+    try {
+      writeTopicExportStatus(root, {
+        ok: false,
+        at,
+        errors: diff.errors,
+        warnings: [...warnings, ...diff.warnings],
+        indexGeneratedAt: readIndexGeneratedAt(root),
+      });
+    } catch {
+      /* 状态写不了也要在 stdout 说清 */
+    }
+    console.log(`✗ 专题导出失败：${diff.errors.length} 处问题（未覆盖 index.json）`);
+    for (const e of diff.errors) console.log(`  - ${e}`);
+    process.exit(1);
+  }
+  const allWarnings = [...new Set([...warnings, ...diff.warnings])];
   for (const w of allWarnings) console.log(`⚠️  ${w}`);
-  const file = writeTopicIndex(root, index);
+  let file: string;
+  try {
+    file = writeTopicIndex(root, index);
+  } catch (e) {
+    const at = new Date().toISOString();
+    const msg = `index.json 写入失败：${String(e)}`;
+    try {
+      writeTopicExportStatus(root, { ok: false, at, errors: [msg], warnings: allWarnings, indexGeneratedAt: readIndexGeneratedAt(root) });
+    } catch {
+      /* 状态也写不了，下面 stdout 报 */
+    }
+    console.log(`✗ ${msg}（旧 index 未覆盖）`);
+    process.exit(1);
+  }
   try {
     writeTopicExportStatus(root, {
       ok: true,
