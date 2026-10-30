@@ -1279,10 +1279,10 @@ async function openSheet(q, p) {
     state.sheet = null;
   });
   d.append(close);
-
-  if (state.tags) d.append(tagSection(tagApp, q, p, anchorOf(q, p, p.blocks[q.blocks?.[0]])));
   state.sheet = { q, p };
 
+  // 顺序即优先级：先「这是哪道题」，再「归了什么类」，然后才是业务标签与题面/答案。
+  // 教学归类提到标签区之前，是因为标签区有 7 行 × 44px，放它后面等于要滚一屏才看得见（U09）。
   d.append(el("h3", "", `第 ${q.number} 题（${q.section || "未识别大题"}）`));
   d.append(
     el(
@@ -1292,6 +1292,8 @@ async function openSheet(q, p) {
         `可信度 ${Math.round(q.confidence * 100)}%${q.status === "needs_review" ? " · 需人工校对" : ""}`,
     ),
   );
+  d.append(teachReadonlySection(q, p));
+  if (state.tags) d.append(tagSection(tagApp, q, p, anchorOf(q, p, p.blocks[q.blocks?.[0]])));
 
   const entry = bankEntryFor(q);
   // 「自己这一面」永远显示（未配对也显示），「另一面」只有配上对才有
@@ -1337,6 +1339,57 @@ async function openSheet(q, p) {
 /** 当前卷是题册还是答案册（措辞与"哪一面是自己"都靠它） */
 function docKind(doc) {
   return DOCS.find((x) => x.id === doc)?.kind ?? "quiz";
+}
+
+/**
+ * 阅读模式里的**只读**「教学归类」区（U09）。
+ *
+ * 为什么要有：挑题归类是在成品页底部托盘里完成的，离开挑题模式后**看不见归了什么** ——
+ * 只靠号牌上的 `N·M` 角标，既不知道是哪几个专题，也没法核对。这里把归属原样列出来，
+ * 并给一个「去挑题修改」直接跳过去（进挑题模式 + 选中该题），不用自己再找一遍。
+ *
+ * 只读 = 不在这里增删（增删只走托盘，避免两套写入口）。**下架项照样显示**并标注「已下架」：
+ * 题上的归属确实还在（软删除语义），藏起来会让人以为归类丢了。
+ */
+function teachReadonlySection(q, p) {
+  const box = el("section", "teach-read");
+  box.append(el("h4", "", "教学归类"));
+  const teach = state.teach;
+  if (!teach) {
+    box.append(el("p", "kv", "归类清单还没加载好：刷新一次再试。"));
+    return box;
+  }
+  if (teach.error) {
+    box.append(el("p", "kv", `归类清单读取失败：${teach.error}（角标与这里都会显示为空，不代表没归类）`));
+  }
+  const a = assignmentFor(teach.bindings ?? emptyTeachBindings(), q.id);
+  /** @param {'topics'|'categories'} kind */
+  const row = (label, kind, ids) => {
+    const line = el("div", "teach-read-row");
+    line.append(el("span", "teach-read-label", label));
+    const chips = el("div", "teach-read-chips");
+    if (!ids.length) chips.append(el("span", "teach-read-none", "未归类"));
+    for (const id of ids) {
+      const item = (teach[kind] ?? []).find((x) => x.id === id) ?? null;
+      const cls = "teach-read-chip" + (item?.retired ? " retired" : "");
+      // 清单里找不到 = 断链（被彻底删过），如实说，不编名字
+      chips.append(el("span", cls, item ? `${item.name}${item.retired ? "（已下架）" : ""}` : `${id}（清单里找不到）`));
+    }
+    line.append(chips);
+    return line;
+  };
+  box.append(row("专题", "topics", a.topicIds));
+  box.append(row("类别", "categories", a.categoryIds));
+  const go = el("button", "teach-read-go", "去挑题修改");
+  go.type = "button";
+  go.addEventListener("click", () => {
+    setPickMode(true); // 会顺手把详情面板关掉
+    pickQuestion(q, p);
+    const chip = state.pages[p.index]?.paper?.wrap.querySelector(".q-chip.pick-selected");
+    chip?.scrollIntoView?.({ block: "center" });
+  });
+  box.append(go);
+  return box;
 }
 
 /**

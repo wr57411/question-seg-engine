@@ -360,6 +360,28 @@ body.pick-mode .q-chip .teach-badge { opacity: 1; }
 .fb-detail .opt { font-family: var(--serif); font-size: 14px; line-height: 1.85; }
 .fb-detail .lbl { font-family: var(--sans); font-size: 11.5px; color: var(--ink-soft); letter-spacing: .1em; }
 
+/* 只读「教学归类」区（阅读模式）：看得见归了什么，并能一键跳去挑题里改 */
+.teach-read {
+  margin: 10px 0 12px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--paper-card);
+}
+.teach-read h4 { margin: 0 0 6px; font-family: var(--sans); font-size: 12px; color: var(--ink-soft); letter-spacing: .08em; }
+.teach-read-row { display: flex; align-items: baseline; gap: 8px; margin: 4px 0; min-width: 0; }
+.teach-read-label { flex: none; width: 2.6em; font-family: var(--sans); font-size: 12px; color: var(--ink-soft); }
+.teach-read-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.teach-read-chip {
+  padding: 2px 8px; border-radius: 999px; background: var(--wash); color: var(--ink);
+  font-family: var(--sans); font-size: 12.5px; line-height: 1.6;
+}
+/* 下架项照样显示（题上归属还在），但明显区别于在用项 —— 藏起来会让人以为归类丢了 */
+.teach-read-chip.retired { background: transparent; border: 1px dashed var(--line); color: var(--ink-soft); }
+.teach-read-none { font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft); }
+.teach-read-go {
+  margin-top: 8px; min-height: 44px; padding: 0 14px;
+  border: 1px solid var(--ink); border-radius: 6px; background: var(--ink); color: var(--paper);
+  font-family: var(--sans); font-size: 13.5px; cursor: pointer;
+}
+
 /* ── 标签：面板形态（触屏为主设备）──────────────────────────────
    桌面沿用右侧抽屉；coarse pointer 或窄屏改成**下半屏 sheet**——
    单手竖屏时拇指只够到屏幕下半部，而打标是最高频动作（需求 T6/U7）。
