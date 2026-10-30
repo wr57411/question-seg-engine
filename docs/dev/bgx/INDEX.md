@@ -38,6 +38,9 @@
   推荐 **B → A → C/D**。
 - HANDOFF §6 的 4 条未闭合项已在报告 §4.1 登记归属：§6-11 纳入本轮（C）；
   §6-28 / §6-6 不纳入；§6-7 部分（DOM 门 + 截图，大卷性能不做）。
+- C 已开工：`stages/uncovered-layout.js` 清零并纳管（**5/11**）；`view:test` 在本机无 IAB 时 SKIP，
+  用 Chrome headless 截图/DOM 替代（平板 1024 → `paper-wrap`×13；375 实际视口 500，测不到 <500 分支，`§88.3` 已知）。
+  剩余顺序：`reconstruct.js`（80）→ `stages.js`（144）/ `entry-paper.js`（49）/ `tag-panel.js`（16）/ `viewer.js`（40）/ `final.js`（192）。
 
 **先读 [`docs/HANDOFF.md`](../../HANDOFF.md) §0「本次交接要点」**——一页给出：现状、本轮 7 项完成表、
 下一步建议（按性价比）、未闭合清单、接手第一件事。本节只记 bgx 侧的治理记录，不复制正文。

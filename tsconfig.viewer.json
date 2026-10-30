@@ -26,6 +26,7 @@
     "viewer/doc-utils.js",
     "stages/font-metrics.js",
     "stages/block-dedup.js",
-    "stages/latex-display.js"
+    "stages/latex-display.js",
+    "stages/uncovered-layout.js"
   ]
 }
