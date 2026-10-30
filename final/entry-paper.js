@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * entry-paper.js —— 把「一道题 / 一条答案」按**书上的位置**裁出来（展示层自有模块）
  *
@@ -21,7 +22,11 @@
 import { el, blockNode, mergeContext, paperCanvas, ocrFillNode, ocrRect, posStyle, rectHits, unfilledContentHoles } from "../stages/reconstruct.js";
 import { baseFontOfPage } from "../stages/font-metrics.js";
 
-/** 块的 bbox 并集 `[x0,y0,x1,y1]`；空集合返回 null。 */
+/**
+ * 块的 bbox 并集 `[x0,y0,x1,y1]`；空集合返回 null。
+ * @param {Array<{ bbox: number[] }>} blocks
+ * @returns {number[] | null}
+ */
 export function unionBbox(blocks) {
   if (!blocks.length) return null;
   return [
@@ -58,6 +63,19 @@ export function unionBbox(blocks) {
  *
  * @typedef {Object} MergeCtx
  * @property {Set<number>} drop
+ *
+ * @typedef {Object} PageRef 整页快照（只声明本模块读过的字段；真实形状见 stages.json 的 pages[i]）
+ * @property {number} width
+ * @property {number} height
+ * @property {number} [columns]
+ * @property {SnapBlock[]} blocks
+ * @property {Array<{ id: string, blocks: number[] }>} [questions]
+ * @property {OcrItem[]} [ocrFill]
+ *
+ * @typedef {{ c: number, box: number[], mine?: boolean, ord?: number }} ColBox
+ * @typedef {{ c: number, box: number[], mine: boolean, ord: number }} ScoredBox
+ * @typedef {HTMLElement & { foreignBlocks: number, holes: number }} EntryBox
+ * @typedef {{ candidateStyle?: boolean, maxFontPx?: number }} EntryCropOpts
  */
 
 /** 组内空洞阈值（pt）：行距约 16pt，超过 3.5 行的空白说明中间不属于本条目 */
@@ -71,8 +89,8 @@ const HOLE_PT = 60;
  * 真双栏应约 150/440）——那是聚类退化出来的值，拿它判栏会把同一栏的行交替判成两栏，
  * 一条答案被切成 7 段。
  *
- * @param {any} block
- * @param {any} page
+ * @param {{ bbox: number[] }} block
+ * @param {Pick<PageRef, "width"> & { columns?: number } | null | undefined} page
  * @returns {number | null} 0 = 左半页，1 = 右半页；单栏页返回 null
  */
 export function columnOf(block, page) {
@@ -94,19 +112,23 @@ export function columnOf(block, page) {
  *
  * 段内**留白是事实**（那部分墨迹不属于本条目），纸面那份同样有这块白 —— 不该由裁切来掩盖。
  *
- * @param {Array<{bbox:number[]}>} blocks 已按阅读顺序排列
- * @param {any} page 所在页（要 columns 与 width）
- * @returns {Array<Array<{bbox:number[]}>>}
+ * @param {EntryItem[]} blocks 已按阅读顺序排列
+ * @param {PageRef} page 所在页（要 columns 与 width）
+ * @returns {EntryItem[][]}
  */
 export function splitSegments(blocks, page) {
+  /** @type {Map<number, EntryItem[]>} */
   const groups = new Map();
   for (const b of blocks) {
     const c = columnOf(b, page) ?? 0;
-    if (!groups.has(c)) groups.set(c, []);
-    groups.get(c).push(b);
+    const bucket = groups.get(c);
+    if (bucket) bucket.push(b);
+    else groups.set(c, [b]);
   }
+  /** @type {EntryItem[][]} */
   const out = [];
   for (const [, arr] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+    /** @type {EntryItem[]} */
     let cur = [];
     let bottom = -Infinity;
     for (const b of arr.slice().sort((x, y) => x.bbox[1] - y.bbox[1])) {
@@ -132,7 +154,7 @@ export function splitSegments(blocks, page) {
  * 所以：**落在本条目区域内的候选行一并纳入**；区域内**属于别题**的块不抢，但要计数，
  * 让面板能说清"这里为什么空"。
  *
- * @param {any} page 整页快照
+ * @param {PageRef} page 整页快照
  * @param {SnapBlock[]} own 本条目的块（已剔除被并集合并掉的）
  * @param {MergeCtx | null} [mergeCtx] 整页并集合并上下文（跳过被合并掉的游离块）
  * @returns {{items: EntryItem[], foreignBlocks: number, boxes: number[][], holes: Array<{bbox:number[],area:number}>}}
@@ -140,7 +162,9 @@ export function splitSegments(blocks, page) {
  */
 export function collectEntryItems(page, own, mergeCtx = null) {
   const mine = new Set(own.map((b) => b.i));
+  /** @type {Set<number>} */
   const assigned = new Set();
+  /** @type {Set<number>} */
   const claimedElsewhere = new Set();
   for (const other of page.questions ?? []) {
     for (const i of other.blocks) assigned.add(i);
@@ -165,14 +189,23 @@ export function collectEntryItems(page, own, mergeCtx = null) {
    * 补洞的行反过来变成"无主"，实测 3 条（题册 p14 的 C/D 选项行）。
    * 判"在不在本条目内"要的是**栏**这个粒度；裁成几段才是空洞的事，两者不必同一个口径。
    */
+  /** @param {Array<{ bbox: number[] }>} blocks @returns {Array<{ c: number, box: number[] }>} */
   const colBoxesOf = (blocks) => {
+    /** @type {Map<number, Array<{ bbox: number[] }>>} */
     const m = new Map();
     for (const b of blocks) {
       const c = columnOf(b, page) ?? 0;
-      if (!m.has(c)) m.set(c, []);
-      m.get(c).push(b);
+      const bucket = m.get(c);
+      if (bucket) bucket.push(b);
+      else m.set(c, [b]);
     }
-    return [...m.entries()].map(([c, bs]) => ({ c, box: unionBbox(bs) })).filter((x) => !!x.box);
+    /** @type {Array<{ c: number, box: number[] }>} */
+    const out = [];
+    for (const [c, bs] of m.entries()) {
+      const box = unionBbox(bs);
+      if (box) out.push({ c, box }); // 空栏不产出（原 `filter(x => !!x.box)` 的等价写法）
+    }
+    return out;
   };
   const myBoxes = colBoxesOf(own);
   const boxes = myBoxes.map((x) => x.box);
@@ -191,6 +224,7 @@ export function collectEntryItems(page, own, mergeCtx = null) {
    *   ③ 洞比 HOLE_PT 还大就不猜（宁可留"无主"可见，红线 G1）；
    *   ④ 平手按条目在页上的序号，保证确定性。
    */
+  /** @type {ColBox[]} */
   const otherBoxes = [];
   for (const other of page.questions ?? []) {
     if (other.blocks.some((i) => mine.has(i))) continue; // 本条目自己的题（跨页段的另一条）不算别人
@@ -200,9 +234,12 @@ export function collectEntryItems(page, own, mergeCtx = null) {
     ...myBoxes.map((x) => ({ ...x, mine: true })),
     ...otherBoxes.map((x) => ({ ...x, mine: false })),
   ].map((x, ord) => ({ ...x, ord }));
+  /** @param {number[]} a @param {number[]} b @returns {number} */
   const overlapY = (a, b) => Math.max(0, Math.min(a[3] ?? 0, b[3] ?? 0) - Math.max(a[1] ?? 0, b[1] ?? 0));
+  /** @param {number[]} bbox @returns {boolean} */
   const claimable = (bbox) => {
     const c = columnOf({ bbox }, page) ?? 0;
+    /** @type {ScoredBox | null} */
     let best = null;
     let bestScore = -Infinity;
     for (const cb of allBoxes) {
@@ -260,13 +297,14 @@ export function collectEntryItems(page, own, mergeCtx = null) {
  * 每一页各出一条**，每条的 `blocks` 只含该页那一段（见 export-stages 的 perPageBlocks）。
  * 只取第一条就把续段整段丢掉 —— 实测热狗题的答案裁出 3 行、书上有 14 行（2026-10-15 用户报出）。
  *
- * @param {Array<{questions: Array<{id: string, blocks: number[]}>}>} pages
- * @param qid
- * @returns {Array<{page: any, blocks: number[]}>}
+ * @param {Array<PageRef & { questions?: Array<{id: string, blocks: number[]}> }> | undefined} pages
+ * @param {string} qid
+ * @returns {Array<{ page: PageRef, blocks: number[] }>}
  */
 export function entrySegments(pages, qid) {
+  /** @type {Array<{ page: PageRef, blocks: number[] }>} */
   const out = [];
-  for (const p of pages ?? []) for (const q of p.questions) if (q.id === qid) out.push({ page: p, blocks: q.blocks });
+  for (const p of pages ?? []) for (const q of p.questions ?? []) if (q.id === qid) out.push({ page: p, blocks: q.blocks });
   return out;
 }
 
@@ -278,10 +316,10 @@ export function entrySegments(pages, qid) {
  *
  * ⚠️ 入参是**段列表**而不是单页：一条目可能跨页，见 `entrySegments`。
  *
- * @param {Array<{page: any, blocks: number[]}>} segments 该条目的各页段（须按页序）
- * @param doc       卷 id（图片由 `blockNode` 拼 `/data/out/<doc>/images/...`）
- * @param widthPx   单段裁出来可占的显示宽度上限（面板可用宽）
- * @param opts      `{ candidateStyle, maxFontPx }`
+ * @param {Array<{page: PageRef, blocks: number[]}>} segments 该条目的各页段（须按页序）
+ * @param {string} doc       卷 id（图片由 `blockNode` 拼 `/data/out/<doc>/images/...`）
+ * @param {number} widthPx   单段裁出来可占的显示宽度上限（面板可用宽）
+ * @param {EntryCropOpts} [opts] `{ candidateStyle, maxFontPx }`
  *                  `maxFontPx`（默认 19）是**字号上限**：条目往往只占原书一栏（约 240pt），
  *                  直接铺满面板宽会放大到 3× 以上，一行只剩 20 个字，读起来像海报。
  * @returns {HTMLElement | null} 容器（内含若干 `.entry-crop`）；无可渲染块时 null。
@@ -289,7 +327,7 @@ export function entrySegments(pages, qid) {
  *          带 `holes`：区域内**原卷有墨迹但没读出来**的处数（供面板明说内容缺失）。
  */
 export function entryCrop(segments, doc, widthPx, opts = {}) {
-  const box = el("div", "entry-figs");
+  const box = /** @type {EntryBox} */ (el("div", "entry-figs"));
   box.foreignBlocks = 0;
   box.holes = 0;
   for (const seg of segments ?? []) {
@@ -301,7 +339,16 @@ export function entryCrop(segments, doc, widthPx, opts = {}) {
   return box.children.length ? box : null;
 }
 
-/** 把一页上的条目段裁进共享容器，返回该页的「别题块数」与「未读出的洞数」。 */
+/**
+ * 把一页上的条目段裁进共享容器，返回该页的「别题块数」与「未读出的洞数」。
+ * @param {EntryBox} box
+ * @param {PageRef} page
+ * @param {number[]} blockIdxs
+ * @param {string} doc
+ * @param {number} widthPx
+ * @param {EntryCropOpts} opts
+ * @returns {{ foreign: number, holes: number }}
+ */
 function cropPageInto(box, page, blockIdxs, doc, widthPx, opts) {
   const { candidateStyle = true, maxFontPx = 19 } = opts;
   const blocks = (blockIdxs ?? []).map((i) => page.blocks[i]).filter(Boolean);
@@ -318,6 +365,7 @@ function cropPageInto(box, page, blockIdxs, doc, widthPx, opts) {
    * ⚠️ 不能用"与段矩形相交"判 —— 图注天然印在图的**下方**，比本题块的底边还低几 pt
    * （实测 答案册 p4 甲/乙/丙 三个洞距图底边 2pt ⇒ 相交判据一个都收不到，标记全丢）。
    */
+  /** @type {number[]} */
   const hostOf = holes.map((h) => {
     const col = columnOf({ bbox: h.bbox }, page) ?? 0;
     let best = -1;
@@ -330,10 +378,13 @@ function cropPageInto(box, page, blockIdxs, doc, widthPx, opts) {
     });
     return best;
   });
+  /** @param {number} i @returns {Array<{bbox:number[], area:number}>} */
   const holesIn = (i) => holes.filter((_, hi) => hostOf[hi] === i);
 
-  const fontAt1x = baseFontOfPage(page.blocks, page.width, page.width); // 1 pt/px 时的基准字号
+  // 1 pt/px 时的基准字号；无可用文本块时为 null ⇒ 与旧行为一致地视为「不封顶」
+  const fontAt1x = baseFontOfPage(page.blocks, page.width, page.width) ?? 0;
   const kFont = fontAt1x > 0 ? maxFontPx / fontAt1x : Infinity;
+  /** @type {Map<number, number | null>} */
   const baseFontCache = new Map();
 
   for (let si = 0; si < segs.length; si++) {
@@ -341,6 +392,7 @@ function cropPageInto(box, page, blockIdxs, doc, widthPx, opts) {
     const mine = holesIn(si);
     // 段矩形必须把归属它的洞**框进来**，否则洞画在裁切框外面照样看不见
     const bbox = unionBbox([...seg, ...mine.map((h) => ({ bbox: h.bbox }))]);
+    if (!bbox) continue; // 段与洞都为空（理论上不会）：跳过这一段，不画空裁切
     const entryW = bbox[2] - bbox[0];
     const k = Math.min(widthPx / entryW, kFont); // 铺满面板宽 与 字号封顶，取小的
     const fullW = page.width * k; // 整页按同一比例放大，块坐标换算才与纸面一致
@@ -361,7 +413,8 @@ function cropPageInto(box, page, blockIdxs, doc, widthPx, opts) {
       canvas.append(node);
     }
     for (const x of seg) {
-      if (x.ocr) canvas.append(ocrFillNode(x.ocr, page, fullW, baseFont, candidateStyle));
+      // baseFont 只在全页无文本块时为 null，此时与 `ocrFillInto` 同口径兜底 12px
+      if (x.ocr) canvas.append(ocrFillNode(x.ocr, page, fullW, baseFont ?? 12, candidateStyle));
     }
     for (const h of mine) {
       const mark = posStyle(el("div", "uncovered-mark hole"), h.bbox, page.width, page.height);
@@ -394,7 +447,8 @@ function cropPageInto(box, page, blockIdxs, doc, widthPx, opts) {
  */
 export function fitEntryCrops(root) {
   if (!root || !root.isConnected) return;
-  for (const crop of root.querySelectorAll(".entry-crop")) {
+  for (const rawCrop of root.querySelectorAll(".entry-crop")) {
+    const crop = /** @type {HTMLElement} */ (rawCrop);
     const cRect = crop.getBoundingClientRect();
     const canvas = crop.querySelector(".canvas");
     // 上限 = 画布还剩多少可看（裁切框再宽也只是空白，不该把页面外头圈进来）
@@ -403,7 +457,7 @@ export function fitEntryCrops(root) {
     let bottom = 0;
     let right = 0;
     for (const n of crop.querySelectorAll(".blk, .blk .txt, .blk img")) {
-      const img = n.tagName === "IMG" ? n : n.querySelector(":scope > img");
+      const img = /** @type {HTMLImageElement | null} */ (n.tagName === "IMG" ? n : n.querySelector(":scope > img"));
       // 图片是替换元素，盒子=墨迹；文字必须走 Range
       const r = img ? img.getBoundingClientRect() : inkRect(n);
       bottom = Math.max(bottom, Math.min(r.bottom - cRect.top, maxBottom));

@@ -29,6 +29,7 @@
     "stages/latex-display.js",
     "stages/uncovered-layout.js",
     "stages/reconstruct.js",
-    "final/tag-panel.js"
+    "final/tag-panel.js",
+    "final/entry-paper.js"
   ]
 }
