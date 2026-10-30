@@ -576,21 +576,35 @@ for (const p of snap.pages) {
     }
   }
 }
+// **判定项与提示项在这里分家**（`DECISIONS §86`，收口 `§6-1`）：两类的可信度根本不同 ——
+//   · 非二维块：走 `clampByWidth`，构造上 `em·F ≤ bboxW`；右缘仍越过画布 ⇒ 夹子失效，
+//     是**真 bug**，阈值 0，超了就让 check 红；
+//   · `\frac/\sqrt` 块：豁免夹子，且 `renderedTextOf` 是分子分母的一维拼接 ⇒ `em·F` 只是**上界**，
+//     实测 `§11.4` DOM 0 块溢出画布、本轮审计估算亦为 0 ⇒ 保持提示项（不可信的量不设门）。
 {
-  const mathN = clipEstimate.filter((x) => x.math).length;
-  console.log("\n⚠️ 画布边界裁切估算（提示项，不计退出码）");
+  const clipMath = clipEstimate.filter((x) => x.math);
+  const clipPlain = clipEstimate.filter((x) => !x.math);
+  const plainBad = clipPlain.length > 0;
+  console.log(
+    `\n${plainBad ? "❌" : "✅"} 画布边界裁切（判定项：非二维块 右缘 > 画布宽(${AUDIT_CANVAS_W}) 的块数 = 0）`,
+  );
+  console.log(
+    `     非二维块 ${clipPlain.length} 个（判定）· \\frac/\\sqrt 块 ${clipMath.length} 个（提示，一维投影只是上界）`,
+  );
   console.log("     成因：\\frac/\\sqrt 块豁免 clampByWidth（Task 14 收窄后只这一类）→ 字号取基准、");
   console.log("     不受 bbox 宽约束 → 文字右缘可能越过画布右边界，被 .canvas{overflow:hidden} 裁掉（G1）。");
-  console.log(
-    `     估算「右缘 > 画布宽(${AUDIT_CANVAS_W})」的块：${clipEstimate.length} 个（其中含二维公式源码 ${mathN} 个）`,
-  );
-  console.log("     ⚠️ 对 \\frac/\\sqrt 块，renderedTextOf 是分子分母的拼接（二维排版的一维投影）→ 仍是上界；");
-  console.log("        真实是否裁切以视觉审板/DOM 为准，本清单只用于把风险显性化。");
+  console.log("     非二维块走夹子后仍越界 = 夹子失效（真 bug，判红）；二维块清单仅供人看。");
   for (const x of [...clipEstimate].sort((a, b) => b.over - a.over).slice(0, 10)) {
     console.log(`        p${x.p} blocks[${x.i}] 右缘超出 ${x.over.toFixed(1)}px math=${x.math} ${JSON.stringify(x.shown)}`);
   }
   if (clipEstimate.length > 10) console.log(`        …另有 ${clipEstimate.length - 10} 条`);
-  hints += clipEstimate.length; // 提示项：计入提示总数（不影响退出码）
+  if (plainBad) {
+    console.log(
+      `        ❌ ${clipPlain.length} 个非二维块越过画布右缘：clampByWidth 应保证 em·F ≤ bboxW，出现即判据失效`,
+    );
+    bad++;
+  }
+  hints += clipMath.length; // 提示项：计入提示总数（不影响退出码）
 }
 
 // ── 10. 墨迹覆盖率（Task 16；判定项：**内容级条数**的回归；提示项：区域清单）──────

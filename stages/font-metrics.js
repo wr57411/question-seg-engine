@@ -107,6 +107,7 @@ import { prettifyLatex } from "./latex-display.js";
  * 不是保真夹子——旧的 8–20px 夹子已在上一轮移除，不要加回来：正是它把正文行抬到 8px、
  * 把选项行压到 7px，直接造成字号偏离原卷。
  */
+/** @param {number} hPx 行高换算出的字号（画布 px） */
 export function fontFromLineHeight(hPx) {
   return Math.max(4, hPx * 1.03);
 }
@@ -172,6 +173,7 @@ export function hasTwoDimensionalMath(text) {
 
 /** HTML 片段 → 纯文本：剥掉标签、还原 `escapeHtml` 转义的三字符。
  * 供 `renderedTextOf` 使用（标签只由 latex-display 生成，属性值不含 `>`）。 */
+/** @param {string} html */
 function stripTags(html) {
   return html
     .replace(/<[^>]*>/g, "")
@@ -231,9 +233,12 @@ const FONT_ESTIMATOR_MIN_FW = 6;
 
 /** 全角/CJK 字数：码位 ≥ U+2E80 的字符计数（与 `emWidthOf` 的「全角/CJK」口径、
  * 审计 `FW_MIN = 0x2e80` 一致）。供交叉验证的「全角字数 ≥ 6」前置条件使用。 */
+/** @param {string} text */
 export function fullWidthCount(text) {
   let n = 0;
-  for (const ch of text ?? "") if (ch.codePointAt(0) >= 0x2e80) n++;
+  // `codePointAt` 返回 `number | undefined`（空串/越界）。原写法依赖 `undefined >= n` 恒 false，
+  // 加类型检查后暴露（`TS2532`）；显式取 0 语义完全一致，但不再是"靠隐式转换成立"。
+  for (const ch of text ?? "") if ((ch.codePointAt(0) ?? 0) >= 0x2e80) n++;
   return n;
 }
 
@@ -317,6 +322,7 @@ const LINE_OVERLAP_MIN = 0.4;
  */
 export function isCrampedLine(block, pageBlocks) {
   if (!pageBlocks) return false;
+  /** @param {{bbox: number[]}} b */
   const w = (b) => b.bbox[2] - b.bbox[0];
   const bw = w(block);
   if (bw <= 0) return false;
@@ -431,7 +437,19 @@ export function clampByWidth(fontPx, block, pageWidth, canvasW) {
   const em = emWidthOf(renderedTextOf(block.text ?? ""));
   if (em <= 0) return fontPx; // 无文字（图片/空块）：无可贴合，不夹
   const wPx = ((block.bbox[2] - block.bbox[0]) / pageWidth) * canvasW;
-  return Math.min(fontPx, wPx / em);
+  /**
+   * **画布夹**（`DECISIONS §86`）：上面的 `wPx/em` 只保证「文字宽 ≤ **块**宽」，
+   * 它管不到「块自己贴着画布右边」。块左缘靠右 + 块宽本身大时，字号合规也会让
+   * 文字右缘越过画布，被 `.canvas{overflow:hidden}` 裁掉（G1：裁切 = 静默丢内容）。
+   * 实测：答案册 p17 一行超出 **0.6px**，就是这么来的。
+   *
+   * 可用宽 = 画布宽 − 块左缘（换算到画布 px）。左缘已在画布外（avail ≤ 0）时不夹 ——
+   * 那是上游 bbox 本身越界，压字号也救不回来，交给审计提示项。
+   */
+  const leftPx = (block.bbox[0] / pageWidth) * canvasW;
+  const availPx = canvasW - leftPx;
+  const byCanvas = availPx > 0 ? availPx / em : fontPx;
+  return Math.min(fontPx, wPx / em, byCanvas);
 }
 
 /** 阶段 1（原料视图）**段级块**的字号（R1）：按**框宽适配**。
@@ -492,6 +510,7 @@ const ASCII_ADVANCE = (() => {
   return a;
 })();
 
+/** @param {string} text */
 export function emWidthOf(text) {
   let ems = 0;
   for (const ch of text) {

@@ -1,0 +1,31 @@
+// 展示层（viewer / stages / final）的独立类型检查（`DECISIONS §87`）。
+//
+// 为什么要单开一份：主 `tsconfig.json` 的 `lib` 只有 ES2022、**没有 DOM** ——
+// 那是 `src/` 的「纯逻辑、无 DOM」解耦红线的体现，不能为了展示层把它放宽（一放宽，
+// `src/` 里误用 `document` 就不再报错）。展示层需要 DOM 全局 + `checkJs`，故独立一份。
+//
+// 分批方式：**每修完一个文件就加一行 include**，`npm run check` 始终绿。
+// 未纳管的文件不是"没债"，是"债还没还"，清单见 `docs/HANDOFF.md §6-11`。
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "allowJs": true,
+    "checkJs": true,
+    "noUncheckedIndexedAccess": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "viewer/doc-utils.js",
+    "stages/font-metrics.js",
+    "stages/block-dedup.js",
+    "stages/latex-display.js"
+  ]
+}
