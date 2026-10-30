@@ -58,7 +58,13 @@
     <div class="pick-head">
       <span class="pick-title" id="pick-title">未选题</span>
       <div class="combo-strip" id="combo-strip" role="group" aria-label="常用组合（长按拖动排序）"></div>
+      <div class="pick-search" id="pick-search" hidden>
+        <input class="pick-search-input" id="pick-search-q" type="search" autocomplete="off"
+          placeholder="搜专题 / 类别" aria-label="搜索专题或类别" />
+        <button class="pick-search-clear" id="pick-search-clear" type="button">清除</button>
+      </div>
       <button class="combo-add-chip" id="combo-add" type="button" aria-label="把当前题存为组合" disabled>＋</button>
+      <button class="pick-find" id="pick-find" type="button" aria-pressed="false">搜</button>
       <button class="pick-manage" id="pick-manage" type="button" aria-pressed="false">管理</button>
       <button class="pick-same" id="pick-same" type="button" disabled>同上题</button>
       <button class="pick-close" id="pick-close" type="button">收起</button>
@@ -89,15 +95,20 @@
     </div>
     <div class="pick-lanes" id="pick-rows" hidden>
       <div class="pick-lane">
-        <span class="pick-lane-label">专题</span>
+        <span class="pick-lane-label">专题<i class="pick-count" id="count-topics" hidden></i></span>
         <div class="pick-chips" id="pick-topics" role="group" aria-label="专题"></div>
         <button class="pick-add" id="pick-add-topics" type="button" aria-label="新建专题">＋</button>
       </div>
       <div class="pick-lane">
-        <span class="pick-lane-label">类别</span>
+        <span class="pick-lane-label">类别<i class="pick-count" id="count-categories" hidden></i></span>
         <div class="pick-chips" id="pick-categories" role="group" aria-label="类别"></div>
         <button class="pick-add" id="pick-add-categories" type="button" aria-label="新建类别">＋</button>
       </div>
+    </div>
+    <div class="pick-nomatch" id="pick-nomatch" hidden>
+      <span class="pick-nomatch-text" id="pick-nomatch-text"></span>
+      <button class="pick-nomatch-btn" id="nomatch-topics" type="button"></button>
+      <button class="pick-nomatch-btn" id="nomatch-categories" type="button"></button>
     </div>
     <form class="pick-create" id="pick-create" hidden>
       <input class="pick-create-input" id="pick-create-name" type="text" maxlength="60"

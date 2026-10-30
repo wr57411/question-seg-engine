@@ -173,7 +173,16 @@ verify: test -z "$(git status --porcelain)" && [ "$(git branch --show-current)" 
   改用 `e.composedPath()`（派发时就固定，不受重绘影响）。**同类浮层别再写 closest 判外点。**
 - **本地服务**：4174（真实数据）中途掉了，已用 `PORT=4174 nohup node --import tsx scripts/view-server.ts`
   重启，日志 `tmp/view-4174.log`，平板地址 `http://192.168.2.64:4174/final/?doc=…`；4175 测试副本服务用完即停。
-- **未做**：Step 6 搜索；Step 7 专题/类别管理（改名/删除 + 影响题数 + **跨卷 bindings 级联**，
+- **Step 6 托盘搜索已完成**（HOTL `step 6 verify` 通过）：`filterTeach` 纯函数（忽略首尾空格/英文大小写，
+  空词不过滤、只读不改清单）；搜索框与组合条共用标题行同一格（实测开搜索托盘高度 97px 不变、
+  标题行零横向溢出、输入框 44px）；两行同步过滤并显示命中数（命中数与标签同行）；
+  点搜索结果即归类（可撤销、角标同步）；搜不到 → 「新建专题『词』/新建类别『词』」，
+  建好打上并自动收起，刷新后保留。内联新建与搜索新建统一走 `applyCreate` 一条路径。
+  验收：`tests/teach-store.test.ts` 14 条全绿；`tmp/search-smoke.mjs`（副本 4175，coarse pointer 实测）
+  EXIT=0、控制台零异常；截图 `tmp/review-pick/search-{open,hit-topic,hit-category,applied,nomatch,created,reloaded}.png`。
+  顺带修：`.pick-lane-label` 固定 26px 宽会把命中数挤到下一行 → 改 `min-width + nowrap`。
+  副本测试数据（6 个「磁场*」测试类别）已清理，真实 `data/out/teach` 实测未受影响。
+- **未做**：Step 7 专题/类别管理（改名/删除 + 影响题数 + **跨卷 bindings 级联**，
   级联要动写通道，属 R2 风险，需服务端一次事务式多文件写）；
   Step 8 导出 v2 + 专题页；Step 9 阅读回显；Step 10/11 迁移（human gate）；Step 12 截图审板；
   Step 13 真机（human gate）；Step 14/15 合回 main。

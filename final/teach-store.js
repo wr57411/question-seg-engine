@@ -307,6 +307,24 @@ export function orderByRecent(items, recent) {
     .map((x) => x.item);
 }
 
+/**
+ * 托盘搜索：一个关键词同时过滤专题与类别（只读，绝不改清单、绝不写盘）。
+ * 忽略首尾空格与英文大小写；空关键词等于不过滤，原样返回两份完整清单。
+ * @param {string} query
+ * @param {{ topics: TeachItem[], categories: TeachItem[] }} lists
+ * @returns {{ q: string, topics: TeachItem[], categories: TeachItem[], total: number }}
+ */
+export function filterTeach(query, lists) {
+  const q = String(query ?? "").trim().toLowerCase();
+  if (!q) {
+    return { q: "", topics: lists.topics, categories: lists.categories, total: lists.topics.length + lists.categories.length };
+  }
+  const hit = (/** @type {TeachItem} */ item) => item.name.toLowerCase().includes(q);
+  const topics = lists.topics.filter(hit);
+  const categories = lists.categories.filter(hit);
+  return { q, topics, categories, total: topics.length + categories.length };
+}
+
 /* ── 网络 ── */
 
 /** @param {string} url @returns {Promise<any>} */

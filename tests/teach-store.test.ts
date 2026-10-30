@@ -13,6 +13,7 @@ import {
   badgeCounts,
   comboMatches,
   emptyTeachBindings,
+  filterTeach,
   moveToFront,
   normalizeCombos,
   normalizeTeachBindings,
@@ -174,6 +175,27 @@ test("组合删除：只摘掉预设本身；不存在的 id 报错不静默", (
   assert.equal(r.item?.name, "曲线基础", "返回被删项，供提示与回滚");
   assert.equal(removeCombo(base, "cb-9").item, null, "删不存在的必须报");
   assert.deepEqual(removeCombo(base, "cb-9").list, base, "失败不动清单");
+});
+
+test("filterTeach：忽略首尾空格与英文大小写；空词不过滤；不动原清单", () => {
+  const topics = [
+    { id: "tp-1", name: "平抛运动" },
+    { id: "tp-2", name: "圆周运动" },
+  ];
+  const categories = [
+    { id: "ct-1", name: "易错" },
+    { id: "ct-2", name: "基础" },
+  ];
+  const r = filterTeach(" 平抛 ", { topics, categories });
+  assert.deepEqual(r.topics.map((t) => t.id), ["tp-1"], "专题行命中");
+  assert.deepEqual(r.categories, [], "类别行没命中就是空，不拿别的凑");
+  assert.equal(r.total, 1);
+  const eng = filterTeach("AB", { topics: [{ id: "t1", name: "aBc混合" }], categories: [] });
+  assert.equal(eng.topics.length, 1, "英文忽略大小写");
+  const none = filterTeach("   ", { topics, categories });
+  assert.equal(none.topics, topics, "空关键词直接复用原数组：不复制、不重排");
+  assert.equal(none.total, 4);
+  assert.equal(topics.length, 2, "过滤是只读的，原清单一个字都不动");
 });
 
 test("normalizeCombos：丢弃空集合/重复 id；comboMatches 判断完全一致", () => {

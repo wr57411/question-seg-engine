@@ -35,6 +35,7 @@ import {
   bindingFor,
   comboMatches,
   emptyTeachBindings,
+  filterTeach,
   loadTeachBindings,
   loadTeachLibrary,
   moveToFront,
@@ -84,6 +85,7 @@ const state = {
   lastClassified: null, // 本会话最近一次已归类题 {doc, questionId, assignment, label}
   undo: null, // 最近一次可撤销动作 {doc, qid, pageIndex, prevBinding, nextBinding}
   manage: null, // 管理面板状态 {renaming: id|null, confirm: id|null}；null=面板关着
+  search: { on: false, q: "" }, // 托盘搜索：开着时组合条让位给搜索框，两行同步过滤
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
@@ -232,19 +234,51 @@ function renderPickRows() {
   const hint = $("pick-hint");
   const topicBox = $("pick-topics");
   const categoryBox = $("pick-categories");
+  const nomatch = $("pick-nomatch");
   if (!rows || !hint || !topicBox || !categoryBox) return;
+  /** @param {'topics'|'categories'} kind @param {number} n @param {boolean} shown */
+  const setCount = (kind, n, shown) => {
+    const node = $(kind === "topics" ? "count-topics" : "count-categories");
+    if (!node) return;
+    node.hidden = !shown;
+    node.textContent = String(n);
+  };
   if (!state.picked) {
     rows.hidden = true;
     hint.hidden = true;
     hint.textContent = "";
+    if (nomatch) nomatch.hidden = true;
     topicBox.replaceChildren();
     categoryBox.replaceChildren();
+    setCount("topics", 0, false);
+    setCount("categories", 0, false);
     return;
   }
-  rows.hidden = false;
   const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), state.picked.q.id);
-  const topics = orderByRecent(state.teach?.topics ?? [], state.recent.topics);
-  const categories = orderByRecent(state.teach?.categories ?? [], state.recent.categories);
+  const all = {
+    topics: orderByRecent(state.teach?.topics ?? [], state.recent.topics),
+    categories: orderByRecent(state.teach?.categories ?? [], state.recent.categories),
+  };
+  const searching = state.search.on && !!state.search.q.trim();
+  const view = searching
+    ? filterTeach(state.search.q, all)
+    : { topics: all.topics, categories: all.categories, total: all.topics.length + all.categories.length };
+  setCount("topics", view.topics.length, searching);
+  setCount("categories", view.categories.length, searching);
+  const nothing = searching && view.total === 0;
+  rows.hidden = nothing;
+  if (nomatch) {
+    nomatch.hidden = !nothing;
+    if (nothing) {
+      const q = state.search.q.trim();
+      const text = $("pick-nomatch-text");
+      const bt = $("nomatch-topics");
+      const bc = $("nomatch-categories");
+      if (text) text.textContent = `没有叫「${q}」的专题或类别`;
+      if (bt) bt.textContent = `新建专题「${q}」`;
+      if (bc) bc.textContent = `新建类别「${q}」`;
+    }
+  }
 
   const chip = (kind, item, on) => {
     const b = el("button", "pick-chip", item.name);
@@ -255,17 +289,48 @@ function renderPickRows() {
     b.addEventListener("click", () => togglePick(kind, item.id, item.name));
     return b;
   };
-  topicBox.replaceChildren(...topics.map((t) => chip("topics", t, a.topicIds.includes(t.id))));
-  categoryBox.replaceChildren(...categories.map((c) => chip("categories", c, a.categoryIds.includes(c.id))));
-  if (!topics.length && !categories.length) {
+  topicBox.replaceChildren(...view.topics.map((t) => chip("topics", t, a.topicIds.includes(t.id))));
+  categoryBox.replaceChildren(...view.categories.map((c) => chip("categories", c, a.categoryIds.includes(c.id))));
+  if (!all.topics.length && !all.categories.length) {
     hint.hidden = false;
     hint.textContent = state.teach?.error
       ? `教学归类读取失败：${state.teach.error}`
-      : "还没有专题/类别（下一步支持新建）";
+      : "还没有专题/类别（点每行末尾的 ＋ 新建）";
   } else {
     hint.hidden = true;
     hint.textContent = "";
   }
+}
+
+/* ── 托盘搜索：一个框同时过滤两行；搜不到直接建 ── */
+
+function setSearchOn(on) {
+  state.search.on = on;
+  const box = $("pick-search");
+  const input = $("pick-search-q");
+  const btn = $("pick-find");
+  if (box) box.hidden = !on;
+  btn?.setAttribute("aria-pressed", String(on));
+  if (!on) {
+    state.search.q = "";
+    if (input) input.value = "";
+  }
+  renderComboStrip();
+  renderPickRows();
+  if (on) input?.focus();
+}
+
+/** 搜不到 → 就地新建并打上，成功后自动收起搜索（新 chip 立刻看得见）。 */
+/** @param {'topics'|'categories'} kind */
+async function createFromSearch(kind) {
+  const q = state.search.q.trim();
+  if (!q) return;
+  if (!state.picked) {
+    flash("先点一道题");
+    return;
+  }
+  const ok = await applyCreate(kind, q);
+  if (ok) setSearchOn(false);
 }
 
 function togglePick(kind, id, name) {
@@ -349,7 +414,12 @@ function renderComboStrip() {
     strip.replaceChildren();
     return;
   }
-  strip.hidden = false;
+  // 搜索框和组合条共用同一格：开着搜索就让位给它（托盘不加行、不加高）
+  strip.hidden = state.search.on === true;
+  if (strip.hidden) {
+    strip.replaceChildren();
+    return;
+  }
   const a = currentAssignment();
   const combos = state.teach?.combos ?? [];
   /** @type {HTMLElement[]} */
@@ -887,18 +957,19 @@ function revealChip(kind, id) {
   chip?.scrollIntoView?.({ inline: "center", block: "nearest" });
 }
 
-async function submitCreate(e) {
-  e.preventDefault();
-  const kind = state.creating;
-  if (!kind || !state.picked || !state.teach) return;
-  const input = $("pick-create-name");
+/**
+ * 新建专题/类别并立刻打给当前题（内联表单与「搜不到就新建」共用一条路径）。
+ * 名字已存在时复用既有条目，不重复写清单。
+ * @param {'topics'|'categories'} kind @param {string} name
+ */
+async function applyCreate(kind, name) {
+  if (!state.picked || !state.teach) return false;
   const prefix = kind === "topics" ? "tp" : "ct";
   const list = kind === "topics" ? state.teach.topics : state.teach.categories;
-  const res = addTeachItem(list, input.value, prefix);
+  const res = addTeachItem(list, name, prefix);
   if (!res.item) {
     flash(res.error ?? "新建失败");
-    input.focus();
-    return;
+    return false;
   }
   if (res.created) {
     const payload =
@@ -908,8 +979,7 @@ async function submitCreate(e) {
     const saved = await saveTeach(kind, payload);
     if (!saved.ok) {
       notice([`新建失败：${saved.error ?? "未知错误"}`], "err");
-      input.focus();
-      return;
+      return false;
     }
     state.teach = { ...state.teach, [kind]: res.list };
     clearTeachNotice();
@@ -924,13 +994,23 @@ async function submitCreate(e) {
     renderPickRows();
     revealChip(kind, res.item.id);
     flash(`已经在「${res.item.name}」里`);
-    return;
+    return true;
   }
   const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
   const next =
     kind === "topics" ? toggleTopic(before, q.id, res.item.id, anchor) : toggleCategory(before, q.id, res.item.id, anchor);
   commitTeach(next, `已放入：${res.item.name}`, before, { qid: q.id, pageIndex: p.index });
   revealChip(kind, res.item.id);
+  return true;
+}
+
+async function submitCreate(e) {
+  e.preventDefault();
+  const kind = state.creating;
+  if (!kind || !state.picked || !state.teach) return;
+  const input = $("pick-create-name");
+  const ok = await applyCreate(kind, input.value);
+  if (!ok) input.focus();
 }
 
 
@@ -995,6 +1075,7 @@ function setPickMode(on) {
     closeCreate();
     closeComboPop();
     closeManage();
+    if (state.search.on) setSearchOn(false);
     hideUndo();
     clearPickSelection();
   }
@@ -1719,6 +1800,20 @@ function initBar() {
   $("combo-cancel").addEventListener("click", closeComboPop);
   $("pick-manage").addEventListener("click", () => (state.manage ? closeManage() : openManage()));
   $("manage-close").addEventListener("click", closeManage);
+  $("pick-find").addEventListener("click", () => setSearchOn(!state.search.on));
+  $("pick-search-q").addEventListener("input", (e) => {
+    state.search.q = /** @type {HTMLInputElement} */ (e.target).value;
+    renderPickRows();
+  });
+  $("pick-search-clear").addEventListener("click", () => {
+    const input = $("pick-search-q");
+    state.search.q = "";
+    if (input) input.value = "";
+    renderPickRows();
+    input?.focus();
+  });
+  $("nomatch-topics").addEventListener("click", () => void createFromSearch("topics"));
+  $("nomatch-categories").addEventListener("click", () => void createFromSearch("categories"));
   document.addEventListener("click", (e) => {
     // 用 composedPath 而不是 closest()：面板里的按钮点下去会同步重绘，
     // 那时 e.target 已经从 DOM 上摘下来了，closest 找不到祖先 → 会把刚打开的面板又关掉。
@@ -1734,6 +1829,7 @@ function initBar() {
     if (e.key !== "Escape") return;
     closeManage();
     closeComboPop();
+    if (state.search.on) setSearchOn(false);
   });
   $("pick-add-topics").addEventListener("click", () => openCreate("topics"));
   $("pick-add-categories").addEventListener("click", () => openCreate("categories"));

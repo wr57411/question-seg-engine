@@ -97,7 +97,7 @@
   font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pick-same, .pick-close, .pick-manage {
+.pick-same, .pick-close, .pick-manage, .pick-find {
   flex: none; min-height: 36px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: 3px;
   background: transparent; color: var(--ink-soft);
@@ -105,7 +105,38 @@
 }
 .pick-same { border-color: var(--ink); color: var(--ink); }
 .pick-same:disabled { opacity: .35; cursor: default; border-color: var(--line); }
-.pick-manage[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); background: var(--paper-card); }
+.pick-manage[aria-pressed="true"], .pick-find[aria-pressed="true"] {
+  border-color: var(--ink); color: var(--ink); background: var(--paper-card);
+}
+
+/* 托盘搜索：占组合条那一格（两者互斥），不额外加行、不加高 */
+.pick-search { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.pick-search[hidden] { display: none; }
+.pick-search-input {
+  flex: 1 1 auto; min-width: 0; height: 40px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--paper-card);
+  color: var(--ink); font-family: var(--sans); font-size: 13px;
+}
+.pick-search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.pick-search-clear {
+  flex: none; min-height: 40px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: transparent; color: var(--ink-soft); font-family: var(--sans); font-size: 12px; cursor: pointer;
+}
+.pick-count { font-style: normal; margin-left: 4px; color: var(--azurite); font-size: 11px; }
+.pick-count[hidden] { display: none; }
+
+/* 搜不到时的两个直接新建入口 */
+.pick-nomatch { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.pick-nomatch[hidden] { display: none; }
+.pick-nomatch-text {
+  flex: 1 1 auto; min-width: 0; color: var(--ink-soft); font-family: var(--sans); font-size: 12.5px;
+}
+.pick-nomatch-btn {
+  flex: none; min-height: 44px; padding: 0 12px;
+  border: 1px solid var(--ink); border-radius: 6px;
+  background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 13px; cursor: pointer;
+}
 .pick-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; }
 .pick-lanes[hidden] { display: none; }
 
@@ -220,15 +251,20 @@
 .manage-note { margin: 0; color: var(--ink-soft); font-family: var(--sans); font-size: 11.5px; }
 
 @media (pointer: coarse) {
-  .pick-same, .pick-close, .pick-manage, .combo-close, .manage-close { min-height: 44px; }
+  .pick-same, .pick-close, .pick-manage, .pick-find, .pick-search-clear,
+  .combo-close, .manage-close { min-height: 44px; }
   .combo-chip, .combo-empty-chip, .combo-add-chip { height: 44px; }
+  .pick-search-input { height: 44px; }
 }
 @media (max-width: 560px) {
   .pick-title { max-width: 84px; }
   .combo-chip, .combo-empty-chip { flex-basis: calc((100% - 6px) / 2); }
 }
 .pick-lane { display: flex; align-items: center; gap: 7px; min-width: 0; height: 44px; }
-.pick-lane-label { flex: none; width: 26px; color: var(--ink-soft); font-family: var(--sans); font-size: 12px; }
+.pick-lane-label {
+  flex: none; min-width: 26px; white-space: nowrap;
+  color: var(--ink-soft); font-family: var(--sans); font-size: 12px;
+}
 .pick-chips {
   flex: 1 1 auto; min-width: 0; display: flex; gap: 6px;
   overflow-x: auto; padding: 0; -webkit-overflow-scrolling: touch;
