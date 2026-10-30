@@ -27,7 +27,12 @@ test("行级展开：真实 layout 夹具切分非空且选项成组", () => {
 
 test("行级展开：夹具四选项组完整成组且无 review", () => {
   const r = segmentFromLayout(raw, "layout-reg");
-  assert.equal(r.stats.reviewCount, 0, "选项成组后此夹具不应有 review");
+  // 夹具是「前 2 页裁剪」片段，题号 1,2,3,8,9 —— 3→8 是裁剪造成的缺号，
+  // 不是切分缺陷。故「无 review」需按来源精确化：选项类 0 条，题号断档恰 1 条。
+  const gapNotes = r.reviews.filter((x) => x.reason.includes("题号断档"));
+  const otherNotes = r.reviews.filter((x) => !x.reason.includes("题号断档"));
+  assert.equal(otherNotes.length, 0, "选项成组后此夹具不应有非题号类 review");
+  assert.equal(gapNotes.length, 1, "裁剪片段 3→8 应恰报 1 条题号断档（新增检测层）");
   const q = r.questions.find((x) => x.options.length === 4);
   assert.ok(q, "应存在 4 选项成组的题目");
   assert.deepEqual(

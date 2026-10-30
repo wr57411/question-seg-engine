@@ -107,6 +107,7 @@ export function segmentWithRules(doc: ParsedDocument): SegmentationResult {
   }
   mergeAnswers(ctx);
   flagDuplicateNumbers(ctx);
+  flagSectionContinuity(ctx, questions);
   return ctx.result(questions);
 }
 
@@ -867,6 +868,94 @@ function mergeAnswers(ctx: Ctx): void {
         snippet: entry.text.slice(0, 40),
       });
     }
+  }
+}
+
+/**
+ * 题号断档判定结果（纯数据，供测试直接断言）。
+ */
+export interface NumberGap {
+  sectionSeq: number;
+  questionId: string;
+  /** 按「节内应从 1 递增」推得的期望题号 */
+  expected: number;
+  /** 实际题号 */
+  actual: number;
+  /** skip = 跳号（疑似漏切 N 题）；back = 回退（疑似漏切或误切） */
+  kind: "skip" | "back";
+  /** 题干前缀，便于人工按清单回查 */
+  snippet: string;
+}
+
+/**
+ * **节内题号断档判定**（纯函数：不读 Ctx、不产生副作用，测试可直接调）。
+ *
+ * 判据：同一 `sectionSeq` 内，题号必须 `1,2,3,…` 严格递增。
+ * 为什么这条成立而不与「每页重排题号」冲突：
+ * 题号回到 `1` 时 `Ctx.openDraft` 已经 `sectionSeq++`（`rule-engine.ts` 约 663 行），
+ * 所以**同一 sectionSeq 内出现非 +1 即为异常**，不需要再判"是不是小节重启"。
+ *
+ * 为什么需要它：`flagDuplicateNumbers` **按页**查重（理由是每页重排题号），
+ * 但漏题常发生在跨页处 —— 实测《电路》p4→p5 序列 `1,2,3,4,2,3`，
+ * 两道重复题分处两页 ⇒ 按页查重看不见，而漏题本身也无人发现
+ * （`tmp/docx-probe/电路-比对报告.md`，三源确证该题整题丢失）。
+ *
+ * 每组只报**第一处**断档：一处断档之后整段序列位移，逐条报会刷屏。
+ */
+export function sectionNumberGaps(questions: Question[]): NumberGap[] {
+  const groups = new Map<number, Question[]>();
+  for (const q of questions) {
+    const list = groups.get(q.sectionSeq) ?? [];
+    list.push(q);
+    groups.set(q.sectionSeq, list);
+  }
+  const out: NumberGap[] = [];
+  for (const [sectionSeq, group] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+    const ordered = [...group].sort(
+      (a, b) => (a.source.blockIndexes[0] ?? 0) - (b.source.blockIndexes[0] ?? 0),
+    );
+    // 基准 = **组内首题**，不从 1 起：夹具/片段可能从任意题号开始
+    // （实测既有 6 个端到端用例的首题不是 1，从 1 起判会直接误报 6 条）。
+    // 代价：组内**首题**被漏切时查不出（首题 2 与"从 2 开始的片段"不可区分）。
+    // 按 L2 纪律「宁可漏判也不能误判」，取此口径。
+    let prev: number | null = null;
+    for (const q of ordered) {
+      const n = Number.parseInt(q.number, 10);
+      if (!Number.isInteger(n)) continue; // 汉字大题（一、二、）等非数字题号，另行判据
+      if (prev !== null && n !== prev + 1) {
+        out.push({
+          sectionSeq,
+          questionId: q.id,
+          expected: prev + 1,
+          actual: n,
+          kind: n > prev + 1 ? "skip" : "back",
+          snippet: q.stem.slice(0, 40) || q.number,
+        });
+        break;
+      }
+      prev = n;
+    }
+  }
+  return out;
+}
+
+/**
+ * 把题号断档写成 `ReviewNote`。
+ *
+ * **只报警，不扣分、不改 status**：该信号是新增的检测层，先看清单规模再决定是否纳入置信度。
+ * 一旦扣分（−0.3 ⇒ 1.0→0.7 < 0.75）会让全库数十道题直接落 `needs_review`，
+ * 在清单未经人工校核前，那是把"漏题"换成"噪声"，属换一种静默。
+ */
+function flagSectionContinuity(ctx: Ctx, questions: Question[]): void {
+  for (const g of sectionNumberGaps(questions)) {
+    const kindText = g.kind === "skip" ? "跳号" : "回退";
+    const hint = g.kind === "skip" ? `，疑似漏切 ${g.actual - g.expected} 题` : "，疑似漏切或误切";
+    ctx.reviews.push({
+      questionId: g.questionId,
+      reason: `题号断档（${kindText}）：第 ${g.sectionSeq} 号组内期望 #${g.expected}，实际 #${g.actual}${hint}`,
+      blockIndex: -1,
+      snippet: g.snippet,
+    });
   }
 }
 
