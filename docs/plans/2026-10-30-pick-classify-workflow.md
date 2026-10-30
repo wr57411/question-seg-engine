@@ -261,3 +261,46 @@ Step 1–7 全部 `pass`（Step 6 托盘搜索、Step 7 专题/类别管理）�
 另外两件已拍板未开工的：**题册下拉折叠**（同一章的 `-OXR`/`-MinerU` 实验版收进「旧版/实验版」分组，
 默认只显示正式版；实测四对变体题干只能对上 70%–90%，所以不做跨版本同步，避免张冠李戴）；
 以及旧数据迁移（Step 10/11，human gate，先 dry-run 给用户看影响面）。
+
+## 交接 3（2026-10-30 第三次暂停：软删除收尾 + Step 8 导出 v2 完成）
+
+### 这一轮做完的（可当基线）
+
+分支 `feat/pick-classify`。`npm run check` **EXIT=0 / 351 例**；
+`npm run topic:export` + `npm run audit:topic` 全绿（**3 专题 / 5 题 / 类别 基础 4 · 培优 1**）。
+
+- **交接 2 第 1–3 条（软删除界面）已完成**：一次点「下架」→ 进「已下架」分区 → 一键「恢复」；
+  `applyCreate` 落盘条件补 `revived`（否则重建同名只改内存、刷新变回下架）；
+  `el("div","mg-acts",null)` 的 `"null"` 文本坑已修；测试 +7；
+  `tmp/manage-topics-smoke.mjs` 改为软删除口径并在副本 4175 跑通（bindings/combos hash 一字不动）。
+- **Step 8（导出 v2）已完成**：
+  - `scripts/topic-export.ts` 输出 **v2**：条目带 `categories: [{id,name}]`、**删掉 `level`**、
+    `stats.byCategory` 按类别 id 计数。输入三路：**教学归类（权威）** + 旧标签（过渡兼容，
+    层级按**类别名**映射到 v2 类别）+ 手工题单。
+  - **下架项全链路排除**：`retired: true` 的专题/类别不导出、不进统计、不出现在任何条目里；
+    但仍被引用时给 warning 说明「恢复后自动回来」（不假装没这回事）。
+  - `scripts/audit-topic.ts` 独立复核 v2 契约：版本必须 2、条目**不许带 level**、
+    类别逐项回源比对（id + name 都要对）、`stats.byCategory` 独立重算、**下架项零出现**。
+  - `topic/topic-model.js` + `topic/topic.js`：类别**单选**筛选（只列该专题里实际出现的类别），
+    题卡显示类别徽标；`topic/index.html` 的 `level-filter` → `category-filter`，副标题去掉「基础/培优分层」。
+- 测试：`tests/topic-export.test.ts` 26 例、`tests/audit-topic.test.ts` 22 例，
+  含「下架专题/类别」「归属断链」「stats 说谎」「版本不是 2」「level 残留」等反向用例。
+- 只读核对：`tmp/topic-v2-check.mjs`（820×1100 CDP）确认类别筛选条渲染、按钮 44px、
+  零控制台异常、零横向溢出；截图 `tmp/review-pick/topic-v2.png`。
+
+### 仍然有效的红线
+
+- 会写 `data/out/teach` 的测试只准跑副本（`tmp/pick-test-app` + 4175 + `.test-root`）。
+- 改了 `scripts/` 必须重启 4174 才生效；静态 `.js` 不用重启。
+- `data/out/topics/index.json` 是**派生数据**，可随时重生成；`data/out/teach/*` 是**用户资产**，不可重生成。
+
+### 下一位的第一步
+
+`npm run check` 建基线 → 读本节 → 进 **Step 9（阅读回显）**：
+详情面板里加只读「教学归类」区（专题/类别 chips + 「去挑题修改」）。
+之后：Step 10/11 旧数据迁移（human gate，先 dry-run 给影响面）、Step 12 截图审板、Step 13 真机、Step 14/15 合回 main。
+
+### 已知未做（故意留着，别当 bug 顺手改）
+
+`disappearedCheck` 对「下架专题」**不豁免**：下架时导出会先告警，若该专题一条题都不剩会红。
+这是故意的——防止把「误删标签」和「主动下架」混为一谈。若将来觉得太吵，再单独决定是否开豁免。
