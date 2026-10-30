@@ -36,6 +36,9 @@
 - 交付基线：已推送（`1e3582b` 之后的全部提交：§90/§91、接管文档、meta 修复；以 `git log -1 origin/feature/oxr` 为准）。
 - 选项：A=元数据收口（G01）；B=推送（G03）；C=展示层类型第二批（§6-11）；D=批量扫书上量。
   推荐 **B → A → C/D**。
+- **G07（P1，新发现）**：main 侧 5 个独有提交（专题知识库 21 文件 / +4,074 行）不在本分支，
+  且 `main` 领先 `origin/main` **34 个提交未 push**；两侧都改过 package.json / view-server / HANDOFF / .gitignore。
+  建议顺序：push main 备份 → 把 main 合进 feature/oxr 解冲突 → 跑门 → 再合回 main。登记 `HANDOFF §6-30`。
 - HANDOFF §6 的 4 条未闭合项已在报告 §4.1 登记归属：§6-11 纳入本轮（C）；
   §6-28 / §6-6 不纳入；§6-7 部分（DOM 门 + 截图，大卷性能不做）。
 - **G05（P2，新发现）**：删 `.d.ts` 会让实现进入主程序（`noUncheckedIndexedAccess:true`）⇒ 实测 113 处新错，
