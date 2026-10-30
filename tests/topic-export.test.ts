@@ -124,6 +124,15 @@ function makeFixture(): Fixture {
     items: [{ doc: "quizA", number: "1", level: "基础" }],
   });
 
+  // v2：类别清单（旧数据的「层级」按**名字**映射到这里的类别）
+  writeJson(join(out, "teach", "categories.json"), {
+    version: 1,
+    categories: [
+      { id: "ct-ji", name: "基础" },
+      { id: "ct-pei", name: "培优" },
+    ],
+  });
+
   return {
     root,
     write(rel, json) {
@@ -169,7 +178,7 @@ test("反向：标签漂移（anchor 页码对不上）⇒ 必红", () => {
     json.bindings[0].anchor.page = 9;
   });
   const errors = errorsOf(fx);
-  assert.ok(errors.some((e) => e.startsWith("标签漂移：")), errors.join("\n"));
+  assert.ok(errors.some((e) => e.startsWith("归属漂移：")), errors.join("\n"));
 });
 
 test("anchor 首行太短 / 为空 ⇒ 告警（不阻断，但必须让人看见）", () => {
@@ -258,14 +267,15 @@ test("导出守恒：标签 + 手工题单指向同一题 ⇒ 每专题每题恰
   assert.equal(index.stats.topics, 2);
   assert.equal(index.stats.items, 2);
   assert.equal(index.stats.needsReview, 1);
-  assert.deepEqual(index.stats.byLevel, { 基础: 1, 培优: 1 });
+  assert.deepEqual(index.stats.byCategory, { "ct-ji": 1, "ct-pei": 1 }, "旧层级按名字映射成类别后计数");
 
   const flat = index.topics.find((t) => t.name === "平抛运动");
   assert.ok(flat);
   assert.equal(flat.items.length, 1, "同一题不能因为两路输入出现两次");
   const item = flat.items[0]!;
   assert.deepEqual(item.sources, ["manual", "tag"]);
-  assert.equal(item.level, "基础");
+  assert.deepEqual(item.categories, [{ id: "ct-ji", name: "基础" }]);
+  assert.equal("level" in item, false, "v2 不许再带 level（两套真相不能并存）");
   assert.equal(item.stem, "题干一\n第二行保留换行");
   assert.equal(item.page, 1, "pageIndex 0 ⇒ 1 基页码 1");
   assert.equal(item.images.length, 1);
@@ -349,13 +359,16 @@ test("反向：手工题单只给重号 ⇒ 题号歧义（不猜）", () => {
   assert.ok(errors.some((e) => e.startsWith("题号歧义：")), errors.join("\n"));
 });
 
-test("反向：同题同专题两个层级 ⇒ 层级冲突", () => {
+test("v2：同题同专题挂两个类别是合法的（多类别不再算「层级冲突」）", () => {
   const fx = makeFixture();
   fx.patch("data/out/tags/quizA.json", (json) => {
     json.bindings[0].tagIds.push("平抛运动#培优");
   });
-  const errors = errorsOf(fx);
-  assert.ok(errors.some((e) => e.startsWith("层级冲突：")), errors.join("\n"));
+  const { index, errors } = buildTopicIndex(fx.root);
+  assert.deepEqual(errors, [], "一题多类别是 v2 的正常状态，不该报错");
+  const flat = index!.topics.find((t) => t.name === "平抛运动")!;
+  assert.equal(flat.items.length, 1, "仍是同一条，不能因为多一个类别变成两条");
+  assert.deepEqual(flat.items[0]!.categories.map((c) => c.name).sort(), ["培优", "基础"].sort());
 });
 
 test("反向：含 # 但不合约定 ⇒ 报错（不静默忽略）", () => {
@@ -458,4 +471,102 @@ test("CLI：有缺答案 ⇒ 退出码 1 且不写 index.json", () => {
   const status = JSON.parse(readFileSync(statusFile, "utf8"));
   assert.equal(status.ok, false);
   assert.ok(status.errors.some((e: string) => e.includes("缺答案")));
+});
+
+/* ── v2：教学归类通道（权威）+ 下架项全局隐藏 ── */
+
+/** 在基础夹具上叠一层 teach 数据：专题清单 + 一条把 q0 归进「平抛运动」并挂两个类别的绑定。 */
+function teachFixture(): Fixture {
+  const fx = makeFixture();
+  fx.write("data/out/teach/topics.json", {
+    version: 1,
+    topics: [
+      { id: "tp-ping", name: "平抛运动" },
+      { id: "tp-yuan", name: "圆周运动" },
+    ],
+  });
+  fx.write("data/out/teach/bindings/quizA.json", {
+    version: 1,
+    bindings: [
+      {
+        questionId: "quizA:p0:q0",
+        topicIds: ["tp-ping"],
+        categoryIds: ["ct-ji", "ct-pei"],
+        anchor: { number: "1", page: 1, firstText: "题干一第二行保留换行" },
+      },
+    ],
+    stale: [],
+  });
+  return fx;
+}
+
+test("v2 教学归类：一题可挂多个类别，来源三路合并，stats.byCategory 按类别 id 计数", () => {
+  const fx = teachFixture();
+  const { index, errors } = buildTopicIndex(fx.root);
+  assert.deepEqual(errors, []);
+  assert.ok(index);
+  assert.equal(index.version, 2);
+  const flat = index.topics.find((t) => t.name === "平抛运动")!;
+  assert.deepEqual(flat.items[0]!.categories.map((c) => c.id).sort(), ["ct-ji", "ct-pei"]);
+  assert.deepEqual(flat.items[0]!.sources, ["manual", "tag", "teach"], "三路输入同一题 ⇒ 来源合并");
+  assert.equal(flat.id, "tp-ping", "专题 id 来自教学归类清单（旧标签来的专题 id 为空）");
+  // 平抛：ct-ji + ct-pei；圆周：tag 的「培优」⇒ ct-pei
+  assert.deepEqual(index.stats.byCategory, { "ct-ji": 1, "ct-pei": 2 });
+  const legacy = index.topics.find((t) => t.name === "圆周运动")!;
+  assert.equal(legacy.id, "tp-yuan", "同名专题能对上教学清单时 id 也补齐");
+});
+
+test("下架专题：不导出、不计统计，但必须告警说明（不许像丢数据）", () => {
+  const fx = teachFixture();
+  fx.patch("data/out/teach/topics.json", (json) => {
+    json.topics[0].retired = true;
+    json.topics[0].retiredAt = "2026-10-30T00:00:00.000Z";
+  });
+  const { index, errors, warnings } = buildTopicIndex(fx.root);
+  assert.deepEqual(errors, []);
+  assert.ok(index);
+  assert.deepEqual(index.topics.map((t) => t.name), ["圆周运动"], "下架专题一条都不许出现");
+  assert.equal(index.stats.byCategory["ct-ji"], undefined, "下架专题的题不该再给类别计数");
+  assert.ok(warnings.some((w) => w.includes("已下架专题「平抛运动」")), warnings.join("\n"));
+  assert.ok(warnings.some((w) => w.includes("手工题单") && w.includes("已下架")), "题单指向下架专题也要说明");
+});
+
+test("下架类别：条目类别里不许有它，stats 里也不许有", () => {
+  const fx = teachFixture();
+  fx.patch("data/out/teach/categories.json", (json) => {
+    const pei = json.categories.find((c: any) => c.id === "ct-pei");
+    pei.retired = true;
+    pei.retiredAt = "2026-10-30T00:00:00.000Z";
+  });
+  const { index, errors, warnings } = buildTopicIndex(fx.root);
+  assert.deepEqual(errors, []);
+  assert.ok(index);
+  const flat = index.topics.find((t) => t.name === "平抛运动")!;
+  assert.deepEqual(flat.items[0]!.categories, [{ id: "ct-ji", name: "基础" }]);
+  assert.deepEqual(index.stats.byCategory, { "ct-ji": 1 }, "下架类别不参与统计");
+  assert.ok(warnings.some((w) => w.includes("已下架类别「培优」")), warnings.join("\n"));
+});
+
+test("反向：归属指向不存在的专题 / 类别 ⇒ 必红（断链不能静默）", () => {
+  const fx = teachFixture();
+  fx.patch("data/out/teach/bindings/quizA.json", (json) => {
+    json.bindings[0].topicIds.push("tp-ghost");
+  });
+  assert.ok(errorsOf(fx).some((e) => e.includes("归属指向不存在的专题") && e.includes("tp-ghost")));
+
+  const fx2 = teachFixture();
+  fx2.patch("data/out/teach/bindings/quizA.json", (json) => {
+    json.bindings[0].categoryIds.push("ct-ghost");
+  });
+  assert.ok(errorsOf(fx2).some((e) => e.includes("归属指向不存在的类别") && e.includes("ct-ghost")));
+});
+
+test("反向：教学归类被挪进 stale ⇒ 必红（专题会缺这道题）", () => {
+  const fx = teachFixture();
+  fx.patch("data/out/teach/bindings/quizA.json", (json) => {
+    const [b] = json.bindings.splice(0, 1);
+    json.stale.push(b);
+  });
+  const errors = errorsOf(fx);
+  assert.ok(errors.some((e) => e.startsWith("归属失效（stale）：")), errors.join("\n"));
 });

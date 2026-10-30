@@ -15,7 +15,7 @@
  *   number: string;
  *   page: number;
  *   questionId: string;
- *   level: '基础' | '培优';
+ *   categories: { id: string; name: string }[];
  *   stem: string;
  *   options: Option[];
  *   images: ImageRef[];
@@ -29,8 +29,8 @@
  *   sources: string[];
  * }} TopicItem
  */
-/** @typedef {{ slug: string; name: string; items: TopicItem[] }} Topic */
-/** @typedef {{ topics: number; items: number; needsReview: number; byLevel: Record<string, number> }} TopicStats */
+/** @typedef {{ id: string; slug: string; name: string; items: TopicItem[] }} Topic */
+/** @typedef {{ topics: number; items: number; needsReview: number; byCategory: Record<string, number> }} TopicStats */
 /** @typedef {{ version: number; generatedAt: string; topics: Topic[]; stats: TopicStats }} TopicIndex */
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
@@ -59,13 +59,16 @@ export function normalizeIndex(raw) {
     if (t) topics.push(t);
   }
   const items = topics.flatMap((t) => t.items);
-  const byLevel = { 基础: 0, 培优: 0 };
-  for (const item of items) byLevel[item.level] += 1;
+  /** @type {Record<string, number>} */
+  const byCategory = {};
+  for (const item of items) {
+    for (const c of item.categories) byCategory[c.id] = (byCategory[c.id] ?? 0) + 1;
+  }
   const stats = {
     topics: topics.length,
     items: items.length,
     needsReview: items.filter((x) => x.status === 'needs_review').length,
-    byLevel,
+    byCategory,
   };
   return {
     index: {
@@ -101,7 +104,7 @@ function normalizeTopic(raw, i, issues) {
     if (item) items.push(item);
   }
   if (items.length === 0) issues.push(`专题「${name}」没有可显示的题目`);
-  return { slug: str(raw.slug) || name, name, items };
+  return { id: str(raw.id), slug: str(raw.slug) || name, name, items };
 }
 
 /**
@@ -125,10 +128,22 @@ function normalizeItem(raw, at, issues) {
     issues.push(`${at}（${questionId}）题干为空`);
     return null;
   }
-  const level = raw.level === '基础' || raw.level === '培优' ? raw.level : null;
-  if (!level) {
-    issues.push(`${at}（${questionId}）层级非法：${JSON.stringify(raw.level)}`);
-    return null;
+  // v2：类别是数组，且**可以为空**（一题只进专题、不挂类别是合法状态）
+  /** @type {{ id: string; name: string }[]} */
+  const categories = [];
+  if (raw.categories !== undefined && raw.categories !== null) {
+    if (!Array.isArray(raw.categories)) {
+      issues.push(`${at}（${questionId}）categories 不是数组，已按无类别显示`);
+    } else {
+      for (const c of raw.categories) {
+        if (!isRec(c) || !str(c.id) || !str(c.name)) {
+          issues.push(`${at}（${questionId}）有类别缺 id/name，已跳过`);
+          continue;
+        }
+        if (categories.some((x) => x.id === str(c.id))) continue;
+        categories.push({ id: str(c.id), name: str(c.name) });
+      }
+    }
   }
   if (raw.options !== undefined && raw.options !== null && !Array.isArray(raw.options)) {
     issues.push(`${at}（${questionId}）选项字段不是数组，已按无选项显示`);
@@ -182,7 +197,7 @@ function normalizeItem(raw, at, issues) {
     number: str(raw.number),
     page: typeof raw.page === 'number' && Number.isFinite(raw.page) ? raw.page : 0,
     questionId,
-    level,
+    categories,
     stem,
     options,
     images,
@@ -214,26 +229,34 @@ export function normalizeExportStatus(raw) {
 }
 
 /**
- * 层级筛选：`''` = 全部。
+ * 类别筛选（**单选**，U24）：`''` = 全部；一题挂多个类别时，在每个类别筛选项下都出现。
  * @param {TopicItem[]} items
- * @param {string} level
+ * @param {string} categoryId
  * @returns {TopicItem[]}
  */
-export function visibleItems(items, level) {
-  if (!level) return items;
-  return items.filter((x) => x.level === level);
+export function visibleItems(items, categoryId) {
+  if (!categoryId) return items;
+  return items.filter((x) => x.categories.some((c) => c.id === categoryId));
 }
 
 /**
+ * 这个专题里**实际出现**的类别 + 计数（按名字排序，供筛选条渲染）。
+ * 空类别不返回 —— 点进去只有空态，是死胡同。
  * @param {TopicItem[]} items
- * @returns {{ total: number; 基础: number; 培优: number }}
+ * @returns {{ total: number; facets: { id: string; name: string; count: number }[] }}
  */
-export function levelCounts(items) {
-  return {
-    total: items.length,
-    基础: items.filter((x) => x.level === '基础').length,
-    培优: items.filter((x) => x.level === '培优').length,
-  };
+export function categoryFacets(items) {
+  /** @type {Map<string, { id: string; name: string; count: number }>} */
+  const map = new Map();
+  for (const item of items) {
+    for (const c of item.categories) {
+      const cur = map.get(c.id) ?? { id: c.id, name: c.name, count: 0 };
+      cur.count += 1;
+      map.set(c.id, cur);
+    }
+  }
+  const facets = [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+  return { total: items.length, facets };
 }
 
 /**

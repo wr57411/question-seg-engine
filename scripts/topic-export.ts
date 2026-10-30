@@ -1,26 +1,30 @@
 // scripts/topic-export.ts
 /**
- * 专题导出：把「专题标签 / 手工题单」两路输入变成展示层唯一消费源
- * `data/out/topics/index.json`。
+ * 专题导出（v2）：把**三路输入**变成展示层唯一消费源 `data/out/topics/index.json`。
  *
- * ## 输入（两路合并，同一道题在同一专题里只出现一次）
- * 1. **标签通道**：`data/out/tags/<doc>.json` 的 bindings。面板新建的标签在
- *    `data/out/tags/library.json` 里是 `{id, name}`，绑定只存 id ⇒ 必须**先用库把 id 解析回
- *    名字**，再判断名字是否形如 `专题名#基础` / `专题名#培优`（`#` 只用于专题标签，其余短码不受影响）。
- *    库里找不到的 id 按其字面值兼容（历史/种子数据）。
- *    `questionId` 是权威键；**anchor 必须与当前题目一致**（页码/题号/首行文本），
- *    不一致 = 切分变了、绑定漂移 ⇒ 退出码 1（不把标签静默挂到别的题上）。
- * 2. **手工题单**：`data/out/topics/<slug>.topic.json`，`{name, items:[{doc, number, level, questionId?, page?}]}`。
+ * ## 输入
+ * 1. **教学归类通道（权威）**：`data/out/teach/{topics,categories}.json` + `bindings/<doc>.json`
+ *    —— 专题与类别是两套独立清单（ADR-0001），一题可进多个专题、挂多个类别。
+ *    **下架（`retired: true`）的专题/类别一律不导出、不计入任何统计**：
+ *    它仍在清单里、题上的归属也还在（软删除语义），但专题页里不许出现，
+ *    否则下架项会冒充"还在用"。
+ * 2. **旧标签通道（过渡期兼容）**：`data/out/tags/<doc>.json` 的 `专题名#基础/培优`。
+ *    层级按**类别名**映射到 v2 的类别；找不到同名类别时只告警、不阻断（迁移前的存量数据）。
+ *    若同名专题已下架，则该标签**不导出**（下架优先，避免旧数据把下架项复活）。
+ * 3. **手工题单**：`data/out/topics/<slug>.topic.json`，`{name, items:[{doc, number, level?, questionId?, page?}]}`。
  *    教辅题号在每节重新开始，**只给 number 可能撞号** ⇒ 有歧义即报错并列出候选，不猜。
  *
  * ## 合并与校验
  * - 题目快照：`data/out/<doc>/questions.json`（题干/选项/图片/status/confidence）
  * - 答案池：`data/out/bank/bank.json`（`quizId` == 题目 id；answerKey/answerText/answerImages）
  * - 图片：题图相对 `data/out/<doc>/images/`，答案图相对 `data/out/<answerDoc>/images/`
- * - **缺题 / 缺题干 / 缺答案 / 缺图 / 标签漂移 ⇒ 退出码 1 并逐条列出**（不静默丢内容）
- * - needs_review 的题**照收**，但带 `reviewFlags`（R05：不允许静默当干净题）
+ * - **缺题 / 缺题干 / 缺答案 / 缺图 / 归属指向不存在的项 / stale 归属 ⇒ 退出码 1 并逐条列出**
+ * - needs_review 的题**照收**，但带 `reviewFlags`（不允许静默当干净题）
  * - 失败时仍写 `data/out/topics/export-status.json`（ok:false + 错误），页面据此提示
  *   「当前显示的是旧数据」，不把上次成功的 index 假装成本次结果
+ *
+ * ## 输出（v2）
+ * 每个条目带 `categories: [{id, name}]`，**不再有 `level`**；`stats.byCategory` 按类别 id 计数。
  *
  * 用法：`npm run topic:export`（`--root <dir>` 仅供单测指向临时夹具）
  */
@@ -28,6 +32,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFile
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/** 旧标签/题单里的层级名；v2 里它只作为**类别名**参与映射。 */
 export type TopicLevel = "基础" | "培优";
 
 /** 标签解析结果：`not-topic` = 不是专题标签；`invalid` = 含 `#` 但不符合约定 */
@@ -35,8 +40,6 @@ export type ParsedTopicTag =
   | { kind: "not-topic" }
   | { kind: "ok"; name: string; level: TopicLevel }
   | { kind: "invalid"; error: string };
-
-const LEVELS: readonly TopicLevel[] = ["基础", "培优"];
 
 /** 标签库缺失时，只有这些预置 id 允许「解析不到名字」；其它 t- id 视为库丢了。 */
 const PRESET_TAG_IDS = new Set(["t-hao", "t-gai", "t-jiao", "t-liu", "t-nan"]);
@@ -57,13 +60,22 @@ export function parseTopicTag(tagId: string): ParsedTopicTag {
   return { kind: "ok", name, level };
 }
 
+/** 条目所属类别（v2 的唯一次元；旧 `level` 已按名字映射到这里）。 */
+export interface CategoryRef {
+  id: string;
+  name: string;
+}
+
+/** 这道题是怎么进专题的：教学归类 / 旧标签 / 手工题单。 */
+export type TopicSource = "teach" | "tag" | "manual";
+
 export interface TopicItem {
   doc: string;
   number: string;
   /** 1 基页码（快照内部是 pageIndex，展示层用这个） */
   page: number;
   questionId: string;
-  level: TopicLevel;
+  categories: CategoryRef[];
   stem: string;
   options: { key: string; text: string }[];
   images: { path: string; bbox?: number[] }[];
@@ -76,25 +88,27 @@ export interface TopicItem {
   status: string;
   confidence: number;
   reviewFlags: string[];
-  /** 这道题是怎么进专题的（tag / manual），合并时去重 */
-  sources: ("tag" | "manual")[];
+  sources: TopicSource[];
 }
 
 export interface Topic {
+  /** 教学归类通道的专题 id；纯旧标签/题单来的专题为 ""（迁移后自然补齐） */
+  id: string;
   slug: string;
   name: string;
   items: TopicItem[];
 }
 
 export interface TopicIndex {
-  version: 1;
+  version: 2;
   generatedAt: string;
   topics: Topic[];
   stats: {
     topics: number;
     items: number;
     needsReview: number;
-    byLevel: Record<TopicLevel, number>;
+    /** 类别 id → 条目数（一题挂两个类别就各记一次，与逐条核对口径一致） */
+    byCategory: Record<string, number>;
   };
 }
 
@@ -110,7 +124,7 @@ export interface TopicExportStatus {
   ok: boolean;
   at: string;
   errors: string[];
-  /** 不阻断导出、但必须让人看见的问题（弱 anchor、条目消失、库缺失） */
+  /** 不阻断导出、但必须让人看见的问题（弱 anchor、条目消失、库缺失、下架项仍有引用） */
   warnings: string[];
   /** 当前磁盘上 index.json 的生成时间（没有则 null） */
   indexGeneratedAt: string | null;
@@ -148,18 +162,27 @@ interface RawAnchor {
   firstText?: unknown;
 }
 
+/** 一条「某题属于某专题」的原始声明（三路输入归一后的形状）。 */
 interface Ref {
+  topicId: string;
   topic: string;
-  level: TopicLevel;
   doc: string;
-  source: "tag" | "manual";
-  /** 标签通道直接给 id；手工题单可给 id 或 number(+page) */
+  source: TopicSource;
+  /** 教学归类/标签通道直接给 id；手工题单可给 id 或 number(+page) */
   questionId?: string;
   number?: string;
   page?: number;
-  /** 标签绑定时记录的锚点：切分变化后必须能识别出「这已经不是原来那道题」 */
+  /** 归类时记录的锚点：切分变化后必须能识别出「这已经不是原来那道题」 */
   anchor?: RawAnchor;
+  categories: CategoryRef[];
   origin: string;
+}
+
+/** 教学归类清单里的一项（专题或类别）。 */
+interface TeachItem {
+  id: string;
+  name: string;
+  retired: boolean;
 }
 
 const isRec = (v: unknown): v is Record<string, unknown> =>
@@ -243,24 +266,67 @@ function loadTagLibrary(outRoot: string, errors: string[]): { map: Map<string, s
   return { map, found: true };
 }
 
+/**
+ * 读教学归类清单（专题 / 类别）。**下架项照读**——导出侧要靠它识别"这条被下架了、
+ * 必须跳过并说明"，而不是当成"不存在"（那样会把归属判成断链）。
+ */
+function loadTeachList(
+  outRoot: string,
+  file: string,
+  key: "topics" | "categories",
+  errors: string[],
+): { items: TeachItem[]; found: boolean } {
+  const path = join(outRoot, "teach", file);
+  if (!existsSync(path)) return { items: [], found: false };
+  let json: unknown;
+  try {
+    json = readJson(path);
+  } catch (e) {
+    errors.push(`教学归类清单解析失败：teach/${file} —— ${String(e)}`);
+    return { items: [], found: true };
+  }
+  if (!isRec(json) || !Array.isArray(json[key])) {
+    errors.push(`教学归类清单形状不对：teach/${file} 需要 {version:1, ${key}:[{id,name}]}`);
+    return { items: [], found: true };
+  }
+  const items: TeachItem[] = [];
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  for (const raw of json[key]) {
+    if (!isRec(raw)) continue;
+    const id = asStr(raw.id);
+    const name = asStr(raw.name).trim();
+    if (!id || !name) {
+      errors.push(`teach/${file} 有条目缺 id 或 name（${JSON.stringify(raw).slice(0, 60)}）`);
+      continue;
+    }
+    if (ids.has(id)) errors.push(`teach/${file} id 重复：${id}`);
+    if (names.has(name)) errors.push(`teach/${file} 名称重复：${name}（重名会让"属于哪个专题"变成猜）`);
+    ids.add(id);
+    names.add(name);
+    items.push({ id, name, retired: raw.retired === true });
+  }
+  return { items, found: true };
+}
+
 /** 比对用文本：去掉空白、标点与 LaTeX 记号，只留字母/数字/汉字。 */
 function normText(s: string): string {
   return s.replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 /**
- * 标签漂移判据：
+ * 归属漂移判据：
  * - 页码/题号不一致、或首行文本明显对不上 ⇒ `problem`（导出必须红）；
  * - anchor 缺失 / 首行有效字符 <6（题号独占一行、图题等）⇒ `warning`：
  *   这种题无法可靠核对漂移，只能核对页码+题号；页面上明说「anchor 较弱」，
  *   不因此阻断整本书的导出（重打标仍是同样的短首行）。
  */
 function anchorCheck(q: RawQuestion, anchor: RawAnchor | undefined): { problem: string | null; warning: string | null } {
-  if (!anchor) return { problem: null, warning: "缺少 anchor（无法核对标签是否已漂移）" };
+  if (!anchor) return { problem: null, warning: "缺少 anchor（无法核对归类是否已漂移）" };
   const page = typeof anchor.page === "number" && Number.isFinite(anchor.page) ? anchor.page : null;
   const number = asStr(anchor.number);
   const firstText = asStr(anchor.firstText);
-  const remedy = "（要接受新位置：先摘光该题所有标签再重打，或改用题单）";
+  const remedy = "（要接受新位置：先摘光该题所有归类再重打，或改用题单）";
   if (page !== null && pageOf(q) !== page) {
     return { problem: `anchor 记的是 p${page}，当前是 p${pageOf(q)}${remedy}`, warning: null };
   }
@@ -318,7 +384,112 @@ export function buildTopicIndex(root: string): TopicExportResult {
   const warnings: string[] = [];
   const refs: Ref[] = [];
 
-  /* ── 1. 标签通道 ── */
+  /* ── 0. 教学归类清单（专题 / 类别）：下架项要能识别出来 ── */
+  const teachTopics = loadTeachList(outRoot, "topics.json", "topics", errors);
+  const teachCats = loadTeachList(outRoot, "categories.json", "categories", errors);
+  const topicById = new Map(teachTopics.items.map((t) => [t.id, t]));
+  const topicByName = new Map(teachTopics.items.map((t) => [t.name, t]));
+  const catById = new Map(teachCats.items.map((c) => [c.id, c]));
+  const catByName = new Map(teachCats.items.map((c) => [c.name, c]));
+
+  /** 下架项被引用的次数：不导出、不统计，但必须让人看见（否则像丢数据） */
+  const retiredTopicHits = new Map<string, number>();
+  const retiredCatHits = new Map<string, number>();
+  const bump = (m: Map<string, number>, key: string) => m.set(key, (m.get(key) ?? 0) + 1);
+
+  /** 层级（旧数据）→ 类别：只按**名字**映射；没有同名类别就只告警一次，不阻断。 */
+  const missingLevelCats = new Set<string>();
+  const categoryFromLevel = (level: TopicLevel, where: string): CategoryRef[] => {
+    const hit = catByName.get(level);
+    if (!hit) {
+      missingLevelCats.add(level);
+      return [];
+    }
+    if (hit.retired) {
+      bump(retiredCatHits, hit.id);
+      return [];
+    }
+    return [{ id: hit.id, name: hit.name }];
+  };
+
+  /* ── 1. 教学归类通道（权威） ── */
+  let sawTeachBinding = false;
+  for (const { file, json } of readJsonDir(join(outRoot, "teach", "bindings"), ".json")) {
+    const doc = file.slice(file.lastIndexOf("/") + 1, -".json".length);
+    if (isRec(json) && typeof json.__parseError === "string") {
+      errors.push(`教学归类绑定解析失败：teach/bindings/${doc}.json —— ${json.__parseError}`);
+      continue;
+    }
+    if (!isRec(json) || !Array.isArray(json.bindings)) {
+      errors.push(`教学归类绑定缺少 bindings 数组：teach/bindings/${doc}.json`);
+      continue;
+    }
+    for (const b of json.bindings) {
+      if (!isRec(b)) continue;
+      const questionId = asStr(b.questionId);
+      if (!questionId) {
+        errors.push(`教学归类绑定缺少 questionId：teach/bindings/${doc}.json`);
+        continue;
+      }
+      const topicIds = Array.isArray(b.topicIds) ? b.topicIds.filter((t): t is string => typeof t === "string") : [];
+      const categoryIds = Array.isArray(b.categoryIds) ? b.categoryIds.filter((t): t is string => typeof t === "string") : [];
+      if (topicIds.length || categoryIds.length) sawTeachBinding = true;
+      const where = `teach/bindings/${doc}.json · ${questionId}`;
+
+      /** 类别先解析：同一题的每个专题条目都带上同一套类别。 */
+      const categories: CategoryRef[] = [];
+      for (const cid of categoryIds) {
+        const c = catById.get(cid);
+        if (!c) {
+          errors.push(`归属指向不存在的类别：${where} 的 ${cid}`);
+          continue;
+        }
+        if (c.retired) {
+          bump(retiredCatHits, c.id);
+          continue;
+        }
+        if (!categories.some((x) => x.id === c.id)) categories.push({ id: c.id, name: c.name });
+      }
+      for (const tid of topicIds) {
+        const t = topicById.get(tid);
+        if (!t) {
+          errors.push(`归属指向不存在的专题：${where} 的 ${tid}`);
+          continue;
+        }
+        if (t.retired) {
+          bump(retiredTopicHits, t.id);
+          continue;
+        }
+        refs.push({
+          topicId: t.id,
+          topic: t.name,
+          doc,
+          source: "teach",
+          questionId,
+          anchor: isRec(b.anchor) ? (b.anchor as RawAnchor) : undefined,
+          categories,
+          origin: `教学归类 ${t.name}`,
+        });
+      }
+    }
+
+    // stale = 对不上原题、被成品页自动挪走的绑定。归属不能在这里静默消失。
+    const stale = Array.isArray(json.stale) ? json.stale : [];
+    for (const b of stale) {
+      if (!isRec(b)) continue;
+      const questionId = asStr(b.questionId);
+      const topicIds = Array.isArray(b.topicIds) ? b.topicIds.filter((t): t is string => typeof t === "string") : [];
+      for (const tid of topicIds) {
+        const t = topicById.get(tid);
+        if (!t || t.retired) continue; // 已下架项本来就不导出，不必报失效
+        errors.push(
+          `归属失效（stale）：teach/bindings/${doc}.json · ${questionId || "?"} · 专题「${t.name}」—— 切分变化后找不到原题，专题会缺这道题；请回成品页处理/恢复`,
+        );
+      }
+    }
+  }
+
+  /* ── 2. 旧标签通道（过渡期兼容） ── */
   const tagLibrary = loadTagLibrary(outRoot, errors);
   let sawTagBinding = false;
   /** 库在但 id 找不到 / 库整个丢了（只剩预置 id）都不允许静默当成普通标签。 */
@@ -363,13 +534,20 @@ export function buildTopicIndex(root: string): TopicExportResult {
           errors.push(`标签格式不合约定（${doc} · ${questionId} · ${tagName}）：${parsed.error}`);
           continue;
         }
+        const named = topicByName.get(parsed.name);
+        if (named?.retired) {
+          // 下架优先：旧标签不能把已下架的专题复活（软删除的语义是"全局隐藏"）
+          bump(retiredTopicHits, named.id);
+          continue;
+        }
         refs.push({
+          topicId: named?.id ?? "",
           topic: parsed.name,
-          level: parsed.level,
           doc,
           source: "tag",
           questionId,
           anchor: isRec(b.anchor) ? (b.anchor as RawAnchor) : undefined,
+          categories: categoryFromLevel(parsed.level, `${doc} · ${questionId}`),
           origin: `标签 ${tagName}${tagName === tagId ? "" : `（${tagId}）`}`,
         });
       }
@@ -385,6 +563,7 @@ export function buildTopicIndex(root: string): TopicExportResult {
         const tagName = resolveTagName(tagId, `stale ${doc} · ${questionId || "?"}`);
         const parsed = parseTopicTag(tagName);
         if (parsed.kind === "ok") {
+          if (topicByName.get(parsed.name)?.retired) continue;
           errors.push(
             `标签失效（stale）：${doc} · ${questionId || "?"} · 专题「${parsed.name}」—— 切分变化后找不到原题，专题会缺这道题；请回成品页处理/恢复`,
           );
@@ -401,7 +580,7 @@ export function buildTopicIndex(root: string): TopicExportResult {
     );
   }
 
-  /* ── 2. 手工题单 ── */
+  /* ── 3. 手工题单 ── */
   for (const { file, json } of readJsonDir(join(outRoot, "topics"), ".topic.json")) {
     const stem = file.slice(file.lastIndexOf("/") + 1, -".topic.json".length);
     if (isRec(json) && typeof json.__parseError === "string") {
@@ -415,6 +594,13 @@ export function buildTopicIndex(root: string): TopicExportResult {
     const name = asStr(json.name).trim();
     if (!name) {
       errors.push(`手工题单缺少 name：${stem}.topic.json`);
+      continue;
+    }
+    const named = topicByName.get(name);
+    if (named?.retired) {
+      // 题单点名一个已下架的专题：整份不导出，但要明说（不静默）
+      bump(retiredTopicHits, named.id);
+      warnings.push(`手工题单 ${stem}.topic.json 指向已下架专题「${name}」：本次未导出`);
       continue;
     }
     for (const [i, item] of json.items.entries()) {
@@ -441,23 +627,38 @@ export function buildTopicIndex(root: string): TopicExportResult {
         continue;
       }
       refs.push({
+        topicId: named?.id ?? "",
         topic: name,
-        level,
         doc,
         source: "manual",
         ...(questionId ? { questionId } : {}),
         ...(!questionId ? { number } : {}),
         ...(page !== undefined ? { page } : {}),
+        categories: categoryFromLevel(level, at),
         origin: at,
       });
     }
   }
 
+  /* ── 4. 下架项必须让人看见：不导出，但不能像丢数据 ── */
+  for (const [id, hits] of retiredTopicHits) {
+    const t = topicById.get(id);
+    if (t) warnings.push(`已下架专题「${t.name}」仍被 ${hits} 处归属引用：按软删除语义本次不导出（恢复后自动回来）`);
+  }
+  for (const [id, hits] of retiredCatHits) {
+    const c = catById.get(id);
+    if (c) warnings.push(`已下架类别「${c.name}」仍被 ${hits} 处归属引用：本次不导出、不计入统计（恢复后自动回来）`);
+  }
+  for (const level of missingLevelCats) {
+    warnings.push(
+      `旧数据里的层级「${level}」没有同名类别可映射（teach/categories.json 里没有「${level}」）⇒ 这些题的类别为空；建一个同名类别即可自动补上`,
+    );
+  }
   if (refs.length === 0 && errors.length === 0) {
-    warnings.push("没有发现任何专题标签或手工题单：先打标 `专题名#基础/培优`，或写 data/out/topics/*.topic.json");
+    warnings.push("没有发现任何教学归类、专题标签或手工题单：先到成品页挑题归类，或写 data/out/topics/*.topic.json");
   }
 
-  /* ── 3. 按专题归组、解析到题 ── */
+  /* ── 5. 按专题归组、解析到题 ── */
   const questionsCache = new Map<string, RawQuestion[] | null>();
   const loadQuestions = (doc: string): RawQuestion[] | null => {
     if (questionsCache.has(doc)) return questionsCache.get(doc) ?? null;
@@ -502,9 +703,12 @@ export function buildTopicIndex(root: string): TopicExportResult {
   const topics = new Map<
     string,
     {
-      slug: string;
+      id: string;
       name: string;
-      entries: Map<string, { q: RawQuestion; doc: string; levels: Set<TopicLevel>; sources: Set<"tag" | "manual"> }>;
+      entries: Map<
+        string,
+        { q: RawQuestion; doc: string; categories: Map<string, CategoryRef>; sources: Set<TopicSource> }
+      >;
     }
   >();
 
@@ -524,31 +728,31 @@ export function buildTopicIndex(root: string): TopicExportResult {
     if (!q) continue;
 
     const id = asStr(q.id);
-    if (ref.source === "tag") {
+    if (ref.source !== "manual") {
       const check = anchorCheck(q, ref.anchor);
-      if (check.problem) errors.push(`标签漂移：${ref.doc} · ${id} · ${ref.origin} —— ${check.problem}`);
-      if (check.warning) warnings.push(`标签 anchor 较弱：${ref.doc} · ${id} · ${ref.origin} —— ${check.warning}`);
+      if (check.problem) errors.push(`归属漂移：${ref.doc} · ${id} · ${ref.origin} —— ${check.problem}`);
+      if (check.warning) warnings.push(`归属 anchor 较弱：${ref.doc} · ${id} · ${ref.origin} —— ${check.warning}`);
     }
     let topic = topics.get(ref.topic);
     if (!topic) {
-      topic = { slug: ref.topic, name: ref.topic, entries: new Map() };
+      topic = { id: ref.topicId, name: ref.topic, entries: new Map() };
       topics.set(ref.topic, topic);
     }
     const existing = topic.entries.get(id);
     if (existing) {
-      if (existing.levels.size > 0 && !existing.levels.has(ref.level)) {
-        errors.push(
-          `层级冲突：专题「${ref.topic}」里的 ${id} 同时被标成 ${[...existing.levels].join("/")} 与 ${ref.level}（${ref.origin}）`,
-        );
-      }
-      existing.levels.add(ref.level);
+      for (const c of ref.categories) existing.categories.set(c.id, c);
       existing.sources.add(ref.source);
     } else {
-      topic.entries.set(id, { q, doc: ref.doc, levels: new Set([ref.level]), sources: new Set([ref.source]) });
+      topic.entries.set(id, {
+        q,
+        doc: ref.doc,
+        categories: new Map(ref.categories.map((c) => [c.id, c])),
+        sources: new Set([ref.source]),
+      });
     }
   }
 
-  /* ── 4. 答案池 + 评审原因（按题逐条 join） ── */
+  /* ── 6. 答案池 + 评审原因（按题逐条 join） ── */
   let bankList: RawBankEntry[] = [];
   const bankFile = join(outRoot, "bank", "bank.json");
   if (existsSync(bankFile)) {
@@ -598,12 +802,7 @@ export function buildTopicIndex(root: string): TopicExportResult {
   const built: Topic[] = [];
   for (const topic of [...topics.values()].sort((a, b) => a.name.localeCompare(b.name, "zh"))) {
     const items: TopicItem[] = [];
-    for (const [questionId, { q, doc: docId, levels, sources }] of topic.entries) {
-      if (levels.size !== 1) {
-        errors.push(`层级冲突：专题「${topic.name}」里的 ${questionId} 同时有多个层级（${[...levels].join("/")}）`);
-        continue;
-      }
-      const level = [...levels][0]!;
+    for (const [questionId, { q, doc: docId, categories, sources }] of topic.entries) {
       const stem = asStr(q.stem);
       if (!stem.trim()) {
         errors.push(`缺题干：${docId} · ${topic.name} · ${questionId}（快照里的 stem 为空）`);
@@ -644,7 +843,7 @@ export function buildTopicIndex(root: string): TopicExportResult {
         number: asStr(q.number),
         page: pageOf(q),
         questionId,
-        level,
+        categories: [...categories.values()].sort((a, b) => a.name.localeCompare(b.name, "zh")),
         stem,
         options: optionsOf(q, `${topic.name} · ${questionId}`, errors),
         images,
@@ -659,7 +858,7 @@ export function buildTopicIndex(root: string): TopicExportResult {
       });
     }
     items.sort((a, b) => a.doc.localeCompare(b.doc, "zh") || a.page - b.page || numCompare(a.number, b.number));
-    built.push({ slug: topic.slug, name: topic.name, items });
+    built.push({ id: topic.id, slug: topic.name, name: topic.name, items });
   }
 
   if (errors.length) {
@@ -667,18 +866,19 @@ export function buildTopicIndex(root: string): TopicExportResult {
   }
 
   const allItems = built.flatMap((t) => t.items);
+  const byCategory: Record<string, number> = {};
+  for (const item of allItems) {
+    for (const c of item.categories) byCategory[c.id] = (byCategory[c.id] ?? 0) + 1;
+  }
   const index: TopicIndex = {
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
     topics: built,
     stats: {
       topics: built.length,
       items: allItems.length,
       needsReview: allItems.filter((x) => x.status === "needs_review").length,
-      byLevel: {
-        基础: allItems.filter((x) => x.level === "基础").length,
-        培优: allItems.filter((x) => x.level === "培优").length,
-      },
+      byCategory,
     },
   };
   return { index, errors: [], warnings };
@@ -739,6 +939,10 @@ function readOldIndexPairs(root: string): Set<string> | null {
  * - **整个专题消失**（旧专题的题没有出现在任何新专题）⇒ error（改名时摘掉 `#` 是常见误操作，
  *   不能让专题悄悄没了；报错则不覆盖旧 index，页面/审计都会红）；
  * - 单个专题少了几条、或改名后题搬到别的专题 ⇒ warning（部分删题/改名是合法操作）。
+ *
+ * ⚠️ 下架专题属于"用户显式要求消失"，但**这里不豁免**：下架时导出会先给 warning
+ * （「已下架专题仍被 N 处引用」），若某个专题连一条题都不剩了，仍然要人看一眼再确认，
+ * 免得把「误删标签」和「下架」混为一谈。
  */
 export function disappearedCheck(root: string, index: TopicIndex): { errors: string[]; warnings: string[] } {
   const oldPairs = readOldIndexPairs(root);
@@ -862,12 +1066,16 @@ function main(): void {
   } catch (e) {
     console.log(`⚠️  导出状态写入失败：${String(e)}（页面会提示「无法确认数据新鲜度」）`);
   }
+  const catNames = new Map<string, string>();
+  for (const t of index.topics) for (const it of t.items) for (const c of it.categories) catNames.set(c.id, c.name);
+  const catBits = Object.entries(index.stats.byCategory)
+    .map(([id, n]) => `${catNames.get(id) ?? id} ${n}`)
+    .join(" · ");
   console.log(
-    `专题导出：${index.stats.topics} 个专题 / ${index.stats.items} 道题（基础 ${index.stats.byLevel.基础} · 培优 ${index.stats.byLevel.培优} · 待复核 ${index.stats.needsReview}）`,
+    `专题导出（v2）：${index.stats.topics} 个专题 / ${index.stats.items} 道题（${catBits || "无类别"} · 待复核 ${index.stats.needsReview}）`,
   );
   for (const t of index.topics) {
-    const levels = LEVELS.map((lv) => `${lv} ${t.items.filter((x) => x.level === lv).length}`).join(" / ");
-    console.log(`  ✓ ${t.name}：${t.items.length} 题（${levels}）`);
+    console.log(`  ✓ ${t.name}：${t.items.length} 题`);
   }
   console.log(`落盘 ${file}`);
 }

@@ -237,8 +237,8 @@ select:focus-visible {
   font-size: 13px;
   line-height: 1;
 }
-.level-basic { background: var(--wash); color: var(--ink); }
-.level-plus { background: #E8EEF4; color: #2F4F6A; }
+/* v2：类别徽标（一题可挂多个；原先的 基础/培优 两个固定层级已由类别清单取代） */
+.badge-cat { background: var(--wash); color: var(--ink); }
 .badge-review { background: var(--cinnabar); color: #fff; font-weight: 700; }
 
 .source { flex: 1 1 220px; text-align: right; overflow-wrap: anywhere; }

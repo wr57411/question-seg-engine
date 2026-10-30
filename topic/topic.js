@@ -11,9 +11,9 @@
  */
 
 import {
+  categoryFacets,
   hasAnswer,
   imageUrl,
-  levelCounts,
   normalizeExportStatus,
   normalizeIndex,
   sourceLabel,
@@ -23,7 +23,7 @@ import {
 const els = {
   stats: /** @type {HTMLElement} */ (document.getElementById('stats')),
   topics: /** @type {HTMLElement} */ (document.getElementById('topic-chips')),
-  levels: /** @type {HTMLElement} */ (document.getElementById('level-filter')),
+  categories: /** @type {HTMLElement} */ (document.getElementById('category-filter')),
   cards: /** @type {HTMLElement} */ (document.getElementById('cards')),
   empty: /** @type {HTMLElement} */ (document.getElementById('empty')),
   banner: /** @type {HTMLElement} */ (document.getElementById('banner')),
@@ -37,7 +37,8 @@ let exportStatus = null;
 /** @type {string[]} */
 let dataIssues = [];
 let currentTopic = '';
-let currentLevel = '';
+/** 类别筛选是**单选**（U24）：存类别 id，'' = 全部 */
+let currentCategory = '';
 /** @type {Set<string>} */
 const openedAnswers = new Set();
 
@@ -86,13 +87,13 @@ async function load() {
     els.empty.hidden = false;
     els.empty.replaceChildren(
       el('h2', '', '还没有专题'),
-      el('p', 'empty-hint', '在成品页点题号牌 → 给题目打标签「专题名#基础」或「专题名#培优」，再运行 npm run topic:export。'),
+      el('p', 'empty-hint', '到成品页开「挑题」，把题目归入专题/类别，再运行 npm run topic:export。'),
     );
   } else {
     els.empty.hidden = true;
     const wanted = new URLSearchParams(location.search).get('topic');
     currentTopic = index.topics.some((t) => t.name === wanted) ? String(wanted) : index.topics[0].name;
-    currentLevel = '';
+    currentCategory = '';
   }
   render();
 }
@@ -137,7 +138,7 @@ function render() {
   if (!index) return;
   renderStats();
   renderTopics();
-  renderLevels();
+  renderCategories();
   renderCards();
 }
 
@@ -147,8 +148,7 @@ function renderStats() {
   els.stats.replaceChildren(
     el('span', 'stat', `${stats.topics} 个专题`),
     el('span', 'stat', `${stats.items} 道题`),
-    el('span', 'stat', `基础 ${stats.byLevel.基础}`),
-    el('span', 'stat', `培优 ${stats.byLevel.培优}`),
+    el('span', 'stat', `${Object.keys(stats.byCategory ?? {}).length} 个类别`),
     el('span', 'stat' + (stats.needsReview ? ' stat-warn' : ''), `待复核 ${stats.needsReview}`),
   );
 }
@@ -163,7 +163,7 @@ function renderTopics() {
     b.setAttribute('aria-pressed', String(topic.name === currentTopic));
     b.addEventListener('click', () => {
       currentTopic = topic.name;
-      currentLevel = '';
+      currentCategory = '';
       openedAnswers.clear();
       const url = new URL(location.href);
       url.searchParams.set('topic', topic.name);
@@ -182,33 +182,36 @@ function currentTopicObj() {
   return index?.topics.find((t) => t.name === currentTopic) ?? null;
 }
 
-function renderLevels() {
+/**
+ * 类别筛选条：**只列这个专题里实际出现的类别**（U24），单选。
+ * 一题挂多个类别时，在每个类别下都会出现（过滤逻辑在 `visibleItems`）。
+ */
+function renderCategories() {
   const topic = currentTopicObj();
   if (!topic) {
-    els.levels.replaceChildren();
+    els.categories.replaceChildren();
     return;
   }
-  const counts = levelCounts(topic.items);
+  const { total, facets } = categoryFacets(topic.items);
   /** @type {{ value: string; label: string; count: number }[]} */
   const options = [
-    { value: '', label: '全部', count: counts.total },
-    { value: '基础', label: '基础', count: counts.基础 },
-    { value: '培优', label: '培优', count: counts.培优 },
+    { value: '', label: '全部', count: total },
+    ...facets.map((f) => ({ value: f.id, label: f.name, count: f.count })),
   ];
-  els.levels.replaceChildren(
+  els.categories.replaceChildren(
     ...options.map(({ value, label, count }) => {
       const b = /** @type {HTMLButtonElement} */ (el('button', 'seg'));
       b.type = 'button';
       b.textContent = `${label} ${count}`;
-      b.dataset.level = value;
-      b.setAttribute('aria-pressed', String(currentLevel === value));
-      // 0 结果的层级直接禁用：点进去只有空态，是死胡同（iPad 上尤其没必要）
+      b.dataset.category = value;
+      b.setAttribute('aria-pressed', String(currentCategory === value));
+      // 0 结果的类别直接禁用：点进去只有空态，是死胡同（iPad 上尤其没必要）
       b.disabled = value !== '' && count === 0;
       b.addEventListener('click', () => {
-        currentLevel = value;
+        currentCategory = value;
         render();
         /** @type {HTMLButtonElement | undefined} */ (
-          [...els.levels.querySelectorAll('.seg')].find((x) => x.dataset.level === currentLevel)
+          [...els.categories.querySelectorAll('.seg')].find((x) => x.dataset.category === currentCategory)
         )?.focus();
       });
       return b;
@@ -222,12 +225,12 @@ function renderCards() {
     els.cards.replaceChildren();
     return;
   }
-  const items = visibleItems(topic.items, currentLevel);
+  const items = visibleItems(topic.items, currentCategory);
   if (items.length === 0) {
     els.empty.hidden = false;
     els.empty.replaceChildren(
-      el('h2', '', '这个层级还没有题'),
-      el('p', 'empty-hint', '换「全部」看看，或回去给题目补对应的层级标签。'),
+      el('h2', '', '这个类别还没有题'),
+      el('p', 'empty-hint', '换「全部」看看，或回成品页给题目补类别。'),
     );
     els.cards.replaceChildren();
     return;
@@ -243,7 +246,8 @@ function renderCard(item, ordinal) {
 
   const head = el('header', 'card-head');
   head.append(el('span', 'ordinal', String(ordinal)));
-  head.append(el('span', `badge level-${item.level === '基础' ? 'basic' : 'plus'}`, item.level));
+  // v2：类别是一组（可以为空），逐个小徽标显示；不再有单一「层级」
+  for (const c of item.categories) head.append(el('span', 'badge badge-cat', c.name));
   if (item.status === 'needs_review') head.append(el('span', 'badge badge-review', '待复核'));
   head.append(el('span', 'source', sourceLabel(item)));
   card.append(head);

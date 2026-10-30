@@ -1,18 +1,21 @@
 // scripts/audit-topic.ts
 /**
- * 专题量化门：**独立复核** `data/out/topics/index.json` 与源的一致性。
+ * 专题量化门（v2）：**独立复核** `data/out/topics/index.json` 与源的一致性。
  *
  * ## 为什么重新实现一遍（不同源原则，HANDOFF 红线 G7）
  * 如果审计直接 import `topic-export.ts` 的解析/合并函数，导出的 bug 会原样复制到审计里，
  * 「审计通过」就退化成「导出现在自己跟自己对得上」。所以本文件：
  * - **不 import** `scripts/topic-export.ts`；
- * - 不信 index 自带的 stats，也不信 item 里的答案/图片字段；
- * - 重新读 tags / 手工题单 / questions.json / bank.json / 文件系统，独立推导「应该是哪些题」，
- *   再与 index 逐项比对（专题集合、题目集合、层级、题干/选项/页码/状态、图片路径与存在性、
- *   答案键/答案文本/答案图）。
+ * - 不信 index 自带的 stats，也不信 item 里的答案/图片/类别字段；
+ * - 重新读 teach 清单与绑定 / tags / 手工题单 / questions.json / bank.json / 文件系统，
+ *   独立推导「应该是哪些题、该带哪些类别」，再与 index 逐项比对。
  *
- * 缺题 / 缺答案 / 缺图 / 集合不一致 / stats 说谎 ⇒ 退出码 1。
- * 暂不接入 `npm run check`（SPEC D04，接入时须先反向验证）。
+ * ## v2 契约（比 v1 多两条硬检查）
+ * - 条目**不得再有 `level`**（v2 用 `categories: [{id,name}]`），出现即红 —— 两套真相不能并存；
+ * - **下架（`retired: true`）的专题/类别不得出现在 index 任何位置**（含 stats.byCategory），
+ *   否则下架项会冒充"还在用"。
+ *
+ * 缺题 / 缺答案 / 缺图 / 集合不一致 / 类别不一致 / stats 说谎 / 下架项漏过滤 ⇒ 退出码 1。
  *
  * 用法：`npm run audit:topic`（`--root <dir>` 供单测/夹具复核）
  */
@@ -26,6 +29,7 @@ interface IndexItem {
   page?: unknown;
   questionId?: unknown;
   level?: unknown;
+  categories?: unknown;
   stem?: unknown;
   options?: unknown;
   images?: unknown;
@@ -40,18 +44,25 @@ interface IndexItem {
 }
 
 interface IndexTopic {
+  id?: unknown;
   slug?: unknown;
   name?: unknown;
   items?: unknown;
+}
+
+interface CatRef {
+  id: string;
+  name: string;
 }
 
 interface Expected {
   topic: string;
   questionId: string;
   doc: string;
-  level: "基础" | "培优";
-  from: "tag" | "manual";
-  /** 标签绑定的锚点（独立核对漂移） */
+  /** 该题在该专题下应有的类别集合（id → name） */
+  categories: Map<string, string>;
+  from: "teach" | "tag" | "manual";
+  /** 归类时记录的锚点（独立核对漂移） */
   anchor?: Record<string, unknown>;
 }
 
@@ -94,9 +105,9 @@ function normText(s: string): string {
   return s.replace(/[^\p{L}\p{N}]/gu, "");
 }
 
-/** 标签锚点独立核对：页码/题号/首行文本。问题=红；弱 anchor=告警。 */
+/** 归属锚点独立核对：页码/题号/首行文本。问题=红；弱 anchor=告警。 */
 function anchorCheck(q: Record<string, unknown>, anchor: Record<string, unknown> | undefined): { problem: string | null; warning: string | null } {
-  if (!anchor) return { problem: null, warning: "缺少 anchor（无法核对标签是否已漂移）" };
+  if (!anchor) return { problem: null, warning: "缺少 anchor（无法核对归类是否已漂移）" };
   const page = typeof anchor.page === "number" && Number.isFinite(anchor.page) ? anchor.page : null;
   const number = asStr(anchor.number);
   const firstText = asStr(anchor.firstText);
@@ -128,10 +139,49 @@ export interface AuditResult {
   errors: string[];
   warnings: string[];
   summary: {
-    topics: { name: string; items: number; byLevel: Record<"基础" | "培优", number> }[];
+    topics: { name: string; items: number }[];
     items: number;
     needsReview: number;
+    byCategory: Record<string, number>;
   } | null;
+}
+
+/** 读 teach 清单（专题/类别），返回 id→{name,retired} 与 name→id。 */
+function readTeachList(
+  outRoot: string,
+  file: string,
+  key: "topics" | "categories",
+  errors: string[],
+): { byId: Map<string, { name: string; retired: boolean }>; byName: Map<string, { id: string; retired: boolean }> } {
+  const byId = new Map<string, { name: string; retired: boolean }>();
+  const byName = new Map<string, { id: string; retired: boolean }>();
+  const path = join(outRoot, "teach", file);
+  if (!existsSync(path)) return { byId, byName };
+  let json: unknown;
+  try {
+    json = readJson(path);
+  } catch (e) {
+    errors.push(`teach/${file} 解析失败：${String(e)}`);
+    return { byId, byName };
+  }
+  if (!isRec(json) || !Array.isArray(json[key])) {
+    errors.push(`teach/${file} 形状不对：需要 {version:1, ${key}:[{id,name}]}`);
+    return { byId, byName };
+  }
+  for (const raw of json[key]) {
+    if (!isRec(raw)) continue;
+    const id = asStr(raw.id);
+    const name = asStr(raw.name).trim();
+    if (!id || !name) {
+      errors.push(`teach/${file} 有条目缺 id 或 name`);
+      continue;
+    }
+    if (byId.has(id)) errors.push(`teach/${file} id 重复：${id}`);
+    if (byName.has(name)) errors.push(`teach/${file} 名称重复：${name}`);
+    byId.set(id, { name, retired: raw.retired === true });
+    byName.set(name, { id, retired: raw.retired === true });
+  }
+  return { byId, byName };
 }
 
 export function auditTopicIndex(root: string): AuditResult {
@@ -153,8 +203,11 @@ export function auditTopicIndex(root: string): AuditResult {
   } catch (e) {
     return { errors: [`专题索引解析失败：${String(e)}`], warnings: [], summary: null };
   }
-  if (!isRec(indexJson) || indexJson.version !== 1 || !Array.isArray(indexJson.topics)) {
-    return { errors: ["专题索引形状不对：需要 {version:1, topics:[...]}"], warnings: [], summary: null };
+  if (!isRec(indexJson) || !Array.isArray(indexJson.topics)) {
+    return { errors: ["专题索引形状不对：需要 {version:2, topics:[...]}"], warnings: [], summary: null };
+  }
+  if (indexJson.version !== 2) {
+    errors.push(`专题索引版本不是 2（实际 ${JSON.stringify(indexJson.version)}）⇒ 重新跑 npm run topic:export（v2 才有 categories）`);
   }
   const topics = indexJson.topics as IndexTopic[];
   const indexGeneratedAt = asStr(indexJson.generatedAt);
@@ -187,10 +240,95 @@ export function auditTopicIndex(root: string): AuditResult {
     }
   }
 
-  /* ── 1. 独立推导「应该是哪些题」 ── */
+  /* ── 1. 独立推导「应该是哪些题、带哪些类别」 ── */
   const expected: Expected[] = [];
+  const teachTopics = readTeachList(outRoot, "topics.json", "topics", errors);
+  const teachCats = readTeachList(outRoot, "categories.json", "categories", errors);
 
-  /** 标签库 id → name（面板新建的标签只存 id） */
+  const questionsByDoc = new Map<string, Record<string, unknown>[] | null>();
+  const questionsOf = (doc: string): Record<string, unknown>[] | null => {
+    if (questionsByDoc.has(doc)) return questionsByDoc.get(doc) ?? null;
+    const file = join(outRoot, doc, "questions.json");
+    if (!existsSync(file)) {
+      questionsByDoc.set(doc, null);
+      return null;
+    }
+    try {
+      const json = readJson(file);
+      const list = Array.isArray(json) ? (json as Record<string, unknown>[]) : [];
+      questionsByDoc.set(doc, list);
+      return list;
+    } catch (e) {
+      errors.push(`题目快照解析失败：${doc}/questions.json —— ${String(e)}`);
+      questionsByDoc.set(doc, null);
+      return null;
+    }
+  };
+
+  /* 1a. 教学归类通道 */
+  for (const file of listFiles(join(outRoot, "teach", "bindings"), ".json")) {
+    const doc = file.slice(file.lastIndexOf("/") + 1, -".json".length);
+    let json: unknown;
+    try {
+      json = readJson(file);
+    } catch (e) {
+      errors.push(`teach/bindings/${doc}.json 解析失败：${String(e)}`);
+      continue;
+    }
+    if (!isRec(json) || !Array.isArray(json.bindings)) {
+      errors.push(`teach/bindings/${doc}.json 缺少 bindings`);
+      continue;
+    }
+    for (const b of json.bindings) {
+      if (!isRec(b)) continue;
+      const questionId = asStr(b.questionId);
+      if (!questionId) {
+        errors.push(`teach/bindings/${doc}.json 有绑定缺 questionId`);
+        continue;
+      }
+      const where = `teach/bindings/${doc}.json · ${questionId}`;
+      const categories = new Map<string, string>();
+      for (const cid of Array.isArray(b.categoryIds) ? b.categoryIds : []) {
+        if (typeof cid !== "string") continue;
+        const c = teachCats.byId.get(cid);
+        if (!c) {
+          errors.push(`归属指向不存在的类别：${where} 的 ${cid}`);
+          continue;
+        }
+        if (c.retired) continue; // 下架项按语义不导出（导出侧已告警）
+        categories.set(cid, c.name);
+      }
+      for (const tid of Array.isArray(b.topicIds) ? b.topicIds : []) {
+        if (typeof tid !== "string") continue;
+        const t = teachTopics.byId.get(tid);
+        if (!t) {
+          errors.push(`归属指向不存在的专题：${where} 的 ${tid}`);
+          continue;
+        }
+        if (t.retired) continue;
+        expected.push({
+          topic: t.name,
+          questionId,
+          doc,
+          categories: new Map(categories),
+          from: "teach",
+          anchor: isRec(b.anchor) ? b.anchor : undefined,
+        });
+      }
+    }
+    for (const b of Array.isArray(json.stale) ? json.stale : []) {
+      if (!isRec(b)) continue;
+      const questionId = asStr(b.questionId);
+      for (const tid of Array.isArray(b.topicIds) ? b.topicIds : []) {
+        if (typeof tid !== "string") continue;
+        const t = teachTopics.byId.get(tid);
+        if (!t || t.retired) continue;
+        errors.push(`归属失效（stale）：teach/bindings/${doc}.json · ${questionId || "?"} · 专题「${t.name}」—— 专题会缺这道题`);
+      }
+    }
+  }
+
+  /* 1b. 旧标签通道 */
   const library = new Map<string, string>();
   const libraryFile = join(outRoot, "tags", "library.json");
   const libraryFound = existsSync(libraryFile);
@@ -213,8 +351,6 @@ export function auditTopicIndex(root: string): AuditResult {
       errors.push(`标签库解析失败：${String(e)}`);
     }
   }
-
-  /** 与导出同口径（但独立实现）：库在但 id 找不到 / 库丢了都不能静默。 */
   const resolveTagName = (tagId: string, where: string): string => {
     const name = library.get(tagId);
     if (name) return name;
@@ -225,6 +361,13 @@ export function auditTopicIndex(root: string): AuditResult {
       errors.push(`标签库缺失：${where} 的 ${tagId} 无法解析名字（library.json 不存在）`);
     }
     return tagId;
+  };
+  /** 旧层级 → 类别：只按名字映射（与导出同口径、独立实现） */
+  const catFromLevel = (level: "基础" | "培优"): Map<string, string> => {
+    const out = new Map<string, string>();
+    const hit = teachCats.byName.get(level);
+    if (hit && !hit.retired) out.set(hit.id, level);
+    return out;
   };
 
   for (const file of listFiles(join(outRoot, "tags"), ".json")) {
@@ -257,55 +400,37 @@ export function auditTopicIndex(root: string): AuditResult {
           errors.push(`标签格式不合约定（${name} · ${questionId} · ${tagName}）：${JSON.stringify(tagName)}`);
           continue;
         }
+        if (teachTopics.byName.get(parsed.name)?.retired) continue; // 下架优先
         expected.push({
           topic: parsed.name,
           questionId,
           doc: name,
-          level: parsed.level,
+          categories: catFromLevel(parsed.level),
           from: "tag",
           anchor: isRec(b.anchor) ? b.anchor : undefined,
         });
       }
     }
-
-    // stale 里的专题标签 = 切分后找不到原题；必须在审计里红（不能从专题里静默消失）
-    const stale = Array.isArray(json.stale) ? json.stale : [];
-    for (const b of stale) {
+    for (const b of Array.isArray(json.stale) ? json.stale : []) {
       if (!isRec(b)) continue;
       const questionId = asStr(b.questionId);
       const tagIds = Array.isArray(b.tagIds) ? b.tagIds.filter((t): t is string => typeof t === "string") : [];
       for (const tagId of tagIds) {
         const tagName = resolveTagName(tagId, `stale ${name} · ${questionId || "?"}`);
         const parsed = splitTag(tagName);
-        if (parsed && parsed !== "non-topic") {
-          errors.push(`标签失效（stale）：${name} · ${questionId || "?"} · 专题「${parsed.name}」—— 专题会缺这道题`);
-        } else if (parsed === null) {
+        if (parsed === null) {
           errors.push(`标签格式不合约定（stale ${name} · ${questionId || "?"} · ${tagName}）`);
+        } else if (parsed !== "non-topic" && !teachTopics.byName.get(parsed.name)?.retired) {
+          errors.push(`标签失效（stale）：${name} · ${questionId || "?"} · 专题「${parsed.name}」—— 专题会缺这道题`);
         }
       }
     }
   }
+  if (!libraryFound && expected.some((e) => e.from === "tag")) {
+    warnings.push("标签库 data/out/tags/library.json 不存在：t- 绑定只能按预置 id 理解，专题标签可能漏导出");
+  }
 
-  const questionsByDoc = new Map<string, Record<string, unknown>[] | null>();
-  const questionsOf = (doc: string): Record<string, unknown>[] | null => {
-    if (questionsByDoc.has(doc)) return questionsByDoc.get(doc) ?? null;
-    const file = join(outRoot, doc, "questions.json");
-    if (!existsSync(file)) {
-      questionsByDoc.set(doc, null);
-      return null;
-    }
-    try {
-      const json = readJson(file);
-      const list = Array.isArray(json) ? (json as Record<string, unknown>[]) : [];
-      questionsByDoc.set(doc, list);
-      return list;
-    } catch (e) {
-      errors.push(`题目快照解析失败：${doc}/questions.json —— ${String(e)}`);
-      questionsByDoc.set(doc, null);
-      return null;
-    }
-  };
-
+  /* 1c. 手工题单 */
   for (const file of listFiles(join(outRoot, "topics"), ".topic.json")) {
     const stem = file.slice(file.lastIndexOf("/") + 1, -".topic.json".length);
     let json: unknown;
@@ -324,6 +449,7 @@ export function auditTopicIndex(root: string): AuditResult {
       errors.push(`手工题单缺少 name：${stem}.topic.json`);
       continue;
     }
+    if (teachTopics.byName.get(topicName)?.retired) continue; // 整份不导出（导出侧有告警）
     for (const [i, item] of json.items.entries()) {
       if (!isRec(item)) continue;
       const at = `${stem}.topic.json items[${i}]`;
@@ -339,6 +465,7 @@ export function auditTopicIndex(root: string): AuditResult {
         errors.push(`手工题单条目缺 questionId/number：${at}`);
         continue;
       }
+      const categories = catFromLevel(item.level);
       if (questionId) {
         const list = questionsOf(doc);
         if (!list) {
@@ -346,7 +473,7 @@ export function auditTopicIndex(root: string): AuditResult {
         } else if (!list.some((q) => asStr(q.id) === questionId)) {
           errors.push(`缺题：${doc} 找不到 ${questionId}（${at}）`);
         } else {
-          expected.push({ topic: topicName, questionId, doc, level: item.level, from: "manual" });
+          expected.push({ topic: topicName, questionId, doc, categories, from: "manual" });
         }
         continue;
       }
@@ -365,26 +492,23 @@ export function auditTopicIndex(root: string): AuditResult {
         );
         continue;
       }
-      expected.push({ topic: topicName, questionId: asStr(candidates[0]!.id), doc, level: item.level, from: "manual" });
+      expected.push({ topic: topicName, questionId: asStr(candidates[0]!.id), doc, categories, from: "manual" });
     }
   }
 
-  /* ── 1b. 标签漂移独立核对：源绑定指向的题必须仍是 anchor 记的那道题 ── */
+  /* ── 1d. 归属漂移独立核对 ── */
   for (const e of expected) {
-    if (e.from !== "tag") continue;
+    if (e.from === "manual") continue;
     const list = questionsOf(e.doc);
-    if (!list) continue; // 缺文档已由上面的 questionsOf 记录
+    if (!list) continue;
     const q = list.find((x) => asStr(x.id) === e.questionId);
     if (!q) {
-      errors.push(`缺题：${e.doc} 找不到 ${e.questionId}（标签「${e.topic}」指向的题不在快照里）`);
+      errors.push(`缺题：${e.doc} 找不到 ${e.questionId}（归属「${e.topic}」指向的题不在快照里）`);
       continue;
     }
     const check = anchorCheck(q, e.anchor);
-    if (check.problem) errors.push(`标签漂移：${e.doc} · ${e.questionId} · 专题「${e.topic}」 —— ${check.problem}`);
-    if (check.warning) warnings.push(`标签 anchor 较弱：${e.doc} · ${e.questionId} · 专题「${e.topic}」 —— ${check.warning}`);
-  }
-  if (!libraryFound && expected.some((e) => e.from === "tag")) {
-    warnings.push("标签库 data/out/tags/library.json 不存在：t- 绑定只能按预置 id 理解，专题标签可能漏导出");
+    if (check.problem) errors.push(`归属漂移：${e.doc} · ${e.questionId} · 专题「${e.topic}」 —— ${check.problem}`);
+    if (check.warning) warnings.push(`归属 anchor 较弱：${e.doc} · ${e.questionId} · 专题「${e.topic}」 —— ${check.warning}`);
   }
 
   /* ── 2. 答案池 ── */
@@ -403,7 +527,7 @@ export function auditTopicIndex(root: string): AuditResult {
     }
   }
 
-  /* ── 3. 索引侧：扁平化 + 守恒 ── */
+  /* ── 3. 索引侧：扁平化 + 守恒 + v2 契约 ── */
   const indexEntries: { topic: string; questionId: string; item: IndexItem }[] = [];
   const seen = new Set<string>();
   for (const t of topics) {
@@ -431,6 +555,9 @@ export function auditTopicIndex(root: string): AuditResult {
         errors.push(`专题「${topicName}」有条目缺 questionId`);
         continue;
       }
+      if (item.level !== undefined) {
+        errors.push(`条目还带着 level（v2 用 categories，两套真相不能并存）：${topicName} · ${questionId}`);
+      }
       const key = `${topicName}\u0000${questionId}`;
       if (seen.has(key)) {
         errors.push(`索引重复：专题「${topicName}」里的 ${questionId} 出现多次（守恒失败）`);
@@ -442,24 +569,15 @@ export function auditTopicIndex(root: string): AuditResult {
   }
 
   const expectedKeys = new Set<string>();
+  const catByKey = new Map<string, Map<string, string>>();
+  const sourcesByKey = new Map<string, Set<string>>();
   for (const e of expected) {
     const key = `${e.topic}\u0000${e.questionId}`;
-    if (expectedKeys.has(key)) {
-      // 同一题在同一专题出现两次（标签 + 题单 / 两条标签）：层级必须一致
-      const prev = expected.find((x) => x.topic === e.topic && x.questionId === e.questionId)!;
-      if (prev.level !== e.level) {
-        errors.push(`源数据层级冲突：专题「${e.topic}」里的 ${e.questionId} 同时是 ${prev.level}/${e.level}`);
-      }
-      continue;
-    }
     expectedKeys.add(key);
-  }
-  const levelByKey = new Map<string, "基础" | "培优">();
-  const sourcesByKey = new Map<string, Set<"tag" | "manual">>();
-  for (const e of expected) {
-    levelByKey.set(`${e.topic}\u0000${e.questionId}`, e.level);
-    const key = `${e.topic}\u0000${e.questionId}`;
-    const set = sourcesByKey.get(key) ?? new Set<"tag" | "manual">();
+    const cats = catByKey.get(key) ?? new Map<string, string>();
+    for (const [id, name] of e.categories) cats.set(id, name);
+    catByKey.set(key, cats);
+    const set = sourcesByKey.get(key) ?? new Set<string>();
     set.add(e.from);
     sourcesByKey.set(key, set);
   }
@@ -505,11 +623,11 @@ export function auditTopicIndex(root: string): AuditResult {
   for (const key of seen) {
     if (!expectedKeys.has(key)) {
       const [topic, qid] = key.split("\u0000");
-      errors.push(`索引多出条目：专题「${topic}」里的 ${qid} 不在源标签/题单里`);
+      errors.push(`索引多出条目：专题「${topic}」里的 ${qid} 不在源归类/标签/题单里（下架项漏过滤？）`);
     }
   }
 
-  /* ── 4. 逐条回源核对（题干/选项/页码/状态/图片/答案） ── */
+  /* ── 4. 逐条回源核对（题干/选项/页码/状态/类别/图片/答案） ── */
   const byDoc = new Map<string, Record<string, unknown>[]>();
   for (const { topic, questionId, item } of indexEntries) {
     const doc = asStr(item.doc);
@@ -549,10 +667,42 @@ export function auditTopicIndex(root: string): AuditResult {
     if (JSON.stringify(item.options) !== JSON.stringify(Array.isArray(q.options) ? q.options : [])) {
       errors.push(`选项不一致：${questionId}`);
     }
-    const wantedLevel = levelByKey.get(`${topic}\u0000${questionId}`);
-    if (wantedLevel && item.level !== wantedLevel) {
-      errors.push(`层级不一致：${questionId}（索引 ${String(item.level)} / 源 ${wantedLevel}）`);
+
+    // 类别：独立重算后逐项比对（id 与 name 都要对得上）
+    const wantedCats = catByKey.get(`${topic}\u0000${questionId}`) ?? new Map<string, string>();
+    const gotCats = new Map<string, string>();
+    if (!Array.isArray(item.categories)) {
+      errors.push(`条目缺 categories 数组：${questionId}`);
+    } else {
+      for (const c of item.categories) {
+        if (!isRec(c)) {
+          errors.push(`categories 有非对象元素：${questionId}`);
+          continue;
+        }
+        const cid = asStr(c.id);
+        const cname = asStr(c.name);
+        if (!cid || !cname) {
+          errors.push(`categories 元素缺 id/name：${questionId}`);
+          continue;
+        }
+        if (gotCats.has(cid)) errors.push(`categories 重复：${questionId} · ${cid}`);
+        gotCats.set(cid, cname);
+        const known = teachCats.byId.get(cid);
+        if (!known) {
+          errors.push(`categories 引用了不存在的类别：${questionId} · ${cid}`);
+        } else if (known.retired) {
+          errors.push(`已下架类别出现在索引里：${questionId} · ${known.name}（软删除必须全局隐藏）`);
+        } else if (known.name !== cname) {
+          errors.push(`类别名与清单不一致：${questionId} · ${cid}（索引 ${cname} / 清单 ${known.name}）`);
+        }
+      }
     }
+    if (gotCats.size !== wantedCats.size || [...wantedCats].some(([id, name]) => gotCats.get(id) !== name)) {
+      const fmt = (m: Map<string, string>) =>
+        [...m.entries()].map(([id, n]) => `${n}(${id})`).sort().join("、") || "(空)";
+      errors.push(`类别不一致：${questionId}（索引 ${fmt(gotCats)} / 源 ${fmt(wantedCats)}）`);
+    }
+
     const wantedSources = [...(sourcesByKey.get(`${topic}\u0000${questionId}`) ?? [])].sort();
     if (JSON.stringify(item.sources) !== JSON.stringify(wantedSources)) {
       errors.push(`来源不一致：${questionId}（索引 ${JSON.stringify(item.sources)} / 源 ${JSON.stringify(wantedSources)}）`);
@@ -617,41 +767,70 @@ export function auditTopicIndex(root: string): AuditResult {
     }
   }
 
-  /* ── 5. stats 不能自说自话：独立重算 ── */
-  const summary = new Map<string, { items: number; byLevel: Record<"基础" | "培优", number> }>();
+  /* ── 5. 下架项全局不得出现（连 stats 也不许留名） ── */
+  const retiredTopicNames = new Set(
+    [...teachTopics.byId.values()].filter((t) => t.retired).map((t) => t.name),
+  );
+  const retiredCatIds = new Set([...teachCats.byId.entries()].filter(([, c]) => c.retired).map(([id]) => id));
+  for (const t of topics) {
+    if (!isRec(t)) continue;
+    const name = asStr(t.name);
+    if (retiredTopicNames.has(name)) {
+      errors.push(`已下架专题出现在索引里：${name}（软删除必须全局隐藏）`);
+    }
+  }
+  const statsRaw = isRec(indexJson.stats) ? indexJson.stats : null;
+  const statsByCat = statsRaw && isRec(statsRaw.byCategory) ? statsRaw.byCategory : null;
+  if (statsByCat) {
+    for (const id of Object.keys(statsByCat)) {
+      if (retiredCatIds.has(id)) errors.push(`已下架类别出现在 stats.byCategory：${id}`);
+    }
+  }
+
+  /* ── 6. stats 不能自说自话：独立重算 ── */
+  const summary = new Map<string, { items: number }>();
+  const byCategory: Record<string, number> = {};
   for (const { topic, item } of indexEntries) {
-    const s = summary.get(topic) ?? { items: 0, byLevel: { 基础: 0, 培优: 0 } };
+    const s = summary.get(topic) ?? { items: 0 };
     s.items += 1;
-    if (isLevel(item.level)) s.byLevel[item.level] += 1;
     summary.set(topic, s);
+    for (const c of Array.isArray(item.categories) ? item.categories : []) {
+      const cid = isRec(c) ? asStr(c.id) : "";
+      if (cid) byCategory[cid] = (byCategory[cid] ?? 0) + 1;
+    }
   }
   const totalItems = indexEntries.length;
   const needsReview = indexEntries.filter(({ item }) => asStr(item.status) === "needs_review").length;
-  const stats = isRec(indexJson.stats) ? indexJson.stats : null;
-  if (!stats) {
+  if (!statsRaw) {
     errors.push("索引缺 stats 对象");
   } else {
-    if (stats.topics !== topics.length) errors.push(`stats.topics 说谎：索引 ${String(stats.topics)} / 实算 ${topics.length}`);
-    if (stats.items !== totalItems) errors.push(`stats.items 说谎：索引 ${String(stats.items)} / 实算 ${totalItems}`);
-    if (stats.needsReview !== needsReview) {
-      errors.push(`stats.needsReview 说谎：索引 ${String(stats.needsReview)} / 实算 ${needsReview}`);
+    if (statsRaw.topics !== topics.length) errors.push(`stats.topics 说谎：索引 ${String(statsRaw.topics)} / 实算 ${topics.length}`);
+    if (statsRaw.items !== totalItems) errors.push(`stats.items 说谎：索引 ${String(statsRaw.items)} / 实算 ${totalItems}`);
+    if (statsRaw.needsReview !== needsReview) {
+      errors.push(`stats.needsReview 说谎：索引 ${String(statsRaw.needsReview)} / 实算 ${needsReview}`);
     }
-    const byLevel = isRec(stats.byLevel) ? stats.byLevel : null;
-    const calcBasic = indexEntries.filter(({ item }) => item.level === "基础").length;
-    const calcPeiyou = indexEntries.filter(({ item }) => item.level === "培优").length;
-    if (!byLevel || byLevel.基础 !== calcBasic || byLevel.培优 !== calcPeiyou) {
-      errors.push(`stats.byLevel 说谎：索引 ${JSON.stringify(stats.byLevel)} / 实算 基础 ${calcBasic} · 培优 ${calcPeiyou}`);
+    const declared = statsByCat ?? {};
+    const declaredIds = Object.keys(declared).sort();
+    const calcIds = Object.keys(byCategory).sort();
+    if (JSON.stringify(declaredIds) !== JSON.stringify(calcIds)) {
+      errors.push(`stats.byCategory 类别集合说谎：索引 ${JSON.stringify(declaredIds)} / 实算 ${JSON.stringify(calcIds)}`);
+    } else {
+      for (const id of calcIds) {
+        if (declared[id] !== byCategory[id]) {
+          errors.push(`stats.byCategory 计数说谎：${id}（索引 ${String(declared[id])} / 实算 ${byCategory[id]}）`);
+        }
+      }
     }
   }
 
   const summaryList = [...summary.entries()]
     .sort((a, b) => a[0].localeCompare(b[0], "zh"))
-    .map(([name, s]) => ({ name, items: s.items, byLevel: s.byLevel }));
+    .map(([name, s]) => ({ name, items: s.items }));
 
   return {
     errors: [...new Set(errors)].sort(),
     warnings: [...new Set(warnings)].sort(),
-    summary: { topics: summaryList, items: totalItems, needsReview },
+    summary: { topics: summaryList, items: totalItems, needsReview, byCategory },
   };
 }
 
@@ -663,19 +842,18 @@ function main(): void {
     console.log(`✗ ${errors.join("\n✗ ")}`);
     process.exit(1);
   }
-  console.log(
-    `专题审计：${summary.topics.length} 个专题 / ${summary.items} 道题（待复核 ${summary.needsReview}）`,
-  );
-  for (const t of summary.topics) {
-    console.log(`  ${t.name}：${t.items} 题（基础 ${t.byLevel.基础} / 培优 ${t.byLevel.培优}）`);
-  }
+  const catBits = Object.entries(summary.byCategory)
+    .map(([id, n]) => `${id} ${n}`)
+    .join(" · ");
+  console.log(`专题审计（v2）：${summary.topics.length} 个专题 / ${summary.items} 道题（${catBits || "无类别"} · 待复核 ${summary.needsReview}）`);
+  for (const t of summary.topics) console.log(`  ${t.name}：${t.items} 题`);
   for (const w of warnings) console.log(`⚠️  ${w}`);
   if (errors.length) {
     console.log(`✗ 专题审计失败：${errors.length} 处问题`);
     for (const e of errors) console.log(`  - ${e}`);
     process.exit(1);
   }
-  console.log("✅ index.json 与源（标签/题单/快照/题库/文件系统）一致");
+  console.log("✅ index.json 与源（teach 归类/标签/题单/快照/题库/文件系统）一致");
 }
 
 const invokedDirectly = (() => {

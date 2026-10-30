@@ -58,6 +58,14 @@ function makeRoot(opts: { writeIndex?: boolean } = {}): string {
     ],
     stale: [],
   });
+  // v2：旧层级「基础」按名字映射到这个类别
+  writeJson(join(out, "teach", "categories.json"), {
+    version: 1,
+    categories: [
+      { id: "ct-ji", name: "基础" },
+      { id: "ct-pei", name: "培优" },
+    ],
+  });
 
   if (opts.writeIndex === false) return root;
   const { index, errors } = buildTopicIndex(root);
@@ -88,7 +96,8 @@ test("干净夹具：审计通过，并给出独立重算的摘要", () => {
   assert.ok(summary);
   assert.equal(summary.items, 1);
   assert.equal(summary.needsReview, 0);
-  assert.deepEqual(summary.topics, [{ name: "平抛运动", items: 1, byLevel: { 基础: 1, 培优: 0 } }]);
+  assert.deepEqual(summary.topics, [{ name: "平抛运动", items: 1 }]);
+  assert.deepEqual(summary.byCategory, { "ct-ji": 1 }, "类别计数由审计独立重算");
 });
 
 test("反向：索引少一条 ⇒ 红（不是只看 stats）", () => {
@@ -144,10 +153,11 @@ test("审计独立性：手工写出的合格 index 也能通过（不是拿导�
   const root = makeRoot({ writeIndex: false });
   const generatedAt = "2026-10-30T00:00:00.000Z";
   writeJson(indexFile(root), {
-    version: 1,
+    version: 2,
     generatedAt,
     topics: [
       {
+        id: "",
         slug: "平抛运动",
         name: "平抛运动",
         items: [
@@ -156,7 +166,7 @@ test("审计独立性：手工写出的合格 index 也能通过（不是拿导�
             number: "1",
             page: 1,
             questionId: "quizA:p0:q0",
-            level: "基础",
+            categories: [{ id: "ct-ji", name: "基础" }],
             stem: "题干一 这是题干",
             options: [{ key: "A", text: "选项 A" }],
             images: [{ path: "a.png", bbox: [1, 2, 3, 4] }],
@@ -172,7 +182,7 @@ test("审计独立性：手工写出的合格 index 也能通过（不是拿导�
         ],
       },
     ],
-    stats: { topics: 1, items: 1, needsReview: 0, byLevel: { 基础: 1, 培优: 0 } },
+    stats: { topics: 1, items: 1, needsReview: 0, byCategory: { "ct-ji": 1 } },
   });
   writeJson(join(root, "data", "out", "topics", "export-status.json"), {
     ok: true,
@@ -234,7 +244,7 @@ test("反向：源标签 anchor 漂移 ⇒ 红（不把标签挂到别的题上�
   const tags = JSON.parse(readFileSync(tagsFile, "utf8"));
   tags.bindings[0].anchor.page = 9;
   writeFileSync(tagsFile, JSON.stringify(tags, null, 1), "utf8");
-  assert.ok(auditTopicIndex(root).errors.some((e) => e.startsWith("标签漂移：")), "漂移必须红");
+  assert.ok(auditTopicIndex(root).errors.some((e) => e.startsWith("归属漂移：")), "漂移必须红");
 });
 
 test("反向：源题干为空 ⇒ 红（即使 index 也跟着为空）", () => {
@@ -277,4 +287,78 @@ test("anchor 首行太短 ⇒ 审计告警（不阻断，但必须让人看见�
   const r = auditTopicIndex(root);
   assert.deepEqual(r.errors, []);
   assert.ok(r.warnings.some((w) => w.includes("有效字符不足 6 个")), r.warnings.join("\n"));
+});
+
+/* ── v2 契约的反向验证（每条都单独实测） ── */
+
+test("反向：条目还带 level ⇒ 红（v2 不许两套真相并存）", () => {
+  const root = makeRoot();
+  patchIndex(root, (json) => {
+    json.topics[0].items[0].level = "基础";
+  });
+  assert.ok(auditTopicIndex(root).errors.some((e) => e.includes("还带着 level")), "level 残留必须红");
+});
+
+test("反向：已下架专题出现在索引里 ⇒ 红（软删除必须全局隐藏）", () => {
+  const root = makeRoot();
+  writeJson(join(root, "data", "out", "teach", "topics.json"), {
+    version: 1,
+    topics: [{ id: "tp-ping", name: "平抛运动", retired: true, retiredAt: "2026-10-30T00:00:00.000Z" }],
+  });
+  const { errors } = auditTopicIndex(root);
+  assert.ok(errors.some((e) => e.includes("已下架专题出现在索引里")), errors.join("\n"));
+});
+
+test("反向：已下架类别出现在 categories / stats.byCategory ⇒ 红", () => {
+  const root = makeRoot();
+  writeJson(join(root, "data", "out", "teach", "categories.json"), {
+    version: 1,
+    categories: [
+      { id: "ct-ji", name: "基础" },
+      { id: "ct-pei", name: "培优", retired: true, retiredAt: "2026-10-30T00:00:00.000Z" },
+    ],
+  });
+  patchIndex(root, (json) => {
+    json.topics[0].items[0].categories.push({ id: "ct-pei", name: "培优" });
+    json.stats.byCategory["ct-pei"] = 1;
+  });
+  const { errors } = auditTopicIndex(root);
+  assert.ok(errors.some((e) => e.includes("已下架类别出现在索引里")), errors.join("\n"));
+  assert.ok(errors.some((e) => e.includes("已下架类别出现在 stats.byCategory")), errors.join("\n"));
+});
+
+test("反向：类别被改（少一个 / 名字被改）⇒ 红", () => {
+  const root = makeRoot();
+  patchIndex(root, (json) => {
+    json.topics[0].items[0].categories = [];
+  });
+  assert.ok(auditTopicIndex(root).errors.some((e) => e.includes("类别不一致")), "少类别必须红");
+
+  const root2 = makeRoot();
+  patchIndex(root2, (json) => {
+    json.topics[0].items[0].categories[0].name = "被改的名字";
+  });
+  assert.ok(auditTopicIndex(root2).errors.some((e) => e.includes("类别名与清单不一致")), "类别名必须回源核对");
+});
+
+test("反向：stats.byCategory 说谎 ⇒ 红（不能自说自话）", () => {
+  const root = makeRoot();
+  patchIndex(root, (json) => {
+    json.stats.byCategory = { "ct-ji": 5 };
+  });
+  assert.ok(auditTopicIndex(root).errors.some((e) => e.includes("stats.byCategory 计数说谎")), "计数必须独立重算");
+
+  const root2 = makeRoot();
+  patchIndex(root2, (json) => {
+    json.stats.byCategory = {};
+  });
+  assert.ok(auditTopicIndex(root2).errors.some((e) => e.includes("stats.byCategory 类别集合说谎")), "集合也必须对");
+});
+
+test("反向：索引版本还是 1 ⇒ 红（旧合同不能冒充 v2）", () => {
+  const root = makeRoot();
+  patchIndex(root, (json) => {
+    json.version = 1;
+  });
+  assert.ok(auditTopicIndex(root).errors.some((e) => e.includes("版本不是 2")), "版本必须核");
 });
