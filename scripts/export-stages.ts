@@ -1122,11 +1122,24 @@ function main(): void {
     try {
       const pagesDir = join(outDir, "pages");
       mkdirSync(pagesDir, { recursive: true });
-      // 超时给足：18 页 @120dpi 实测要 2 分钟以上，120s 会把整册渲染判成「不可用」，
-      // 于是原卷对照长期降级成 PDF 内嵌、浏览器里一片黑（2026-10-30 实测 ETIMEDOUT）。
-      execFileSync("pdftoppm", ["-png", "-r", "120", pdfPath, join(pagesDir, "page")], {
-        timeout: 600_000,
-      });
+      /**
+       * **按目标像素宽度渲染，不用固定 DPI**（2026-10-30 实测）。
+       *
+       * `-r 120` 是「每英寸 120 像素」的绝对分辨率，它假设 PDF 页面是 A4（595×842pt）。
+       * 但《教材基础练》整套 6 册的页面是 **2093×2994 pt**（3.5 倍 A4）——
+       * 同样是 `-r 120`，渲染出的却是 3489×4990、单张 10MB 的图：
+       * 18 页跑到 2 分钟以上，直接撞上调用超时，整册被判「工具不可用」而降级成 PDF 内嵌
+       * （浏览器里一片黑），页面加载也因此卡顿。
+       *
+       * `-scale-to-x 1000` 让「A4 册」和「放大册」产出同一量级（1000×1431、约 1.4MB/页），
+       * 同一份 18 页实测 **27.7s**（原 >120s），总量 180MB → 26MB。
+       * 1000px 宽也够墨迹覆盖率用：A4 册原本就是 992px，检测精度与之对齐。
+       */
+      execFileSync(
+        "pdftoppm",
+        ["-png", "-scale-to-x", "1000", "-scale-to-y", "-1", pdfPath, join(pagesDir, "page")],
+        { timeout: 600_000 },
+      );
       originPages = readdirSync(pagesDir).filter((f) => f.endsWith(".png")).length;
     } catch (err) {
       // ⚠️ 这里**不许静默吞原因**：曾在 2026-10-30 出现「手动能跑、脚本内失败」，
