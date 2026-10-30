@@ -42,7 +42,19 @@ const BANK_DIR = join(OUT, "bank");
 const BINDINGS_PATH = join(ROOT, "bank-bindings.json");
 
 interface Bindings {
-  bindings: { quiz: string; answer: string; verified?: boolean; metric?: number; note?: string }[];
+  bindings: {
+    quiz: string;
+    answer: string;
+    verified?: boolean;
+    metric?: number;
+    note?: string;
+    /**
+     * **题册侧显式章号**（`DECISIONS §81`）：该册 PDF 本身没有章标题时（如夸克拍的光学 8 页节选），
+     * 引擎把 `chapter` 留空，配对键永远进不了任何章。显式声明后由 `build-bank --quiz-chapter` 补上，
+     * 只补空章号的题。不信推断 —— 补章号必须显式绑定（`§6-24`）。
+     */
+    quizChapter?: string;
+  }[];
   excluded: { quiz: string; answer?: string; reason: string }[];
   unbound: { quiz: string; reason: string }[];
 }
@@ -93,13 +105,24 @@ interface PairResult {
   output: string;
 }
 
-function runPair(quiz: DocMeta, ans: DocMeta, outJson: string): PairResult {
+function runPair(quiz: DocMeta, ans: DocMeta, outJson: string, quizChapter?: string): PairResult {
   let ok = true;
   let output = "";
   try {
     output = execFileSync(
       process.execPath,
-      ["--import", "tsx", join(ROOT, "scripts", "build-bank.ts"), "--quiz", quiz.id, "--answer", ans.id, "--out", outJson],
+      [
+        "--import",
+        "tsx",
+        join(ROOT, "scripts", "build-bank.ts"),
+        "--quiz",
+        quiz.id,
+        "--answer",
+        ans.id,
+        "--out",
+        outJson,
+        ...(quizChapter ? ["--quiz-chapter", quizChapter] : []),
+      ],
       { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
   } catch (e) {
@@ -150,7 +173,7 @@ function main(): void {
     boundQuiz.add(b.quiz);
     const outJson = join(tmp, `${results.length}.json`);
     console.log(`\n=== ${q.label} × ${a.label}（显式绑定${b.verified ? "" : "，⚠️ 未核对"}） ===`);
-    const r = runPair(q, a, outJson);
+    const r = runPair(q, a, outJson, b.quizChapter);
     for (const line of r.output.split("\n")) {
       if (/配对成功|未配对|✅|✗|违规/.test(line)) console.log(`  ${line.trim()}`);
     }
