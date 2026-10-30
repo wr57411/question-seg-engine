@@ -25,7 +25,8 @@
     "report:generalization": "tsx scripts/generalization.ts",
     "bank:all": "tsx scripts/bank-all.ts",
     "topic:export": "tsx scripts/topic-export.ts",
-    "audit:topic": "tsx scripts/audit-topic.ts"
+    "audit:topic": "tsx scripts/audit-topic.ts",
+    "cleanup:topic-tags": "tsx scripts/cleanup-topic-tags.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
