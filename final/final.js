@@ -1,3 +1,6 @@
+// 类型权威检查器：`tsconfig.viewer.json`（checkJs:true + DOM lib）。本文件是 DOM 代码，
+// **不要**加 `// @ts-check` —— 主 `tsconfig.json` 的 lib 没有 DOM，一旦本文件被 TS 测试 import
+// 进主程序，`HTMLElement` / `document` 会被判成未知名字（DECISIONS §95）。
 /**
  * final/final.js —— **成品页**（整册浏览）
  *
@@ -28,16 +31,142 @@ import { tagSection } from "./tag-panel.js";
 import { anchorOf, loadBindings, loadLibrary, reconcile, saveBindings, saveLibrary, tagIdsFor } from "./tag-store.js";
 
 /**
+ * ── 类型声明 ──
+ *
+ * 快照 typedef 为什么**在本地声明**（而不是 import `reconstruct.js` 的 `Page`/`Block`）：
+ * `stages/reconstruct.d.ts` 是手写声明、**整体遮蔽实现**（债：`HANDOFF §6-29`），它的导出形状
+ * 刻意宽松（`el`/`mergeContext`/`renderPaper` 回来的都是 `any`），跨文件也拿不到它的 typedef ——
+ * 与 `final/entry-paper.js`（本地 `PageRef`/`SnapBlock`）、`final/tag-panel.js`（本地
+ * `QuestionRef`/`PageRef`）同一口径：**只声明本文件读过的字段**，真实形状见
+ * `scripts/export-stages.ts`（快照）与 `scripts/build-bank.ts:279`（bank 条目）。
+ * 标签数据一律复用 `tag-store.js` 的导出 typedef（不另造一份，同 `tag-panel.js:30-38`）。
+ *
+ * @typedef {Object} SnapBlock 快照里的一个行级块（stages.json 的 pages[i].blocks[j]）
+ * @property {number} i
+ * @property {number[]} bbox
+ * @property {string} [text]
+ * @property {string} [kind]
+ * @property {string} [img]
+ * @property {string} [html]
+ * @property {boolean} [ocr]
+ *
+ * @typedef {Object} SnapOcrItem 一条 OCR 候选补行（`text` 取必填，与 entry-paper.js:50 OcrItem 对齐）
+ * @property {string} text
+ * @property {number[]} [bbox]
+ * @property {number[]} [win]
+ * @property {boolean} [accepted]
+ * @property {string} [source]
+ * @property {string} [raw]
+ * @property {string} [crop]
+ * @property {number} [ratio]
+ *
+ * @typedef {Object} SnapQuestion 快照题目（真实形状：export-stages.ts StageQuestion）
+ * @property {string} id
+ * @property {string} number
+ * @property {string} section
+ * @property {string} type
+ * @property {number[]} blocks
+ * @property {boolean} [startsHere]
+ * @property {number} confidence
+ * @property {string} status
+ *
+ * @typedef {Object} SnapPage 快照一页（只列本文件读过的字段；`index` 见 export-stages.ts StagePage）
+ * @property {number} index
+ * @property {number} width
+ * @property {number} height
+ * @property {number} [columns]
+ * @property {SnapBlock[]} blocks
+ * @property {SnapQuestion[]} questions
+ * @property {SnapOcrItem[]} [ocrFill]
+ *
+ * @typedef {Object} Snap 整册 stages.json 快照
+ * @property {SnapPage[]} pages
+ *
+ * @typedef {{ key: string, text: string }} OptLine 选项行（questions.json / bank.json 都是这个形状）
+ * @typedef {{ path: string, bbox?: number[] }} ImageRef 图片引用（裸文件名 + 原卷 bbox）
+ *
+ * @typedef {Object} BankQuestion questions.json 的一条（面板只读这几个字段）
+ * @property {string} id
+ * @property {string} [stem]
+ * @property {OptLine[]} [options]
+ * @property {ImageRef[]} [images]
+ *
+ * @typedef {Object} BankEntry bank.json 的一条配对条目（只读字段；真实形状 build-bank.ts Entry）
+ * @property {string} quizId
+ * @property {string} answerId
+ * @property {string} answerKey
+ * @property {string} stem
+ * @property {string} answerText
+ * @property {OptLine[]} [options]
+ * @property {ImageRef[]} answerImages
+ *
+ * @typedef {{ byQuizId: Map<string, BankEntry>, byAnswerId: Map<string, BankEntry> }} Bank
+ *
+ * @typedef {{ level: string, short?: string, issues?: string[] }} HealthInfo meta.json 体检结论（本文件读的部分）
+ * @typedef {{ questions?: number, pages?: number, ocrFilled?: number }} DocStats meta.json stats（只读这三个键）
+ * @typedef {{ id: string, label: string, kind: string, examined: boolean, stats: DocStats | null, health: HealthInfo | null }} DocMeta /api/docs 的一项（形状见 scripts/view-server.ts listDocs）
+ *
+ * @typedef {import("./tag-store.js").Tag} Tag
+ * @typedef {import("./tag-store.js").DocTags} DocTags
+ * @typedef {{ version: number, tags: Tag[] }} Library
+ * @typedef {{ library: Library, bindings: DocTags }} TagState
+ *
+ * 号牌点击回调与 `tagSection` 的 `QuestionRef`/`PageRef` 参数对得上即可（结构性兼容），
+ * 这里本地声明的理由与 `tag-panel.js:33-34` 相同（reconstruct.d.ts 遮蔽债，跨不了文件）。
+ * @typedef {{ id: string, number: string }} QuestionRef
+ * @typedef {{ index: number, width: number, height: number }} PageRef
+ *
+ * @typedef {{ q: SnapQuestion, p: SnapPage }} SheetRef 当前面板打开的题/页
+ * @typedef {{ sec: HTMLElement, head: HTMLElement, p: SnapPage }} PageSlot 每页的三段（重绘单页要用）
+ * @typedef {HTMLElement & { foreignBlocks: number, holes: number }} CropBox entryCrop 容器（契约见 entry-paper.js:326-327：容器上挂这两个计数）
+ * @typedef {{ drop: Set<number>, keep: Map<number, { text: string }> }} MergeCtx mergeContext 返回（与 entry-paper.js:64 同形，另加 keep）
+ * @typedef {{ kind?: string, blk?: SnapBlock, text?: string, last?: SnapBlock }} FlowItem 文本流的一条（text 段或块段）
+ * @typedef {{ kind: "text", text: string, last: SnapBlock }} FlowPara groupParagraphs 的进行中段落
+ * @typedef {{ kind: "question", pageIndex: number, q: SnapQuestion, snippet: string }} HitQuestion 题号候选行
+ * @typedef {{ kind?: never, pageIndex: number, blockIndex: number, snippet: string }} HitBlock 正文命中行
+ */
+
+/**
  * 文档清单来自服务端 `/api/docs`（扫 `data/out/<docId>/` 里有快照的目录），
  * **不再硬编码** —— 硬编码的代价是「导入一份新卷要改前端代码」，那不叫每天能用。
  * 每项形如 `{ id, label, kind, examined, stats, health }`，`examined=false` 表示没跑过
  * `npm run daily` 的体检（此时如实显示「未体检」，不假装健康）。
  */
+/** @type {DocMeta[]} */
 let DOCS = [];
 let DEFAULT_DOC = "";
 
-const $ = (id) => document.getElementById(id);
+/**
+ * 页面骨架里的元素**恒存在**（final/index.html 随页面一起提交）。
+ * ⚠️ 这里只做类型声明、**不加存在性检查**：真缺元素时维持原样 —— 在后续属性访问处抛
+ * TypeError。换成 viewer.js 的 `need()`（查询时抛 Error）会**提前抛、换异常类型**，
+ * 按红线「不得改变何时抛错」不采用，只做等价的返回类型收窄。
+ * @param {string} id
+ * @returns {HTMLElement}
+ */
+const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
+/**
+ * 单一可变对象（纪律 7：整体声明一次，下游 never/隐式 any 自然消失，不靠逐点断言）。
+ * @type {{
+ *   doc: string,
+ *   data: Snap | null,
+ *   paneW: number,
+ *   audit: boolean,
+ *   ocrStyle: boolean,
+ *   ocrFill: boolean,
+ *   bank: Bank | null,
+ *   snap: Snap | null,
+ *   snaps: Map<string, Snap>,
+ *   sheetToken: object | null,
+ *   byId: Map<string, BankQuestion> | null,
+ *   byIdError: string,
+ *   tagsOn: boolean,
+ *   tags: TagState | null,
+ *   pages: PageSlot[],
+ *   sheet: SheetRef | null
+ * }}
+ */
 const state = {
   doc: DEFAULT_DOC,
   data: null,
@@ -63,6 +192,13 @@ const state = {
 function paperWidth() {  return Math.max(320, Math.min(CANVAS_W, window.innerWidth - 110));
 }
 
+/**
+ * JSON 取数的边界。`Promise<any>` 沿用 `tag-store.js:65-67`（getJson）的既有先例：
+ * 解析结果的形状在**各个消费处**用本地 typedef + `/** @type *\/` 断言钉住（见 loadDocs /
+ * loadDoc / loadQuestions / loadBank / snapshotOf），不在这里伪造一个全局类型。
+ * @param {string} url
+ * @returns {Promise<any>}
+ */
 async function fetchJson(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -70,7 +206,10 @@ async function fetchJson(url) {
 }
 
 /** 顶部提示条。⚠️ 一律走 DOM 构造、不用 innerHTML：`doc` 来自 URL 参数，
- *  拼进 HTML 等于把 `?doc=<img onerror=…>` 变成可执行内容（本地工具也是工具）。 */
+ *  拼进 HTML 等于把 `?doc=<img onerror=…>` 变成可执行内容（本地工具也是工具）。
+ * @param {(string | [string, string])[]} parts 一段文本，或 `[标签名, 文本]` 二元组
+ * @param {string} [kind] "err" 走错误态样式，其余（如 "warn"）为普通提示
+ */
 function notice(parts, kind) {
   const n = $("notice");
   n.hidden = false;
@@ -87,8 +226,12 @@ function notice(parts, kind) {
 
 async function loadTags() {
   const [library, bindings] = await Promise.all([loadLibrary(), loadBindings(state.doc)]);
+  /** @type {Set<string>} */
   const present = new Set();
-  for (const p of state.data.pages) for (const q of p.questions) present.add(q.id);
+  // loadTags 只在 loadDoc 里 `state.data` 就位后被调用 ⇒ 边界收窄（cast 不产生任何运行时代码，
+  // 真为 null 时依旧在 `.pages` 上抛 TypeError，抛点与原先一致）
+  const data = /** @type {Snap} */ (state.data);
+  for (const p of data.pages) for (const q of p.questions) present.add(q.id);
   const r = reconcile(bindings, present);
   state.tags = { library, bindings: r.state };
   // 对不上的绑定不删、不藏：先把状态如实写回文件，再在页面上说清楚（U21）
@@ -105,12 +248,19 @@ async function loadTags() {
 
 /* ── 题号牌点开：标签区置顶 + 详情在下（同一个浮层，不做两个并存面板） ── */
 
+/**
+ * @param {SnapQuestion} q
+ * @returns {BankEntry | null}
+ */
 function bankEntryFor(q) {
   if (!state.bank) return null;
   return state.bank.byQuizId.get(q.id) ?? state.bank.byAnswerId.get(q.id) ?? null;
 }
 
-/** 渲染用的标签解析器，交给 renderPaper（纸面只读，数据在这里） */
+/** 渲染用的标签解析器，交给 renderPaper（纸面只读，数据在这里）
+ * @param {SnapQuestion} q
+ * @returns {Tag[] | null}
+ */
 function tagsForQuestion(q) {
   if (!state.tags) return null;
   const ids = new Set(tagIdsFor(state.tags.bindings, q.id));
@@ -119,7 +269,9 @@ function tagsForQuestion(q) {
   return state.tags.library.tags.filter((t) => ids.has(t.id));
 }
 
-/** 只重绘受影响的这一页：标签层不改 innerW，页高不变，滚动位置不会跳 */
+/** 只重绘受影响的这一页：标签层不改 innerW，页高不变，滚动位置不会跳
+ * @param {number} pageIndex
+ */
 function repaintPage(pageIndex) {
   const slot = state.pages[pageIndex];
   if (!slot) return;
@@ -177,8 +329,15 @@ const FLOW_ENDS = /[。！？：；!?:;…]$/;
  * 四条 AND。宁可不合并（读起来是短的独立行）也不能误合并 ——
  * 把标题和正文粘成一行，比多一个段落更难读。
  */
+/**
+ * @param {SnapBlock[]} blocks
+ * @param {MergeCtx} ctx mergeContext 的返回（`reconstruct.d.ts` 债 ⇒ 这里是本地声明，字段见 reconstruct.js:304 的 JSDoc）
+ * @returns {FlowItem[]}
+ */
 function groupParagraphs(blocks, ctx) {
+  /** @type {FlowItem[]} */
   const out = [];
+  /** @type {FlowPara | null} */
   let cur = null;
   for (const b of blocks) {
     if (ctx.drop.has(b.i)) continue;
@@ -209,6 +368,13 @@ function groupParagraphs(blocks, ctx) {
   return out;
 }
 
+/**
+ * @param {SnapBlock} prevBlk
+ * @param {string} prevText
+ * @param {SnapBlock} blk
+ * @param {string} text
+ * @returns {boolean}
+ */
 function sameParagraph(prevBlk, prevText, blk, text) {
   // 60 而不是个位数：题号行顶格、正文首行缩进，实测同一段内 x0 差可达 45
   //（`1 [人教版必修三 P56 第 1 题情境变式]` x0=76 → `如图所示…` x0=121）。
@@ -222,6 +388,10 @@ function sameParagraph(prevBlk, prevText, blk, text) {
   return true;
 }
 
+/**
+ * @param {SnapPage} p
+ * @returns {HTMLElement}
+ */
 function flowPaper(p) {
   const wrap = el("div", "flow-page");
   const ctx = mergeContext(p);
@@ -230,12 +400,14 @@ function flowPaper(p) {
     if (item.kind === "text") {
       const para = el("p", "flow-p");
       // prettifyLatex 返回 HTML 片段（分式/根号/上下标），与纸面同一个渲染函数
-      para.innerHTML = prettifyLatex(item.text);
+      // （text 段由 groupParagraphs 构造时必带 text ⇒ 边界收窄，不产生运行时代码）
+      para.innerHTML = prettifyLatex(/** @type {string} */ (item.text));
       wrap.append(para);
       continue;
     }
 
-    if (blk.kind === "image" && blk.img) {
+    // 非 text 段必带 blk（构造保证）；`blk &&` 只是把这份不变量讲给 tsc 听，永不改变走向
+    if (blk && blk.kind === "image" && blk.img) {
       const img = el("img", "flow-img");
       img.src = `/data/out/${enc(state.doc)}/images/${enc(blk.img)}`;
       img.alt = "图片块";
@@ -243,7 +415,7 @@ function flowPaper(p) {
       wrap.append(img);
       continue;
     }
-    if (blk.kind === "table" && blk.html) {
+    if (blk && blk.kind === "table" && blk.html) {
       // 上游 HTML 直接沿用（含 rowspan/colspan）；宽度交给 CSS，不重新推断列宽
       const box = el("div", "flow-table");
       box.innerHTML = blk.html;
@@ -253,6 +425,11 @@ function flowPaper(p) {
   return wrap;
 }
 
+/**
+ * @param {SnapPage} p
+ * @returns {HTMLElement} `renderPaper(...).wrap` —— d.ts 把它写成 any（遮蔽债，HANDOFF §6-29），
+ *          实现侧 reconstruct.js:625 声明的是 HTMLElement，这里按实现收窄。
+ */
 function paper(p) {
   if (isPhoneViewport()) return flowPaper(p);
   return renderPaper(p, {
@@ -268,14 +445,20 @@ function paper(p) {
 
 /** 标签面板拿的「应用」句柄：写路径只有 commitBindings / commitLibrary 两条 */
 const tagApp = {
+  /** @returns {TagState} openSheet 只在 `if (state.tags)` 之后才把本句柄交给 tagSection ⇒
+   *  「tags 为 null」在句柄使用期内不可达，这里按该不变量收窄（tag-panel.js:38 的 TagApp 要求非空） */
   get tags() {
-    return state.tags;
+    return /** @type {TagState} */ (state.tags);
   },
+  /** @param {TagState} v */
   set tags(v) {
     state.tags = v;
   },
+  /** @param {DocTags} next */
   commitBindings: (next) => saveBindings(state.doc, next),
+  /** @param {Library} next */
   commitLibrary: (next) => saveLibrary(next),
+  /** @param {QuestionRef} q @param {PageRef} p */
   onRepaint: (q, p) => repaintPage(p.index),
 };
 
@@ -286,6 +469,10 @@ const tagApp = {
  * 之前把图甩到文末，是因为只用了引擎的一维文本（stem / answerText）—— 那里面没有图片位置。
  * 现在改用快照的块坐标（entryCrop），图文相对位置与纸面同源。
  * 跨页条目**逐页续裁**：同一个 id 在快照里按页各有一段，段段都裁、按页序叠放。
+ */
+/**
+ * @param {SnapQuestion} q
+ * @param {SnapPage} p
  */
 async function openSheet(q, p) {
   const d = $("detail");
@@ -352,7 +539,10 @@ async function openSheet(q, p) {
   }
 }
 
-/** 当前卷是题册还是答案册（措辞与"哪一面是自己"都靠它） */
+/** 当前卷是题册还是答案册（措辞与"哪一面是自己"都靠它）
+ * @param {string} doc
+ * @returns {string} "quiz" | "answer"（取自 meta.json，类型只按字符串对待）
+ */
 function docKind(doc) {
   return DOCS.find((x) => x.id === doc)?.kind ?? "quiz";
 }
@@ -361,6 +551,7 @@ function docKind(doc) {
  * 顶部体检摘要：把 `meta.json` 的结论翻译成一句人话。
  * - `examined=false` ⇒ 说「未体检」而不是「通过」（没测过 ≠ 没问题）；
  * - 有 issues ⇒ 显示第一条，悬停/点击看全部。
+ * @param {string} doc
  */
 function renderHealth(doc) {
   const box = $("doc-health");
@@ -372,6 +563,7 @@ function renderHealth(doc) {
     box.hidden = true;
     return;
   }
+  /** @type {DocStats} */
   const s = d.stats ?? {};
   const bits = [];
   if (s.questions !== undefined) bits.push(`${s.questions} 题`);
@@ -394,10 +586,12 @@ function renderHealth(doc) {
   }
   box.append(el("span", "", [...bits, tail].join(" · ")));
   if (d.health?.issues?.length) {
-    box.title = d.health.issues.join("\n");
+    // 同一引用先取局部：闭包里 `d.health.issues` 会丢收窄（health 可变属性），取局部不改变任何读取时机
+    const issues = d.health.issues;
+    box.title = issues.join("\n");
     box.append(el("span", "more", "详情"));
     box.onclick = () =>
-      notice([["div", "本册体检："], ...d.health.issues.map((x) => ["div", `· ${x}`])], "warn");
+      notice([["div", "本册体检："], ...issues.map((x) => /** @type {[string, string]} */ (["div", `· ${x}`]))], "warn");
     box.style.cursor = "pointer";
   } else {
     box.title = "体检通过：题号连续、无未解释的抑制";
@@ -407,7 +601,15 @@ function renderHealth(doc) {
 }
 
 /** 一面：先试纸面裁切；拿不到快照或块才退回文本 + 图片条，并明说是降级（不静默换排法）。
- *  返回 null = 这次点击已作废（调用方不许再往面板里塞东西）。 */
+ *  返回 null = 这次点击已作废（调用方不许再往面板里塞东西）。
+ * @param {object} token 本次点击的令牌（state.sheetToken）
+ * @param {HTMLElement} d 面板容器
+ * @param {string} label
+ * @param {{ id: string, doc: string }} side 要裁的条目：id + 所属卷
+ * @param {number} w 面板可用宽
+ * @param {() => HTMLElement[]} fallback 降级出口（textFallback）
+ * @returns {Promise<HTMLElement | null>}
+ */
 async function sideSection(token, d, label, side, w, fallback) {
   const box = el("div", "sec");
   box.append(el("div", "lbl", label));
@@ -459,8 +661,15 @@ async function sideSection(token, d, label, side, w, fallback) {
   return box;
 }
 
-/** 降级出口：文本 + 按阅读顺序的图片条（位置不如纸面准，但图不丢） */
+/** 降级出口：文本 + 按阅读顺序的图片条（位置不如纸面准，但图不丢）
+ * @param {string} stem
+ * @param {OptLine[] | null | undefined} options
+ * @param {ImageRef[] | null | undefined} images
+ * @param {string} doc
+ * @returns {HTMLElement[]}
+ */
 function textFallback(stem, options, images, doc) {
+  /** @type {HTMLElement[]} */
   const out = [];
   const stemBox = el("div", "stem");
   stemBox.innerHTML = prettifyLatex(stem ?? "");
@@ -475,27 +684,42 @@ function textFallback(stem, options, images, doc) {
   return out;
 }
 
-/** 一条目可能跨页：段列表由 `entrySegments` 从整册快照里按 id 找齐。 */
+/** 一条目可能跨页：段列表由 `entrySegments` 从整册快照里按 id 找齐。
+ * @param {Snap | null} snap
+ * @param {string} qid
+ * @param {string} doc
+ * @param {number} w
+ * @returns {CropBox | null}
+ */
 function cropOf(snap, qid, doc, w) {
   const segs = snap ? entrySegments(snap.pages, qid) : [];
   if (!segs.length) return null;
   try {
-    return entryCrop(segs, doc, w, { candidateStyle: state.ocrStyle });
+    // `holes`/`foreignBlocks` 是 entryCrop 的**声明契约**（entry-paper.js:326-327），
+    // 但其导出签名只到 `HTMLElement | null` ⇒ 调用点按契约收窄（d.ts 遮蔽债 HANDOFF §6-29 同源问题）
+    return /** @type {CropBox} */ (entryCrop(segs, doc, w, { candidateStyle: state.ocrStyle }));
   } catch (e) {
     console.warn("按原卷裁切失败，退回文本：", String(e).slice(0, 80));
     return null;
   }
 }
 
-/** 另一册的快照按需拉取并缓存（题册 0.4 MB / 答案册 0.9 MB） */
+/** 另一册的快照按需拉取并缓存（题册 0.4 MB / 答案册 0.9 MB）
+ * @param {string} doc
+ * @returns {Promise<Snap>}
+ */
 async function snapshotOf(doc) {
-  if (state.snaps.has(doc)) return state.snaps.get(doc);
-  const snap = await fetchJson(`/data/out/${enc(doc)}/stages.json`);
+  // `has` 已判过存在 ⇒ `get` 的 `| undefined` 只是 lib 签名，cast 不产生运行时代码
+  if (state.snaps.has(doc)) return /** @type {Snap} */ (state.snaps.get(doc));
+  const snap = /** @type {Snap} */ (await fetchJson(`/data/out/${enc(doc)}/stages.json`));
   state.snaps.set(doc, snap);
   return snap;
 }
 
-/** `docId:p2:q23` → `docId`（图片要拼 `/data/out/<docId>/images/`） */
+/** `docId:p2:q23` → `docId`（图片要拼 `/data/out/<docId>/images/`）
+ * @param {string} id
+ * @returns {string}
+ */
 function docOf(id) {
   const i = String(id ?? "").lastIndexOf(":p");
   return i > 0 ? id.slice(0, i) : state.doc;
@@ -504,6 +728,10 @@ function docOf(id) {
 /**
  * 图片条：**只在降级路径里出现**（正常路径是 entryCrop，图按原卷位置排）。
  * 按原卷阅读顺序（bbox 先 y 后 x）排；此时手里只有一维文本，没有可回填的位置标记。
+ * @param {ImageRef[] | null | undefined} images
+ * @param {string} doc
+ * @param {string} label
+ * @returns {HTMLElement}
  */
 function figStrip(images, doc, label) {
   const box = el("div", "figs");
@@ -529,7 +757,9 @@ function renderBook() {
   const book = $("book");
   book.replaceChildren();
   state.pages = [];
-  const data = state.data;
+  // renderBook 只在快照就位后被调用（loadDoc 尾部 / 三个开关 / resize 的 `if (state.data)`）
+  // ⇒ 边界收窄：cast 不产生运行时代码，真为 null 时依旧在 `.pages` 上抛 TypeError
+  const data = /** @type {Snap} */ (state.data);
   data.pages.forEach((p, i) => {
     const sec = el("section", "bk-page");
     sec.id = `pg-${i + 1}`;
@@ -560,12 +790,18 @@ function updatePageIndicator() {
  * 那里只有 id/number/section/type/blocks/startsHere/confidence/status/reasons，
  * 没有 stem/options/images —— 曾经面板因此把题干渲染成字面量 `undefined`、选项恒 0、图片全丢。
  * 阅读版（viewer/）一直读的就是这份（viewer.js:28）。
+ * @param {string} doc
  */
 async function loadQuestions(doc) {
   state.byId = null;
   state.byIdError = "";
   try {
-    const list = await fetchJson(`/data/out/${enc(doc)}/questions.json`);
+    // 产物实际是裸数组；`list.questions ?? list` 兼容带壳返回 ⇒ 用交叉类型声明，
+    // 数组上读不到 `questions`（undefined）走 ?? 兜底，运行路径与原先逐字相同
+    const list = /** @type {BankQuestion[] & { questions?: BankQuestion[] }} */ (
+      await fetchJson(`/data/out/${enc(doc)}/questions.json`)
+    );
+    /** @type {Map<string, BankQuestion>} */
     const m = new Map();
     for (const q of list.questions ?? list) m.set(q.id, q);
     state.byId = m;
@@ -576,8 +812,10 @@ async function loadQuestions(doc) {
 
 async function loadBank() {
   try {
-    const list = await fetchJson("/data/out/bank/bank.json");
+    const list = /** @type {BankEntry[]} */ (await fetchJson("/data/out/bank/bank.json"));
+    /** @type {Map<string, BankEntry>} */
     const byQuizId = new Map();
+    /** @type {Map<string, BankEntry>} */
     const byAnswerId = new Map();
     for (const e of list) {
       if (e.quizId) byQuizId.set(e.quizId, e);
@@ -596,7 +834,7 @@ async function loadBank() {
 async function loadDocs() {
   const asked = new URLSearchParams(location.search).get("doc");
   try {
-    const j = await fetchJson("/api/docs");
+    const j = /** @type {{ docs?: DocMeta[] }} */ (await fetchJson("/api/docs"));
     DOCS = (j.docs ?? []).map((d) => ({ ...d, label: d.label || d.id }));
     if (!DOCS.length) throw new Error("服务端没发现任何文档");
   } catch (e) {
@@ -628,13 +866,16 @@ async function loadDocs() {
   state.doc = asked && DOCS.some((d) => d.id === asked) ? asked : DEFAULT_DOC;
 }
 
+/**
+ * @param {string} doc
+ */
 async function loadDoc(doc) {
   try {
-    state.data = await fetchJson(`/data/out/${enc(doc)}/stages.json`);
+    state.data = /** @type {Snap} */ (await fetchJson(`/data/out/${enc(doc)}/stages.json`));
     state.doc = doc;
-    $("doc-pick").value = doc;
-    $("lnk-stages").href = `/stages/?doc=${enc(doc)}&stage=6&page=1`;
-    $("lnk-viewer").href = `/viewer/?doc=${enc(doc)}`;
+    /** @type {HTMLSelectElement} */ ($("doc-pick")).value = doc;
+    /** @type {HTMLAnchorElement} */ ($("lnk-stages")).href = `/stages/?doc=${enc(doc)}&stage=6&page=1`;
+    /** @type {HTMLAnchorElement} */ ($("lnk-viewer")).href = `/viewer/?doc=${enc(doc)}`;
     $("notice").hidden = true;
     $("detail").hidden = true; // 换卷时关掉面板，避免标签区指着上一卷的题目
     state.sheet = null;
@@ -673,7 +914,9 @@ async function loadDoc(doc) {
  */
 
 /** 底部轻提示（2.4s 自动消失） */
-let toastTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} 定时器句柄；初值 null→undefined：两者都是 clearTimeout 的空句柄 no-op，行为不变（同 stages.js:716 的处理） */
+let toastTimer = undefined;
+/** @param {string} text */
 function flash(text) {
   const t = $("toast");
   t.textContent = text;
@@ -686,17 +929,21 @@ function flash(text) {
   }, 2400);
 }
 
-/** 跳转后必须看得见"跳到了哪"：短暂高亮 2s */
+/** 跳转后必须看得见"跳到了哪"：短暂高亮 2s
+ * @param {Element | null} node
+ */
 function markHit(node) {
   if (!node) return;
   node.classList.add("hit");
   setTimeout(() => node.classList.remove("hit"), 2000);
 }
 
+/** @param {number} index @returns {HTMLElement | null} */
 function pageEl(index) {
   return document.getElementById(`pg-${index + 1}`);
 }
 
+/** @param {number} index @returns {boolean} */
 function jumpToPage(index) {
   const sec = pageEl(index);
   if (!sec) return false;
@@ -707,15 +954,24 @@ function jumpToPage(index) {
   return true;
 }
 
-/** 本册所有该题号的题（不同节会重号 ⇒ 天然是列表） */
+/** 本册所有该题号的题（不同节会重号 ⇒ 天然是列表）
+ * @param {string} n
+ * @returns {Array<{ pageIndex: number, q: SnapQuestion }>}
+ */
 function questionsByNumber(n) {
+  /** @type {Array<{ pageIndex: number, q: SnapQuestion }>} */
   const out = [];
-  state.data.pages.forEach((p, i) => {
+  // 只在 runJump 判过 `!state.data` 之后被调用 ⇒ 边界收窄（cast 不产生运行时代码）
+  const data = /** @type {Snap} */ (state.data);
+  data.pages.forEach((p, i) => {
     for (const q of p.questions ?? []) if (String(q.number) === String(n)) out.push({ pageIndex: i, q });
   });
   return out;
 }
 
+/** 只需要 {pageIndex, q} 两点：HitQuestion 与 questionsByNumber 的裸命中都结构兼容
+ * @param {{ pageIndex: number, q: SnapQuestion }} hit @returns {boolean}
+ */
 function jumpToQuestion(hit) {
   jumpToPage(hit.pageIndex);
   const chip = document.querySelector(`.q-chip[data-qid="${CSS.escape(hit.q.id)}"]`);
@@ -723,13 +979,19 @@ function jumpToQuestion(hit) {
   return Boolean(chip);
 }
 
-/** 搜正文：返回 { pageIndex, blockIndex, snippet }，最多 60 条（再多也没人翻） */
+/** 搜正文：返回 { pageIndex, blockIndex, snippet }，最多 60 条（再多也没人翻）
+ * @param {string} text
+ * @returns {HitBlock[]}
+ */
 function searchBlocks(text) {
   const needle = text.trim().toLowerCase();
   if (!needle) return [];
+  /** @type {HitBlock[]} */
   const out = [];
-  for (let i = 0; i < state.data.pages.length; i++) {
-    const blocks = state.data.pages[i].blocks ?? [];
+  // 只在 runJump 判过 `!state.data` 之后被调用 ⇒ 边界收窄（cast 不产生运行时代码）
+  const data = /** @type {Snap} */ (state.data);
+  for (let i = 0; i < data.pages.length; i++) {
+    const blocks = data.pages[i].blocks ?? [];
     for (let k = 0; k < blocks.length; k++) {
       const t = blocks[k].text ?? "";
       const at = t.toLowerCase().indexOf(needle);
@@ -749,7 +1011,10 @@ function searchBlocks(text) {
   return out;
 }
 
-/** 结果面板（题号候选与正文命中共用；点一行就跳过去） */
+/** 结果面板（题号候选与正文命中共用；点一行就跳过去）
+ * @param {(HitQuestion | HitBlock)[]} hits
+ * @param {string} title
+ */
 function showHits(hits, title) {
   const box = $("hits");
   box.replaceChildren();
@@ -775,7 +1040,9 @@ function showHits(hits, title) {
   }
 }
 
-/** 输入框的唯一入口：页码 → 题号 → 搜索 */
+/** 输入框的唯一入口：页码 → 题号 → 搜索
+ * @param {string | null | undefined} raw
+ */
 function runJump(raw) {
   const q = String(raw ?? "").trim();
   if (!q || !state.data) return;
@@ -826,8 +1093,10 @@ function runJump(raw) {
  * 每天用的人不会每天从第 1 页翻起。位置存 localStorage：
  * 隐私模式/禁用存储时**写不进去也不影响阅读**（try/catch 兜住，不弹错）。 */
 
+/** @param {string} doc */
 const posKey = (doc) => `final:pos:${doc}`;
-let posTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} 同 toastTimer：null→undefined 对 clearTimeout 都是空句柄 no-op，行为不变 */
+let posTimer = undefined;
 /**
  * 跳转后的短暂锁：平滑滚动途中 `updatePageIndicator` 会一路报**中间页**
  * （实测跳 p7 被记成 p5）。锁住这段时间，只认"跳到的目标页"；锁一过，
@@ -835,6 +1104,10 @@ let posTimer = null;
  */
 let posLockUntil = 0;
 
+/**
+ * @param {number} page
+ * @param {boolean} [force]
+ */
 function savePosition(page, force = false) {
   if (!force && Date.now() < posLockUntil) return;
   clearTimeout(posTimer);
@@ -854,7 +1127,8 @@ function restorePosition() {
   } catch {
     return;
   }
-  if (!p || p < 1 || p > state.data.pages.length) return;
+  // restorePosition 只在 loadDoc 的 renderBook 之后被调用 ⇒ 边界收窄（cast 不产生运行时代码）
+  if (!p || p < 1 || p > /** @type {Snap} */ (state.data).pages.length) return;
   const sec = pageEl(p - 1);
   if (!sec) return;
   sec.scrollIntoView({ block: "start" });
@@ -866,7 +1140,9 @@ function restorePosition() {
 /* ── 交互 ── */
 
 function initBar() {
-  const pick = $("doc-pick");
+  // index.html 里 doc-pick 是 `<select>`、jump 是 `<input>`、t-* 是 `checkbox`：
+  // `$` 只收窄到 HTMLElement（见上方注释），这里按元素实际标签再收一层（tag-panel.js:51 同法）
+  const pick = /** @type {HTMLSelectElement} */ ($("doc-pick"));
   pick.replaceChildren();
   for (const d of DOCS) {
     const o = el("option", "", d.label);
@@ -882,7 +1158,7 @@ function initBar() {
   pick.value = state.doc;
   pick.addEventListener("change", () => loadDoc(pick.value));
 
-  const jump = $("jump");
+  const jump = /** @type {HTMLInputElement} */ ($("jump"));
   jump.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -891,22 +1167,27 @@ function initBar() {
   // 输入框失焦时收起结果面板（点面板里的行之前会先失焦 ⇒ 延迟收，否则点不中）
   jump.addEventListener("blur", () => setTimeout(() => ($("hits").hidden = true), 180));
 
-  $("t-audit").addEventListener("change", (e) => {
-    state.audit = e.target.checked;
+  const tAudit = /** @type {HTMLInputElement} */ ($("t-audit"));
+  tAudit.addEventListener("change", (e) => {
+    // change 的 e.target 即 checkbox 本体；为 null 时原先在 `.checked` 上抛 TypeError，cast 不改这点
+    state.audit = /** @type {HTMLInputElement} */ (e.target).checked;
     renderBook();
   });
-  $("t-fill").checked = state.ocrFill;
-  $("t-fill").addEventListener("change", (e) => {
-    state.ocrFill = e.target.checked;
+  const tFill = /** @type {HTMLInputElement} */ ($("t-fill"));
+  tFill.checked = state.ocrFill;
+  tFill.addEventListener("change", (e) => {
+    state.ocrFill = /** @type {HTMLInputElement} */ (e.target).checked;
     renderBook();
   });
-  $("t-ocr").addEventListener("change", (e) => {
-    state.ocrStyle = e.target.checked;
+  const tOcr = /** @type {HTMLInputElement} */ ($("t-ocr"));
+  tOcr.addEventListener("change", (e) => {
+    state.ocrStyle = /** @type {HTMLInputElement} */ (e.target).checked;
     renderBook();
   });
 }
 
-let resizeTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} 同上：空句柄对 clearTimeout 等价（stages.js:716） */
+let resizeTimer = undefined;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
@@ -930,9 +1211,9 @@ async function main() {
   state.tagsOn = qs.get("tags") !== "0";
   await loadDocs();
   initBar();
-  $("t-audit").checked = state.audit;
-  $("t-ocr").checked = state.ocrStyle;
-  $("t-fill").checked = state.ocrFill;
+  /** @type {HTMLInputElement} */ ($("t-audit")).checked = state.audit;
+  /** @type {HTMLInputElement} */ ($("t-ocr")).checked = state.ocrStyle;
+  /** @type {HTMLInputElement} */ ($("t-fill")).checked = state.ocrFill;
   const asked = qs.get("doc") || DEFAULT_DOC;
   await loadBank();
   await loadDoc(asked);
@@ -941,7 +1222,7 @@ async function main() {
   // ?q= 打开即执行一次跳转/搜索（方便收藏"某个搜索"，也让交互可被自动化核对）
   const q = qs.get("q");
   if (q) {
-    $("jump").value = q;
+    /** @type {HTMLInputElement} */ ($("jump")).value = q;
     runJump(q);
   }
 }
