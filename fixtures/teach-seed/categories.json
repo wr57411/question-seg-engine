@@ -1,0 +1,16 @@
+{
+ "version": 1,
+ "updatedAt": "2026-10-30T02:50:00.000Z",
+ "categories": [
+  {
+   "id": "ct-ji",
+   "name": "基础",
+   "createdAt": "2026-10-30T02:50:00.000Z"
+  },
+  {
+   "id": "ct-pei",
+   "name": "培优",
+   "createdAt": "2026-10-30T02:50:00.000Z"
+  }
+ ]
+}

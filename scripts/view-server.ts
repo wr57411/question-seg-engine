@@ -19,6 +19,12 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promi
 import { networkInterfaces } from "node:os";
 import { extname, join, normalize, resolve } from "node:path";
 import { isKnownDoc, MAX_BODY, tagFilePath, validatePayload } from "./tag-write-guards.js";
+import {
+  isKnownDoc as isKnownTeachDoc,
+  isTeachScope,
+  teachFilePath,
+  validateTeachPayload,
+} from "./teach-write-guards.js";
 
 const ROOT = process.cwd();
 const PORT = Number(process.env.PORT ?? 4173);
@@ -109,6 +115,55 @@ async function handleTagsWrite(req: IncomingMessage, res: ServerResponse, url: U
   }
 }
 
+/**
+ * 教学归类写通道（第二条写路径）。与 `/api/tags` 同样的约束：
+ * scope 白名单、doc 白名单、路径断言、形状校验、原子替换；失败不落半截。
+ */
+async function handleTeachWrite(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+  const scope = url.searchParams.get("scope") ?? "";
+  const doc = url.searchParams.get("doc") ?? "";
+  if (!isTeachScope(scope)) {
+    res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: `非法 scope：${JSON.stringify(scope).slice(0, 80)}` }));
+    return;
+  }
+  if (scope === "bindings" && !(await isKnownTeachDoc(ROOT, doc))) {
+    res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: `doc 不在白名单内：${JSON.stringify(doc).slice(0, 130)}` }));
+    return;
+  }
+  const target = teachFilePath(ROOT, scope, doc);
+  if (!target) {
+    res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: "落盘路径越界" }));
+    return;
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse((await readBody(req)).toString("utf8"));
+  } catch (e) {
+    res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: `JSON 解析失败：${String(e).slice(0, 200)}` }));
+    return;
+  }
+  const invalid = validateTeachPayload(scope, payload);
+  if (invalid) {
+    res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: invalid }));
+    return;
+  }
+  try {
+    const text = `${JSON.stringify(payload, null, 1)}\n`;
+    await atomicWrite(target, text);
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(JSON.stringify({ ok: true, bytes: Buffer.byteLength(text), at: new Date().toISOString() }));
+  } catch (e) {
+    res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: `写入失败：${String(e).slice(0, 200)}` }));
+  }
+}
+
 /* ── 文档清单（成品页据此发现文档，取代前端硬编码 DOCS） ── */
 
 interface DocListItem {
@@ -173,6 +228,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST") {
       if (url.pathname === "/api/tags") await handleTagsWrite(req, res, url);
+      else if (url.pathname === "/api/teach") await handleTeachWrite(req, res, url);
       else res.writeHead(405).end("method not allowed");
       return;
     }

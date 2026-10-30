@@ -20,6 +20,8 @@
     "scripts",
     "stages/tag-layout.js",
     "final/tag-store.js",
+    "final/pick-hit.js",
+    "final/teach-store.js",
     "topic/topic-model.js"
   ]
 }

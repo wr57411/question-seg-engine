@@ -23,9 +23,22 @@
  */
 import { CANVAS_W, el, enc, renderPaper } from "../stages/reconstruct.js";
 import { entryCrop, entrySegments, fitEntryCrops } from "./entry-paper.js";
+import { pickQuestionAt } from "./pick-hit.js";
 import { prettifyLatex } from "../stages/latex-display.js";
 import { tagSection } from "./tag-panel.js";
 import { anchorOf, loadBindings, loadLibrary, reconcile, saveBindings, saveLibrary, tagIdsFor } from "./tag-store.js";
+import {
+  assignmentFor,
+  badgeCounts,
+  emptyTeachBindings,
+  loadTeachBindings,
+  loadTeachLibrary,
+  moveToFront,
+  orderByRecent,
+  saveTeachBindings,
+  toggleCategory,
+  toggleTopic,
+} from "./teach-store.js";
 
 /**
  * 文档清单来自服务端 `/api/docs`（扫 `data/out/<docId>/` 里有快照的目录），
@@ -52,8 +65,12 @@ const state = {
   byIdError: "", // 读不到 questions.json 时面板要如实说，不能拿 undefined 冒充题干
   tagsOn: true, // ?tags=0 关掉标签层（版式不变门的对照态，与 ?audit/?ocr 同构）
   tags: null, // {library, bindings}：标签库 + 本题标签（独立文件，与快照解耦）
-  pages: [], // 每页的 {sec, head, p}，供打标后**只重绘那一页**（整册重绘在平板上会闪）
+  pages: [], // 每页的 {sec, head, p, paper}，供打标后**只重绘那一页**（整册重绘在平板上会闪）
   sheet: null, // 当前面板打开的 {q, p}
+  pickMode: false, // 挑题模式：点题目任意块选中；关掉即正常阅读
+  picked: null, // 当前选中的 {q, p}
+  teach: null, // {topics, categories, bindings, error}
+  recent: { topics: [], categories: [] }, // 最近使用的专题/类别（本机 localStorage）
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
@@ -82,6 +99,17 @@ function notice(parts, kind) {
 }
 
 /* ── 标签：加载与漂移核对 ── */
+
+async function loadTeach(doc) {
+  state.teach = { topics: [], categories: [], bindings: emptyTeachBindings(), error: "" };
+  try {
+    const [lib, bindings] = await Promise.all([loadTeachLibrary(), loadTeachBindings(doc)]);
+    state.teach = { ...lib, bindings, error: "" };
+  } catch (e) {
+    state.teach = { topics: [], categories: [], bindings: emptyTeachBindings(), error: String(e).slice(0, 80) };
+    notice([`教学归类读取失败（${state.teach.error}）：托盘会空着，不影响阅读。`], "warn");
+  }
+}
 
 async function loadTags() {
   const [library, bindings] = await Promise.all([loadLibrary(), loadBindings(state.doc)]);
@@ -121,7 +149,10 @@ function tagsForQuestion(q) {
 function repaintPage(pageIndex) {
   const slot = state.pages[pageIndex];
   if (!slot) return;
-  slot.sec.replaceChildren(slot.head, paper(slot.p));
+  const pr = paper(slot.p);
+  slot.paper = pr;
+  slot.sec.replaceChildren(slot.head, pr.wrap);
+  if (state.picked?.p === slot.p) paintPickSelection(slot);
 }
 
 function paper(p) {
@@ -130,9 +161,224 @@ function paper(p) {
     paneW: state.paneW,
     diagnostics: state.audit,
     candidateStyle: state.ocrStyle,
-    onChipClick: openSheet,
+    onChipClick: (q, page) => {
+      if (state.pickMode) pickQuestion(q, page);
+      else void openSheet(q, page);
+    },
     resolveTags: state.tagsOn ? tagsForQuestion : null,
-  }).wrap;
+    assignmentBadge: (q) => {
+      const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), q.id);
+      return a.topicIds.length || a.categoryIds.length ? badgeCounts(a) : null;
+    },
+  });
+}
+
+/* ── 挑题模式（第一步：选中 + 高亮 + 托盘空壳；归类在下一步接入） ── */
+
+const RECENT_KEY = "final:teach:recent";
+function loadRecent() {
+  try {
+    const j = JSON.parse(localStorage.getItem(RECENT_KEY) || "{}");
+    state.recent = {
+      topics: Array.isArray(j.topics) ? j.topics.filter((x) => typeof x === "string") : [],
+      categories: Array.isArray(j.categories) ? j.categories.filter((x) => typeof x === "string") : [],
+    };
+  } catch {
+    state.recent = { topics: [], categories: [] };
+  }
+}
+function bumpRecent(kind, id) {
+  state.recent[kind] = moveToFront(state.recent[kind], id);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(state.recent));
+  } catch {
+    /* 存不了不影响本次归类 */
+  }
+}
+
+function updatePickTray() {
+  const title = $("pick-title");
+  if (!title) return;
+  renderPickRows();
+  if (!state.picked) {
+    title.textContent = state.pickMode ? "先点一道题" : "未选题";
+    return;
+  }
+  const { q, p } = state.picked;
+  const full = state.byId?.get(q.id);
+  const first = String(full?.stem ?? "").split("\n")[0]?.trim().slice(0, 42) ?? "";
+  title.textContent = `p${p.index + 1} · 第${q.number}题${first ? ` · ${first}` : ""}`;
+}
+
+function renderPickRows() {
+  const rows = $("pick-rows");
+  const hint = $("pick-hint");
+  const topicBox = $("pick-topics");
+  const categoryBox = $("pick-categories");
+  if (!rows || !hint || !topicBox || !categoryBox) return;
+  if (!state.picked) {
+    rows.hidden = true;
+    hint.hidden = false;
+    hint.textContent = state.pickMode ? "先点一道题" : "";
+    topicBox.replaceChildren();
+    categoryBox.replaceChildren();
+    return;
+  }
+  rows.hidden = false;
+  const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), state.picked.q.id);
+  const topics = orderByRecent(state.teach?.topics ?? [], state.recent.topics);
+  const categories = orderByRecent(state.teach?.categories ?? [], state.recent.categories);
+
+  const chip = (kind, item, on) => {
+    const b = el("button", "pick-chip", item.name);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(on));
+    b.title = on ? `点一下移出：${item.name}` : `点一下放入：${item.name}`;
+    b.addEventListener("click", () => togglePick(kind, item.id, item.name));
+    return b;
+  };
+  topicBox.replaceChildren(...topics.map((t) => chip("topics", t, a.topicIds.includes(t.id))));
+  categoryBox.replaceChildren(...categories.map((c) => chip("categories", c, a.categoryIds.includes(c.id))));
+  if (!topics.length && !categories.length) {
+    hint.hidden = false;
+    hint.textContent = state.teach?.error
+      ? `教学归类读取失败：${state.teach.error}`
+      : "还没有专题/类别（下一步支持新建）";
+  } else {
+    hint.hidden = true;
+    hint.textContent = "";
+  }
+}
+
+function togglePick(kind, id, name) {
+  if (!state.picked || !state.teach) {
+    flash("先点一道题");
+    return;
+  }
+  const { q, p } = state.picked;
+  const before = state.teach.bindings;
+  const cur = assignmentFor(before, q.id);
+  const on = kind === "topics" ? cur.topicIds.includes(id) : cur.categoryIds.includes(id);
+  const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
+  const next = kind === "topics" ? toggleTopic(before, q.id, id, anchor) : toggleCategory(before, q.id, id, anchor);
+  bumpRecent(kind, id);
+  commitTeach(next, `${on ? "已移出" : "已放入"}：${name}`, before, p);
+}
+
+let teachSaveChain = Promise.resolve();
+function commitTeach(next, label, prev, p) {
+  state.teach = { ...state.teach, bindings: next };
+  updatePickTray();
+  repaintPage(p.index);
+  flash(label);
+
+  const doc = state.doc;
+  const payload = JSON.parse(JSON.stringify(next));
+  const nextRef = next;
+  teachSaveChain = teachSaveChain
+    .then(async () => {
+      const r = await saveTeachBindings(doc, payload);
+      if (r.ok) return;
+      const rolledBack = state.doc === doc && state.teach?.bindings === nextRef;
+      if (rolledBack) {
+        state.teach = { ...state.teach, bindings: prev };
+        updatePickTray();
+        repaintPage(p.index);
+      }
+      notice(
+        [`教学归类未能保存：${r.error ?? "未知错误"}${rolledBack ? "（本次改动已回退）" : "（后续改动仍在，未回退）"}`],
+        "err",
+      );
+    })
+    .catch((e) => {
+      notice([`教学归类保存异常：${String(e).slice(0, 100)}`], "err");
+    });
+}
+
+function clearPickSelection() {
+  state.picked = null;
+  for (const node of document.querySelectorAll(".blk.pick-selected, .q-chip.pick-selected")) {
+    node.classList.remove("pick-selected");
+  }
+  updatePickTray();
+}
+
+/** 给选中题的所有块与号牌加高亮；只加 class/outline，不改任何几何。 */
+function paintPickSelection(slot) {
+  const q = state.picked?.q;
+  if (!q || !slot?.paper) return;
+  const blocks = new Set((q.blocks ?? []).map(String));
+  for (const node of slot.paper.canvas.querySelectorAll(".blk")) {
+    const bi = /** @type {HTMLElement} */ (node).dataset?.bi;
+    if (bi !== undefined && blocks.has(bi)) node.classList.add("pick-selected");
+  }
+  for (const chip of slot.paper.wrap.querySelectorAll(".q-chip")) {
+    if (/** @type {HTMLElement} */ (chip).dataset?.qid === q.id) chip.classList.add("pick-selected");
+  }
+}
+
+function pickQuestion(q, p) {
+  if (!state.pickMode) return;
+  clearPickSelection();
+  state.picked = { q, p };
+  const slot = state.pages[p.index];
+  paintPickSelection(slot);
+  const chip = slot?.paper?.wrap.querySelector(".q-chip.pick-selected");
+  chip?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  updatePickTray();
+}
+
+function setPickMode(on) {
+  state.pickMode = on;
+  document.body.classList.toggle("pick-mode", on);
+  const btn = $("t-pick");
+  btn.setAttribute("aria-pressed", String(on));
+  btn.textContent = on ? "退出挑题" : "挑题";
+  $("pick-tray").hidden = !on;
+  if (on) {
+    $("detail").hidden = true;
+    state.sheet = null;
+    updatePickTray();
+  } else {
+    clearPickSelection();
+  }
+}
+
+/** 点整道题：按下到抬起移动 >10px 视为滚动，不选。 */
+let pickDown = null;
+function bindPickPointer() {
+  const book = $("book");
+  book.addEventListener("pointerdown", (e) => {
+    if (!state.pickMode) return;
+    pickDown = { x: e.clientX, y: e.clientY };
+  });
+  book.addEventListener("pointerup", (e) => {
+    if (!state.pickMode || !pickDown) return;
+    const down = pickDown;
+    pickDown = null;
+    if (Math.abs(e.clientX - down.x) > 10 || Math.abs(e.clientY - down.y) > 10) return;
+    const target = /** @type {HTMLElement} */ (e.target);
+    const sec = target.closest?.(".bk-page");
+    if (!sec) return;
+    const idx = Number(sec.id.replace("pg-", "")) - 1;
+    const slot = state.pages[idx];
+    if (!slot?.paper) return;
+    const chip = target.closest?.(".q-chip");
+    if (chip?.dataset?.qid) {
+      const q = slot.p.questions.find((x) => x.id === chip.dataset.qid);
+      if (q) pickQuestion(q, slot.p);
+      return;
+    }
+    const rect = slot.paper.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const xPt = ((e.clientX - rect.left) * slot.p.width) / rect.width;
+    const yPt = ((e.clientY - rect.top) * slot.p.height) / rect.height;
+    const q = pickQuestionAt(slot.p, xPt, yPt, 6);
+    if (q) pickQuestion(q, slot.p);
+  });
+  book.addEventListener("pointercancel", () => {
+    pickDown = null;
+  });
 }
 
 /** 标签面板拿的「应用」句柄：写路径只有 commitBindings / commitLibrary 两条 */
@@ -157,6 +403,10 @@ const tagApp = {
  * 跨页条目**逐页续裁**：同一个 id 在快照里按页各有一段，段段都裁、按页序叠放。
  */
 async function openSheet(q, p) {
+  if (state.pickMode) {
+    pickQuestion(q, p);
+    return;
+  }
   const d = $("detail");
   const token = (state.sheetToken = {}); // 连点两个号牌时，后点开的才算数
   d.replaceChildren();
@@ -403,10 +653,12 @@ function renderBook() {
     const sec = el("section", "bk-page");
     sec.id = `pg-${i + 1}`;
     const head = el("p", "bk-head", `第 ${i + 1} / ${data.pages.length} 页`);
-    sec.append(head, paper(p));
+    const pr = paper(p);
+    sec.append(head, pr.wrap);
     book.append(sec);
-    state.pages[i] = { sec, head, p };
+    state.pages[i] = { sec, head, p, paper: pr };
   });
+  if (state.picked) paintPickSelection(state.pages[state.picked.p.index]);
   updatePageIndicator();
 }
 
@@ -507,9 +759,12 @@ async function loadDoc(doc) {
     $("notice").hidden = true;
     $("detail").hidden = true; // 换卷时关掉面板，避免标签区指着上一卷的题目
     state.sheet = null;
+    state.picked = null;
+    updatePickTray();
     await loadQuestions(doc);
     state.snap = state.data;
     await loadTags();
+    await loadTeach(doc);
     renderBook();
     renderHealth(doc);
     if (!/^#pg-\d+$/.test(location.hash)) restorePosition();
@@ -768,6 +1023,9 @@ function initBar() {
     state.ocrStyle = e.target.checked;
     renderBook();
   });
+  $("t-pick").addEventListener("click", () => setPickMode(!state.pickMode));
+  $("pick-close").addEventListener("click", () => setPickMode(false));
+  bindPickPointer();
 }
 
 let resizeTimer = null;
@@ -784,6 +1042,7 @@ window.addEventListener("scroll", updatePageIndicator, { passive: true });
 
 async function main() {
   state.paneW = paperWidth();
+  loadRecent();
   // 开关支持 URL 参数（可分享/收藏某个视图）：?audit=1 开审计标记、?ocr=0 关候选样式
   const qs = new URLSearchParams(location.search);
   state.audit = qs.get("audit") === "1";
@@ -796,6 +1055,7 @@ async function main() {
   const asked = qs.get("doc") || DEFAULT_DOC;
   await loadBank();
   await loadDoc(asked);
+  if (qs.get("pick") === "1") setPickMode(true);
   const hash = /^#pg-(\d+)$/.exec(location.hash);
   if (hash) document.getElementById(`pg-${hash[1]}`)?.scrollIntoView();
   // ?q= 打开即执行一次跳转/搜索（方便收藏"某个搜索"，也让交互可被自动化核对）
