@@ -3,6 +3,10 @@
    这里只写「书壳」：吸顶工具条、页与页之间的分隔、详情抽屉。
    颜色沿用 stages.css 的变量（纸色/墨/朱砂/石青）。 */
 
+/* 卡片底色：成品页此前用了 var(--paper-card) 却没定义（只有专题页定义过），
+   于是组合 chip 一直是透明底。这里补一个同值令牌，两页观感一致。 */
+:root { --paper-card: #fffdf8; }
+
 .fb-bar {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
@@ -93,7 +97,7 @@
   font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pick-same, .pick-close {
+.pick-same, .pick-close, .pick-manage {
   flex: none; min-height: 36px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: 3px;
   background: transparent; color: var(--ink-soft);
@@ -101,6 +105,7 @@
 }
 .pick-same { border-color: var(--ink); color: var(--ink); }
 .pick-same:disabled { opacity: .35; cursor: default; border-color: var(--line); }
+.pick-manage[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); background: var(--paper-card); }
 .pick-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-width: 0; }
 .pick-lanes[hidden] { display: none; }
 
@@ -161,8 +166,61 @@
 }
 .combo-save { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .combo-hint { margin: 0; color: var(--cinnabar); font-size: 12.5px; }
+
+/* 管理面板：改名 / 删除（首版只装组合，Step 7 并入专题与类别） */
+.manage-pop {
+  position: absolute; right: 12px; bottom: calc(100% + 8px); z-index: 61;
+  width: min(460px, calc(100% - 24px));
+  display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 10px;
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(43, 42, 38, .22);
+}
+.manage-pop[hidden] { display: none; }
+.manage-head { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.manage-head strong { flex: 1 1 auto; font-family: var(--sans); font-size: 13px; color: var(--ink); }
+.manage-close {
+  min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 3px;
+  background: transparent; color: var(--ink-soft); font-family: var(--sans); font-size: 12.5px; cursor: pointer;
+}
+.manage-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: min(46vh, 320px); overflow-y: auto; padding-right: 2px;
+}
+.mg-label { margin: 2px 0 0; color: var(--ink-soft); font-family: var(--sans); font-size: 12px; }
+.mg-empty { margin: 0; color: var(--ink-soft); font-family: var(--sans); font-size: 12.5px; }
+.mg-row {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper-card);
+}
+.mg-row.mg-confirm { border-color: var(--cinnabar); }
+.mg-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mg-name {
+  font-family: var(--sans); font-size: 13.5px; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mg-sum {
+  color: var(--ink-soft); font-family: var(--sans); font-size: 12px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mg-acts { flex: none; display: flex; gap: 6px; }
+.mg-btn {
+  min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 13px; cursor: pointer;
+}
+.mg-btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.mg-btn.danger { color: var(--cinnabar); border-color: var(--cinnabar); }
+.mg-edit { display: flex; gap: 6px; align-items: center; width: 100%; }
+.mg-input {
+  flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--paper);
+  color: var(--ink); font-family: var(--sans); font-size: 15px;
+}
+.manage-hint { margin: 0; font-family: var(--sans); font-size: 12.5px; color: var(--cinnabar); }
+.manage-hint.ok { color: var(--jade); }
+.manage-note { margin: 0; color: var(--ink-soft); font-family: var(--sans); font-size: 11.5px; }
+
 @media (pointer: coarse) {
-  .pick-same, .pick-close, .combo-close { min-height: 44px; }
+  .pick-same, .pick-close, .pick-manage, .combo-close, .manage-close { min-height: 44px; }
   .combo-chip, .combo-empty-chip, .combo-add-chip { height: 44px; }
 }
 @media (max-width: 560px) {

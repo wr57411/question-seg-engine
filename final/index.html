@@ -59,8 +59,19 @@
       <span class="pick-title" id="pick-title">未选题</span>
       <div class="combo-strip" id="combo-strip" role="group" aria-label="常用组合（长按拖动排序）"></div>
       <button class="combo-add-chip" id="combo-add" type="button" aria-label="把当前题存为组合" disabled>＋</button>
+      <button class="pick-manage" id="pick-manage" type="button" aria-pressed="false">管理</button>
       <button class="pick-same" id="pick-same" type="button" disabled>同上题</button>
       <button class="pick-close" id="pick-close" type="button">收起</button>
+    </div>
+
+    <div class="manage-pop" id="manage-pop" hidden aria-label="管理">
+      <div class="manage-head">
+        <strong id="manage-title">管理常用组合</strong>
+        <button class="manage-close" id="manage-close" type="button">收起</button>
+      </div>
+      <div class="manage-list" id="manage-list"></div>
+      <p class="manage-hint" id="manage-hint" hidden></p>
+      <p class="manage-note">改名只改名字；删除组合只删这套预设，已经归好类的题不受影响。</p>
     </div>
 
     <div class="combo-pop" id="combo-pop" hidden>

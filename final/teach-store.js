@@ -266,6 +266,38 @@ export function comboMatches(combo, a) {
   return same(combo.topicIds, a.topicIds) && same(combo.categoryIds, a.categoryIds);
 }
 
+/**
+ * 组合改名：按 id 更新名字，成员集合一个都不动（组合只是预设，不是归属）。
+ * 名字 trim 后必须非空，且不能和别的组合重名（重名会让“套用哪个”变成猜）。
+ * @param {TeachCombo[]} list
+ * @param {string} id
+ * @param {string} name
+ * @returns {{ list: TeachCombo[], item: TeachCombo | null, error?: string }}
+ */
+export function renameCombo(list, id, name) {
+  const cur = list.find((c) => c.id === id);
+  if (!cur) return { list, item: null, error: "组合不存在，请刷新后重试" };
+  const clean = String(name ?? "").trim();
+  if (!clean) return { list, item: null, error: "组合名不能为空" };
+  if (list.some((c) => c.id !== id && c.name.trim() === clean)) {
+    return { list, item: null, error: `已有同名组合：${clean}` };
+  }
+  const item = { ...cur, name: clean };
+  return { list: list.map((c) => (c.id === id ? item : c)), item };
+}
+
+/**
+ * 删除组合：只删这套预设本身。
+ * 已经按它归好类的题**不受影响**——归属写在 bindings 里，与组合无关。
+ * @param {TeachCombo[]} list @param {string} id
+ * @returns {{ list: TeachCombo[], item: TeachCombo | null, error?: string }}
+ */
+export function removeCombo(list, id) {
+  const cur = list.find((c) => c.id === id);
+  if (!cur) return { list, item: null, error: "组合不存在，可能已经删过了" };
+  return { list: list.filter((c) => c.id !== id), item: cur };
+}
+
 /** @param {TeachItem[]} items @param {string[]} recent @returns {TeachItem[]} */
 export function orderByRecent(items, recent) {
   const rank = new Map(recent.map((id, i) => [id, i]));

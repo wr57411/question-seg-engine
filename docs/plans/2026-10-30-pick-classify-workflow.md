@@ -160,7 +160,21 @@ verify: test -z "$(git status --porcelain)" && [ "$(git branch --show-current)" 
   （替换当前题归属、复用撤销）；`＋` 起名小浮层；长按 380ms 拖动排序并写 `combos.json`。
   独立副本实测：5 条组合、3 个可见槽、横滑到最后一个、拖动后顺序落盘、套用/撤销/刷新持久化全过；
   `npm run check` 退出码 0。
-- **未做**：组合的**改名/删除**（建错只能让它先留着或手工改文件）；Step 6 搜索；Step 7 专题/类别管理；
+- **组合改名/删除已完成**（换模型后续做，用户优先级 1）：托盘标题行新增「管理」→ 面板列出全部组合
+  （名字 + 成员摘要 + 条数）；改名按 id 更新、成员不动，重名/空名/不存在的 id 一律拒并在面板内提示；
+  删除两步确认（6 秒不点第二下自动退回），且**不动任何题的归属**（实测 bindings 文件逐字节不变）。
+  新建/改名/删除/排序统一走 `saveComboList` 串行写 + 失败回滚。
+  验收：`tests/teach-store.test.ts` 13 条全绿；`tmp/combo-manage-smoke.mjs`（独立副本 4175）
+  改名落盘/重名拒绝/两步确认/删除落盘/刷新持久化/触控 44px/标题行零溢出/控制台零异常 全过；
+  `tmp/manage-live-check.mjs` 在真实页 4174 **只读**核对（跑完比对 `data/out/teach` 全目录 hash+mtime，
+  证明零写入）。SPEC 新增 U38。
+- **踩到并已修的坑**：面板内按钮点下去会同步重绘，`e.target` 当场脱离 DOM，
+  用 `closest('#manage-pop')` 判断"点的是不是面板里"会失效并把刚打开的面板关掉。
+  改用 `e.composedPath()`（派发时就固定，不受重绘影响）。**同类浮层别再写 closest 判外点。**
+- **本地服务**：4174（真实数据）中途掉了，已用 `PORT=4174 nohup node --import tsx scripts/view-server.ts`
+  重启，日志 `tmp/view-4174.log`，平板地址 `http://192.168.2.64:4174/final/?doc=…`；4175 测试副本服务用完即停。
+- **未做**：Step 6 搜索；Step 7 专题/类别管理（改名/删除 + 影响题数 + **跨卷 bindings 级联**，
+  级联要动写通道，属 R2 风险，需服务端一次事务式多文件写）；
   Step 8 导出 v2 + 专题页；Step 9 阅读回显；Step 10/11 迁移（human gate）；Step 12 截图审板；
   Step 13 真机（human gate）；Step 14/15 合回 main。
 - **接手第一步**：读本文件前文 + `AGENTS.md` + `docs/HANDOFF.md`；`npm run check` 全绿；

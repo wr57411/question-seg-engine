@@ -39,6 +39,8 @@ import {
   loadTeachLibrary,
   moveToFront,
   orderByRecent,
+  removeCombo,
+  renameCombo,
   replaceBinding,
   sameAsPrevious,
   saveTeach,
@@ -81,6 +83,7 @@ const state = {
   creating: null, // 'topics' | 'categories' | null：托盘内联新建
   lastClassified: null, // 本会话最近一次已归类题 {doc, questionId, assignment, label}
   undo: null, // 最近一次可撤销动作 {doc, qid, pageIndex, prevBinding, nextBinding}
+  manage: null, // 管理面板状态 {renaming: id|null, confirm: id|null}；null=面板关着
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
@@ -396,6 +399,39 @@ function openComboForm() {
   input.focus();
 }
 
+/**
+ * 组合清单的唯一写路径：新建/改名/删除/排序都走这里。
+ * 串行发写请求（同一份 combos.json 不能两条并发写，后写的会盖掉前写的），
+ * 失败回滚到本次改动前的清单并明说，不留「屏幕上有、文件里没有」的假成功。
+ * @param {import('./teach-store.js').TeachCombo[]} next
+ * @param {string} label 用于提示的主语，如「组合「曲线基础」」
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+let comboSaveChain = Promise.resolve();
+async function saveComboList(next, label) {
+  if (!state.teach) return { ok: false, error: "教学清单没加载" };
+  const prev = state.teach.combos ?? [];
+  state.teach = { ...state.teach, combos: next };
+  renderComboStrip();
+  if (state.manage) renderManageList();
+  const run = comboSaveChain.then(() =>
+    saveTeach("combos", { version: 1, updatedAt: new Date().toISOString(), combos: next }),
+  );
+  comboSaveChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  const r = await run;
+  if (!r.ok) {
+    state.teach = { ...state.teach, combos: prev };
+    renderComboStrip();
+    if (state.manage) renderManageList();
+    notice([`${label}未能保存：${r.error ?? "未知错误"}（已回退）`], "err");
+    return r;
+  }
+  return r;
+}
+
 async function submitCombo(e) {
   e.preventDefault();
   if (!state.picked || !state.teach) return;
@@ -409,16 +445,13 @@ async function submitCombo(e) {
     input.focus();
     return;
   }
-  const payload = { version: 1, updatedAt: new Date().toISOString(), combos: res.list };
-  const saved = await saveTeach("combos", payload);
+  const saved = await saveComboList(res.list, `组合「${res.item.name}」`);
   if (!saved.ok) {
-    notice([`保存组合失败：${saved.error ?? "未知错误"}`], "err");
     input.focus();
     return;
   }
-  state.teach = { ...state.teach, combos: res.list };
   closeComboPop();
-  renderComboStrip();
+  flash(`组合「${res.item.name}」已保存`);
 }
 
 function applyCombo(combo) {
@@ -443,6 +476,172 @@ function applyCombo(combo) {
   if (missing) {
     notice([`组合「${combo.name}」有 ${missing} 项专题/类别已不存在，已跳过`], "warn");
   }
+}
+
+/* ── 管理面板：组合改名 / 删除（删除要两步确认，改名走唯一写路径） ── */
+
+let manageConfirmTimer = null;
+
+function showManageHint(text, kind) {
+  const hint = $("manage-hint");
+  if (!hint) return;
+  hint.hidden = false;
+  hint.textContent = text;
+  hint.classList.toggle("ok", kind === "ok");
+}
+
+function clearManageHint() {
+  const hint = $("manage-hint");
+  if (!hint) return;
+  hint.hidden = true;
+  hint.textContent = "";
+  hint.classList.remove("ok");
+}
+
+function openManage() {
+  if (!state.teach) {
+    flash("教学清单还没加载好");
+    return;
+  }
+  const pop = $("manage-pop");
+  if (!pop) return;
+  closeComboPop();
+  state.manage = { renaming: null, confirm: null };
+  clearManageHint();
+  const t = $("toast");
+  if (t) {
+    t.hidden = true;
+    t.classList.remove("on");
+  }
+  pop.hidden = false;
+  $("pick-manage")?.setAttribute("aria-pressed", "true");
+  renderManageList();
+}
+
+function closeManage() {
+  if (!state.manage) return;
+  state.manage = null;
+  clearTimeout(manageConfirmTimer);
+  manageConfirmTimer = null;
+  const pop = $("manage-pop");
+  if (pop) pop.hidden = true;
+  $("pick-manage")?.setAttribute("aria-pressed", "false");
+}
+
+function renderManageList() {
+  const box = $("manage-list");
+  if (!box || !state.teach || !state.manage) return;
+  const combos = state.teach.combos ?? [];
+  /** @type {HTMLElement[]} */
+  const nodes = [el("p", "mg-label", `常用组合（${combos.length}）`)];
+  if (!combos.length) {
+    nodes.push(el("p", "mg-empty", "还没有组合。先点一道题、给它选好专题/类别，再按托盘里的 ＋ 存成组合。"));
+  }
+  for (const c of combos) nodes.push(comboManageRow(c));
+  box.replaceChildren(...nodes);
+}
+
+/** @param {import('./teach-store.js').TeachCombo} combo */
+function comboManageRow(combo) {
+  const renaming = state.manage?.renaming === combo.id;
+  const confirming = state.manage?.confirm === combo.id;
+  const row = el("div", "mg-row" + (confirming ? " mg-confirm" : ""));
+  row.dataset.id = combo.id;
+  const main = el("div", "mg-main");
+  if (renaming) {
+    const form = el("form", "mg-edit");
+    const input = el("input", "mg-input");
+    input.type = "text";
+    input.maxLength = 60;
+    input.value = combo.name;
+    input.setAttribute("aria-label", "组合新名字");
+    const ok = el("button", "mg-btn primary", "保存");
+    ok.type = "submit";
+    form.append(input, ok);
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      void commitComboRename(combo.id, input.value);
+    });
+    main.append(form);
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
+  } else {
+    main.append(el("span", "mg-name", combo.name));
+    main.append(el("span", "mg-sum", comboSummary(combo)));
+  }
+  row.append(main);
+  if (!renaming) {
+    const acts = el("div", "mg-acts");
+    const rn = el("button", "mg-btn", "改名");
+    rn.type = "button";
+    rn.addEventListener("click", () => {
+      if (!state.manage) return;
+      state.manage.renaming = combo.id;
+      state.manage.confirm = null;
+      clearManageHint();
+      renderManageList();
+    });
+    const del = el("button", "mg-btn danger", confirming ? "确认删除" : "删除");
+    del.type = "button";
+    del.addEventListener("click", () => {
+      if (!state.manage) return;
+      clearManageHint();
+      if (state.manage.confirm === combo.id) {
+        state.manage.confirm = null;
+        clearTimeout(manageConfirmTimer);
+        void commitComboRemove(combo);
+        return;
+      }
+      state.manage.confirm = combo.id;
+      state.manage.renaming = null;
+      renderManageList();
+      clearTimeout(manageConfirmTimer);
+      manageConfirmTimer = setTimeout(() => {
+        if (state.manage?.confirm !== combo.id) return;
+        state.manage.confirm = null;
+        renderManageList();
+      }, 6000);
+    });
+    acts.append(rn, del);
+    row.append(acts);
+  }
+  return row;
+}
+
+/** @param {string} id @param {string} name */
+async function commitComboRename(id, name) {
+  if (!state.teach) return;
+  const res = renameCombo(state.teach.combos ?? [], id, name);
+  if (!res.item) {
+    showManageHint(res.error ?? "改名失败");
+    return;
+  }
+  const saved = await saveComboList(res.list, `组合「${res.item.name}」`);
+  if (!saved.ok) return;
+  if (!state.manage) return;
+  state.manage.renaming = null;
+  clearManageHint();
+  renderManageList();
+  showManageHint(`已改名为「${res.item.name}」`, "ok");
+}
+
+/** @param {import('./teach-store.js').TeachCombo} combo */
+async function commitComboRemove(combo) {
+  if (!state.teach) return;
+  const res = removeCombo(state.teach.combos ?? [], combo.id);
+  if (!res.item) {
+    showManageHint(res.error ?? "删除失败");
+    renderManageList();
+    return;
+  }
+  const saved = await saveComboList(res.list, `组合「${combo.name}」`);
+  if (!saved.ok) return;
+  if (!state.manage) return;
+  clearManageHint();
+  renderManageList();
+  showManageHint(`已删除「${combo.name}」（${combo.topicIds.length + combo.categoryIds.length} 项设置，不影响已归类的题）`, "ok");
 }
 
 /* ── 组合条拖动排序：长按 380ms 进入拖动，松手写回 combos.json ── */
@@ -483,13 +682,9 @@ function bindComboDrag() {
     const byId = new Map(prev.map((c) => [c.id, c]));
     const next = ids.map((id) => byId.get(id)).filter(Boolean);
     if (next.length !== prev.length) return;
-    state.teach = { ...state.teach, combos: next };
-    renderComboStrip();
-    saveTeach("combos", { version: 1, updatedAt: new Date().toISOString(), combos: next }).then((r) => {
-      if (r.ok) return;
-      state.teach = { ...state.teach, combos: prev };
-      renderComboStrip();
-      notice([`组合排序未保存：${r.error ?? "未知错误"}`], "err");
+    if (JSON.stringify(next.map((c) => c.id)) === JSON.stringify(prev.map((c) => c.id))) return;
+    void saveComboList(next, "组合顺序").then((r) => {
+      if (r.ok) flash("组合顺序已保存");
     });
   };
 
@@ -799,6 +994,7 @@ function setPickMode(on) {
   } else {
     closeCreate();
     closeComboPop();
+    closeManage();
     hideUndo();
     clearPickSelection();
   }
@@ -1521,14 +1717,23 @@ function initBar() {
   $("combo-add").addEventListener("click", openComboForm);
   $("combo-form").addEventListener("submit", (e) => void submitCombo(e));
   $("combo-cancel").addEventListener("click", closeComboPop);
+  $("pick-manage").addEventListener("click", () => (state.manage ? closeManage() : openManage()));
+  $("manage-close").addEventListener("click", closeManage);
   document.addEventListener("click", (e) => {
+    // 用 composedPath 而不是 closest()：面板里的按钮点下去会同步重绘，
+    // 那时 e.target 已经从 DOM 上摘下来了，closest 找不到祖先 → 会把刚打开的面板又关掉。
+    const path = typeof e.composedPath === "function" ? e.composedPath() : [];
+    const has = (id) => path.some((n) => n?.id === id) || !!/** @type {HTMLElement} */ (e.target)?.closest?.(`#${id}`);
+    if (!has("manage-pop") && !has("pick-manage")) closeManage();
     const pop = $("combo-pop");
     if (!pop || pop.hidden) return;
-    if (e.target.closest?.("#combo-pop") || e.target.closest?.("#combo-add")) return;
+    if (has("combo-pop") || has("combo-add")) return;
     closeComboPop();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeComboPop();
+    if (e.key !== "Escape") return;
+    closeManage();
+    closeComboPop();
   });
   $("pick-add-topics").addEventListener("click", () => openCreate("topics"));
   $("pick-add-categories").addEventListener("click", () => openCreate("categories"));

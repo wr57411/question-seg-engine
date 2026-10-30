@@ -19,6 +19,8 @@ import {
   normalizeTeachList,
   orderByRecent,
   replaceBinding,
+  removeCombo,
+  renameCombo,
   sameAsPrevious,
   toggleCategory,
   toggleTopic,
@@ -143,6 +145,35 @@ test("常用组合：名字必填且唯一、至少一个专题/类别、id 唯�
   const b = addCombo(a.list, "圆周培优", ["tp-1", "tp-1"], ["ct-2"], gen);
   assert.deepEqual(b.item?.topicIds, ["tp-1"], "id 去重");
   assert.equal(b.item?.id, "cb-2");
+});
+
+test("组合改名：按 id 换名字、成员不动；空名/重名/不存在的 id 一律拒", () => {
+  const base = [
+    { id: "cb-1", name: "曲线基础", topicIds: ["tp-1"], categoryIds: ["ct-1"] },
+    { id: "cb-2", name: "圆周培优", topicIds: ["tp-2"], categoryIds: ["ct-2"] },
+  ];
+  const r = renameCombo(base, "cb-1", "  曲线·基础题  ");
+  assert.equal(r.item?.name, "曲线·基础题", "trim 后入库");
+  assert.deepEqual(r.item, { id: "cb-1", name: "曲线·基础题", topicIds: ["tp-1"], categoryIds: ["ct-1"] }, "成员集合不能动");
+  assert.equal(r.list.length, 2);
+  assert.equal(r.list[1]?.name, "圆周培优", "别的组合一个字都不改");
+  assert.ok(renameCombo(base, "cb-1", "圆周培优").error, "跟别的组合重名必须拒");
+  assert.ok(renameCombo(base, "cb-1", "   ").error, "空名必须拒");
+  assert.ok(renameCombo(base, "cb-9", "随便").error, "id 不存在必须拒");
+  assert.equal(renameCombo(base, "cb-1", "曲线基础").item?.name, "曲线基础", "改成自己的原名允许（不误报重名）");
+  assert.deepEqual(renameCombo(base, "cb-1", "").list, base, "失败时清单原样返回");
+});
+
+test("组合删除：只摘掉预设本身；不存在的 id 报错不静默", () => {
+  const base = [
+    { id: "cb-1", name: "曲线基础", topicIds: ["tp-1"], categoryIds: ["ct-1"] },
+    { id: "cb-2", name: "圆周培优", topicIds: ["tp-2"], categoryIds: ["ct-2"] },
+  ];
+  const r = removeCombo(base, "cb-1");
+  assert.deepEqual(r.list, [base[1]!], "剩下的顺序与内容不变");
+  assert.equal(r.item?.name, "曲线基础", "返回被删项，供提示与回滚");
+  assert.equal(removeCombo(base, "cb-9").item, null, "删不存在的必须报");
+  assert.deepEqual(removeCombo(base, "cb-9").list, base, "失败不动清单");
 });
 
 test("normalizeCombos：丢弃空集合/重复 id；comboMatches 判断完全一致", () => {
