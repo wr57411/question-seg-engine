@@ -2,7 +2,7 @@
 
 - 更新时间：2026-10-30T13:07:00+08:00
 - 技能版本：bgx 2.2.0
-- 项目：`question-seg-engine`（当前 worktree：`feature/oxr` @ `1c65512`，工作区干净，**未推送 1 个**）
+- 项目：`question-seg-engine`（当前 worktree：`feature/oxr` @ `1c65512`，工作区干净，**有未推送提交**；远端停在 `1e3582b`）
 - 门禁基线：`check` **EXIT=0** · typecheck + `typecheck:viewer` · 测试 **356/356** · 渲染审计 **7/7** · 配对 **420** · 决策 **§1–§91**
 - 性质：bgx **从属资料索引**；项目唯一跨 Agent 交接入口仍是 [`docs/HANDOFF.md`](../../HANDOFF.md)
 
