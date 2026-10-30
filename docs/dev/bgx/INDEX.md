@@ -2,7 +2,7 @@
 
 - 更新时间：2026-10-30T13:07:00+08:00
 - 技能版本：bgx 2.2.0
-- 项目：`question-seg-engine`（当前 worktree：`feature/oxr` @ `1c65512`，工作区干净，**有未推送提交**；远端停在 `1e3582b`）
+- 项目：`question-seg-engine`（当前 worktree：`feature/oxr` @ `1c65512`，工作区干净，**已推送**，与远端一致）
 - 门禁基线：`check` **EXIT=0** · typecheck + `typecheck:viewer` · 测试 **357/357** · 渲染审计 **7/7** · 配对 **420** · 决策 **§1–§92**
 - 性质：bgx **从属资料索引**；项目唯一跨 Agent 交接入口仍是 [`docs/HANDOFF.md`](../../HANDOFF.md)
 
@@ -33,7 +33,7 @@
   已 `--meta-only` 刷新 + 新增一致性门（`DECISIONS §92`，反向验证通过）。
 - 文档漂移已修 9 处：HANDOFF 的 HEAD / 门禁数 / 提交范围 / 审计卷数 / 决策数 / §6-17 / §6-24 状态，
   AGENTS + README 的决策数，INDEX 头的 HEAD 与推送状态。
-- 交付基线：`1c65512` **未推送**（远端停在 `1e3582b`）。
+- 交付基线：已推送（`1e3582b` 之后的全部提交：§90/§91、接管文档、meta 修复；以 `git log -1 origin/feature/oxr` 为准）。
 - 选项：A=元数据收口（G01）；B=推送（G03）；C=展示层类型第二批（§6-11）；D=批量扫书上量。
   推荐 **B → A → C/D**。
 - HANDOFF §6 的 4 条未闭合项已在报告 §4.1 登记归属：§6-11 纳入本轮（C）；
