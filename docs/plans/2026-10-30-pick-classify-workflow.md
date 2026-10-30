@@ -182,9 +182,22 @@ verify: test -z "$(git status --porcelain)" && [ "$(git branch --show-current)" 
   EXIT=0、控制台零异常；截图 `tmp/review-pick/search-{open,hit-topic,hit-category,applied,nomatch,created,reloaded}.png`。
   顺带修：`.pick-lane-label` 固定 26px 宽会把命中数挤到下一行 → 改 `min-width + nowrap`。
   副本测试数据（6 个「磁场*」测试类别）已清理，真实 `data/out/teach` 实测未受影响。
-- **未做**：Step 7 专题/类别管理（改名/删除 + 影响题数 + **跨卷 bindings 级联**，
-  级联要动写通道，属 R2 风险，需服务端一次事务式多文件写）；
-  Step 8 导出 v2 + 专题页；Step 9 阅读回显；Step 10/11 迁移（human gate）；Step 12 截图审板；
-  Step 13 真机（human gate）；Step 14/15 合回 main。
+- **Step 7 专题/类别管理已完成**（HOTL `step 7 verify` 通过）：管理面板扩成三区（专题/类别/组合），
+  每行「改名 + 两步删除」，删除按钮上直接写明影响几题。跨卷题数与新端点：
+  `GET /api/teach-usage`（跨所有卷数活题与 stale，分开计）、`POST /api/teach-manage`
+  （服务端一次算出清单 + 所有卷 bindings + combos 的新内容，逐个过 `validateTeachPayload` 再落盘，
+  任一文件写失败就把已写的全部回滚）。删除只摘这一项、其余归类保留，两集合都空才删整条；
+  引用它的组合同步摘掉、只剩这一项的组合一并删；改名不碰任何 bindings 文件。
+  级联逻辑放在纯函数 `scripts/teach-manage.ts`（`planTeachManage`/`countTeachUsage`/`validateManageRequest`），
+  view-server 只做 I/O，两边分别可测。
+  验收：`tests/teach-manage.test.ts` 8 条（含"未知字段必须原样带过去""没引用这一项的卷一个字节都不写"
+  "坏输入不猜"）；`tmp/manage-topics-smoke.mjs` 在副本上造**第二卷**归属，实测
+  改名不动 bindings、删除跨两卷摘干净、空归属整条消失、stale 也摘、组合跟着清、
+  角标 `1·1→1·0` 且刷新一致、四类非法请求 403/400 且**盘上 hash 一字不变**、取消删除数据不变、
+  控制台零异常，EXIT=0。
+  ⚠️ 新增端点要**重启**本地 view-server 才生效（4174 已重启；接手者改了 `scripts/` 记得重启）。
+- **未做**：Step 8 导出 v2 + 专题页类别单选（含把 teach bindings 接进 `topic:export`/`audit:topic`）；
+  Step 9 阅读回显；Step 10/11 旧数据迁移（human gate）；Step 12 截图审板；
+  Step 13 真机（human gate）；Step 14/15 全量门 + 合回 main。
 - **接手第一步**：读本文件前文 + `AGENTS.md` + `docs/HANDOFF.md`；`npm run check` 全绿；
   在 `feat/pick-classify` 上 `owner claim` 当前 run；从 Step 6 继续，**不要重跑会写真实 teach 的冒烟**。

@@ -38,7 +38,12 @@ import {
   filterTeach,
   loadTeachBindings,
   loadTeachLibrary,
+  loadTeachUsage,
+  manageTeach,
   moveToFront,
+  normalizeCombos,
+  normalizeTeachBindings,
+  normalizeTeachList,
   orderByRecent,
   removeCombo,
   renameCombo,
@@ -85,6 +90,7 @@ const state = {
   lastClassified: null, // 本会话最近一次已归类题 {doc, questionId, assignment, label}
   undo: null, // 最近一次可撤销动作 {doc, qid, pageIndex, prevBinding, nextBinding}
   manage: null, // 管理面板状态 {renaming: id|null, confirm: id|null}；null=面板关着
+  teachUsage: null, // 跨所有卷的「某个专题/类别被几题在用」，管理面板删除前要摆出来
   search: { on: false, q: "" }, // 托盘搜索：开着时组合条让位给搜索框，两行同步过滤
 };
 
@@ -548,7 +554,7 @@ function applyCombo(combo) {
   }
 }
 
-/* ── 管理面板：组合改名 / 删除（删除要两步确认，改名走唯一写路径） ── */
+/* ── 管理面板：专题 / 类别 / 组合的改名与删除 ── */
 
 let manageConfirmTimer = null;
 
@@ -576,7 +582,7 @@ function openManage() {
   const pop = $("manage-pop");
   if (!pop) return;
   closeComboPop();
-  state.manage = { renaming: null, confirm: null };
+  state.manage = { renaming: null, confirm: null, usage: state.teachUsage };
   clearManageHint();
   const t = $("toast");
   if (t) {
@@ -586,6 +592,7 @@ function openManage() {
   pop.hidden = false;
   $("pick-manage")?.setAttribute("aria-pressed", "true");
   renderManageList();
+  refreshManageUsage();
 }
 
 function closeManage() {
@@ -598,39 +605,80 @@ function closeManage() {
   $("pick-manage")?.setAttribute("aria-pressed", "false");
 }
 
+/** 「会影响几题」必须跨**所有卷**数，客户端只看得见当前卷 → 问服务端再补数字。 */
+function refreshManageUsage() {
+  void loadTeachUsage().then((usage) => {
+    state.teachUsage = usage;
+    if (!state.manage) return;
+    state.manage.usage = usage;
+    renderManageList();
+  });
+}
+
 function renderManageList() {
   const box = $("manage-list");
   if (!box || !state.teach || !state.manage) return;
-  const combos = state.teach.combos ?? [];
   /** @type {HTMLElement[]} */
-  const nodes = [el("p", "mg-label", `常用组合（${combos.length}）`)];
-  if (!combos.length) {
-    nodes.push(el("p", "mg-empty", "还没有组合。先点一道题、给它选好专题/类别，再按托盘里的 ＋ 存成组合。"));
-  }
-  for (const c of combos) nodes.push(comboManageRow(c));
+  const nodes = [];
+  const section = (label, kind, items, emptyText) => {
+    nodes.push(el("p", "mg-label", `${label}（${items.length}）`));
+    if (!items.length) {
+      nodes.push(el("p", "mg-empty", emptyText));
+      return;
+    }
+    for (const item of items) nodes.push(manageRow(kind, item));
+  };
+  section("专题", "topics", state.teach.topics ?? [], "还没有专题。");
+  section("类别", "categories", state.teach.categories ?? [], "还没有类别。");
+  section(
+    "常用组合",
+    "combos",
+    state.teach.combos ?? [],
+    "还没有组合。先点一道题、选好专题/类别，再按托盘里的 ＋ 存成组合。",
+  );
   box.replaceChildren(...nodes);
 }
 
-/** @param {import('./teach-store.js').TeachCombo} combo */
-function comboManageRow(combo) {
-  const renaming = state.manage?.renaming === combo.id;
-  const confirming = state.manage?.confirm === combo.id;
+/** 这一项现在被多少题在用（跨卷；数字没回来前如实说"题数未知"）。 */
+function usageLabel(kind, id) {
+  if (!state.manage?.usage) return "题数未知";
+  const u = state.manage.usage[kind]?.[id];
+  if (!u) return "还没用过";
+  return `用在 ${u.live} 题上${u.stale ? `（另 ${u.stale} 题已漂移）` : ""}`;
+}
+
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
+function usageCountOf(kind, id) {
+  const u = state.manage?.usage?.[kind]?.[id];
+  return u ? u.live + u.stale : null;
+}
+
+/**
+ * 一行：名字 + 说明（专题/类别显示在用题数，组合显示成员）+ 改名/删除。
+ * 删除一律两步确认，按钮上直接写清会影响几题。
+ * @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item
+ */
+function manageRow(kind, item) {
+  const key = `${kind}:${item.id}`;
+  const renaming = state.manage?.renaming === key;
+  const confirming = state.manage?.confirm === key;
   const row = el("div", "mg-row" + (confirming ? " mg-confirm" : ""));
-  row.dataset.id = combo.id;
+  row.dataset.kind = kind;
+  row.dataset.id = item.id;
   const main = el("div", "mg-main");
   if (renaming) {
     const form = el("form", "mg-edit");
     const input = el("input", "mg-input");
     input.type = "text";
     input.maxLength = 60;
-    input.value = combo.name;
-    input.setAttribute("aria-label", "组合新名字");
+    input.value = item.name;
+    input.setAttribute("aria-label", "新名字");
     const ok = el("button", "mg-btn primary", "保存");
     ok.type = "submit";
     form.append(input, ok);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      void commitComboRename(combo.id, input.value);
+      void commitManageRename(kind, item, input.value);
     });
     main.append(form);
     setTimeout(() => {
@@ -638,8 +686,8 @@ function comboManageRow(combo) {
       input.select();
     }, 0);
   } else {
-    main.append(el("span", "mg-name", combo.name));
-    main.append(el("span", "mg-sum", comboSummary(combo)));
+    main.append(el("span", "mg-name", item.name));
+    main.append(el("span", "mg-sum", kind === "combos" ? comboSummary(item) : usageLabel(kind, item.id)));
   }
   row.append(main);
   if (!renaming) {
@@ -648,28 +696,29 @@ function comboManageRow(combo) {
     rn.type = "button";
     rn.addEventListener("click", () => {
       if (!state.manage) return;
-      state.manage.renaming = combo.id;
+      state.manage.renaming = key;
       state.manage.confirm = null;
       clearManageHint();
       renderManageList();
     });
-    const del = el("button", "mg-btn danger", confirming ? "确认删除" : "删除");
+    const n = kind === "combos" ? null : usageCountOf(kind, item.id);
+    const del = el("button", "mg-btn danger", confirming ? `确认删除${n !== null ? `（${n} 题）` : ""}` : "删除");
     del.type = "button";
     del.addEventListener("click", () => {
       if (!state.manage) return;
       clearManageHint();
-      if (state.manage.confirm === combo.id) {
+      if (state.manage.confirm === key) {
         state.manage.confirm = null;
         clearTimeout(manageConfirmTimer);
-        void commitComboRemove(combo);
+        void commitManageDelete(kind, item);
         return;
       }
-      state.manage.confirm = combo.id;
+      state.manage.confirm = key;
       state.manage.renaming = null;
       renderManageList();
       clearTimeout(manageConfirmTimer);
       manageConfirmTimer = setTimeout(() => {
-        if (state.manage?.confirm !== combo.id) return;
+        if (state.manage?.confirm !== key) return;
         state.manage.confirm = null;
         renderManageList();
       }, 6000);
@@ -680,38 +729,91 @@ function comboManageRow(combo) {
   return row;
 }
 
-/** @param {string} id @param {string} name */
-async function commitComboRename(id, name) {
+/** 管理成功后把服务端返回的新清单/新归属装回内存，并重画纸面角标。 */
+function applyManageResult(kind, res) {
   if (!state.teach) return;
-  const res = renameCombo(state.teach.combos ?? [], id, name);
-  if (!res.item) {
+  if (Array.isArray(res.list)) {
+    state.teach = { ...state.teach, [kind]: normalizeTeachList({ [kind]: res.list }, kind) };
+  }
+  if (Array.isArray(res.combos)) {
+    state.teach = { ...state.teach, combos: normalizeCombos({ combos: res.combos }) };
+  }
+  const docPayload = res.bindings ? res.bindings[state.doc] : undefined;
+  if (docPayload) {
+    state.teach = { ...state.teach, bindings: normalizeTeachBindings(docPayload) };
+    for (let i = 0; i < state.pages.length; i++) repaintPage(i);
+  }
+  updatePickTray();
+  if (!state.manage) return;
+  state.manage.usage = null; // 数字随清单一起过期，重新问
+  state.manage.renaming = null;
+  state.manage.confirm = null;
+  renderManageList();
+  refreshManageUsage();
+}
+
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
+async function commitManageRename(kind, item, name) {
+  if (!state.teach) return;
+  const clean = String(name ?? "").trim();
+  if (kind === "combos") {
+    const res = renameCombo(state.teach.combos ?? [], item.id, clean);
+    if (!res.item) {
+      showManageHint(res.error ?? "改名失败");
+      return;
+    }
+    const saved = await saveComboList(res.list, `组合「${res.item.name}」`);
+    if (!saved.ok || !state.manage) return;
+    renderManageList();
+    showManageHint(`已改名为「${res.item.name}」`, "ok");
+    return;
+  }
+  if (!clean) {
+    showManageHint("名字不能为空");
+    return;
+  }
+  const dup = (state.teach[kind] ?? []).some((x) => x.id !== item.id && x.name.trim() === clean);
+  if (dup) {
+    showManageHint(`已有同名：${clean}`);
+    return;
+  }
+  const res = await manageTeach("rename", kind, item.id, clean);
+  if (!res.ok) {
     showManageHint(res.error ?? "改名失败");
     return;
   }
-  const saved = await saveComboList(res.list, `组合「${res.item.name}」`);
-  if (!saved.ok) return;
-  if (!state.manage) return;
-  state.manage.renaming = null;
-  clearManageHint();
-  renderManageList();
-  showManageHint(`已改名为「${res.item.name}」`, "ok");
+  applyManageResult(kind, res);
+  showManageHint(`已改名为「${clean}」`, "ok");
 }
 
-/** @param {import('./teach-store.js').TeachCombo} combo */
-async function commitComboRemove(combo) {
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
+async function commitManageDelete(kind, item) {
   if (!state.teach) return;
-  const res = removeCombo(state.teach.combos ?? [], combo.id);
-  if (!res.item) {
+  if (kind === "combos") {
+    const res = removeCombo(state.teach.combos ?? [], item.id);
+    if (!res.item) {
+      showManageHint(res.error ?? "删除失败");
+      renderManageList();
+      return;
+    }
+    const saved = await saveComboList(res.list, `组合「${item.name}」`);
+    if (!saved.ok || !state.manage) return;
+    renderManageList();
+    showManageHint(`已删除「${item.name}」（只删这套预设，不影响已归类的题）`, "ok");
+    return;
+  }
+  const res = await manageTeach("delete", kind, item.id);
+  if (!res.ok) {
     showManageHint(res.error ?? "删除失败");
     renderManageList();
     return;
   }
-  const saved = await saveComboList(res.list, `组合「${combo.name}」`);
-  if (!saved.ok) return;
-  if (!state.manage) return;
-  clearManageHint();
-  renderManageList();
-  showManageHint(`已删除「${combo.name}」（${combo.topicIds.length + combo.categoryIds.length} 项设置，不影响已归类的题）`, "ok");
+  applyManageResult(kind, res);
+  const bits = [`已从 ${res.affected ?? 0} 题上摘掉`];
+  if (res.staleAffected) bits.push(`另含 ${res.staleAffected} 题已漂移`);
+  if (res.combosDropped) bits.push(`顺带删掉 ${res.combosDropped} 个空组合`);
+  else if (res.combosChanged) bits.push(`同步了 ${res.combosChanged} 个组合`);
+  showManageHint(`已删除「${res.item ?? item.name}」（${bits.join("，")}）`, "ok");
 }
 
 /* ── 组合条拖动排序：长按 380ms 进入拖动，松手写回 combos.json ── */

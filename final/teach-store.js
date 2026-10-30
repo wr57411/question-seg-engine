@@ -380,3 +380,43 @@ export async function saveTeach(scope, payload, doc = "") {
 
 /** @param {string} doc @param {TeachBindings} state */
 export const saveTeachBindings = (doc, state) => saveTeach("bindings", state, doc);
+
+/**
+ * 某个专题/类别在**所有卷**上被多少题在用。客户端只看得见当前卷，
+ * 删除前那句「会影响 N 题」必须由服务端跨文件数出来，不能拿本卷数字糊弄。
+ * @returns {Promise<{topics: Record<string, {live:number,stale:number}>, categories: Record<string, {live:number,stale:number}>} | null>}
+ */
+export async function loadTeachUsage() {
+  try {
+    const res = await fetch("/api/teach-usage", { cache: "no-store" });
+    if (!res.ok) return null;
+    const out = /** @type {{ok?: boolean, usage?: any}} */ (await res.json().catch(() => ({})));
+    return out.ok ? out.usage : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 改名 / 删除：一次请求让服务端跨所有卷级联改写（失败整体回滚）。
+ * @param {'rename'|'delete'} action
+ * @param {'topics'|'categories'} kind
+ * @param {string} id
+ * @param {string} [name]
+ * @returns {Promise<{ok: boolean, error?: string, item?: string, affected?: number, staleAffected?: number,
+ *   combosChanged?: number, combosDropped?: number, list?: unknown, combos?: unknown, bindings?: Record<string, unknown>}>}
+ */
+export async function manageTeach(action, kind, id, name) {
+  try {
+    const res = await fetch("/api/teach-manage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, kind, id, ...(name === undefined ? {} : { name }) }),
+    });
+    const out = /** @type {Record<string, unknown>} */ (await res.json().catch(() => ({})));
+    if (!res.ok || out.ok === false) return { ok: false, error: String(out.error || `HTTP ${res.status}`) };
+    return { ...out, ok: true };
+  } catch (e) {
+    return { ok: false, error: `管理请求失败：${String(e).slice(0, 120)}` };
+  }
+}

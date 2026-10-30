@@ -17,7 +17,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
-import { extname, join, normalize, resolve } from "node:path";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import { isKnownDoc, MAX_BODY, tagFilePath, validatePayload } from "./tag-write-guards.js";
 import {
   isKnownDoc as isKnownTeachDoc,
@@ -25,6 +25,7 @@ import {
   teachFilePath,
   validateTeachPayload,
 } from "./teach-write-guards.js";
+import { countTeachUsage, planTeachManage, validateManageRequest } from "./teach-manage.js";
 
 const ROOT = process.cwd();
 const PORT = Number(process.env.PORT ?? 4173);
@@ -164,6 +165,173 @@ async function handleTeachWrite(req: IncomingMessage, res: ServerResponse, url: 
   }
 }
 
+/* ── 教学归类管理（改名 / 删除）：一次请求跨所有卷级联，任一步失败整体回滚 ── */
+
+const TEACH_DIR = join(ROOT, "data", "out", "teach");
+
+interface ReadJson {
+  text: string;
+  data: unknown;
+}
+
+/** 读一份 JSON：文件不存在返回 null；解析失败返回 {text, parseError}。 */
+async function readJsonFile(file: string): Promise<ReadJson | { parseError: string } | null> {
+  const text = await readFile(file, "utf8").catch(() => null);
+  if (text === null) return null;
+  try {
+    return { text, data: JSON.parse(text) };
+  } catch (e) {
+    return { parseError: String(e).slice(0, 160) };
+  }
+}
+
+/** bindings 目录里的每一卷（文件名即 doc；不接受客户端传路径）。 */
+async function listBindingFiles(): Promise<{ doc: string; file: string }[]> {
+  const dir = join(TEACH_DIR, "bindings");
+  const names = await readdir(dir).catch(() => [] as string[]);
+  const base = resolve(TEACH_DIR);
+  const out: { doc: string; file: string }[] = [];
+  for (const name of names.sort()) {
+    if (!name.endsWith(".json")) continue;
+    const file = resolve(join(dir, name));
+    if (!file.startsWith(base + sep)) continue;
+    out.push({ doc: name.slice(0, -".json".length), file });
+  }
+  return out;
+}
+
+function jsonOut(res: ServerResponse, code: number, obj: unknown): void {
+  res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(JSON.stringify(obj));
+}
+
+/** 某个专题/类别在**所有卷**上被多少题在用（管理面板要先把这个数摆出来再让人删）。 */
+async function handleTeachUsage(res: ServerResponse): Promise<void> {
+  const files = await listBindingFiles();
+  const bindings: { doc: string; raw: unknown }[] = [];
+  const broken: string[] = [];
+  for (const f of files) {
+    const r = await readJsonFile(f.file);
+    if (!r || "parseError" in r) {
+      if (r) broken.push(f.doc);
+      continue;
+    }
+    bindings.push({ doc: f.doc, raw: r.data });
+  }
+  jsonOut(res, 200, { ok: true, usage: countTeachUsage({ bindings }), docs: bindings.length, broken });
+}
+
+async function handleTeachManage(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  let body: unknown;
+  try {
+    body = JSON.parse((await readBody(req)).toString("utf8"));
+  } catch (e) {
+    jsonOut(res, 400, { ok: false, error: `JSON 解析失败：${String(e).slice(0, 160)}` });
+    return;
+  }
+  const invalid = validateManageRequest(body);
+  if (invalid) {
+    jsonOut(res, 403, { ok: false, error: invalid });
+    return;
+  }
+  const req2 = body as { action: "rename" | "delete"; kind: "topics" | "categories"; id: string; name?: string };
+  const listFile = teachFilePath(ROOT, req2.kind, "");
+  const combosFile = teachFilePath(ROOT, "combos", "");
+  if (!listFile || !combosFile) {
+    jsonOut(res, 403, { ok: false, error: "落盘路径越界" });
+    return;
+  }
+  const listRaw = await readJsonFile(listFile);
+  if (listRaw && "parseError" in listRaw) {
+    jsonOut(res, 500, { ok: false, error: `${req2.kind}.json 解析失败（${listRaw.parseError}），先修数据再管理` });
+    return;
+  }
+  const combosRaw = await readJsonFile(combosFile);
+  if (combosRaw && "parseError" in combosRaw) {
+    jsonOut(res, 500, { ok: false, error: `combos.json 解析失败（${combosRaw.parseError}），先修数据再管理` });
+    return;
+  }
+  const originals = new Map<string, string | null>();
+  const bindings: { doc: string; raw: unknown }[] = [];
+  for (const f of await listBindingFiles()) {
+    const r = await readJsonFile(f.file);
+    if (r && "parseError" in r) {
+      jsonOut(res, 500, { ok: false, error: `bindings/${f.doc}.json 解析失败（${r.parseError}），先修数据再管理` });
+      return;
+    }
+    originals.set(f.file, r ? r.text : null);
+    if (r && !("parseError" in r)) bindings.push({ doc: f.doc, raw: r.data });
+  }
+
+  const plan = planTeachManage({
+    ...req2,
+    list: listRaw && !("parseError" in listRaw) ? listRaw.data : null,
+    combos: combosRaw && !("parseError" in combosRaw) ? combosRaw.data : null,
+    bindings,
+    now: new Date().toISOString(),
+  });
+  if (!plan.ok) {
+    jsonOut(res, 400, { ok: false, error: plan.error });
+    return;
+  }
+  // 落盘前逐个校验新载荷：任何一个不合法就一个都不写
+  const badList = validateTeachPayload(req2.kind, plan.listPayload);
+  if (badList) {
+    jsonOut(res, 500, { ok: false, error: `新清单不合法：${badList}` });
+    return;
+  }
+  if (plan.combosPayload) {
+    const bad = validateTeachPayload("combos", plan.combosPayload);
+    if (bad) {
+      jsonOut(res, 500, { ok: false, error: `新组合清单不合法：${bad}` });
+      return;
+    }
+  }
+  for (const bf of plan.bindingsFiles) {
+    const bad = validateTeachPayload("bindings", bf.payload);
+    if (bad) {
+      jsonOut(res, 500, { ok: false, error: `${bf.doc} 的新归属不合法：${bad}` });
+      return;
+    }
+  }
+
+  const written: { file: string; before: string | null }[] = [];
+  const put = async (file: string, payload: unknown) => {
+    await atomicWrite(file, `${JSON.stringify(payload, null, 1)}\n`);
+    written.push({ file, before: originals.get(file) ?? null });
+  };
+  try {
+    originals.set(listFile, listRaw ? listRaw.text : null);
+    originals.set(combosFile, combosRaw ? combosRaw.text : null);
+    await put(listFile, plan.listPayload);
+    if (plan.combosPayload) await put(combosFile, plan.combosPayload);
+    for (const bf of plan.bindingsFiles) {
+      const file = teachFilePath(ROOT, "bindings", bf.doc);
+      if (!file) throw new Error(`bindings 路径越界：${JSON.stringify(bf.doc).slice(0, 80)}`);
+      await put(file, bf.payload);
+    }
+  } catch (e) {
+    for (const w of written.reverse()) {
+      if (w.before !== null) await atomicWrite(w.file, w.before).catch(() => undefined);
+    }
+    jsonOut(res, 500, { ok: false, error: `写入失败，已回滚 ${written.length} 个文件：${String(e).slice(0, 160)}` });
+    return;
+  }
+  jsonOut(res, 200, {
+    ok: true,
+    action: req2.action,
+    kind: req2.kind,
+    item: plan.itemName,
+    affected: plan.affected,
+    staleAffected: plan.staleAffected,
+    combosChanged: plan.combosChanged,
+    combosDropped: plan.combosDropped,
+    list: req2.kind === "topics" ? plan.listPayload.topics : plan.listPayload.categories,
+    combos: plan.combosPayload ? plan.combosPayload.combos : undefined,
+    bindings: Object.fromEntries(plan.bindingsFiles.map((b) => [b.doc, b.payload])),
+  });
+}
+
 /* ── 文档清单（成品页据此发现文档，取代前端硬编码 DOCS） ── */
 
 interface DocListItem {
@@ -226,9 +394,14 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ docs }));
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/teach-usage") {
+      await handleTeachUsage(res);
+      return;
+    }
     if (req.method === "POST") {
       if (url.pathname === "/api/tags") await handleTagsWrite(req, res, url);
       else if (url.pathname === "/api/teach") await handleTeachWrite(req, res, url);
+      else if (url.pathname === "/api/teach-manage") await handleTeachManage(req, res);
       else res.writeHead(405).end("method not allowed");
       return;
     }
