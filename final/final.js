@@ -43,7 +43,7 @@ const state = {
   data: null,
   paneW: CANVAS_W,
   audit: false,
-  ocrStyle: true,
+  ocrStyle: false, // OCR 补入行的绿色候选样式：**默认关**（成品页要干净，需要核查时勾选）
   bank: null,
   snap: null, // 当前文档的整册快照：面板按原卷坐标裁条目要用
   snaps: new Map(), // 另一册的快照缓存（按需拉，见 snapshotOf）
@@ -914,7 +914,9 @@ async function main() {
   // 开关支持 URL 参数（可分享/收藏某个视图）：?audit=1 开审计标记、?ocr=0 关候选样式
   const qs = new URLSearchParams(location.search);
   state.audit = qs.get("audit") === "1";
-  state.ocrStyle = qs.get("ocr") !== "0";
+  // 默认**关**（2026-10-30 用户：成品页里成片的绿字没法看）。要看哪些行是 OCR 补的，
+  // 勾工具栏「OCR 候选样式」或加 `?ocr=1` —— 能力保留，只是不再默认糊在脸上。
+  state.ocrStyle = qs.get("ocr") === "1";
   state.tagsOn = qs.get("tags") !== "0";
   await loadDocs();
   initBar();

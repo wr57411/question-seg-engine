@@ -83,6 +83,15 @@ const NOISE_KIND_LABEL = {
   long: "超长公式",
 };
 
+/**
+ * **OCR 候选样式是否开启**（`DECISIONS §89`）：默认**关**。
+ *
+ * 原来默认打开，成品页/对比页整页文字被染成绿色 + 绿虚线框（`.blk-ocr`），
+ * 用户看到的第一反应是「这页面是坏的」。绿色本意是「这一行是 OCR 补的、不是引擎原文」
+ * （G1 可追溯），但这个信息不该糊在默认视图上 —— 需要核查时加 `?ocr=1` 或勾 final 页的开关。
+ */
+const CANDIDATE_STYLE = new URLSearchParams(location.search).get("ocr") === "1";
+
 const state = { doc: null, effectiveDoc: null, data: null, stage: 0, page: 0, highlight: null };
 
 const $ = (id) => document.getElementById(id);
@@ -239,7 +248,7 @@ function renderRaw(p) {
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
-  ocrFillInto(c, p, CANVAS_W); // 阶段 1 也呈现 OCR 候选补全（先画，标记后画才盖得住）
+  ocrFillInto(c, p, CANVAS_W, CANDIDATE_STYLE); // 阶段 1 也呈现 OCR 候选补全（先画，标记后画才盖得住）
   uncoveredInto(c, p, CANVAS_W); // 阶段 1 也标出解析遗漏（Task 16）
   return c;
 }
@@ -309,7 +318,7 @@ function renderSeg(p) {
       c.append(chip);
     }
   }
-  ocrFillInto(c, p, CANVAS_W); // 阶段 3 也呈现 OCR 候选补全
+  ocrFillInto(c, p, CANVAS_W, CANDIDATE_STYLE); // 阶段 3 也呈现 OCR 候选补全
   uncoveredInto(c, p, CANVAS_W); // 阶段 3 也标出解析遗漏（Task 16）
   return c;
 }
@@ -466,6 +475,7 @@ function renderFinal(p) {
       doc: state.effectiveDoc,
       paneW: CANVAS_W,
       diagnostics: false,
+      candidateStyle: CANDIDATE_STYLE,
       onChipClick: showDetail,
     }).wrap,
   );
@@ -516,6 +526,7 @@ function renderCompare(p) {
     doc: state.effectiveDoc,
     paneW,
     diagnostics: true,
+    candidateStyle: CANDIDATE_STYLE,
     onChipClick: showDetail,
   });
   right.append(paper.wrap);
