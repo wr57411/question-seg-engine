@@ -19,6 +19,7 @@
     "tests",
     "scripts",
     "stages/tag-layout.js",
-    "final/tag-store.js"
+    "final/tag-store.js",
+    "topic/topic-model.js"
   ]
 }

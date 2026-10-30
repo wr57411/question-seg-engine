@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#F6F1E7" />
+  <title>专题知识库 · 基础 / 培优</title>
+
+  <!-- KaTeX（联网加载公式；离线时保持 $..$ 原文，不报错、不吞内容） -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="./topic.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="title-row">
+      <div>
+        <h1>专题知识库</h1>
+        <p class="subtitle">平板上挑题 · 基础 / 培优分层</p>
+      </div>
+      <button class="refresh" id="refresh" type="button">刷新数据</button>
+    </div>
+    <div class="stats mono" id="stats" aria-live="polite"></div>
+
+    <div class="picker">
+      <span class="picker-label">专题</span>
+      <div class="chip-row" id="topic-chips" role="group" aria-label="选择专题"></div>
+    </div>
+    <div class="picker">
+      <span class="picker-label">层级</span>
+      <div class="seg-row" id="level-filter" role="group" aria-label="按层级筛选"></div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" role="status" hidden></div>
+
+  <main class="cards" id="cards" aria-live="polite"></main>
+
+  <section class="empty" id="empty" hidden></section>
+
+  <footer class="footnote">
+    数据：<code>data/out/topics/index.json</code>（<code>npm run topic:export</code> 生成）·
+    只读快照，不改纸面
+  </footer>
+
+  <noscript>
+    <p class="no-js">这个页面需要 JavaScript 才能显示专题题目。</p>
+  </noscript>
+
+  <script type="module" src="./topic.js"></script>
+</body>
+</html>

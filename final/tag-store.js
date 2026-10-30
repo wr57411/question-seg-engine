@@ -194,7 +194,13 @@ export function toggleTag(state, questionId, tagId, anchor) {
   const ids = new Set(cur?.tagIds ?? []);
   if (ids.has(tagId)) ids.delete(tagId);
   else ids.add(tagId);
-  if (ids.size) bindings.push({ questionId, tagIds: [...ids], anchor });
+  if (ids.size) {
+    // 已有绑定的 anchor 不因「再加/摘一个标签」而被重写：切分变化后 id 落到别的题上时，
+    // 不能让一次无关的点击把旧 anchor 悄悄"洗白"（专题导出靠 anchor 判漂移）。
+    // 要把 anchor 更新到当前题，先摘光这条绑定的所有标签再重新打。
+    const nextAnchor = cur && cur.tagIds.length ? (cur.anchor ?? anchor) : anchor;
+    bindings.push({ questionId, tagIds: [...ids], anchor: nextAnchor });
+  }
   return { ...state, bindings };
 }
 

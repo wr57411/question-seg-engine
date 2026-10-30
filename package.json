@@ -23,7 +23,9 @@
     "bank": "tsx scripts/build-bank.ts",
     "audit:attribution": "tsx scripts/audit-attribution.ts",
     "report:generalization": "tsx scripts/generalization.ts",
-    "bank:all": "tsx scripts/bank-all.ts"
+    "bank:all": "tsx scripts/bank-all.ts",
+    "topic:export": "tsx scripts/topic-export.ts",
+    "audit:topic": "tsx scripts/audit-topic.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

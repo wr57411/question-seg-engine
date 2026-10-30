@@ -9,37 +9,37 @@ worktree: false
 
 ## Steps
 
-- [ ] **Step 1: 规格落盘**
+- [x] **Step 1: 规格落盘**
 action: `docs/specs/2026-10-30-topic-knowledge-base-spec.md`（场景/指标/风险边界/数据合同/阶段规划，标准深度，暂定假设显式标注）。
 loop: false
 verify: test -f docs/specs/2026-10-30-topic-knowledge-base-spec.md
 
-- [ ] **Step 2: topic-export 脚本**
-action: 新增 `scripts/topic-export.ts`（`npm run topic:export`）。输入两路合并：① `data/out/tags/*.json` 中 `tagIds` 含 `#` 的绑定（约定 `专题名#基础|培优`，anchor 提供 doc/number）；② `data/out/topics/*.topic.json` 手工题单。逐题 join `data/out/<doc>/questions.json`（stem/options/images/status）与 `data/out/bank/bank.json`（answerKey/answerText/answerImages，按 key `quizDoc|chapter|blockIndex|number` 匹配）；图片文件逐条验证存在（相对 `data/out/<doc>/`）。输出 `data/out/topics/index.json`；needs_review 题照收但带 `reviewFlags`（R05 不静默）。缺题/缺答案/缺图 ⇒ 退出码 1 并逐条列出。
+- [x] **Step 2: topic-export 脚本**
+action: 新增 `scripts/topic-export.ts`（`npm run topic:export`）。输入两路合并：① `data/out/tags/*.json` 的绑定 —— 先按 `data/out/tags/library.json` 把 `tagIds` 解析回名字，再识别 `专题名#基础|培优`（UI 新建标签只存 id；库缺 id / 库丢 / id 重复 / 专题标签在 stale 均红）；anchor 与当前题比对（页码/题号/长首行不符即红；首行 <6 个有效字符只告警，不阻断）；② `data/out/topics/*.topic.json` 手工题单。逐题 join `data/out/<doc>/questions.json`（stem/options/images/status）与 `data/out/bank/bank.json`（**按 `quizId` == 题目 id** 取 answerKey/answerText/answerDoc/answerImages）；图片文件逐条验证存在（题图相对 `data/out/<doc>/images/`，答案图相对 `data/out/<answerDoc>/images/`）。输出 `data/out/topics/index.json` + `export-status.json`（成功/失败都写）；needs_review 题照收但带 `reviewFlags`（R05 不静默）。缺题/缺题干/缺答案/缺图/标签漂移 ⇒ 退出码 1 并逐条列出。
 loop: false
 verify: npm run typecheck
 
-- [ ] **Step 3: 单测 + 反向验证**
-action: 新增 `tests/topic-export.test.ts`（最小 fixture 目录）：约定解析（`#` 分隔、非专题标签不受影响）、题单合并去重、**缺题/缺答案/缺图各自必红**（反向验证写在测试注释）、needs_review 带 flags、导出守恒（每 questionId 每专题恰好一条）。
+- [x] **Step 3: 单测 + 反向验证**
+action: 新增 `tests/topic-export.test.ts`（最小 fixture 目录）：约定解析（`#` 分隔、非专题标签不受影响）、**标签库 id→name 解析**、**anchor 漂移/标签在 stale/库丢失/id 重复必红、首行过短告警**、题单合并去重、**缺题/缺题干/缺答案/缺图/选项形状坏各自必红**（反向验证写在测试注释）、needs_review 带 flags、导出守恒（每 questionId 每专题恰好一条）、失败写 export-status（ok:false）。另加 `tests/audit-topic.test.ts`：审计独立性（手写 index 也能过）+ 索引/源/统计/状态被改必红。
 loop: false
 verify: node --import tsx --test tests/topic-export.test.ts
 
-- [ ] **Step 4: audit:topic 量化门**
+- [x] **Step 4: audit:topic 量化门**
 action: 新增 `scripts/audit-topic.ts`（`npm run audit:topic`）：独立复核 index.json 与源的一致性（不同源原则：重新读 questions/bank/文件系统，不信 index 自带 stats），缺失即非 0。暂不接入 check（SPEC D04）。
 loop: false
 verify: npm run audit:topic
 
-- [ ] **Step 5: 专题页**
+- [x] **Step 5: 专题页**
 action: `scripts/view-server.ts` 静态白名单加 `/topic`（唯一共享文件改动，一行）；新增 `topic/index.html` + `topic/topic.js`（文件头 `// @ts-check` + JSDoc）+ `topic/topic.css`。页面 fetch `/data/out/topics/index.json` 渲染：专题选择、层级筛选（全部/基础/培优）、题卡（题干保留换行、选项、答案开关、图片、来源 `doc p页 · needs_review` 徽标）。**只消费快照 JSON，不 import src/，不用 renderPaper**；iPad 优先（基础字号 ≥13px、触控目标 ≥44px），needs_review 题卡带可见标记（R05）。
 loop: false
 verify: npm run typecheck
 
-- [ ] **Step 6: 演示种子 + 导出**
-action: 给 `data/out/物理_教材基础练 曲线运动` 的教材实验 5/6 两题写 tags 演示种子（`平抛运动#基础`、`圆周运动#培优`，形状与 tag-write-guards 校验一致， SPEC 注明这是种子数据）；跑 `npm run topic:export` 与 `npm run audit:topic`。
+- [x] **Step 6: 演示种子 + 导出**
+action: 演示种子改用 **`23必刷题 4 曲线运动`**（与答案册同系列；教材基础练与合订本不同书，见 SPEC R07）：在 `data/out/tags/library.json` 建 3 个专题标签（`平抛运动#基础` / `圆周运动#培优` / `圆周运动#基础`），绑定 q16 / q31 / q58（含 1 道 needs_review），种子另存 `fixtures/topic-seed/`；跑 `npm run topic:export` 与 `npm run audit:topic`。
 loop: false
 verify: npx tsx -e "import('./scripts/topic-export.js').catch(()=>process.exit(1))" 2>/dev/null; npm run audit:topic
 
-- [ ] **Step 7: iPad 视口截图审板**
+- [x] **Step 7: iPad 视口截图审板**
 action: 起 main 的 view-server（PORT=4174，避开 worktree 的 4173），用 CDP 截图（820×1100）专题页整页 + 层级筛选切换 + 答案展开 + needs_review 徽标各一张，存 `tmp/review-topic/`。审板清单首项=内容齐全性（lessons L1）：题干/选项/答案/图与快照逐项对。
 loop: false
 verify: test $(ls tmp/review-topic/*.png 2>/dev/null | wc -l) -ge 4

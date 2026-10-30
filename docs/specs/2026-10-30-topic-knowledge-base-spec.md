@@ -3,6 +3,8 @@
 - 日期：2026-10-30 · 深度：标准（bgx 产品规划，用户「通过 Loop 完成」= 直接实施授权 MVP）
 - 状态：需求目标已确认（用户原话，见 §1）；技术约定 D02–D04 为**暂定假设**，标注待确认
 - 本轮实施：S01（MVP）由 `docs/plans/2026-10-30-topic-mvp-workflow.md` 的 HOTL loop 执行
+- 实施结果（2026-10-30，main）：S01 完成。演示种子改用 `23必刷题 4 曲线运动`（原因见 §5）；
+  答案池跨书错配作为 R07 登记（§3）
 
 ## 1. 目标（用户原话 + 复述）
 
@@ -42,21 +44,41 @@
 - **R06 多会话并行**：main 侧写 `data/out/topics/`、tags 演示种子；feature/oxr 正在做 B 全量重导。
   data/ 已拆克隆（lessons L4），两边互不影响；**重导会冲掉 tags 吗 ⇒ 不会**（tags 独立落
   `data/out/tags/`，不写快照），但 topic 演示种子绑定的题目若题号序列变了会失配 ⇒ audit 必红，可发现。
+- **R07 答案池可能跨书错配**：实测 `bank:all` 把 `物理_教材基础练 曲线运动` 配到
+  `答案册-合订本`（不同系列），答案与题干语义不符（见 HANDOFF §6-17）。S01 的校验只保证
+  「答案存在且与 bank 结构一致」，**不宣称配对语义正确**；演示种子改用同系列题册（§5）。
 
 ## 4. 数据合同（v1）
 
-- **标签约定（D02 暂定）**：`tagIds` 中含 `#` 的即专题标签，格式 `专题名#基础` / `专题名#培优`；
-  其余短码不受影响。iPad 上点号牌 → 面板输入即可打标（既有通道）。
+- **标签约定（D02 暂定）**：标签**名字**形如 `专题名#基础` / `专题名#培优` 的即专题标签；
+  绑定只存 tagId，导出按 `data/out/tags/library.json` 的 id→name 解析；历史/种子可直接把
+  `专题名#层级` 当 id（按字面值兼容）。其余短码不受影响。iPad 上点号牌 → 面板输入即可打标。
+- **漂移/失效判据**：页码/题号必须一致；首行有效字符 ≥6 时还要包含匹配，不符 ⇒ 红。
+  首行为空或 <6 个有效字符（题号独占一行、图题等）⇒ **告警**（只能核对页码+题号，页面可见，
+  不阻断整本书；重打标仍是同样短首行，不能当阻断理由）。专题标签在 `stale`、库缺 id、
+  库文件丢失、库 id 重复 ⇒ 导出/审计均红（不允许专题静默少题）。
+  改名/摘掉 `#` 导致旧条目消失 ⇒ 导出告警（状态文件 + 页面提示条），不阻断（改名是合法操作）。
 - **手工通道（D03 暂定）**：`data/out/topics/<slug>.topic.json`，手写题单 `{name, items:[{doc, number, level}]}`。
 - **导出产物**：`data/out/topics/index.json` —— 展示层唯一消费源。
-  `{version, generatedAt, topics:[{slug, name, items:[{doc, number, questionId, level, stem, options[], images[], answerKey, answerText, answerImages[], status, reviewFlags[]}]}], stats}`。
-  图片路径相对 `data/out/<doc>/`（与快照一致），导出时逐条验证文件存在。
+  `{version, generatedAt, topics:[{slug, name, items:[{doc, number, page, questionId, level, stem, options[], images[], answerKey, answerText, answerDoc, answerImages[], status, confidence, reviewFlags[], sources[]}]}], stats}`。
+  `page` 为 1 基页码（0 = 未知）；`answerDoc` 是答案来源册；`answerImages` 元素为
+  `{doc, path, bbox?}`（path 相对答案册的 `images/`）；`sources` 记录 tag/manual。
+  题图路径相对 `data/out/<doc>/images/`（与快照一致），导出时逐条验证文件存在。
+- **导出状态**：`data/out/topics/export-status.json` = `{ok, at, errors[], warnings[], indexGeneratedAt}`；
+  成功/失败都写。页面据此显示「上次导出失败 / 旧数据 / 索引与状态不一致 / 告警」提示条；
+  `audit:topic` 要求该文件存在、`ok:true` 且 `indexGeneratedAt` 与 index 一致。
 - **审计**：`audit:topic` 独立复核 index.json 与源（questions/bank/图片文件）的一致性；
   缺题/缺答案/缺图 ⇒ 退出码非 0。暂不接入 `check`（D04，接入时须反向验证）。
 
 ## 5. 阶段规划（S01 已授权，S02+ 待排）
 
-- **S01 MVP（本轮 loop）**：标签约定 + `topic:export` + `audit:topic` + `topic/` 页面 + 演示种子 + iPad 视口审板。
+- **S01 MVP（已完成 2026-10-30）**：标签约定 + `topic:export` + `audit:topic` + `topic/` 页面 +
+  演示种子 + iPad 视口审板。演示种子 3 题在 `23必刷题 4 曲线运动`：`平抛运动#基础`（p4 第1题）、
+  `圆周运动#培优`（p7 第3题）、`圆周运动#基础`（p13 第3题，needs_review）。
+  ⚠️ 原候选「教材实验 5/6」不在 bank 配对中（无答案），且教材基础练与合订本不同系列 ⇒ 不采用。
+  种子文件（标签库 + 绑定，含 anchor）已存 `fixtures/topic-seed/`：演示环境执行
+  `cp fixtures/topic-seed/*.json data/out/tags/` 后重跑 `npm run topic:export`
+  （会覆盖同名文件 —— 已有用户标签库时先备份 `library.json`）。
 - **S02 配对覆盖 ≥60%**：7 册缺章显式绑定（feature/oxr 的 C 方案 + 扩展；等合并后收口到主线）。
 - **S03 待复核率 ≤8%**：金标准扩样 + 逐题选源复核（feature/oxr 既有 batch/score 链路）。
 - **S04 标注 v2**：语音/手写探针 → 数据模型（annotations store，走 tags 同款守卫）→ 面板。

@@ -179,10 +179,15 @@ const server = createServer(async (req, res) => {
     let path = normalize(decodeURIComponent(url.pathname));
     // "/" 或任意目录路径（以 / 结尾）一律落到该目录的 index.html
     if (path === "/") path = "/viewer/index.html";
-    else if (path.endsWith("/")) path += "index.html";
+    else if (path === "/topic") {
+      // 少一个斜杠也进得去（用户/文档容易漏）；不把目录本身当 404
+      res.writeHead(302, { Location: "/topic/" });
+      res.end();
+      return;
+    } else if (path.endsWith("/")) path += "index.html";
     const file = join(ROOT, path);
-    // 路径安全：只允许 /viewer /stages /final 与 /data/out 前缀，且归一化后必须仍落在 ROOT 内
-    if (!file.startsWith(ROOT) || !/^\/?(viewer|stages|final|data\/out)/.test(path)) {
+    // 路径安全：只允许 /viewer /stages /final /topic 与 /data/out 前缀，且归一化后必须仍落在 ROOT 内
+    if (!file.startsWith(ROOT) || !/^\/?(viewer|stages|final|topic|data\/out)/.test(path)) {
       res.writeHead(403).end("forbidden");
       return;
     }
