@@ -21,7 +21,7 @@
  * 留白 22px 里 12px 高的目标在触屏上点不准。数据独立落在 `data/out/tags/`，
  * 不碰快照（快照每次导出都会被冲掉）。
  */
-import { CANVAS_W, el, enc, renderPaper } from "../stages/reconstruct.js";
+import { CANVAS_W, el, enc, mergeContext, renderPaper } from "../stages/reconstruct.js";
 import { entryCrop, entrySegments, fitEntryCrops } from "./entry-paper.js";
 import { prettifyLatex } from "../stages/latex-display.js";
 import { tagSection } from "./tag-panel.js";
@@ -57,8 +57,7 @@ const state = {
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
-function paperWidth() {
-  return Math.max(320, Math.min(CANVAS_W, window.innerWidth - 110));
+function paperWidth() {  return Math.max(320, Math.min(CANVAS_W, window.innerWidth - 110));
 }
 
 async function fetchJson(url) {
@@ -124,7 +123,135 @@ function repaintPage(pageIndex) {
   slot.sec.replaceChildren(slot.head, paper(slot.p));
 }
 
+/**
+ * **是否手机**（`DECISIONS §88`）：用「较短边 < 500」判，而不是宽度 ——
+ * 手机横屏是 844×390（宽度够、但屏幕仍是手机）、平板最小 768×1024。
+ * 只看宽度会把手机横屏误判成平板。
+ *
+ * 为什么按设备而不是横竖屏分：用户 2026-10-30 明确「手机横屏用原排版也别扭」。
+ * 手机上纸面按原卷坐标等比缩放后正文只有 5-6px（375 宽）/ 12px（844 横屏但行宽过大），
+ * 读起来都难受 ⇒ 手机一律走文本流；平板与桌面保留原版排版（那是这个项目的核心卖点）。
+ */
+function isPhoneViewport() {
+  // 手动覆盖：`?flow=1` 强制文本流、`?flow=0` 强制纸面。
+  // 不只是调试用 —— 平板用户可能想临时切到文本流读某个密页，反之亦然。
+  const forced = new URLSearchParams(location.search).get("flow");
+  if (forced === "1") return true;
+  if (forced === "0") return false;
+  return Math.min(window.innerWidth, window.innerHeight) < 500;
+}
+
+/**
+ * **手机端文本流**（`DECISIONS §88`）：不跟原卷坐标，按阅读顺序流式排列。
+ *
+ * 为什么能这么做而不丢内容：`p.blocks` 在版面层已按阅读顺序排好（双栏也是「左栏读完再右栏」，
+ * 与原卷阅读顺序一致），这里只是把「绝对定位的块」换成「流式块」，块集合完全相同。
+ *
+ * 三处必须与纸面渲染保持同源，否则会出现「手机能看到、平板看不到」的分叉：
+ * 1. 同页块级重复的并集合并（`mergeContext`）—— 被合并掉的块不渲染，内容已在合并文本里；
+ * 2. 公式渲染（`prettifyLatex`）—— 与纸面同一个函数，`\frac`/`\sqrt` 照样是二维排版；
+ * 3. 表格（`blk.html` 原始网格）—— 直接沿用上游 HTML，不重新推断列宽（`§76` 的同一条原则）。
+ */
+/** 下一行明显是「新块开头」的形态：编号题、选项、栏目头、方框头 —— 都不许接上一行。 */
+const FLOW_STARTS_NEW =
+  /^(?:\d{1,3}\s|\d{1,3}[.．、)）]|第[一二三四五六七八九十百\d]{1,3}[讲章节]|[【〔]|教材|答案|变式|例题|解析|[A-D][.．、])/;
+
+/** 上一行已经收句 —— 段落该断了。 */
+const FLOW_ENDS = /[。！？：；!?:;…]$/;
+
+/**
+ * **行级块 → 段落**（`DECISIONS §88`）。
+ *
+ * 为什么必须有这一步：快照的 `pages[].blocks` 是**行级**的（`normalizeLayout` 每行一块），
+ * 直接一段一行，行距 1.8em 读起来比纸面还松散 —— 实测第一版就是这样。
+ *
+ * 判据全部来自几何 + 标点，不猜内容：
+ * 1. **同栏**：`x0` 差 ≤ 8（双栏页里左栏与右栏天然差半页宽，一步就分开了）；
+ * 2. **同一行距带**：垂直间距 ≤ 1.6 × 行高（跨段空行、跨栏都超）；
+ * 3. **上一行没收句**：末尾不是 `。！？：；`；
+ * 4. **下一行不是新块开头**：编号/选项/栏目头/方框头（`FLOW_STARTS_NEW`）。
+ *
+ * 四条 AND。宁可不合并（读起来是短的独立行）也不能误合并 ——
+ * 把标题和正文粘成一行，比多一个段落更难读。
+ */
+function groupParagraphs(blocks, ctx) {
+  const out = [];
+  let cur = null;
+  for (const b of blocks) {
+    if (ctx.drop.has(b.i)) continue;
+    const merged = ctx.keep.get(b.i);
+    const blk = merged ? { ...b, text: merged.text } : b;
+
+    if (blk.kind !== "text") {
+      // 图片**不**重置段落上下文：浮动图常插在两行正文之间（实测电路 p1 的 A/B 电极图
+      // 压在 `…分别接 A、` 与 `B 金属板给…` 之间），重置会把一句话劈成两段。
+      // 图后若真是新段落，下面的 x0/行距判据会自然断开。表格是块级独占，必须重置。
+      if (blk.kind === "table") cur = null;
+      out.push({ kind: blk.kind, blk });
+      continue;
+    }
+    const t = (blk.text ?? "").trim();
+    if (!t) continue;
+
+    if (cur && cur.last && cur.last.bbox && blk.bbox && sameParagraph(cur.last, cur.text, blk, t)) {
+      // 中英文/数字相邻时补一个空格，避免 `P062教材` 这种粘连
+      const glue = /[A-Za-z0-9]$/.test(cur.text) && /^[A-Za-z0-9]/.test(t) ? " " : "";
+      cur.text += glue + t;
+      cur.last = blk;
+      continue;
+    }
+    cur = { kind: "text", text: t, last: blk };
+    out.push(cur);
+  }
+  return out;
+}
+
+function sameParagraph(prevBlk, prevText, blk, text) {
+  // 60 而不是个位数：题号行顶格、正文首行缩进，实测同一段内 x0 差可达 45
+  //（`1 [人教版必修三 P56 第 1 题情境变式]` x0=76 → `如图所示…` x0=121）。
+  // 放这么宽仍安全：双栏页两栏的 x0 相差 >1000，居中标题与正文相差 >400。
+  if (Math.abs(prevBlk.bbox[0] - blk.bbox[0]) > 60) return false;
+  const h = prevBlk.bbox[3] - prevBlk.bbox[1];
+  const gap = blk.bbox[1] - prevBlk.bbox[3];
+  if (gap > Math.max(h * 1.6, 12)) return false;
+  if (FLOW_ENDS.test(prevText)) return false;
+  if (FLOW_STARTS_NEW.test(text)) return false;
+  return true;
+}
+
+function flowPaper(p) {
+  const wrap = el("div", "flow-page");
+  const ctx = mergeContext(p);
+  for (const item of groupParagraphs(p.blocks, ctx)) {
+    const blk = item.blk;
+    if (item.kind === "text") {
+      const para = el("p", "flow-p");
+      // prettifyLatex 返回 HTML 片段（分式/根号/上下标），与纸面同一个渲染函数
+      para.innerHTML = prettifyLatex(item.text);
+      wrap.append(para);
+      continue;
+    }
+
+    if (blk.kind === "image" && blk.img) {
+      const img = el("img", "flow-img");
+      img.src = `/data/out/${enc(state.doc)}/images/${enc(blk.img)}`;
+      img.alt = "图片块";
+      img.loading = "lazy";
+      wrap.append(img);
+      continue;
+    }
+    if (blk.kind === "table" && blk.html) {
+      // 上游 HTML 直接沿用（含 rowspan/colspan）；宽度交给 CSS，不重新推断列宽
+      const box = el("div", "flow-table");
+      box.innerHTML = blk.html;
+      wrap.append(box);
+    }
+  }
+  return wrap;
+}
+
 function paper(p) {
+  if (isPhoneViewport()) return flowPaper(p);
   return renderPaper(p, {
     doc: state.doc,
     paneW: state.paneW,

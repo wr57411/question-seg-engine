@@ -330,3 +330,50 @@
    图片块的青绿虚线框同理（那是「这里是图片块」的标记，不是图本身的边框）。 */
 #book .blk-line .txt { border-color: transparent; }
 #book .blk-line.kind-image { border: 0; background: none; }
+
+/* ── 手机端文本流（DECISIONS §88）────────────────────────────────────────────
+   手机（较短边 < 500）不跟原卷坐标：纸面等比缩放在 375 宽下正文只有 5-6px，
+   横屏虽然有 12px 但一行要横跨整屏、读起来更别扭（用户 2026-10-30 拍板）。
+   平板与桌面仍走纸面渲染 —— 那是这个项目的核心卖点，不为手机牺牲。 */
+.flow-page {
+  width: 100%;
+  max-width: 44em;
+  margin: 0 auto;
+  padding: 4px 14px 40px;
+  font-size: 16px;
+  line-height: 1.8;
+  text-align: justify;
+  word-break: break-word;
+  -webkit-text-size-adjust: 100%;
+}
+.flow-page .flow-p {
+  margin: 0 0 0.5em;
+}
+/* 图片一律按容器宽收，不按原卷坐标 —— 原卷图在双栏里可能只有半栏宽，
+   手机上再用那个比例就小得看不见了 */
+.flow-page .flow-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 10px auto;
+}
+/* 表格：横竖都能滚（实验数据表列多），不压成看不清的窄条 */
+.flow-page .flow-table {
+  margin: 10px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.flow-page .flow-table table {
+  width: 100%;
+  min-width: 20em;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+}
+.flow-page .flow-table td,
+.flow-page .flow-table th {
+  border: 1px solid rgba(0, 0, 0, 0.28);
+  padding: 3px 5px;
+  vertical-align: top;
+}
