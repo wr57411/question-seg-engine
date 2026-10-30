@@ -185,7 +185,14 @@ interface Meta {
 }
 
 /** 从产物算体检摘要 —— 数字全部来自落盘文件，不从内存里猜 */
-function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: Meta["source"], ocrError: string | null = null): Meta {
+function buildMeta(
+  docId: string,
+  label: string,
+  kind: "quiz" | "answer",
+  src: Meta["source"],
+  ocrError: string | null = null,
+  importedAt?: string,
+): Meta {
   const outDir = join(OUT_ROOT, docId);
   const qPath = join(outDir, "questions.json");
   const sPath = join(outDir, "stages.json");
@@ -259,7 +266,7 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
     id: docId,
     label,
     kind,
-    importedAt: new Date().toISOString(),
+    importedAt: importedAt ?? new Date().toISOString(),
     source: src,
     stats: {
       pages: snap.pages.length,
@@ -331,8 +338,11 @@ async function main(): Promise<void> {
 
   // --meta-only：只刷新体检摘要（产物已就位时用；不重跑导出，不动快照）
   if (flags["meta-only"] === true) {
-    // source 从**产物**推断，不读旧 meta（旧 meta 可能带着上一轮的默认值，越传越错）
-    writeMeta(docId, label, kind, inferSource(outDir), null);
+    // 数字一律从产物重算；**来源**（pdf/parser/ocr）优先沿用旧记录：
+    // 产物文件不足以还原历史来源（OXR 响应可能已删、prebuilt 目录后来也有 layout.json），
+    // 用 inferSource 猜会把 oxr 误记成 mineru —— 来源记错比沿用旧记录更糟（2026-10-30 实测）。
+    const prev = readPrevMeta(outDir);
+    writeMeta(docId, label, kind, prev?.source ?? inferSource(outDir), null, prev?.importedAt);
     return;
   }
 
@@ -482,15 +492,25 @@ async function main(): Promise<void> {
  * 写 `meta.json`（成品页据此发现文档 + 显示体检）。
  * 只读落盘产物算数字，不从内存里猜 —— 重算一次和重跑一遍必须得到同一个结论。
  */
+/** 读已有 meta（读不到就当没有；--meta-only 只用它保留来源与导入时刻） */
+function readPrevMeta(outDir: string): Meta | null {
+  try {
+    return JSON.parse(readFileSync(join(outDir, "meta.json"), "utf8")) as Meta;
+  } catch {
+    return null;
+  }
+}
+
 function writeMeta(
   docId: string,
   label: string,
   kind: "quiz" | "answer",
   src: Meta["source"],
   ocrError: string | null = null,
+  importedAt?: string,
 ): Meta {
   const outDir = join(OUT_ROOT, docId);
-  const meta = buildMeta(docId, label, kind, src, ocrError);
+  const meta = buildMeta(docId, label, kind, src, ocrError, importedAt);
   writeFileSync(join(outDir, "meta.json"), JSON.stringify(meta, null, 2));
 
   const s = meta.stats;
