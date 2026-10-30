@@ -27,6 +27,7 @@
     "stages/font-metrics.js",
     "stages/block-dedup.js",
     "stages/latex-display.js",
-    "stages/uncovered-layout.js"
+    "stages/uncovered-layout.js",
+    "stages/reconstruct.js"
   ]
 }
