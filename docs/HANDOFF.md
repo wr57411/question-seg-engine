@@ -393,8 +393,11 @@ layout.json / content_list.json
 2. `npm install && npm run check` —— **必须全绿才能动手**；不绿先修门，勿带病开发。
    ⚠️ **新建/换 worktree 时门会红 2 例**（`tests/contract*.test.ts` 读
    `data/out/23必刷题 2相互作用/questions.json`）：`data/` 是 git 忽略的运行时产物，
-   新 worktree 里没有。不是代码缺陷 —— 把已有产物接过来即可（软链或复制整个 `data/`），
-   或用 `npm run daily` 重新生成。判据：这 2 例之外的任何红都是真红。
+   新 worktree 里没有。不是代码缺陷 —— 在 worktree 根目录
+   **`cp -Rc <主仓库>/data data` 做 APFS 克隆**（秒级、写时复制不占双倍空间；
+   ⚠️ 不要用软链：两个 worktree 会共用同一个产物目录，并行会话互相覆盖，
+   见 `tasks/lessons.md` L4），或用 `npm run daily` 重新生成。
+   `books/` 是只读源 PDF，保持软链共享即可。判据：这 2 例之外的任何红都是真红。
 3. 先看**成品页**（`npm run view` → `/final/?doc=<docId>`）：这就是交付物的样子，
    逐页按原坐标重建、像翻原版书。再看 `npm run stages` 的**对比模式**
    （`?doc=第二章相互作用-答案与解析`）对照原卷页图看 5 分钟——建立「这套系统现在长什么样」的直觉。

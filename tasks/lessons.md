@@ -70,3 +70,9 @@
   重跑恢复再继续，并把事故记入台账。
 - 质量门里**会写产物**的步骤（`bank:all`、重导、`daily`）是冲突热点；只读审计
   （`audit:ab`、`audit:render`、审计脚本）可以放心跑。
+
+**解除（2026-10-30）**：功能 worktree 的 `data` 软链已换成 **APFS 克隆**
+（`cp -Rc` 写时复制，4931 个文件秒级完成、不占双倍空间）—— 两个 worktree 从此各写
+各的产物。`books/`（16 份只读源 PDF）保持软链共享。**新 worktree 约定：用
+`cp -Rc <主仓库>/data data` 克隆，不要再建软链**；换链要在无并行写入的间隙做
+（先克隆成 `data.new`，`rm data && mv data.new data` 的窗口只有毫秒级）。
