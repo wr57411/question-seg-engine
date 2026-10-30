@@ -11,6 +11,7 @@
 import { layoutPage } from "./layout.js";
 import {
   bandOrdinal,
+  hasTextbookSource,
   isBandSubheading,
   isPageFurniture,
   isPageNoiseLine,
@@ -471,7 +472,9 @@ class Ctx {
         return;
       }
       case "question_no": {
-        if (this.extractBand) {
+        if (this.extractBand && !hasTextbookSource(block.text)) {
+          // 萃取区内**带教材出处标注**的是真题（`DECISIONS §84`）：
+          // 一刀切抑制会把真题一起丢掉（实测机械能 p7 丢 2 道），所以按标注放行。
           this.review(blockIndex, `教材知识萃取栏内的编号条目「${m.captured}.」不是题目（参考表格内容）`, this.current);
           return;
         }

@@ -314,6 +314,20 @@ function matchKind(ok: boolean, kind: TextMatch["kind"]): LineMatch {
  * 把收集到的块直接拼进题干、绕过了它 ⇒ 实测 `教材实验12` 的题干混进了 `答案 P049]`。
  * 同一判据两处实现必然漂移，提出来共用。
  */
+/**
+ * **真题的教材出处标注**（`DECISIONS §84`）：`[鲁科版必修二 P108 第5题设问变式]`、`[多选][人教版…]`。
+ *
+ * 用途：`教材知识萃取` 板块里混着两类东西 —— 知识条目（`定义:/内容:/表达式:/1. 公式：`）
+ * 与**带出处标注的真题**。原来的 `extractBand` 一刀切抑制**所有**编号，把真题也丢了
+ * （实测机械能守恒 p7 的 `1[粤教版必修二P114第4题拓展变式]不考虑空气`、
+ * `4[多选][鲁科版必修二P34第1题模型变式]如图所` 两道真题没有切成题）。
+ *
+ * 用「教材版本名 + 版」当白名单：知识条目不会长这样，真题一定带它。
+ */
+export function hasTextbookSource(text: string): boolean {
+  return /\[(人教|鲁科|粤教|沪科|教科|苏教|北师大|外研|冀教|湘教)版/.test(text);
+}
+
 export function isPageNoiseLine(text: string): boolean {
   const t = text.trim();
   return /^\[?答案\s*[A-Z]?\d+\]?$/.test(t) || /^[（）()\s]+$/.test(t);
