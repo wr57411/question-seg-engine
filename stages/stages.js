@@ -1,3 +1,4 @@
+// @ts-check
 // stages/stages.js —— 阶段样品展示前端。
 // 解耦红线：本文件不 import 引擎代码，只消费
 //   /data/out/<docId>/stages.json（快照契约，见 scripts/export-stages.ts）
@@ -25,6 +26,24 @@ import {
   uncoveredInto,
 } from "./reconstruct.js";
 
+/**
+ * 本文件消费的快照形状（只声明**本文件读过**的字段；契约权威在
+ * `scripts/export-stages.ts` 的 TS interface，这里按展示层最小口径重列）。
+ *
+ * 为什么不 `@typedef {import("./reconstruct.js").Block} Block` 复用：
+ * `reconstruct.js` 被手写的 `reconstruct.d.ts` 遮蔽（债务登记 `HANDOFF §6-29`），
+ * 类型 import 过去同样拿不到，故先在本文件自带最小 typedef
+ * （同 `final/tag-panel.js` 的 G05 处理：在调用点显式收窄，不为过检查写 `any`）。
+ * @typedef {{ i: number, type: string, bbox: number[], text: string }} RawBlock
+ * @typedef {{ i: number, bbox: number[], text?: string }} Block
+ * @typedef {{ id: string, number: string, section?: string, type: string, blocks: number[], confidence: number, status: string, reasons: string[] }} PageQuestion
+ * @typedef {{ index: number, width: number, height: number, columns: number, centers: number[], raw: RawBlock[], blocks: Block[], order: number[], questions: PageQuestion[], ocrFullText?: string }} Page
+ * @typedef {{ questionId: string, field: string, latex: string, kinds: string[] }} NoiseItem
+ * @typedef {{ totalFormulas: number, noisyFormulas: number, questionsAffected: number, kindCounts?: Record<string, number>, items: NoiseItem[] }} FormulaNoise
+ * @typedef {{ pages: Page[], originPages?: number, answerEntriesTotal?: number, stats: { answersMatched?: number }, formulaNoise?: FormulaNoise, reviews: unknown[] }} Snapshot
+ * @typedef {PageQuestion & { page: number }} QAItem
+ */
+
 const DEFAULT_DOC = "23必刷题 2相互作用";
 
 const STAGES = [
@@ -37,6 +56,8 @@ const STAGES = [
   { key: "compare", t: "对比", q: "跟原卷像不像？" },
 ];
 
+/** 阶段名 → 「这一步做什么 / 该看什么」文案表：按 key 索引，Record 让取用不必命中文面键。 */
+/** @type {Record<string, { do: string, look: string }>} */
 const EXPLAIN = {
   origin: {
     do: "这是给电脑吃的原始试卷（PDF 原文，双栏排版）。后面每个阶段都是对这份原文的逐步理解，随时回到这一步对照。",
@@ -68,12 +89,15 @@ const EXPLAIN = {
   },
 };
 
+/** @type {Record<string, string>} */
 const TYPE_LABEL = {
   title: "标题", text: "正文", image: "图片", table: "表格", chart: "图表",
   equation: "公式", interline_equation: "公式", abandon: "弃用",
 };
+/** @param {string} t @returns {string} */
 const TYPE_LABEL_CN = (t) => TYPE_LABEL[t] ?? t;
 
+/** @type {Record<string, string>} */
 const NOISE_KIND_LABEL = {
   "spaced-digits": "数字间空格",
   wrapper: "字体包装命令",
@@ -99,11 +123,22 @@ const CANDIDATE_STYLE = new URLSearchParams(location.search).get("ocr") === "1";
  */
 const SHOW_OCR_FILL = new URLSearchParams(location.search).get("fill") === "1";
 
+/** @type {{ doc: string | null, effectiveDoc: string | null, data: Snapshot | null, stage: number, page: number, highlight: string | null }} */
 const state = { doc: null, effectiveDoc: null, data: null, stage: 0, page: 0, highlight: null };
 
-const $ = (id) => document.getElementById(id);
+/**
+ * 取页面骨架（index.html）里的固定节点。这些 id 全部写死在骨架里、本文件的每次调用都命中，
+ * ⇒ 按 `final/tag-panel.js` 的惯例在取用处显式收窄为 HTMLElement（而不是抛错改变行为）。
+ * @param {string} id
+ * @returns {HTMLElement}
+ */
+const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
 /* ── 数据加载（与 viewer 相同的宽容策略：doc 参数非法时回退默认卷一次） ── */
+/**
+ * @param {string} doc
+ * @returns {Promise<Snapshot>}
+ */
 async function fetchSnapshot(doc) {
   const res = await fetch(`/data/out/${enc(doc)}/stages.json`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -133,8 +168,9 @@ async function load() {
     }
   }
   if (state.effectiveDoc !== state.doc) {
-    const url = new URL(location);
-    url.searchParams.set("doc", state.effectiveDoc);
+    // location.href 与 new URL(location) 的隐式 ToString 同一个串（Location.toString() 即 href）⇒ 严格等价
+    const url = new URL(location.href);
+    url.searchParams.set("doc", /** @type {string} */ (state.effectiveDoc));
     history.replaceState(null, "", url);
   }
   $("doc-name").textContent = state.effectiveDoc;
@@ -143,12 +179,15 @@ async function load() {
   const wantPage = Number(params.get("page"));
   if (Number.isInteger(wantStage) && wantStage >= 0 && wantStage < STAGES.length) state.stage = wantStage;
   if (Number.isInteger(wantPage) && wantPage >= 0 && wantPage < state.data.pages.length) state.page = wantPage;
-  $("link-viewer").href = `/viewer/?doc=${enc(state.effectiveDoc)}`;
+  // `<a id="link-viewer">` 写死在 index.html ⇒ 收窄到 anchor 只是告诉类型系统 DOM 事实（同上 G05 口径）
+  const viewerLink = /** @type {HTMLAnchorElement} */ ($("link-viewer"));
+  viewerLink.href = `/viewer/?doc=${enc(/** @type {string} */ (state.effectiveDoc))}`;
   buildStepper();
   buildPager();
   render();
 }
 
+/** @param {string} name */
 function missingSnapshot(name) {
   state.effectiveDoc = null;
   notice(
@@ -158,6 +197,10 @@ function missingSnapshot(name) {
   $("doc-name").textContent = name;
 }
 
+/**
+ * @param {string} html
+ * @param {boolean} [isError]
+ */
 function notice(html, isError) {
   const n = $("notice");
   n.innerHTML = html; // 内容为本页面自身生成的提示，不含用户数据文本
@@ -186,9 +229,12 @@ function buildStepper() {
 }
 
 function buildPager() {
-  const sel = $("page-jump");
+  // buildPager/render*/syncToolbar 只在 load() 成功之后被调用 ⇒ state.data 此时必为快照；
+  // 别名 data 只做类型收窄（同一次调用里 state.data 不会再被改写），不改任何行为。
+  const data = /** @type {Snapshot} */ (state.data);
+  const sel = /** @type {HTMLSelectElement} */ ($("page-jump")); // index.html 里是 <select>
   sel.replaceChildren();
-  state.data.pages.forEach((p) => {
+  data.pages.forEach((p) => {
     const o = el("option", "", `第 ${p.index + 1} 页`);
     o.value = String(p.index);
     sel.append(o);
@@ -197,22 +243,29 @@ function buildPager() {
     state.page = Number(sel.value);
     render();
   });
-  $("page-prev").addEventListener("click", () => {
+  const prev = /** @type {HTMLButtonElement} */ ($("page-prev"));
+  const next = /** @type {HTMLButtonElement} */ ($("page-next"));
+  prev.addEventListener("click", () => {
     if (state.page > 0) { state.page--; render(); }
   });
-  $("page-next").addEventListener("click", () => {
-    if (state.page < state.data.pages.length - 1) { state.page++; render(); }
+  next.addEventListener("click", () => {
+    if (state.page < data.pages.length - 1) { state.page++; render(); }
   });
 }
 
+/** @param {Page} p */
 function syncToolbar(p) {
-  const last = state.data.pages.length - 1;
-  $("page-label").textContent = `第 ${p.index + 1} / ${state.data.pages.length} 页`;
-  $("page-prev").disabled = p.index === 0;
-  $("page-next").disabled = p.index === last;
-  $("page-jump").value = String(p.index);
-  const origin = $("origin-link");
-  origin.href = `/data/out/${enc(state.effectiveDoc)}/origin.pdf#page=${p.index + 1}`;
+  const data = /** @type {Snapshot} */ (state.data); // 同上：仅收窄，不改行为
+  const doc = /** @type {string} */ (state.effectiveDoc); // 同上：load() 成功后必为字符串
+  const last = data.pages.length - 1;
+  $("page-label").textContent = `第 ${p.index + 1} / ${data.pages.length} 页`;
+  const prev = /** @type {HTMLButtonElement} */ ($("page-prev")); // index.html 里是 <button>
+  const nextBtn = /** @type {HTMLButtonElement} */ ($("page-next"));
+  prev.disabled = p.index === 0;
+  nextBtn.disabled = p.index === last;
+  /** @type {HTMLSelectElement} */ ($("page-jump")).value = String(p.index);
+  const origin = /** @type {HTMLAnchorElement} */ ($("origin-link"));
+  origin.href = `/data/out/${enc(doc)}/origin.pdf#page=${p.index + 1}`;
   origin.hidden = false;
   $("page-meta").textContent =
     `判定 ${p.columns} 栏 · ${p.blocks.length} 行块 · ${p.questions.length} 题` +
@@ -221,25 +274,34 @@ function syncToolbar(p) {
 
 /* ── 各阶段渲染（纸面重建的基元在 ./reconstruct.js） ── */
 
+/**
+ * @param {Page} p
+ */
 function renderOrigin(p) {
+  const data = /** @type {Snapshot} */ (state.data); // 同上：仅收窄，不改行为
+  const doc = /** @type {string} */ (state.effectiveDoc); // 同上
   $("canvas-wrap").replaceChildren();
-  const total = state.data.pages.length;
-  if ((state.data.originPages ?? 0) >= total && total > 0) {
+  const total = data.pages.length;
+  if ((data.originPages ?? 0) >= total && total > 0) {
     // 逐页 PNG（pdftoppm 渲染）：任何浏览器可靠显示
     const pad = String(total).length;
     const img = el("img", "origin-img");
-    img.src = `/data/out/${enc(state.effectiveDoc)}/pages/page-${String(p.index + 1).padStart(pad, "0")}.png`;
+    img.src = `/data/out/${enc(doc)}/pages/page-${String(p.index + 1).padStart(pad, "0")}.png`;
     img.alt = `原卷第 ${p.index + 1} 页`;
     $("canvas-wrap").append(img);
   } else {
     // 降级：PDF 内嵌（依赖浏览器 PDF 查看器）
     const f = el("iframe", "origin-frame");
-    f.src = `/data/out/${enc(state.effectiveDoc)}/origin.pdf#page=${p.index + 1}`;
+    f.src = `/data/out/${enc(doc)}/origin.pdf#page=${p.index + 1}`;
     f.title = `原卷第 ${p.index + 1} 页`;
     $("canvas-wrap").append(f);
   }
 }
 
+/**
+ * @param {Page} p
+ * @returns {HTMLElement}
+ */
 function renderRaw(p) {
   const c = paperCanvas(p);
   // 阶段 1 是**段级块**（整段多行）：行高模型不成立，改用「按框宽适配」（R1，见 font-metrics.js）
@@ -260,6 +322,10 @@ function renderRaw(p) {
   return c;
 }
 
+/**
+ * @param {Page} p
+ * @returns {HTMLElement}
+ */
 function renderOrder(p) {
   const c = paperCanvas(p);
   if (p.centers.length >= 2) {
@@ -275,7 +341,8 @@ function renderOrder(p) {
     c.append(left, right, divider);
   }
   const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
-  appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p), state.effectiveDoc); // 同页块级重复并集合并（Task 15）
+  // `el`/`appendBlockNodes` 等的返回类型仍被 `reconstruct.d.ts` 写成 any（§6-29 债）⇒ 这里只收窄 doc 实参
+  appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p), /** @type {string} */ (state.effectiveDoc)); // 同页块级重复并集合并（Task 15）
   p.order.forEach((blockIdx, seq) => {
     const b = p.blocks[blockIdx];
     if (!b) return;
@@ -288,12 +355,17 @@ function renderOrder(p) {
   return c;
 }
 
+/**
+ * @param {Page} p
+ * @returns {HTMLElement}
+ */
 function renderSeg(p) {
   const c = paperCanvas(p);
   const baseFont = baseFontOfPage(p.blocks, p.width, CANVAS_W);
   // 同页块级重复并集合并（Task 15）：被合并掉的块不渲染 → 节点数组与 p.blocks 按位对齐（null = 未渲染）
-  const blockNodes = appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p), state.effectiveDoc);
+  const blockNodes = appendBlockNodes(c, p, CANVAS_W, baseFont, mergeContext(p), /** @type {string} */ (state.effectiveDoc));
 
+  /** @type {Set<number>} 被题目圈走的块下标 */
   const covered = new Set();
   for (const q of p.questions) for (const i of q.blocks) covered.add(i);
   blockNodes.forEach((n, i) => {
@@ -330,6 +402,10 @@ function renderSeg(p) {
   return c;
 }
 
+/**
+ * @param {PageQuestion} q
+ * @param {Page} p
+ */
 function showDetail(q, p) {
   const d = $("detail");
   d.hidden = false;
@@ -350,10 +426,13 @@ function showDetail(q, p) {
 }
 
 function renderQA() {
+  const data = /** @type {Snapshot} */ (state.data); // 只在 load() 成功后被调用 ⇒ 仅收窄，不改行为
+  /** @type {QAItem[]} */
   const qs = [];
   // 同一道题可能跨页出现在多页，质检清单按（题号 id）去重
+  /** @type {Set<string>} */
   const seen = new Set();
-  state.data.pages.forEach((p) =>
+  data.pages.forEach((p) =>
     p.questions.forEach((q) => {
       if (!seen.has(q.id)) {
         seen.add(q.id);
@@ -364,17 +443,23 @@ function renderQA() {
   qs.sort((a, b) => a.confidence - b.confidence);
   const flagged = qs.filter((q) => q.status === "needs_review");
   const avg = qs.length ? qs.reduce((a, q) => a + q.confidence, 0) / qs.length : 0;
-  const diagTotal = state.data.reviews.length;
+  const diagTotal = data.reviews.length;
 
   const extra = $("stage-extra");
   extra.replaceChildren();
   const sum = el("div", "qa-summary");
+  /**
+   * @param {string | number} n
+   * @param {string} l
+   * @param {boolean} [warn]
+   * @returns {HTMLElement}
+   */
   const chip = (n, l, warn) => {
     const c = el("div", `qa-chip${warn ? " warn" : ""}`);
     c.append(el("span", "n", String(n)), el("span", "l", l));
     return c;
   };
-  const ansTotal = state.data.answerEntriesTotal ?? 0;
+  const ansTotal = data.answerEntriesTotal ?? 0;
   sum.append(
     chip(qs.length, "共切出题目"),
     chip(flagged.length, "需人工校对", flagged.length > 0),
@@ -382,13 +467,13 @@ function renderQA() {
     chip(diagTotal, "诊断记录（含已兜底）"),
     ansTotal === 0
       ? chip("—", "本卷无答案区")
-      : chip(`${state.data.stats.answersMatched ?? "—"}/${ansTotal}`, "答案已对号"),
+      : chip(`${data.stats.answersMatched ?? "—"}/${ansTotal}`, "答案已对号"),
   );
   extra.append(sum);
   extra.append(el("p", "qa-note", `说明：诊断记录是规则引擎发现的所有疑点；只有可信度低于 75% 的题才会被标记「需人工校对」。诊断多而待复核少是正常现象（多数疑点已被规则自行兜底）。`));
 
   // 公式噪声检测区（检测不改写）：量化上游 LaTeX 可读性问题，计数随清洗规则迭代下降
-  const noise = state.data.formulaNoise;
+  const noise = data.formulaNoise;
   if (noise && noise.totalFormulas > 0) {
     const nsum = el("div", "qa-summary");
     nsum.append(
@@ -404,8 +489,9 @@ function renderQA() {
       );
     }
     const nlist = el("div", "qa-list");
+    /** @type {Map<string, number>} 题号 id → 首次出现的页下标 */
     const pageOf = new Map();
-    state.data.pages.forEach((p) => p.questions.forEach((q) => {
+    data.pages.forEach((p) => p.questions.forEach((q) => {
       if (!pageOf.has(q.id)) pageOf.set(q.id, p.index);
     }));
     for (const it of noise.items.slice(0, 8)) {
@@ -437,6 +523,7 @@ function renderQA() {
   }
 
   const list = el("div", "qa-list");
+  /** @param {QAItem} q @returns {string} */
   const why = (q) => (q.reasons.length ? q.reasons.join("；") : "规则匹配完整");
   for (const q of qs.slice(0, 60)) {
     const row = el("div", `qa-row${q.status === "needs_review" ? " flag" : ""}`);
@@ -472,14 +559,16 @@ function renderQA() {
  * 默认画就不像原版书了；要查漏识别请切到「对比」（那里全开）。
  * 题号牌保留：它就是用户要的题号标注，且挂在留白里、不压正文。
  */
+/** @param {Page} p */
 function renderFinal(p) {
+  const doc = /** @type {string} */ (state.effectiveDoc); // 只在 load() 成功后被调用 ⇒ 仅收窄，不改行为
   $("canvas-wrap").replaceChildren();
   const extra = $("stage-extra");
   extra.replaceChildren();
   const holder = el("div", "final-wrap");
   holder.append(
     renderPaper(p, {
-      doc: state.effectiveDoc,
+      doc,
       paneW: CANVAS_W,
       diagnostics: false,
       candidateStyle: CANDIDATE_STYLE,
@@ -492,14 +581,17 @@ function renderFinal(p) {
   const note = el("p", "final-note");
   note.innerHTML =
     "成品 = 结构化数据按原坐标重建的纸面（与原卷逐块对位，非原图）。" +
-    `完整成品页（整册浏览 · 可切审计标记）：<a href="/final/?doc=${enc(state.effectiveDoc)}" target="_blank" rel="noopener">打开成品页 ↗</a>` +
-    ` · 要检索/答案开关：<a href="/viewer/?doc=${enc(state.effectiveDoc)}" target="_blank" rel="noopener">阅读版 ↗</a>` +
+    `完整成品页（整册浏览 · 可切审计标记）：<a href="/final/?doc=${enc(doc)}" target="_blank" rel="noopener">打开成品页 ↗</a>` +
+    ` · 要检索/答案开关：<a href="/viewer/?doc=${enc(doc)}" target="_blank" rel="noopener">阅读版 ↗</a>` +
     " · 要查漏识别：上一步「对比」。";
   extra.append(note);
 }
 
 /** 对比模式：左 = 原卷页图，右 = 结构化数据按原坐标重建的纸面 */
+/** @param {Page} p */
 function renderCompare(p) {
+  const data = /** @type {Snapshot} */ (state.data); // 只在 load() 成功后被调用 ⇒ 仅收窄，不改行为
+  const doc = /** @type {string} */ (state.effectiveDoc); // 同上
   const row = el("div", "compare-wrap");
 
   // 栏宽按**可用宽度**算，不写死 460：写死 + flex-wrap 会在窄窗口折行堆叠，
@@ -511,15 +603,15 @@ function renderCompare(p) {
   const left = el("div", "compare-pane");
   left.style.width = `${paneW}px`;
   left.append(el("p", "pane-title", "原卷"));
-  if ((state.data.originPages ?? 0) >= state.data.pages.length && state.data.pages.length > 0) {
-    const pad = String(state.data.pages.length).length;
+  if ((data.originPages ?? 0) >= data.pages.length && data.pages.length > 0) {
+    const pad = String(data.pages.length).length;
     const img = el("img", "origin-page-img");
-    img.src = `/data/out/${enc(state.effectiveDoc)}/pages/page-${String(p.index + 1).padStart(pad, "0")}.png`;
+    img.src = `/data/out/${enc(doc)}/pages/page-${String(p.index + 1).padStart(pad, "0")}.png`;
     img.alt = `原卷第 ${p.index + 1} 页`;
     left.append(img);
   } else {
     const f = el("iframe", "origin-frame");
-    f.src = `/data/out/${enc(state.effectiveDoc)}/origin.pdf#page=${p.index + 1}`;
+    f.src = `/data/out/${enc(doc)}/origin.pdf#page=${p.index + 1}`;
     f.title = `原卷第 ${p.index + 1} 页`;
     left.append(f);
   }
@@ -531,7 +623,7 @@ function renderCompare(p) {
   // 所以「成品 = 对比右侧」是结构保证的，不是两处各写一遍碰巧长得像。
   // 对比模式是**审计视图** ⇒ diagnostics 全开（解析遗漏框 + 丢弃块）。
   const paper = renderPaper(p, {
-    doc: state.effectiveDoc,
+    doc,
     paneW,
     diagnostics: true,
     candidateStyle: CANDIDATE_STYLE,
@@ -564,7 +656,8 @@ function renderCompare(p) {
 }
 
 function render() {
-  const p = state.data.pages[state.page];
+  const data = /** @type {Snapshot} */ (state.data); // 只在 load() 成功后被调用 ⇒ 仅收窄，不改行为
+  const p = data.pages[state.page];
   [...$("stepper").children].forEach((b, i) => b.classList.toggle("active", i === state.stage));
   const ex = EXPLAIN[STAGES[state.stage].key];
   const explain = $("explain");
@@ -620,7 +713,8 @@ function render() {
 }
 
 /* 对比模式的栏宽随窗口变化 → 防抖重渲染，保证「永远并排」且字号换算口径与真实栏宽同步。 */
-let resizeTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} 定时器句柄；初值由 null 改为 undefined（两者都被 clearTimeout 当空句柄 no-op，行为不变），以便类型收窄不靠断言 */
+let resizeTimer = undefined;
 window.addEventListener("resize", () => {
   if (state.stage !== 6 || !state.data) return;
   clearTimeout(resizeTimer);

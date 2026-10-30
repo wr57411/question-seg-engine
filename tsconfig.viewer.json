@@ -31,6 +31,7 @@
     "stages/reconstruct.js",
     "final/tag-panel.js",
     "final/entry-paper.js",
-    "viewer/viewer.js"
+    "viewer/viewer.js",
+    "stages/stages.js"
   ]
 }
