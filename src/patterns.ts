@@ -120,6 +120,16 @@ const SECTION_HEAD_ALT = /^(专题[　\s]*(.{0,26})|全章综合测试\s*(.{0,26
  */
 const BAND_HEAD =
   /^[☑□▶■●◆◇○•·\-—]?\s*(教材知识萃取|教材素材变式|教材实验\s*\d+|教材知识\s*\d+|教材模型\s*\d+|教材模型攻略|大单元素养聚焦|素养演练|单元设计)/;
+/**
+ * 教辅栏目板块的**序号**（`教材实验 10 长度的测量…` → `"10"`），用于「整块无题号时按栏目序号开题」
+ * （`DECISIONS §79`）。只认 `教材实验 N`：其它板块（教材素材变式/教材知识萃取/素养演练）没有序号，
+ * 返回 null ⇒ 不开题。
+ */
+export function bandOrdinal(title: string): string | null {
+  const m = /^[☑□▶■●◆◇○•·\-—]?\s*教材实验\s*(\d{1,2})(?!\d)/.exec(title.trim());
+  return m && m[1] ? m[1] : null;
+}
+
 const VARIANT_HEAD = /^[☑□▶■●◆◇○•·\-—]?\s*变式\s*(\d{1,2})[　\s]+(.{1,30})$/;
 
 /**
@@ -476,6 +486,9 @@ export function isBandSubheading(text: string): boolean {
   const head = stripQuestionPrefix(first).trim();
   if (!head) return false;
   if (/[。，,；;：:！!？?]/.test(head)) return false;
+  // 顿号是**枚举标题**的特征（`安阻法、伏阻法测电源电动势和内阻`）；
+  // 题干不会只有一串并列名词而没有任何句读。带顿号且 ≤20 字 ⇒ 小标题。
+  if (/、/.test(head) && head.length <= 20) return true;
   if (lines.length === 1) return head.length <= 8;
   return head.length <= 18 && /【[^】]{1,12}】/.test(text);
 }

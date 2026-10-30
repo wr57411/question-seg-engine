@@ -10,6 +10,7 @@
  */
 import { layoutPage } from "./layout.js";
 import {
+  bandOrdinal,
   isBandSubheading,
   isPageFurniture,
   looksLikeAnswerEntry,
@@ -175,6 +176,23 @@ class Ctx {
   private blockSlots = new Map<number, { page: number; within: number; text: string }>();
   /** 每页已处理块数（算页内下标用） */
   private pageSeen = new Map<number, number>();
+
+  /**
+   * 板块头**待开题**（`DECISIONS §79`）：`教材实验 10 …` 这类栏目，整块可能本身就是一道大题
+   * （题号印在栏目名里），也可能栏目内还有自己的 `1. 2.` 编号。
+   *
+   * 为什么延迟开题、而不是见到栏目头就开：机械能守恒 p13 的「教材实验7」下面紧跟真题
+   * `1小天同学用如图1所示的实验装置进行实验。`（`§77` 切出来的）。若栏目头先开一道「第 7 题」，
+   * 就会多出一道空题、题号序列变成 7 → 1（同组不连续，N4 报红）。
+   * ⇒ 收集到第一个**真实题号**时放弃开题；整块都没有题号时，才用栏目序号开题。
+   */
+  private pendingBand: {
+    title: string;
+    ordinal: string | null;
+    entry: IndexedBlock;
+    blockIndexes: number[];
+    texts: string[];
+  } | null = null;
   /** 章/节标题时间线（按 (页, y) 排序）—— 见 buildHeadingTimeline */
   private headings: {
     page: number;
@@ -259,6 +277,11 @@ class Ctx {
       within: withinPage,
       text: block.kind === "text" || block.kind === "table" ? block.text : "",
     });
+    // 待开题的板块头：把它之后的块先攒起来（开题时一次性归给题目；放弃开题时块仍在快照里）
+    if (this.pendingBand) {
+      this.pendingBand.blockIndexes.push(blockIndex);
+      if (block.kind === "text") this.pendingBand.texts.push(block.text);
+    }
 
     /**
      * **表格块**（`DECISIONS §76`）：只归属当前题，**不参与任何题号/选项判定**。
@@ -347,6 +370,8 @@ class Ctx {
           : matchGluedQuestionNumber(block.firstLine, expected);
       if (glued !== null) {
         this.settleOptions(null);
+        // 黏连通道也是**真实题号**：板块内有它 ⇒ 放弃用栏目序号开题（机械能 p13 `1小天同学…`）
+        this.pendingBand = null;
         // 剥掉行首题号（`2为了…` → `为了…`），其余文本原样进题干
         const stripped = block.firstLine.trimStart().replace(/^\d{1,2}/, "");
         const restText = block.text.trimStart().replace(/^\d{1,2}/, "");
@@ -367,6 +392,9 @@ class Ctx {
       case "answer_zone": {
         // 参考答案区：试题流终止，之后只解析答案条目。
         //
+        // 试题流终止 = 板块终止（`DECISIONS §79`）：挂着待开题的板块必须在此结算，
+        // 否则它会一路攒到 finish()，把整个答案区文本吞进假题干。
+        this.settlePendingBand();
         // **位置守卫（2026-10-29）**：切进 answers 模式是**不可逆**的破坏性状态变化，
         // 而「答案及解析」这类词形在**封面/扉页/页脚**上同样出现（本册页脚就是它）。
         // 没有已收题目就切换，等于把整册正文判成答案续行 —— 实测《答案册-合订本》
@@ -398,6 +426,7 @@ class Ctx {
         this.section = "";
         this.extractBand = false;
         this.bandTitle = "";
+        this.settlePendingBand();
         this.bandMarks.push({ index: blockIndex, type: "end" });
         return;
       }
@@ -410,12 +439,22 @@ class Ctx {
         // 若照节处理会把 sectionNo 清成空串、把 section 覆盖成栏目名，
         // 而节号参与「题号唯一键」⇒ 后面同号题会跨节错配（`DECISIONS §78`）。
         if (m.band) {
+          this.settlePendingBand();
           this.bandTitle = (m.title ?? block.text).trim();
           this.bandMarks.push({ index: blockIndex, type: "band", title: this.bandTitle });
           this.extractBand = /^教材知识萃取/.test(block.text.trim());
+          // 挂起：先不开题，等这个板块里出现第一个真实题号（有则放弃）或板块结束（无则开题）
+          this.pendingBand = {
+            title: this.bandTitle,
+            ordinal: bandOrdinal(this.bandTitle),
+            entry,
+            blockIndexes: [blockIndex],
+            texts: block.kind === "text" ? [block.text] : [],
+          };
           return;
         }
         this.bandTitle = "";
+        this.settlePendingBand();
         this.bandMarks.push({ index: blockIndex, type: "end" });
         this.sectionNo = m.captured || (m.indexNumeral ?? "");
         this.section = block.text.trim();
@@ -476,6 +515,8 @@ class Ctx {
         }
         this.boxList = null;
         this.settleOptions(null);
+        // 板块内出现了真实题号 ⇒ 该板块本来就有自己的编号，**放弃**用栏目序号开题
+        this.pendingBand = null;
         this.openDraft(m.captured, block, entry);
         return;
       }
@@ -669,6 +710,7 @@ class Ctx {
 
   finish(): void {
     this.settleOptions(null);
+    this.settlePendingBand();
   }
 
   /**
@@ -682,6 +724,32 @@ class Ctx {
       this.settleOptions(this.current);
       this.current = null;
     }
+  }
+
+  /**
+   * 板块结束：整块没有出现过真实题号 ⇒ 把栏目本身开成一道题（`DECISIONS §79`）。
+   * 题号取栏目序号（`教材实验 10` → `"10"`），并**强制新编号组** ——
+   * 它不是同册的「第 10 题」，不该排在前面真题号序列里（否则 N4「组内不连续」报红）。
+   */
+  private settlePendingBand(): void {
+    const p = this.pendingBand;
+    this.pendingBand = null;
+    if (!p || !p.ordinal) return;
+    const ordinal = p.ordinal;
+    this.sectionSeq++;
+    this.groupHasQuestions = false;
+    this.openDraft(ordinal, { text: p.title }, p.entry);
+    const cur = this.current;
+    if (!cur) return;
+    this.settleOptions(null);
+    cur.blockIndexes = [...new Set([...p.blockIndexes, ...cur.blockIndexes])];
+    const extra = p.texts.filter((t) => t.trim() && t.trim() !== p.title.trim());
+    if (extra.length) cur.stemParts = [p.title, ...extra];
+    this.review(
+      p.entry.index,
+      `栏目「${p.title}」整块无可识别题号 ⇒ 按栏目序号开为第 ${ordinal} 题（自成一组，不占同册真题号序）`,
+      cur,
+    );
   }
 
   /**

@@ -11,7 +11,7 @@
 // （`第5题` 的「题」），数字后接它必然不是题号开头。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchFirstLine } from "../src/patterns.js";
+import { bandOrdinal, matchFirstLine } from "../src/patterns.js";
 
 const cases: [string, string][] = [
   ["5 题设问变式] 如图是", "电路 p2：`第5题设问变式` 的折行残片"],
@@ -56,4 +56,18 @@ test("折行残片守卫不漏真题：「1）下列说法正确的是」仍是�
   const m = matchFirstLine("1）下列说法正确的是");
   assert.equal(m.ok && m.kind, "question_no");
   assert.equal(m.ok && m.captured, "1");
+});
+
+// 板块序号（`DECISIONS §79`）：只有 `教材实验 N` 有序号 —— 它决定「整块无题号时按栏目序号开题」。
+// 其它板块（教材素材变式/教材知识萃取/素养演练）没有序号，必须返回 null，否则会凭空开题。
+test("bandOrdinal：只认教材实验 N", () => {
+  assert.equal(bandOrdinal("教材实验 10 长度的测量及其测量工具的选取"), "10");
+  assert.equal(bandOrdinal("教材实验12练习使用多用电表"), "12");
+  assert.equal(bandOrdinal("教材实验4探究加速度与力、质量的关系"), "4");
+});
+
+test("bandOrdinal：其它板块不开题", () => {
+  assert.equal(bandOrdinal("教材素材变式 多维变式，夯基础"), null);
+  assert.equal(bandOrdinal("教材知识萃取 回归教材，萃精华"), null);
+  assert.equal(bandOrdinal("素养演练 跟踪拓展，培素养素养1 物理观念"), null);
 });
