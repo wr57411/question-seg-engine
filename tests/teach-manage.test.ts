@@ -1,7 +1,7 @@
 // tests/teach-manage.test.ts
 /**
- * 专题/类别「改名 / 删除」的服务端计划：跨所有卷级联、只写动过的文件、
- * 保留不认识的字段、任何不成立的情况一个文件都不许写。
+ * 专题/类别「改名 / 下架（软删除）/ 恢复 / 彻底清除」的服务端计划：
+ * 跨所有卷级联、只写动过的文件、保留不认识的字段、任何不成立的情况一个文件都不许写。
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -65,8 +65,10 @@ const baseInput = {
   now: NOW,
 };
 
-test("validateManageRequest：只认 rename/delete + topics/categories，id/名字有界", () => {
+test("validateManageRequest：只认 rename/retire/restore/delete + topics/categories，id/名字有界", () => {
   assert.equal(validateManageRequest({ action: "rename", kind: "topics", id: "tp-1", name: "新名" }), null);
+  assert.equal(validateManageRequest({ action: "retire", kind: "topics", id: "tp-1" }), null, "下架不用给名字");
+  assert.equal(validateManageRequest({ action: "restore", kind: "categories", id: "ct-1" }), null);
   assert.ok(validateManageRequest({ action: "drop", kind: "topics", id: "tp-1" }));
   assert.ok(validateManageRequest({ action: "delete", kind: "tags", id: "tp-1" }), "业务标签不在这条通道里");
   assert.ok(validateManageRequest({ action: "delete", kind: "topics", id: "" }));
@@ -110,6 +112,60 @@ test("改名撞名 / 空名 / 不存在的 id：整体拒绝，不给半截计�
     msg(planTeachManage({ ...baseInput, list: { version: 1, topics: "坏了" }, action: "rename", kind: "topics", id: "tp-1", name: "新" })),
     /形状不对/,
   );
+});
+
+test("下架（软删除）：只写清单一个文件，题上的归属与组合一个都不动", () => {
+  const plan = planTeachManage({ ...baseInput, action: "retire", kind: "topics", id: "tp-1" });
+  assert.equal(plan.ok, true);
+  if (!plan.ok) return;
+  assert.equal(plan.itemName, "曲线运动");
+  assert.deepEqual(plan.bindingsFiles, [], "下架不碰任何一卷 bindings —— 题上归类都还在");
+  assert.equal(plan.combosPayload, null, "下架不碰组合");
+  assert.equal(plan.combosChanged, 0);
+  assert.equal(plan.combosDropped, 0);
+  const topics = plan.listPayload.topics as { id: string; name: string; retired?: boolean; retiredAt?: string; createdAt?: string }[];
+  assert.deepEqual(topics.map((t) => t.id), ["tp-1", "tp-2"], "条目还在清单里，不是删掉");
+  assert.equal(topics[0]?.retired, true);
+  assert.equal(topics[0]?.retiredAt, NOW);
+  assert.equal(topics[0]?.createdAt, "留着这个字段", "下架也不许洗掉未知字段");
+  assert.equal(topics[1]?.retired, undefined, "没下架的那条不能沾上标记");
+  assert.equal(plan.stillAssigned, 3, "2 题活着 + 1 题漂移，界面要说清「题上没动」");
+  assert.equal(plan.affected, 2);
+  assert.equal(plan.staleAffected, 1);
+});
+
+test("恢复：去掉 retired/retiredAt，其余字段原样；归属与组合同样不动", () => {
+  const retiredFile = {
+    version: 1,
+    updatedAt: "旧时间",
+    topics: [
+      { id: "tp-1", name: "曲线运动", retired: true, retiredAt: "2026-10-30T01:00:00.000Z", createdAt: "留着这个字段" },
+      { id: "tp-2", name: "平抛运动" },
+    ],
+  };
+  const plan = planTeachManage({ ...baseInput, list: retiredFile, action: "restore", kind: "topics", id: "tp-1" });
+  assert.equal(plan.ok, true);
+  if (!plan.ok) return;
+  const topics = plan.listPayload.topics as { id: string; retired?: boolean; retiredAt?: string; createdAt?: string }[];
+  assert.equal(topics[0]?.retired, undefined, "恢复就是摘掉标记");
+  assert.equal(topics[0]?.retiredAt, undefined);
+  assert.equal(topics[0]?.createdAt, "留着这个字段");
+  assert.deepEqual(plan.bindingsFiles, []);
+  assert.equal(plan.combosPayload, null);
+  assert.equal(plan.stillAssigned, 3, "恢复后这些题本来就还挂着它");
+});
+
+test("重复下架 / 恢复没下架的项：整体拒绝，不给半截计划", () => {
+  const alreadyRetired = {
+    version: 1,
+    topics: [{ id: "tp-1", name: "曲线运动", retired: true, retiredAt: "x" }],
+  };
+  assert.match(
+    msg(planTeachManage({ ...baseInput, list: alreadyRetired, action: "retire", kind: "topics", id: "tp-1" })),
+    /已经是下架状态/,
+  );
+  assert.match(msg(planTeachManage({ ...baseInput, action: "restore", kind: "topics", id: "tp-1" })), /没有下架记录/);
+  assert.match(msg(planTeachManage({ ...baseInput, action: "retire", kind: "topics", id: "tp-9" })), /不存在/);
 });
 
 test("删除专题：跨所有卷摘引用、空归属整条删、组合跟着清", () => {

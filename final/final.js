@@ -45,7 +45,6 @@ import {
   normalizeTeachBindings,
   normalizeTeachList,
   orderByRecent,
-  removeCombo,
   renameCombo,
   replaceBinding,
   restoreCombo,
@@ -92,7 +91,7 @@ const state = {
   creating: null, // 'topics' | 'categories' | null：托盘内联新建
   lastClassified: null, // 本会话最近一次已归类题 {doc, questionId, assignment, label}
   undo: null, // 最近一次可撤销动作 {doc, qid, pageIndex, prevBinding, nextBinding}
-  manage: null, // 管理面板状态 {renaming: id|null, confirm: id|null}；null=面板关着
+  manage: null, // 管理面板状态 {renaming: id|null, usage}；null=面板关着
   teachUsage: null, // 跨所有卷的「某个专题/类别被几题在用」，管理面板删除前要摆出来
   search: { on: false, q: "" }, // 托盘搜索：开着时组合条让位给搜索框，两行同步过滤
 };
@@ -568,9 +567,7 @@ function applyCombo(combo) {
   }
 }
 
-/* ── 管理面板：专题 / 类别 / 组合的改名与删除 ── */
-
-let manageConfirmTimer = null;
+/* ── 管理面板：专题 / 类别 / 组合的改名、下架（软删除）与恢复 ── */
 
 function showManageHint(text, kind) {
   const hint = $("manage-hint");
@@ -596,7 +593,7 @@ function openManage() {
   const pop = $("manage-pop");
   if (!pop) return;
   closeComboPop();
-  state.manage = { renaming: null, confirm: null, usage: state.teachUsage };
+  state.manage = { renaming: null, usage: state.teachUsage };
   clearManageHint();
   const t = $("toast");
   if (t) {
@@ -612,8 +609,6 @@ function openManage() {
 function closeManage() {
   if (!state.manage) return;
   state.manage = null;
-  clearTimeout(manageConfirmTimer);
-  manageConfirmTimer = null;
   const pop = $("manage-pop");
   if (pop) pop.hidden = true;
   $("pick-manage")?.setAttribute("aria-pressed", "false");
@@ -635,12 +630,15 @@ function renderManageList() {
   /** @type {HTMLElement[]} */
   const nodes = [];
   const section = (label, kind, items, emptyText) => {
-    nodes.push(el("p", "mg-label", `${label}（${items.length}）`));
-    if (!items.length) {
-      nodes.push(el("p", "mg-empty", emptyText));
-      return;
+    const { active, retired } = splitRetired(items);
+    nodes.push(el("p", "mg-label", `${label}（${active.length}）`));
+    if (!active.length) nodes.push(el("p", "mg-empty", emptyText));
+    for (const item of active) nodes.push(manageRow(kind, item, false));
+    // 已下架单独一堆：清单里还在、题上的归类一个没动，所以随时能恢复
+    if (retired.length) {
+      nodes.push(el("p", "mg-label mg-sublabel", `已下架（${retired.length}）· 题上的归类都还在`));
+      for (const item of retired) nodes.push(manageRow(kind, item, true));
     }
-    for (const item of items) nodes.push(manageRow(kind, item));
   };
   section("专题", "topics", state.teach.topics ?? [], "还没有专题。");
   section("类别", "categories", state.teach.categories ?? [], "还没有类别。");
@@ -661,22 +659,16 @@ function usageLabel(kind, id) {
   return `用在 ${u.live} 题上${u.stale ? `（另 ${u.stale} 题已漂移）` : ""}`;
 }
 
-/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
-function usageCountOf(kind, id) {
-  const u = state.manage?.usage?.[kind]?.[id];
-  return u ? u.live + u.stale : null;
-}
-
 /**
- * 一行：名字 + 说明（专题/类别显示在用题数，组合显示成员）+ 改名/删除。
- * 删除一律两步确认，按钮上直接写清会影响几题。
- * @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item
+ * 一行：名字 + 说明（专题/类别显示在用题数，组合显示成员）+ 改名/下架。
+ * 下架是软删除（用户 2026-10-30 拍板）：点一下就下架、随时可恢复，
+ * 所以不再需要「两步确认 + 影响几题」那套防手滑设计。
+ * @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item @param {boolean} retired
  */
-function manageRow(kind, item) {
+function manageRow(kind, item, retired) {
   const key = `${kind}:${item.id}`;
-  const renaming = state.manage?.renaming === key;
-  const confirming = state.manage?.confirm === key;
-  const row = el("div", "mg-row" + (confirming ? " mg-confirm" : ""));
+  const renaming = !retired && state.manage?.renaming === key;
+  const row = el("div", "mg-row" + (retired ? " mg-retired" : ""));
   row.dataset.kind = kind;
   row.dataset.id = item.id;
   const main = el("div", "mg-main");
@@ -704,41 +696,33 @@ function manageRow(kind, item) {
     main.append(el("span", "mg-sum", kind === "combos" ? comboSummary(item) : usageLabel(kind, item.id)));
   }
   row.append(main);
-  if (!renaming) {
-    const acts = el("div", "mg-acts");
+  /** @type {HTMLElement[]} */
+  const acts = [];
+  if (retired) {
+    const back = el("button", "mg-btn primary", "恢复");
+    back.type = "button";
+    back.addEventListener("click", () => void commitManageRestore(kind, item));
+    acts.push(back);
+  } else if (!renaming) {
     const rn = el("button", "mg-btn", "改名");
     rn.type = "button";
     rn.addEventListener("click", () => {
       if (!state.manage) return;
       state.manage.renaming = key;
-      state.manage.confirm = null;
       clearManageHint();
       renderManageList();
     });
-    const n = kind === "combos" ? null : usageCountOf(kind, item.id);
-    const del = el("button", "mg-btn danger", confirming ? `确认删除${n !== null ? `（${n} 题）` : ""}` : "删除");
-    del.type = "button";
-    del.addEventListener("click", () => {
-      if (!state.manage) return;
-      clearManageHint();
-      if (state.manage.confirm === key) {
-        state.manage.confirm = null;
-        clearTimeout(manageConfirmTimer);
-        void commitManageDelete(kind, item);
-        return;
-      }
-      state.manage.confirm = key;
-      state.manage.renaming = null;
-      renderManageList();
-      clearTimeout(manageConfirmTimer);
-      manageConfirmTimer = setTimeout(() => {
-        if (state.manage?.confirm !== key) return;
-        state.manage.confirm = null;
-        renderManageList();
-      }, 6000);
-    });
-    acts.append(rn, del);
-    row.append(acts);
+    const off = el("button", "mg-btn danger", "下架");
+    off.type = "button";
+    off.title = "下架后挑题时不再出现，题上已归的类保留，可随时恢复";
+    off.addEventListener("click", () => void commitManageRetire(kind, item));
+    acts.push(rn, off);
+  }
+  if (acts.length) {
+    // ⚠️ el(tag, cls, text) 判的是 text !== undefined：传 null 会把文本设成 "null"
+    const box = el("div", "mg-acts");
+    box.append(...acts);
+    row.append(box);
   }
   return row;
 }
@@ -761,7 +745,6 @@ function applyManageResult(kind, res) {
   if (!state.manage) return;
   state.manage.usage = null; // 数字随清单一起过期，重新问
   state.manage.renaming = null;
-  state.manage.confirm = null;
   renderManageList();
   refreshManageUsage();
 }
@@ -800,34 +783,59 @@ async function commitManageRename(kind, item, name) {
   showManageHint(`已改名为「${clean}」`, "ok");
 }
 
-/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
-async function commitManageDelete(kind, item) {
+/** 下架（软删除）：题上的归属一个都不动。 @param {'topics'|'categories'|'combos'} kind */
+async function commitManageRetire(kind, item) {
   if (!state.teach) return;
+  clearManageHint();
   if (kind === "combos") {
-    const res = removeCombo(state.teach.combos ?? [], item.id);
+    const res = retireCombo(state.teach.combos ?? [], item.id);
     if (!res.item) {
-      showManageHint(res.error ?? "删除失败");
-      renderManageList();
+      showManageHint(res.error ?? "下架失败");
       return;
     }
     const saved = await saveComboList(res.list, `组合「${item.name}」`);
     if (!saved.ok || !state.manage) return;
     renderManageList();
-    showManageHint(`已删除「${item.name}」（只删这套预设，不影响已归类的题）`, "ok");
+    showManageHint(`已下架「${item.name}」，在「已下架」里可以恢复`, "ok");
     return;
   }
-  const res = await manageTeach("delete", kind, item.id);
+  const res = await manageTeach("retire", kind, item.id);
   if (!res.ok) {
-    showManageHint(res.error ?? "删除失败");
+    showManageHint(res.error ?? "下架失败");
     renderManageList();
     return;
   }
   applyManageResult(kind, res);
-  const bits = [`已从 ${res.affected ?? 0} 题上摘掉`];
-  if (res.staleAffected) bits.push(`另含 ${res.staleAffected} 题已漂移`);
-  if (res.combosDropped) bits.push(`顺带删掉 ${res.combosDropped} 个空组合`);
-  else if (res.combosChanged) bits.push(`同步了 ${res.combosChanged} 个组合`);
-  showManageHint(`已删除「${res.item ?? item.name}」（${bits.join("，")}）`, "ok");
+  showManageHint(
+    `已下架「${res.item ?? item.name}」（${res.stillAssigned ?? 0} 题上的归类保留，随时可恢复）`,
+    "ok",
+  );
+}
+
+/** 恢复已下架项。 @param {'topics'|'categories'|'combos'} kind */
+async function commitManageRestore(kind, item) {
+  if (!state.teach) return;
+  clearManageHint();
+  if (kind === "combos") {
+    const res = restoreCombo(state.teach.combos ?? [], item.id);
+    if (!res.item) {
+      showManageHint(res.error ?? "恢复失败");
+      return;
+    }
+    const saved = await saveComboList(res.list, `组合「${item.name}」`);
+    if (!saved.ok || !state.manage) return;
+    renderManageList();
+    showManageHint(`已恢复「${item.name}」`, "ok");
+    return;
+  }
+  const res = await manageTeach("restore", kind, item.id);
+  if (!res.ok) {
+    showManageHint(res.error ?? "恢复失败");
+    renderManageList();
+    return;
+  }
+  applyManageResult(kind, res);
+  showManageHint(`已恢复「${res.item ?? item.name}」，挑题时又能选了`, "ok");
 }
 
 /* ── 组合条拖动排序：长按 380ms 进入拖动，松手写回 combos.json ── */
@@ -1087,14 +1095,16 @@ async function applyCreate(kind, name) {
     flash(res.error ?? "新建失败");
     return false;
   }
-  if (res.created) {
+  // created = 真新建；revived = 同名的那一项原本已下架，这次要**落盘**摘掉下架标记，
+  // 否则只改内存、刷新又变回下架态（2026-10-30 交接 2 第 2 条）
+  if (res.created || res.revived) {
     const payload =
       kind === "topics"
         ? { version: 1, updatedAt: new Date().toISOString(), topics: res.list }
         : { version: 1, updatedAt: new Date().toISOString(), categories: res.list };
     const saved = await saveTeach(kind, payload);
     if (!saved.ok) {
-      notice([`新建失败：${saved.error ?? "未知错误"}`], "err");
+      notice([`${res.revived ? "恢复" : "新建"}失败：${saved.error ?? "未知错误"}`], "err");
       return false;
     }
     state.teach = { ...state.teach, [kind]: res.list };

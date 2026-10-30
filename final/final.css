@@ -223,7 +223,10 @@
   display: flex; align-items: center; gap: 8px; min-width: 0;
   padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper-card);
 }
-.mg-row.mg-confirm { border-color: var(--cinnabar); }
+/* 已下架（软删除）的行：虚线 + 灰名字，但「恢复」按钮保持正常对比度（触屏要看得清、点得准） */
+.mg-row.mg-retired { border-style: dashed; background: transparent; }
+.mg-row.mg-retired .mg-name { color: var(--ink-soft); }
+.mg-label.mg-sublabel { margin-top: 6px; }
 .mg-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .mg-name {
   font-family: var(--sans); font-size: 13.5px; color: var(--ink);

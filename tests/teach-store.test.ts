@@ -22,7 +22,10 @@ import {
   replaceBinding,
   removeCombo,
   renameCombo,
+  restoreCombo,
+  retireCombo,
   sameAsPrevious,
+  splitRetired,
   toggleCategory,
   toggleTopic,
 } from "../final/teach-store.js";
@@ -241,3 +244,78 @@ test("最近使用：移到最前、去重、截断；清单按最近重排", ()
   );
   assert.deepEqual(ordered.map((x) => x.id), ["c", "a", "b"]);
 });
+
+/* ── 软删除（下架 / 恢复，2026-10-30 用户拍板：题上不动） ── */
+
+test("normalize：下架标记要带出来；retired 不是 true 的脏值不认", () => {
+  const list = normalizeTeachList(
+    {
+      topics: [
+        { id: "tp-1", name: "下架了", retired: true, retiredAt: "2026-10-30T00:00:00.000Z" },
+        { id: "tp-2", name: "在用" },
+        { id: "tp-3", name: "脏值", retired: "yes" },
+      ],
+    },
+    "topics",
+  );
+  assert.deepEqual(list, [
+    { id: "tp-1", name: "下架了", retired: true, retiredAt: "2026-10-30T00:00:00.000Z" },
+    { id: "tp-2", name: "在用" },
+    { id: "tp-3", name: "脏值" },
+  ]);
+});
+
+test("splitRetired：分成两堆且各自保序；空清单/缺字段不崩", () => {
+  const items = [
+    { id: "a", retired: true as const },
+    { id: "b" },
+    { id: "c", retired: true as const },
+    { id: "d" },
+  ];
+  const { active, retired } = splitRetired(items);
+  assert.deepEqual(active.map((x) => x.id), ["b", "d"]);
+  assert.deepEqual(retired.map((x) => x.id), ["a", "c"]);
+  assert.deepEqual(splitRetired([]), { active: [], retired: [] });
+  assert.deepEqual(splitRetired(undefined as never), { active: [], retired: [] });
+});
+
+test("组合下架/恢复：只换标记、成员不动；重复下架与恢复没下架的都报错", () => {
+  const list = [{ id: "cb-1", name: "曲线基础", topicIds: ["tp-1"], categoryIds: ["ct-1"] }];
+  const off = retireCombo(list, "cb-1", "2026-10-30T02:00:00.000Z");
+  assert.equal(off.error, undefined);
+  assert.deepEqual(off.item, {
+    id: "cb-1",
+    name: "曲线基础",
+    topicIds: ["tp-1"],
+    categoryIds: ["ct-1"],
+    retired: true,
+    retiredAt: "2026-10-30T02:00:00.000Z",
+  });
+  assert.equal(off.list.length, 1, "下架不删条目");
+
+  assert.match(String(retireCombo(off.list, "cb-1").error), /已经是下架状态/);
+  assert.match(String(retireCombo(list, "cb-9").error), /不存在/);
+
+  const back = restoreCombo(off.list, "cb-1");
+  assert.equal(back.error, undefined);
+  assert.deepEqual(back.item, { id: "cb-1", name: "曲线基础", topicIds: ["tp-1"], categoryIds: ["ct-1"] });
+  assert.equal(back.item?.retired, undefined, "恢复要把 retired/retiredAt 都摘掉");
+  assert.equal(back.item?.retiredAt, undefined);
+  assert.match(String(restoreCombo(list, "cb-1").error), /没有下架记录/);
+});
+
+test("新建同名且那一项已下架：复活（revived）而不是建重复，且必须由调用方落盘", () => {
+  const list = [
+    { id: "tp-1", name: "曲线运动", retired: true as const, retiredAt: "2026-10-30T00:00:00.000Z" },
+    { id: "tp-2", name: "平抛运动" },
+  ];
+  const r = addTeachItem(list, " 曲线运动 ", "tp", () => "tp-9");
+  assert.equal(r.created, false, "不是新建");
+  assert.equal(r.revived, true, "调用方据此落盘：只在 created 时写盘 ⇒ 刷新又变回下架");
+  assert.deepEqual(r.item, { id: "tp-1", name: "曲线运动" });
+  assert.equal(r.list.find((t) => t.id === "tp-1")?.retired, undefined);
+  assert.equal(r.list.find((t) => t.id === "tp-1")?.retiredAt, undefined);
+  assert.equal(r.list.length, 2, "不许因为复活多出一条");
+  assert.equal(r.list.find((t) => t.id === "tp-2")?.name, "平抛运动", "别的项一个字节都不动");
+});
+
