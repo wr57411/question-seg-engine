@@ -28,7 +28,7 @@ loop: until tests pass
 max_iterations: 3
 verify: node --import tsx --test tests/teach-store.test.ts tests/teach-write-guards.test.ts tests/layout-invariant.test.ts
 
-- [ ] **Step 4: 内联新建专题/类别（ticket 003）**
+- [x] **Step 4: 内联新建专题/类别（ticket 003）**
 action: `teach-store` 增加 `createTopic`/`createCategory`（服务端生成 id、name 去空格后唯一、重名复用）；`final.js` 两行行尾「＋」、单字段输入、`建好并打上`、创建后滚动到新 chip 并高亮；用 `visualViewport`/CSS 变量抬升托盘避开 iPad 键盘；补 `tests/teach-store.test.ts`。
 loop: until tests pass
 max_iterations: 3

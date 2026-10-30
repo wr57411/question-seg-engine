@@ -165,6 +165,29 @@ export function moveToFront(list, id, max = 12) {
 }
 
 /** 按“最近使用”重排清单；未在最近里的保持原顺序。 */
+/**
+ * 新建专题/类别：去首尾空格；同名（trim 后完全一致）复用已有项，不建重复。
+ * id 由调用方生成（默认时间戳+随机），守卫会再校验 id/name 唯一。
+ * @param {TeachItem[]} list
+ * @param {string} name
+ * @param {'tp'|'ct'} prefix
+ * @param {(prefix: string) => string} [idGen]
+ * @returns {{ list: TeachItem[], item: TeachItem | null, created: boolean, error?: string }}
+ */
+export function addTeachItem(list, name, prefix, idGen) {
+  const clean = String(name ?? "").trim();
+  if (!clean) return { list, item: null, created: false, error: "名字不能为空" };
+  const existing = list.find((t) => t.name.trim() === clean);
+  if (existing) return { list, item: existing, created: false };
+  const gen = idGen ?? ((p) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
+  let id = gen(prefix);
+  let guard = 0;
+  while (list.some((t) => t.id === id) && guard++ < 10) id = gen(prefix);
+  if (list.some((t) => t.id === id)) return { list, item: null, created: false, error: "生成 id 失败，请重试" };
+  const item = { id, name: clean };
+  return { list: [...list, item], item, created: true };
+}
+
 /** @param {TeachItem[]} items @param {string[]} recent @returns {TeachItem[]} */
 export function orderByRecent(items, recent) {
   const rank = new Map(recent.map((id, i) => [id, i]));

@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  addTeachItem,
   assignmentFor,
   badgeCounts,
   emptyTeachBindings,
@@ -90,6 +91,39 @@ test("同上题：替换而不是合并；当前题已有 anchor 保留", () => 
   // 空集合 = 清空
   s = sameAsPrevious(s, "q2", { topicIds: [], categoryIds: [] }, anchor);
   assert.equal(s.bindings.length, 0);
+});
+
+test("新建：去空格、生成唯一 id；同名复用已有项，不产生重复", () => {
+  const empty: { id: string; name: string }[] = [];
+  let n = 0;
+  const gen = (p: string) => `${p}-${++n}`;
+  const a = addTeachItem(empty, "  易错  ", "ct", gen);
+  assert.equal(a.created, true);
+  assert.deepEqual(a.item, { id: "ct-1", name: "易错" });
+  assert.deepEqual(a.list, [{ id: "ct-1", name: "易错" }]);
+
+  const b = addTeachItem(a.list, "易错 ", "ct", gen);
+  assert.equal(b.created, false);
+  assert.deepEqual(b.item, { id: "ct-1", name: "易错" });
+  assert.deepEqual(b.list, a.list, "同名不新增");
+  assert.equal(b.list.some((x) => x.id === "ct-2"), false, "同名不应吃掉一个新 id");
+
+  const c = addTeachItem(a.list, "   ", "ct", gen);
+  assert.equal(c.item, null);
+  assert.ok(c.error);
+  assert.deepEqual(c.list, a.list);
+});
+
+test("新建：id 碰撞时重试，仍碰撞则拒绝", () => {
+  const list = [{ id: "tp-dup", name: "已有" }];
+  let calls = 0;
+  const gen = () => (calls++ < 2 ? "tp-dup" : "tp-new");
+  const r = addTeachItem(list, "新专题", "tp", gen);
+  assert.equal(r.created, true);
+  assert.equal(r.item?.id, "tp-new");
+  const bad = addTeachItem(list, "另一个", "tp", () => "tp-dup");
+  assert.equal(bad.created, false);
+  assert.ok(bad.error);
 });
 
 test("最近使用：移到最前、去重、截断；清单按最近重排", () => {

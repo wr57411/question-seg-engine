@@ -28,6 +28,7 @@ import { prettifyLatex } from "../stages/latex-display.js";
 import { tagSection } from "./tag-panel.js";
 import { anchorOf, loadBindings, loadLibrary, reconcile, saveBindings, saveLibrary, tagIdsFor } from "./tag-store.js";
 import {
+  addTeachItem,
   assignmentFor,
   badgeCounts,
   emptyTeachBindings,
@@ -35,6 +36,7 @@ import {
   loadTeachLibrary,
   moveToFront,
   orderByRecent,
+  saveTeach,
   saveTeachBindings,
   toggleCategory,
   toggleTopic,
@@ -71,6 +73,7 @@ const state = {
   picked: null, // 当前选中的 {q, p}
   teach: null, // {topics, categories, bindings, error}
   recent: { topics: [], categories: [] }, // 最近使用的专题/类别（本机 localStorage）
+  creating: null, // 'topics' | 'categories' | null：托盘内联新建
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
@@ -232,6 +235,7 @@ function renderPickRows() {
   const chip = (kind, item, on) => {
     const b = el("button", "pick-chip", item.name);
     b.type = "button";
+    b.dataset.id = item.id;
     b.setAttribute("aria-pressed", String(on));
     b.title = on ? `点一下移出：${item.name}` : `点一下放入：${item.name}`;
     b.addEventListener("click", () => togglePick(kind, item.id, item.name));
@@ -265,6 +269,16 @@ function togglePick(kind, id, name) {
   commitTeach(next, `${on ? "已移出" : "已放入"}：${name}`, before, p);
 }
 
+function clearTeachNotice() {
+  const n = $("notice");
+  if (!n || n.hidden) return;
+  const t = n.textContent ?? "";
+  if (t.includes("教学归类未能保存") || t.includes("教学归类保存异常") || t.includes("新建失败")) {
+    n.hidden = true;
+    n.replaceChildren();
+  }
+}
+
 let teachSaveChain = Promise.resolve();
 function commitTeach(next, label, prev, p) {
   state.teach = { ...state.teach, bindings: next };
@@ -278,7 +292,10 @@ function commitTeach(next, label, prev, p) {
   teachSaveChain = teachSaveChain
     .then(async () => {
       const r = await saveTeachBindings(doc, payload);
-      if (r.ok) return;
+      if (r.ok) {
+        clearTeachNotice();
+        return;
+      }
       const rolledBack = state.doc === doc && state.teach?.bindings === nextRef;
       if (rolledBack) {
         state.teach = { ...state.teach, bindings: prev };
@@ -293,6 +310,92 @@ function commitTeach(next, label, prev, p) {
     .catch((e) => {
       notice([`教学归类保存异常：${String(e).slice(0, 100)}`], "err");
     });
+}
+
+function openCreate(kind) {
+  if (!state.picked) {
+    flash("先点一道题");
+    return;
+  }
+  state.creating = kind;
+  const form = $("pick-create");
+  const input = $("pick-create-name");
+  form.hidden = false;
+  input.value = "";
+  input.placeholder = kind === "topics" ? "新专题名" : "新类别名";
+  input.focus();
+}
+
+function closeCreate() {
+  state.creating = null;
+  const form = $("pick-create");
+  if (form) form.hidden = true;
+  const input = $("pick-create-name");
+  if (input) input.value = "";
+}
+
+function revealChip(kind, id) {
+  const box = $(kind === "topics" ? "pick-topics" : "pick-categories");
+  const chip = [...box.querySelectorAll(".pick-chip")].find((b) => b.dataset.id === id);
+  chip?.scrollIntoView?.({ inline: "center", block: "nearest" });
+}
+
+async function submitCreate(e) {
+  e.preventDefault();
+  const kind = state.creating;
+  if (!kind || !state.picked || !state.teach) return;
+  const input = $("pick-create-name");
+  const prefix = kind === "topics" ? "tp" : "ct";
+  const list = kind === "topics" ? state.teach.topics : state.teach.categories;
+  const res = addTeachItem(list, input.value, prefix);
+  if (!res.item) {
+    flash(res.error ?? "新建失败");
+    input.focus();
+    return;
+  }
+  if (res.created) {
+    const payload =
+      kind === "topics"
+        ? { version: 1, updatedAt: new Date().toISOString(), topics: res.list }
+        : { version: 1, updatedAt: new Date().toISOString(), categories: res.list };
+    const saved = await saveTeach(kind, payload);
+    if (!saved.ok) {
+      notice([`新建失败：${saved.error ?? "未知错误"}`], "err");
+      input.focus();
+      return;
+    }
+    state.teach = { ...state.teach, [kind]: res.list };
+    clearTeachNotice();
+  }
+  const { q, p } = state.picked;
+  const before = state.teach.bindings;
+  const cur = assignmentFor(before, q.id);
+  const already = kind === "topics" ? cur.topicIds.includes(res.item.id) : cur.categoryIds.includes(res.item.id);
+  closeCreate();
+  bumpRecent(kind, res.item.id);
+  if (already) {
+    renderPickRows();
+    revealChip(kind, res.item.id);
+    flash(`已经在「${res.item.name}」里`);
+    return;
+  }
+  const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
+  const next =
+    kind === "topics" ? toggleTopic(before, q.id, res.item.id, anchor) : toggleCategory(before, q.id, res.item.id, anchor);
+  commitTeach(next, `已放入：${res.item.name}`, before, p);
+  revealChip(kind, res.item.id);
+}
+
+function bindKeyboardLift() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const update = () => {
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty("--pick-kb", `${Math.round(kb)}px`);
+  };
+  vv.addEventListener("resize", update);
+  vv.addEventListener("scroll", update);
+  update();
 }
 
 function clearPickSelection() {
@@ -319,6 +422,7 @@ function paintPickSelection(slot) {
 
 function pickQuestion(q, p) {
   if (!state.pickMode) return;
+  closeCreate();
   clearPickSelection();
   state.picked = { q, p };
   const slot = state.pages[p.index];
@@ -340,6 +444,7 @@ function setPickMode(on) {
     state.sheet = null;
     updatePickTray();
   } else {
+    closeCreate();
     clearPickSelection();
   }
 }
@@ -760,6 +865,7 @@ async function loadDoc(doc) {
     $("detail").hidden = true; // 换卷时关掉面板，避免标签区指着上一卷的题目
     state.sheet = null;
     state.picked = null;
+    closeCreate();
     updatePickTray();
     await loadQuestions(doc);
     state.snap = state.data;
@@ -1025,7 +1131,12 @@ function initBar() {
   });
   $("t-pick").addEventListener("click", () => setPickMode(!state.pickMode));
   $("pick-close").addEventListener("click", () => setPickMode(false));
+  $("pick-add-topics").addEventListener("click", () => openCreate("topics"));
+  $("pick-add-categories").addEventListener("click", () => openCreate("categories"));
+  $("pick-create").addEventListener("submit", (e) => void submitCreate(e));
+  $("pick-create-cancel").addEventListener("click", closeCreate);
   bindPickPointer();
+  bindKeyboardLift();
 }
 
 let resizeTimer = null;
