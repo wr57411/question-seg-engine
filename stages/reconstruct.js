@@ -501,6 +501,20 @@ export function renderPaper(p, opts = {}) {
     candidateStyle = true,
     onChipClick = null,
     resolveTags = null,
+    /**
+     * **是否把 OCR 补行画到纸面上**（`DECISIONS §91`）：默认 **false**。
+     *
+     * 补行是「引擎没识别到、由 OCR 补出来的候选行」。它有两种来源：
+     * - `crop`：按行裁图，位置天然对得上；
+     * - `page`：**整页 OCR，没有位置信息** —— 算法要靠「锚点 + 宽度比例」把文本硬配回洞，
+     *   实测会错配（电路 p1 把表格单元格的文字配到页眉的洞上 ⇒ 页面上出现
+     *   `欧姆定律（纯电阻电路` / `dot` / `_2+` 一堆错位碎字，2026-10-30 用户截图）。
+     *
+     * 补行是**核查**用的证据（"这里原来漏了什么"），不是阅读内容。默认不画：
+     * 需要时 `?fill=1` 或工具栏开关，`OCR 整页识别全文` 折叠区也一直可看。
+     * 数据一个字没删（G1），只是不再默认糊在页面上。
+     */
+    ocrFill = false,
   } = opts;
 
   // 题号牌挂在「题目所在那一栏」的外侧：
@@ -602,7 +616,7 @@ export function renderPaper(p, opts = {}) {
     wrap.append(stack);
   }
 
-  ocrFillInto(c, p, innerW, candidateStyle); // 先画候选
+  if (ocrFill) ocrFillInto(c, p, innerW, candidateStyle); // 候选补行：默认不画（见 opts.ocrFill）
   if (diagnostics) uncoveredInto(c, p, innerW); // 再画遗漏标记（盖得住候选，符合原顺序）
   // 注意：**不要再次 append(c)** —— c 已经在 wrap 里；重复 append 会把它移出容器，
   // 号牌就又回到被 `.canvas{overflow:hidden}` 裁掉的状态。

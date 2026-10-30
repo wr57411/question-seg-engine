@@ -20,6 +20,8 @@ export interface PaperOptions {
   onChipClick?: ((q: any, p: any) => void) | null;
   /** 标签解析器：返回该题的标签（纸面**只读渲染**，不做增删）。 */
   resolveTags?: ((q: any, p: any) => PaperTag[] | null) | null;
+  /** 是否把 OCR 补行画到纸面上（`DECISIONS §91`；默认 false，补行是核查证据不是阅读内容）。 */
+  ocrFill?: boolean;
 }
 
 export const CANVAS_W: number;

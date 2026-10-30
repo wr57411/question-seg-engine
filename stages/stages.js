@@ -92,6 +92,13 @@ const NOISE_KIND_LABEL = {
  */
 const CANDIDATE_STYLE = new URLSearchParams(location.search).get("ocr") === "1";
 
+/**
+ * **是否把 OCR 补行画到纸面上**（`DECISIONS §91`）：默认 **false**。
+ * 整页 OCR 来源没有位置信息，硬配回洞会错位（电路 p1 把表格单元格的文字画到页眉）。
+ * `?fill=1` 打开（与 final 页的「显示 OCR 补行」同口径）。
+ */
+const SHOW_OCR_FILL = new URLSearchParams(location.search).get("fill") === "1";
+
 const state = { doc: null, effectiveDoc: null, data: null, stage: 0, page: 0, highlight: null };
 
 const $ = (id) => document.getElementById(id);
@@ -248,7 +255,7 @@ function renderRaw(p) {
     node.append(txt, el("span", "tag", TYPE_LABEL_CN(b.type)));
     c.append(node);
   }
-  ocrFillInto(c, p, CANVAS_W, CANDIDATE_STYLE); // 阶段 1 也呈现 OCR 候选补全（先画，标记后画才盖得住）
+  if (SHOW_OCR_FILL) ocrFillInto(c, p, CANVAS_W, CANDIDATE_STYLE); // 阶段 1 也呈现 OCR 候选补全（先画，标记后画才盖得住）
   uncoveredInto(c, p, CANVAS_W); // 阶段 1 也标出解析遗漏（Task 16）
   return c;
 }
@@ -318,7 +325,7 @@ function renderSeg(p) {
       c.append(chip);
     }
   }
-  ocrFillInto(c, p, CANVAS_W, CANDIDATE_STYLE); // 阶段 3 也呈现 OCR 候选补全
+  if (SHOW_OCR_FILL) ocrFillInto(c, p, CANVAS_W, CANDIDATE_STYLE); // 阶段 3 也呈现 OCR 候选补全
   uncoveredInto(c, p, CANVAS_W); // 阶段 3 也标出解析遗漏（Task 16）
   return c;
 }
@@ -476,6 +483,7 @@ function renderFinal(p) {
       paneW: CANVAS_W,
       diagnostics: false,
       candidateStyle: CANDIDATE_STYLE,
+      ocrFill: SHOW_OCR_FILL,
       onChipClick: showDetail,
     }).wrap,
   );
@@ -527,6 +535,7 @@ function renderCompare(p) {
     paneW,
     diagnostics: true,
     candidateStyle: CANDIDATE_STYLE,
+    ocrFill: SHOW_OCR_FILL,
     onChipClick: showDetail,
   });
   right.append(paper.wrap);

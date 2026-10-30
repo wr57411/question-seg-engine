@@ -44,6 +44,9 @@ const state = {
   paneW: CANVAS_W,
   audit: false,
   ocrStyle: false, // OCR 补入行的绿色候选样式：**默认关**（成品页要干净，需要核查时勾选）
+  // OCR 补行（引擎漏识别、由 OCR 补出来的**候选行**）：默认**不画**（`DECISIONS §91`）。
+  // 整页 OCR 来源没有位置信息，硬配回洞会错位（用户实测：表格单元格的文字被画到页眉）。
+  ocrFill: false,
   bank: null,
   snap: null, // 当前文档的整册快照：面板按原卷坐标裁条目要用
   snaps: new Map(), // 另一册的快照缓存（按需拉，见 snapshotOf）
@@ -257,6 +260,7 @@ function paper(p) {
     paneW: state.paneW,
     diagnostics: state.audit,
     candidateStyle: state.ocrStyle,
+    ocrFill: state.ocrFill,
     onChipClick: openSheet,
     resolveTags: state.tagsOn ? tagsForQuestion : null,
   }).wrap;
@@ -891,6 +895,11 @@ function initBar() {
     state.audit = e.target.checked;
     renderBook();
   });
+  $("t-fill").checked = state.ocrFill;
+  $("t-fill").addEventListener("change", (e) => {
+    state.ocrFill = e.target.checked;
+    renderBook();
+  });
   $("t-ocr").addEventListener("change", (e) => {
     state.ocrStyle = e.target.checked;
     renderBook();
@@ -916,12 +925,14 @@ async function main() {
   state.audit = qs.get("audit") === "1";
   // 默认**关**（2026-10-30 用户：成品页里成片的绿字没法看）。要看哪些行是 OCR 补的，
   // 勾工具栏「OCR 候选样式」或加 `?ocr=1` —— 能力保留，只是不再默认糊在脸上。
+  state.ocrFill = qs.get("fill") === "1";
   state.ocrStyle = qs.get("ocr") === "1";
   state.tagsOn = qs.get("tags") !== "0";
   await loadDocs();
   initBar();
   $("t-audit").checked = state.audit;
   $("t-ocr").checked = state.ocrStyle;
+  $("t-fill").checked = state.ocrFill;
   const asked = qs.get("doc") || DEFAULT_DOC;
   await loadBank();
   await loadDoc(asked);

@@ -31,6 +31,9 @@
       <label class="fb-toggle" title="解析遗漏（洋红框）与丢弃块（灰虚线）——原版书上没有这些标记，默认不显示">
         <input type="checkbox" id="t-audit" /> 审计标记
       </label>
+      <label class="fb-toggle" title="把 OCR 补出来的候选行画到纸面上。默认不画：整页 OCR 来源没有位置信息，硬配回洞会错位（表格文字被画到页眉），只作核查用">
+        <input type="checkbox" id="t-fill" /> 显示 OCR 补行
+      </label>
       <label class="fb-toggle" title="OCR 补回的行加青绿候选样式；关掉则按普通正文显示（信息仍在悬停里）">
         <input type="checkbox" id="t-ocr" /> OCR 候选样式
       </label>

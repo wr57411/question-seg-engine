@@ -384,17 +384,152 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
       // **跨行折断回接**（`DECISIONS §85`）：放在这里是因为 leak 行已被挑走
       // （`continue` 进 leaks、不进 blocks），此刻 blocks 里剩下的才是本页真正相邻的行。
       const joined = joinBrokenBracketLines(blocks, pageWidth, pageHeight);
+      // 再收「压平表格行」（`§90`）：顺序必须在折断回接之后 —— 先让同一行的碎片接好，
+      // 再按表格行的几何一致性分组，否则被折断的行会破坏 `x0`/宽度的一致性判定。
+      const tabled = mergeFlatTableRows(joined, pageWidth);
       return {
         index: asInt(rec.page_idx) ?? 0,
         width: asNumber(size?.[0]) ?? 1654,
         height: pageHeight,
-        blocks: joined,
+        blocks: tabled,
         leaks,
       } satisfies PageInfo & { leaks: ParsedBlock[] };
     })
     .sort((a, b) => a.index - b.index);
   const withLeaks = pages as (PageInfo & { leaks: ParsedBlock[] })[];
   return { docId, pages: dropCrossPageLeaks(withLeaks) };
+}
+
+/**
+ * **压平表格行 → 表格块**（`DECISIONS §90`）。
+ *
+ * 现象（2026-10-30 用户截图，电路册 p1）：页面上出现一堆参差不齐的小字
+ * （`欧姆定律(纯电阻电路` / `表达式` / `-2+` / `dot` …）。根因不是渲染坏，
+ * 而是**上游把一个知识清单表格压平成了 10 行纯文本**，单元格之间用 `|` 隔开：
+ *
+ * ```
+ * #32 欧姆定律(纯电阻电路) | 电流的三个表达式 | (1)I=q/t(定义式);…
+ * #33 (决定式);(3)I=neSv(微观决定式)          ← 上一行第 3 列的续行
+ * #34 伏安特性曲线(如图所示) |
+ * #35 电阻定律 | 表达式 | R=ρl/S(也是电阻的决定式),适用于粗细均匀的
+ * ```
+ *
+ * 十行各自按 bbox 算字号（行越长被 `clampByWidth` 压得越小）⇒ 字号参差、挤成一团。
+ *
+ * **判据**（全部 AND，取自这一组行共享的几何特征）：
+ * 1. 连续 ≥ 3 个 text 块，首块含 `|`；
+ * 2. `x0` 与宽度逐块一致（±3pt）—— 表格行左边界与宽度是**同一列的**；
+ * 3. 宽度 > 页宽的 60% —— 单栏正文行不会这么宽；
+ * 4. 相邻行纵向间距 < 1.2 倍行高（同一张表内不会跳跃）。
+ *
+ * **还原列**（`|` 拆段后的对齐规则，实测这 10 行全部适用）：
+ * - 3 段 ⇒ 列1/列2/列3；
+ * - 2 段且**末段为空** ⇒ 从列1 起（`伏安特性曲线(如图所示) |` 这种）；
+ * - 2 段且末段非空 ⇒ 归列2/列3（`定义式 | R=U/I`，列1 是跨行合并单元格）；
+ * - 无 `|` ⇒ 上一行**最后一列**的续行。
+ *
+ * 产出 `kind:"table"` + 上游同款 `<table>` HTML，交给 `§76` 已有的网格渲染 ——
+ * 三处展示层（成品页 / 对比页 / 手机文本流）一次修好，不用各打各的补丁。
+ */
+function mergeFlatTableRows(blocks: ParsedBlock[], pageWidth: number): ParsedBlock[] {
+  const out: ParsedBlock[] = [];
+  const wideEnough = (b: ParsedBlock) =>
+    b.kind === "text" && b.bbox[2] - b.bbox[0] > pageWidth * 0.6;
+  const sameColumn = (a: ParsedBlock, b: ParsedBlock) =>
+    Math.abs(a.bbox[0] - b.bbox[0]) <= 3 &&
+    Math.abs((a.bbox[2] - a.bbox[0]) - (b.bbox[2] - b.bbox[0])) <= 3;
+
+  let i = 0;
+  while (i < blocks.length) {
+    const first = blocks[i];
+    if (!first) break;
+    if (!wideEnough(first) || !String((first as { text?: string }).text ?? "").includes("|")) {
+      out.push(first);
+      i++;
+      continue;
+    }
+    // 收集这一组：后续行要么同列宽且含 `|`（新行），要么同列宽且紧贴上一行（续行）
+    const group: ParsedBlock[] = [first];
+    let j = i + 1;
+    while (j < blocks.length) {
+      const b = blocks[j];
+      if (!b || !wideEnough(b) || !sameColumn(first, b)) break;
+      const prev = group[group.length - 1]!;
+      const h = prev.bbox[3] - prev.bbox[1];
+      if (b.bbox[1] - prev.bbox[3] > h * 1.2) break;
+      group.push(b);
+      j++;
+    }
+    if (group.length < 3) {
+      out.push(first);
+      i++;
+      continue;
+    }
+    const table = buildFlatTable(group, pageWidth);
+    if (!table) {
+      out.push(first);
+      i++;
+      continue;
+    }
+    out.push(table);
+    i = j;
+  }
+  return out;
+}
+
+/** 把一组压平表格行还原成 `kind:"table"` 块。列对齐规则见调用方注释。 */
+function buildFlatTable(group: ParsedBlock[], pageWidth: number): ParsedBlock | null {
+  const rows: string[][] = [];
+  for (const b of group) {
+    const text = String((b as { text?: string }).text ?? "").trim();
+    if (!text) continue;
+    if (!text.includes("|")) {
+      // 续行：接在上一行**最后一列**后面
+      const last = rows[rows.length - 1];
+      if (last && last.length) {
+        const k = last.length - 1;
+        last[k] = last[k] ? `${last[k]} ${text}` : text;
+      } else {
+        rows.push([text]);
+      }
+      continue;
+    }
+    const parts = text.split("|").map((x) => x.trim());
+    if (parts.length === 2) {
+      // 末段为空 ⇒ 这行从列1 起；否则列1 是上一行的合并单元格，本行从列2 起
+      rows.push(parts[1] ? ["", parts[0]!, parts[1]] : [parts[0]!, "", ""]);
+    } else {
+      rows.push(parts);
+    }
+  }
+  if (rows.length < 3) return null;
+
+  const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const html =
+    "<table>" +
+    rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("") +
+    "</table>";
+
+  const bb = group.reduce<[number, number, number, number]>(
+    (acc, b) => [
+      Math.min(acc[0], b.bbox[0]),
+      Math.min(acc[1], b.bbox[1]),
+      Math.max(acc[2], b.bbox[2]),
+      Math.max(acc[3], b.bbox[3]),
+    ],
+    [group[0]!.bbox[0], group[0]!.bbox[1], group[0]!.bbox[2], group[0]!.bbox[3]],
+  );
+  const text = rows.map((r) => r.join("\t")).join("\n");
+  void pageWidth;
+  return {
+    kind: "table",
+    bbox: bb,
+    text,
+    firstLine: rows[0]!.join(" "),
+    lineCount: rows.length,
+    maxFontSize: 0,
+    html,
+  };
 }
 
 /**
