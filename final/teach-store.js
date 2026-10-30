@@ -17,7 +17,8 @@ const TEACH_ROOT = "/data/out/teach";
  * @typedef {{ id: string, name: string }} TeachItem
  * @typedef {{ questionId: string, topicIds: string[], categoryIds: string[], anchor?: Record<string, unknown> }} TeachBinding
  * @typedef {{ version: 1, updatedAt: string | null, bindings: TeachBinding[], stale: TeachBinding[] }} TeachBindings
- * @typedef {{ topics: TeachItem[], categories: TeachItem[] }} TeachLibrary
+ * @typedef {{ id: string, name: string, topicIds: string[], categoryIds: string[] }} TeachCombo
+ * @typedef {{ topics: TeachItem[], categories: TeachItem[], combos: TeachCombo[] }} TeachLibrary
  */
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */
@@ -210,6 +211,61 @@ export function addTeachItem(list, name, prefix, idGen) {
   return { list: [...list, item], item, created: true };
 }
 
+/** @param {unknown} raw @returns {TeachCombo[]} */
+export function normalizeCombos(raw) {
+  if (!isRec(raw) || !Array.isArray(raw.combos)) return [];
+  /** @type {TeachCombo[]} */
+  const out = [];
+  const seen = new Set();
+  for (const c of raw.combos) {
+    if (!isRec(c)) continue;
+    const id = str(c.id);
+    const name = str(c.name).trim();
+    if (!id || !name || seen.has(id)) continue;
+    const topicIds = Array.isArray(c.topicIds) ? c.topicIds.filter((x) => typeof x === "string") : [];
+    const categoryIds = Array.isArray(c.categoryIds) ? c.categoryIds.filter((x) => typeof x === "string") : [];
+    if (!topicIds.length && !categoryIds.length) continue;
+    seen.add(id);
+    out.push({ id, name, topicIds, categoryIds });
+  }
+  return out;
+}
+
+/**
+ * 新建常用组合：名字必须自己起、trim 后唯一；至少含 1 个专题或类别。
+ * @param {TeachCombo[]} list
+ * @param {string} name
+ * @param {string[]} topicIds
+ * @param {string[]} categoryIds
+ * @param {(prefix: string) => string} [idGen]
+ * @returns {{ list: TeachCombo[], item: TeachCombo | null, created: boolean, error?: string }}
+ */
+export function addCombo(list, name, topicIds, categoryIds, idGen) {
+  const clean = String(name ?? "").trim();
+  if (!clean) return { list, item: null, created: false, error: "组合名不能为空" };
+  if (!topicIds.length && !categoryIds.length) {
+    return { list, item: null, created: false, error: "当前题还没有专题/类别，不能存成组合" };
+  }
+  if (list.some((c) => c.name.trim() === clean)) {
+    return { list, item: null, created: false, error: `已有同名组合：${clean}` };
+  }
+  const gen = idGen ?? ((p) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
+  let id = gen("cb");
+  let guard = 0;
+  while (list.some((c) => c.id === id) && guard++ < 10) id = gen("cb");
+  if (list.some((c) => c.id === id)) return { list, item: null, created: false, error: "生成 id 失败，请重试" };
+  const item = { id, name: clean, topicIds: [...new Set(topicIds)], categoryIds: [...new Set(categoryIds)] };
+  return { list: [...list, item], item, created: true };
+}
+
+/** 判断当前题的集合是否与组合完全一致（用于高亮“正在用”）。 */
+/** @param {TeachCombo} combo @param {{topicIds:string[],categoryIds:string[]}} a */
+export function comboMatches(combo, a) {
+  /** @param {string[]} x @param {string[]} y @returns {boolean} */
+  const same = (x, y) => x.length === y.length && x.every((v) => y.includes(v));
+  return same(combo.topicIds, a.topicIds) && same(combo.categoryIds, a.categoryIds);
+}
+
 /** @param {TeachItem[]} items @param {string[]} recent @returns {TeachItem[]} */
 export function orderByRecent(items, recent) {
   const rank = new Map(recent.map((id, i) => [id, i]));
@@ -231,13 +287,15 @@ async function getJson(url) {
 
 /** @returns {Promise<TeachLibrary>} */
 export async function loadTeachLibrary() {
-  const [topicsRaw, categoriesRaw] = await Promise.all([
+  const [topicsRaw, categoriesRaw, combosRaw] = await Promise.all([
     getJson(`${TEACH_ROOT}/topics.json`),
     getJson(`${TEACH_ROOT}/categories.json`),
+    getJson(`${TEACH_ROOT}/combos.json`),
   ]);
   return {
     topics: normalizeTeachList(topicsRaw, "topics"),
     categories: normalizeTeachList(categoriesRaw, "categories"),
+    combos: normalizeCombos(combosRaw),
   };
 }
 
@@ -248,7 +306,7 @@ export async function loadTeachBindings(doc) {
 
 /**
  * 唯一写路径：POST /api/teach。失败返回 {ok:false,error}，调用方必须显示并回退。
- * @param {'topics'|'categories'|'bindings'} scope
+ * @param {'topics'|'categories'|'bindings'|'combos'} scope
  * @param {unknown} payload
  * @param {string} [doc]
  * @returns {Promise<{ok: boolean, error?: string}>}

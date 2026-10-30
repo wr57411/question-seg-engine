@@ -1,6 +1,6 @@
 ---
 intent: 在成品页实现 iPad 挑题与归类（专题 / 类别 / 业务标签三套独立清单），完成导出 v2、旧数据迁移与 iPad 验收。
-success_criteria: 000-010 工单全部完成；npm run check 全绿；topic:export/audit:topic v2 绿；迁移 dry-run/备份/幂等通过且 0 条归属丢失；纸面几何不变量全绿；iPad 820×1100 截图审板 ≥8 张且内容齐全；真机 Safari 人工验收记录在案；每步绿后在 feat/pick-classify 有检查点提交；全部完成后合回 main（不推送）。
+success_criteria: 000-011 工单全部完成（011 = 自定义常用组合）；npm run check 全绿；topic:export/audit:topic v2 绿；迁移 dry-run/备份/幂等通过且 0 条归属丢失；纸面几何不变量全绿；iPad 820×1100 截图审板 ≥8 张且内容齐全；真机 Safari 人工验收记录在案；每步绿后在 feat/pick-classify 有检查点提交；全部完成后合回 main（不推送）。
 risk_level: high
 auto_approve: true
 branch: feat/pick-classify
@@ -35,6 +35,8 @@ max_iterations: 3
 verify: node --import tsx --test tests/teach-store.test.ts
 
 - [x] **Step 5: 同上题 + 撤销 + 写失败回滚（ticket 004）**
+> 2026-10-30 追加（用户）：自定义常用组合（ticket 011）已实现——托盘标题栏「组合」浮层、
+  用户命名、套用替换当前题归属、复用撤销；测试在 `tmp/pick-test-app` 独立数据副本上跑。
 action: `teach-store` 增加 `sameAsPrevious`（替换语义）、动作快照与 `undoLast`；`final.js` 增加「同上题」按钮（无上一题/当前就是上一题时禁用）、5 秒撤销条、错误提示条；写入失败时 chip 与角标恢复写前状态；补 `tests/teach-store.test.ts` 与失败注入。
 loop: until tests pass
 max_iterations: 3

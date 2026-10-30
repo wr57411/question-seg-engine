@@ -27,8 +27,8 @@ function fixtureRoot() {
   return root;
 }
 
-test("scope 只认 topics / categories / bindings", () => {
-  for (const s of ["topics", "categories", "bindings"]) assert.equal(isTeachScope(s), true);
+test("scope 只认 topics / categories / bindings / combos", () => {
+  for (const s of ["topics", "categories", "bindings", "combos"]) assert.equal(isTeachScope(s), true);
   for (const s of ["library", "tags", "", "bindings ", null, 1]) assert.equal(isTeachScope(s), false);
   assert.equal(MAX_BODY, 2 * 1024 * 1024);
 });
@@ -47,6 +47,7 @@ test("落盘目标必须仍在 data/out/teach 内", () => {
   assert.equal(teachFilePath(root, "topics", ""), join(root, "data", "out", "teach", "topics.json"));
   assert.equal(teachFilePath(root, "categories", ""), join(root, "data", "out", "teach", "categories.json"));
   assert.equal(teachFilePath(root, "bindings", "真卷甲"), join(root, "data", "out", "teach", "bindings", "真卷甲.json"));
+  assert.equal(teachFilePath(root, "combos", ""), join(root, "data", "out", "teach", "combos.json"));
   assert.equal(teachFilePath(root, "bindings", "../../../etc/passwd"), null);
   assert.equal(teachFilePath(root, "bindings", "a/../../b"), null);
 });
@@ -68,6 +69,17 @@ test("topics：字段齐全、id/name 唯一才放行", () => {
 test("categories：与 topics 同标准", () => {
   assert.equal(validateTeachPayload("categories", { version: 1, categories: [{ id: "ct-1", name: "基础" }] }), null);
   assert.ok(validateTeachPayload("categories", { version: 1, categories: [{ id: "ct-1", name: "基础" }, { id: "ct-2", name: "基础" }] }));
+});
+
+test("combos：id/name 唯一、集合非空、数组元素一致", () => {
+  const ok = { version: 1, combos: [{ id: "cb-1", name: "曲线基础", topicIds: ["tp-1"], categoryIds: ["ct-1"] }] };
+  assert.equal(validateTeachPayload("combos", ok), null);
+  assert.ok(validateTeachPayload("combos", { version: 1, combos: {} }));
+  assert.ok(validateTeachPayload("combos", { version: 1, combos: [{ id: "", name: "A", topicIds: ["tp-1"], categoryIds: [] }] }));
+  assert.ok(validateTeachPayload("combos", { version: 1, combos: [{ id: "cb-1", name: "", topicIds: ["tp-1"], categoryIds: [] }] }));
+  assert.ok(validateTeachPayload("combos", { version: 1, combos: [{ id: "cb-1", name: "A", topicIds: [], categoryIds: [] }] }));
+  assert.ok(validateTeachPayload("combos", { version: 1, combos: [{ id: "cb-1", name: "A", topicIds: "tp-1", categoryIds: [] }] }));
+  assert.ok(validateTeachPayload("combos", { version: 1, combos: [{ id: "cb-1", name: "A", topicIds: ["tp-1"], categoryIds: [] }, { id: "cb-1", name: "B", topicIds: ["tp-2"], categoryIds: [] }] }));
 });
 
 test("bindings：questionId 唯一、数组元素一致、anchor 合法", () => {

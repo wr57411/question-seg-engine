@@ -7,11 +7,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  addCombo,
   addTeachItem,
   assignmentFor,
   badgeCounts,
+  comboMatches,
   emptyTeachBindings,
   moveToFront,
+  normalizeCombos,
   normalizeTeachBindings,
   normalizeTeachList,
   orderByRecent,
@@ -125,6 +128,34 @@ test("新建：id 碰撞时重试，仍碰撞则拒绝", () => {
   const bad = addTeachItem(list, "另一个", "tp", () => "tp-dup");
   assert.equal(bad.created, false);
   assert.ok(bad.error);
+});
+
+test("常用组合：名字必填且唯一、至少一个专题/类别、id 唯一", () => {
+  const empty: { id: string; name: string; topicIds: string[]; categoryIds: string[] }[] = [];
+  let n = 0;
+  const gen = () => `cb-${++n}`;
+  const a = addCombo(empty, "  曲线基础 ", ["tp-1"], ["ct-1"], gen);
+  assert.equal(a.created, true);
+  assert.deepEqual(a.item, { id: "cb-1", name: "曲线基础", topicIds: ["tp-1"], categoryIds: ["ct-1"] });
+  assert.ok(addCombo(a.list, "曲线基础", ["tp-2"], [], gen).error, "同名必须拒");
+  assert.ok(addCombo(a.list, "空组合", [], [], gen).error, "空集合必须拒");
+  assert.ok(addCombo(a.list, " ", ["tp-2"], [], gen).error, "空名必须拒");
+  const b = addCombo(a.list, "圆周培优", ["tp-1", "tp-1"], ["ct-2"], gen);
+  assert.deepEqual(b.item?.topicIds, ["tp-1"], "id 去重");
+  assert.equal(b.item?.id, "cb-2");
+});
+
+test("normalizeCombos：丢弃空集合/重复 id；comboMatches 判断完全一致", () => {
+  const list = normalizeCombos({
+    combos: [
+      { id: "cb-1", name: "A", topicIds: ["tp-1"], categoryIds: ["ct-1"] },
+      { id: "cb-1", name: "B", topicIds: ["tp-2"], categoryIds: [] },
+      { id: "cb-2", name: "空", topicIds: [], categoryIds: [] },
+    ],
+  });
+  assert.deepEqual(list, [{ id: "cb-1", name: "A", topicIds: ["tp-1"], categoryIds: ["ct-1"] }]);
+  assert.equal(comboMatches(list[0]!, { topicIds: ["tp-1"], categoryIds: ["ct-1"] }), true);
+  assert.equal(comboMatches(list[0]!, { topicIds: ["tp-1"], categoryIds: [] }), false);
 });
 
 test("撤销：replaceBinding 精确恢复/删除，不动其它题", () => {

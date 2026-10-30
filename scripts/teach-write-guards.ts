@@ -21,7 +21,7 @@ const ID_MAX_LEN = 80;
 const NAME_MAX_LEN = 60;
 const BAD_DOC_CHARS = /[/\\]|\.\.|[\0-\u001f\u007f]/;
 
-export const TEACH_SCOPES = ["topics", "categories", "bindings"] as const;
+export const TEACH_SCOPES = ["topics", "categories", "bindings", "combos"] as const;
 export type TeachScope = (typeof TEACH_SCOPES)[number];
 
 const isStr = (v: unknown): v is string => typeof v === "string";
@@ -50,6 +50,7 @@ export function teachFilePath(root: string, scope: TeachScope, doc: string): str
   let file: string;
   if (scope === "topics") file = join(base, "topics.json");
   else if (scope === "categories") file = join(base, "categories.json");
+  else if (scope === "combos") file = join(base, "combos.json");
   else {
     if (!safeDocName(doc)) return null;
     file = join(base, "bindings", `${doc}.json`);
@@ -120,11 +121,39 @@ function validateBindings(body: Record<string, unknown>): string | null {
   return null;
 }
 
+function validateCombos(list: unknown): string | null {
+  if (!Array.isArray(list)) return "combos 必须是数组";
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  for (const raw of list) {
+    if (!isRec(raw)) return "combos 元素必须是对象";
+    const id = raw.id;
+    const name = raw.name;
+    if (!isStr(id) || !id.trim() || id.length > ID_MAX_LEN) return `combos.id 必须是非空字符串（≤${ID_MAX_LEN}）`;
+    if (!isStr(name) || !name.trim() || name.length > NAME_MAX_LEN) return `combos.name 必须是非空字符串（≤${NAME_MAX_LEN}）`;
+    if (raw.createdAt !== undefined && !isStr(raw.createdAt)) return "combos.createdAt 必须是字符串";
+    if (ids.has(id)) return `combos.id 重复：${id}`;
+    if (names.has(name.trim())) return `combos.name 重复：${name.trim()}`;
+    for (const key of ["topicIds", "categoryIds"] as const) {
+      const arr = raw[key];
+      if (!Array.isArray(arr) || !arr.every(isStr)) return `combos.${key} 必须是字符串数组`;
+      if (new Set(arr).size !== arr.length) return `combos.${key} 有重复 id`;
+    }
+    const topicIds = raw.topicIds as string[];
+    const categoryIds = raw.categoryIds as string[];
+    if (!topicIds.length && !categoryIds.length) return "combos 至少要有 1 个专题或类别";
+    ids.add(id);
+    names.add(name.trim());
+  }
+  return null;
+}
+
 /** 只校验「能不能安全落盘」的最小结构；语义正确性由导出/审计负责。 */
 export function validateTeachPayload(scope: TeachScope, body: unknown): string | null {
   if (!isRec(body)) return "载荷必须是 JSON 对象";
   if (body.version !== 1) return "version 必须为 1";
   if (scope === "topics") return validateList("topics", body.topics);
   if (scope === "categories") return validateList("categories", body.categories);
+  if (scope === "combos") return validateCombos(body.combos);
   return validateBindings(body);
 }

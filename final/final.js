@@ -28,10 +28,12 @@ import { prettifyLatex } from "../stages/latex-display.js";
 import { tagSection } from "./tag-panel.js";
 import { anchorOf, loadBindings, loadLibrary, reconcile, saveBindings, saveLibrary, tagIdsFor } from "./tag-store.js";
 import {
+  addCombo,
   addTeachItem,
   assignmentFor,
   badgeCounts,
   bindingFor,
+  comboMatches,
   emptyTeachBindings,
   loadTeachBindings,
   loadTeachLibrary,
@@ -211,6 +213,9 @@ function updatePickTray() {
   if (!state.picked) {
     title.textContent = state.pickMode ? "先点一道题" : "未选题";
     updateSameButton();
+    updateComboButton();
+    const pop = $("combo-pop");
+    if (pop && !pop.hidden) renderComboList();
     return;
   }
   const { q, p } = state.picked;
@@ -220,6 +225,9 @@ function updatePickTray() {
   const full = state.byId?.get(q.id);
   title.title = String(full?.stem ?? "").split("\n")[0]?.trim().slice(0, 80) ?? "";
   updateSameButton();
+  updateComboButton();
+  const pop = $("combo-pop");
+  if (pop && !pop.hidden) renderComboList();
 }
 
 function renderPickRows() {
@@ -314,6 +322,151 @@ function updateSameButton() {
   const can = !!(prev && cur && prev.doc === state.doc && prev.questionId !== cur.q.id);
   btn.disabled = !can;
   btn.title = can ? `复制「${prev.label}」到本题` : "先给另一道题归类后才能同上题";
+}
+
+function comboSummary(combo) {
+  const t = combo.topicIds.map((id) => state.teach?.topics.find((x) => x.id === id)?.name ?? "已删除专题");
+  const c = combo.categoryIds.map((id) => state.teach?.categories.find((x) => x.id === id)?.name ?? "已删除类别");
+  return [...t, ...c].join(" · ");
+}
+
+function currentAssignment() {
+  if (!state.picked) return { topicIds: [], categoryIds: [] };
+  return assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), state.picked.q.id);
+}
+
+function updateComboButton() {
+  const btn = $("pick-combo");
+  if (!btn) return;
+  btn.disabled = !state.picked;
+  btn.title = state.picked ? "常用组合：点一条套到当前题" : "先点一道题";
+}
+
+function renderComboList() {
+  const listBox = $("combo-list");
+  const empty = $("combo-empty");
+  const add = $("combo-add");
+  if (!listBox || !empty || !add) return;
+  const combos = state.teach?.combos ?? [];
+  const a = currentAssignment();
+  const row = (combo) => {
+    const b = el("button", "combo-row" + (comboMatches(combo, a) ? " on" : ""));
+    b.type = "button";
+    b.dataset.id = combo.id;
+    b.append(el("span", "combo-name", combo.name), el("span", "combo-sum", comboSummary(combo)));
+    b.title = `套用组合：${combo.name}`;
+    b.addEventListener("click", () => applyCombo(combo));
+    return b;
+  };
+  listBox.replaceChildren(...combos.map(row));
+  empty.hidden = combos.length > 0;
+  add.disabled = !state.picked || (!a.topicIds.length && !a.categoryIds.length);
+}
+
+function closeComboForm() {
+  const form = $("combo-form");
+  const add = $("combo-add");
+  const hint = $("combo-hint");
+  if (form) form.hidden = true;
+  if (add) add.hidden = false;
+  if (hint) hint.hidden = true;
+}
+
+function closeComboPop() {
+  const pop = $("combo-pop");
+  if (pop) pop.hidden = true;
+  closeComboForm();
+}
+
+function toggleComboPop() {
+  if (!state.picked) {
+    flash("先点一道题");
+    return;
+  }
+  const pop = $("combo-pop");
+  if (!pop) return;
+  pop.hidden = !pop.hidden;
+  if (!pop.hidden) {
+    const t = $("toast");
+    if (t) {
+      t.hidden = true;
+      t.classList.remove("on");
+    }
+    renderComboList();
+    closeComboForm();
+  }
+}
+
+function openComboForm() {
+  const a = currentAssignment();
+  const hint = $("combo-hint");
+  if (!state.picked || (!a.topicIds.length && !a.categoryIds.length)) {
+    if (hint) {
+      hint.hidden = false;
+      hint.textContent = "当前题还没有专题/类别，先归类再存组合";
+    }
+    return;
+  }
+  const form = $("combo-form");
+  const add = $("combo-add");
+  const input = $("combo-name");
+  if (!form || !input) return;
+  form.hidden = false;
+  add.hidden = true;
+  if (hint) hint.hidden = true;
+  input.value = "";
+  input.focus();
+}
+
+async function submitCombo(e) {
+  e.preventDefault();
+  if (!state.picked || !state.teach) return;
+  const a = currentAssignment();
+  const input = $("combo-name");
+  const hint = $("combo-hint");
+  const res = addCombo(state.teach.combos ?? [], input.value, a.topicIds, a.categoryIds);
+  if (!res.item) {
+    hint.hidden = false;
+    hint.textContent = res.error ?? "保存失败";
+    input.focus();
+    return;
+  }
+  const payload = { version: 1, updatedAt: new Date().toISOString(), combos: res.list };
+  const saved = await saveTeach("combos", payload);
+  if (!saved.ok) {
+    notice([`保存组合失败：${saved.error ?? "未知错误"}`], "err");
+    input.focus();
+    return;
+  }
+  state.teach = { ...state.teach, combos: res.list };
+  closeComboForm();
+  renderComboList();
+}
+
+function applyCombo(combo) {
+  if (!state.picked || !state.teach) return;
+  const { q, p } = state.picked;
+  const validTopics = combo.topicIds.filter((id) => state.teach.topics.some((t) => t.id === id));
+  const validCategories = combo.categoryIds.filter((id) => state.teach.categories.some((c) => c.id === id));
+  const missing = combo.topicIds.length + combo.categoryIds.length - validTopics.length - validCategories.length;
+  if (!validTopics.length && !validCategories.length) {
+    notice([`组合「${combo.name}」里的专题/类别都已不存在，不能套用`], "err");
+    return;
+  }
+  const cur = currentAssignment();
+  if (comboMatches({ ...combo, topicIds: validTopics, categoryIds: validCategories }, cur)) {
+    flash(`已经是「${combo.name}」`);
+    closeComboPop();
+    return;
+  }
+  const before = state.teach.bindings;
+  const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
+  const next = sameAsPrevious(before, q.id, { topicIds: validTopics, categoryIds: validCategories }, anchor);
+  commitTeach(next, `应用组合：${combo.name}`, before, { qid: q.id, pageIndex: p.index });
+  closeComboPop();
+  if (missing) {
+    notice([`组合「${combo.name}」有 ${missing} 项专题/类别已不存在，已跳过`], "warn");
+  }
 }
 
 function rememberClassified(qid, assignment) {
@@ -555,6 +708,7 @@ function setPickMode(on) {
     updatePickTray();
   } else {
     closeCreate();
+    closeComboPop();
     hideUndo();
     clearPickSelection();
   }
@@ -980,6 +1134,7 @@ async function loadDoc(doc) {
     state.lastClassified = null;
     hideUndo();
     closeCreate();
+    closeComboPop();
     updatePickTray();
     await loadQuestions(doc);
     state.snap = state.data;
@@ -1272,6 +1427,20 @@ function initBar() {
   $("pick-close").addEventListener("click", () => setPickMode(false));
   $("pick-same").addEventListener("click", applySameAsPrevious);
   $("pick-undo-btn").addEventListener("click", undoLast);
+  $("pick-combo").addEventListener("click", () => toggleComboPop());
+  $("combo-close").addEventListener("click", closeComboPop);
+  $("combo-add").addEventListener("click", openComboForm);
+  $("combo-form").addEventListener("submit", (e) => void submitCombo(e));
+  $("combo-cancel").addEventListener("click", closeComboForm);
+  document.addEventListener("click", (e) => {
+    const pop = $("combo-pop");
+    if (!pop || pop.hidden) return;
+    if (e.target.closest?.("#combo-pop") || e.target.closest?.("#pick-combo")) return;
+    closeComboPop();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeComboPop();
+  });
   $("pick-add-topics").addEventListener("click", () => openCreate("topics"));
   $("pick-add-categories").addEventListener("click", () => openCreate("categories"));
   $("pick-create").addEventListener("submit", (e) => void submitCreate(e));
