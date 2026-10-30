@@ -140,3 +140,28 @@ verify: test -z "$(git status --porcelain)" && [ "$(git branch --show-current)" 
 - **M06 持久化**：点 chip 后刷新，归属保留率 100%；快速连点后最终状态与最后一次操作一致（0 乱序）。
 - **M07 失败不静默**：模拟写失败时 UI 回退并显示错误，0 次“假成功”；非法 scope/doc/路径/形状的写请求 0 次落盘。
 - **M08 真机**：iPad Safari 清单逐项通过；发现项全部登记 HANDOFF §6（未闭合不冒充通过）。
+
+## 交接要点（2026-10-30 暂停，模型卡顿，换模型续做）
+
+- **当前分支**：`feat/pick-classify`；`main` 未合并（main 仍为 `68d805c`）。最新检查点 **`0572e6e`**
+  （组合常驻条），前序 `985aa70`（组合初版）、`79e92be`（同上题+撤销）、`6e41f70`（顶栏/托盘压缩）、
+  `8b5dac9`（内联新建）、`b680f51`（写通道/挑题）、`ecb8d87`（SPEC/工单）。
+- **HOTL run**：`pick-classify-20261030T024035Z-9fa769d0a516`；Step 1–5 已 done，**Step 6（托盘搜索）
+  尚未开始**；run 状态 running，owner 已 release（接手者重新 `owner claim --run-id ...`）。
+  状态文件在 `.hotl/state/`，报告在 `.hotl/reports/`。
+- **用户真实数据（不要覆盖）**：`data/out/teach/` 目前有专题 `平抛运动 / 圆周运动 / 曲线运动`；
+  bindings 含 q16/q31/q58 + q0/q1（q0/q1 -> 曲线运动 + 基础）；用户自己建了一个组合
+  `曲线基础`（`cb-mvujgdzldavzra`）。**绝不能用 `fixtures/teach-seed` 覆盖真实目录**。
+- **测试安全**：所有会写 `data/out/teach` 的浏览器测试必须用 `tmp/pick-test-app`（APFS 克隆）
+  + 独立端口 4175 + `.test-root` 标记；`tmp/combo-smoke.mjs` 已带 marker 守卫。
+  真实服务在 **4174**（当前 nohup 运行）；临时 4175 服务测试完已停。`tasks/lessons.md` L5 记录过
+  一次冒烟用种子覆盖用户数据的真实事故。
+- **本次组合 UI 已实现**：组合常驻在托盘标题行，一屏 3 槽、12px 小字、超出横滑；点 chip 套用
+  （替换当前题归属、复用撤销）；`＋` 起名小浮层；长按 380ms 拖动排序并写 `combos.json`。
+  独立副本实测：5 条组合、3 个可见槽、横滑到最后一个、拖动后顺序落盘、套用/撤销/刷新持久化全过；
+  `npm run check` 退出码 0。
+- **未做**：组合的**改名/删除**（建错只能让它先留着或手工改文件）；Step 6 搜索；Step 7 专题/类别管理；
+  Step 8 导出 v2 + 专题页；Step 9 阅读回显；Step 10/11 迁移（human gate）；Step 12 截图审板；
+  Step 13 真机（human gate）；Step 14/15 合回 main。
+- **接手第一步**：读本文件前文 + `AGENTS.md` + `docs/HANDOFF.md`；`npm run check` 全绿；
+  在 `feat/pick-classify` 上 `owner claim` 当前 run；从 Step 6 继续，**不要重跑会写真实 teach 的冒烟**。
