@@ -304,6 +304,21 @@ function matchKind(ok: boolean, kind: TextMatch["kind"]): LineMatch {
 }
 
 /** 尝试对某块首行做全部语言模式判定（按优先级：区间 > 大题 > 括号 > 题号 > 选项） */
+/**
+ * **页内噪声块**（不是正文，`DECISIONS §83`）：页中的答案标记（`[答案 P014]` / `答案 P049]`），
+ * 以及被上游拆出的孤立括号 `()`。
+ *
+ * 只认「整块恰好是这些形态」，不做子串删除 —— 避免误伤正文里的「答案」二字。
+ *
+ * 为什么抽成函数：这条判据原先内联在 `rule-engine.process()` 里，而**板块开题路径**
+ * 把收集到的块直接拼进题干、绕过了它 ⇒ 实测 `教材实验12` 的题干混进了 `答案 P049]`。
+ * 同一判据两处实现必然漂移，提出来共用。
+ */
+export function isPageNoiseLine(text: string): boolean {
+  const t = text.trim();
+  return /^\[?答案\s*[A-Z]?\d+\]?$/.test(t) || /^[（）()\s]+$/.test(t);
+}
+
 export function matchFirstLine(line: string): LineMatch {
   const s = line.trimStart();
 

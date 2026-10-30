@@ -6,7 +6,7 @@
 // 失败时打印该卷审计输出的末尾；不替代 `npm run check`（后者仍只审基线卷）。
 //
 // 用法：node scripts/audit-render-all.mjs [--baseline] [--include-oxr]
-//   --baseline 只审 8 卷基线（npm run check 用；新入批的书另由批次验收审）
+//   --baseline 只审 7 卷基线（npm run check 用；新入批的书另由批次验收审）
 // 退出码：0 = 全部通过；1 = 有卷失败；2 = 没有可审计的快照。
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
@@ -14,13 +14,16 @@ import { join } from "node:path";
 
 const ROOT = process.cwd();
 const BASELINE_MODE = process.argv.includes("--baseline");
-/** 代码变更的稳定门：这 8 卷是融合/切题/渲染改动前就存在的基线卷。 */
+/**
+ * 代码变更的稳定门：这 **7 卷**是融合/切题/渲染改动前就存在的基线卷。
+ * 2026-10-30 移除「23必刷题 光学」—— 该册是 8 页手工节选，用户已删书，
+ * 目录不存在会让 `--baseline` 直接报「缺卷」并 exit 2，把 `npm run check` 卡死。
+ */
 const BASELINE_DOCS = [
   "23必刷题 1 直线运动",
   "23必刷题 2相互作用",
   "23必刷题 3 运动和力的关系",
   "23必刷题 4 曲线运动",
-  "23必刷题 光学",
   "动量守恒定律23必刷题",
   "机械能23必刷题",
   "第二章相互作用-答案与解析",

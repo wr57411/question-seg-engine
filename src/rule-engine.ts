@@ -13,6 +13,7 @@ import {
   bandOrdinal,
   isBandSubheading,
   isPageFurniture,
+  isPageNoiseLine,
   looksLikeAnswerEntry,
   matchAnswerEntry,
   matchBoxListItem,
@@ -304,10 +305,7 @@ class Ctx {
     // 页内噪声块：答案标记（如 `[答案 P014]`）与被拆出的孤立括号 `()`。
     // 它们不是正文，但可能出现在页面中部（顶部家具守卫管不到），会粘进题干/选项。
     // 只跳过**整块恰好是**这些形态的块，不做子串删除，避免误伤正文。
-    if (block.kind === "text") {
-      const t = block.text.trim();
-      if (/^\[?答案\s*[A-Z]?\d+\]?$/.test(t) || /^[（）()\s]+$/.test(t)) return;
-    }
+    if (block.kind === "text" && isPageNoiseLine(block.text)) return;
 
     // 方框列表状态防滞留：距上次方框条目超过 BOX_LIST_MAX_IDLE 个块即失效。
     // 为什么需要：状态要跨页存活（实测该方框从 p15 底跨到 p16 顶），所以不能用页界清；
@@ -743,7 +741,8 @@ class Ctx {
     if (!cur) return;
     this.settleOptions(null);
     cur.blockIndexes = [...new Set([...p.blockIndexes, ...cur.blockIndexes])];
-    const extra = p.texts.filter((t) => t.trim() && t.trim() !== p.title.trim());
+    // 噪声块（`答案 P049]` 之类）不进题干 —— 走的是与 process() 同一份判据
+    const extra = p.texts.filter((t) => t.trim() && t.trim() !== p.title.trim() && !isPageNoiseLine(t));
     if (extra.length) cur.stemParts = [p.title, ...extra];
     this.review(
       p.entry.index,
