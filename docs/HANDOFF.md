@@ -5,31 +5,44 @@
 > 维护规则：每轮有实质进展后更新「当前状态」与「未闭合风险」两节；事实必须可复现
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
-> ⚠️ **导航提示（2026-10-30）**：开发前沿在 **`feature/oxr` 分支**，已大幅领先本快照 ——
-> 该分支 HANDOFF 有自己的 §0「本次交接要点」，决策记到 **§79**
-> （§48 之后：修正层治理 / 批量导入 / 金标准 / 逐题选源 / 表格结构 / 答案区守卫 / 板块条目）。
-> **要继续功能开发或读最新交接，先切到 `feature/oxr` 看它的 HANDOFF**；
-> 本文件的 10-28 快照只描述 `main` 基线。多会话并行注意 `tasks/lessons.md` **L4**（共享 `data/`）。
+> ⚠️ **三条工作线并存（2026-10-30 核实）** —— 动手前先确认自己在哪条线上。
+> 别照「前沿在某分支，先切过去」这类单句导航切分支（本文件曾这样写过，是错的）。
+>
+> | 分支 | 位置 | 状态（`git branch -vv` 实跑，2026-10-30） |
+> |---|---|---|
+> | `main` | 本仓库目录 | 基线。`68d805c`，**落后 `origin/main` 34 个未推送提交** |
+> | `feature/oxr` | worktree `…/Worktrees/question-seg-engine/feature-oxr-6b3489a1` | OXR 第二解析源。**未并入 `main`**（`git merge-base --is-ancestor feature/oxr main` 非 0）；已推 origin，领先 `origin/main` 111；决策到 **§79**，有自己的 §0「本次交接要点」 |
+> | **`feat/pick-classify`** | **本仓库目录（当前检出）** | **当前活跃线**：iPad 挑题归类 v2。领先 `main` **13** 个提交，**无 upstream**（未推送） |
+>
+> **接着做功能开发 → 读 [`docs/plans/2026-10-30-pick-classify-workflow.md`](plans/2026-10-30-pick-classify-workflow.md)
+> 末尾「交接 2」**：哪几件必做、顺序、已知的坑与红线都在那儿，本文件不复述。
+> 多会话并行注意 `tasks/lessons.md` **L4**（worktree 的 `data/` 是软链 ⇒ 产物目录被共享）
+> 与 **L5**（会写 `data/out/teach` 的测试只准跑副本）。
+>
+> 下面 §1–§7 是 **2026-10-28 的 `main` 基线快照**，不描述上面两条功能线；
+> **当前实测值以 `npm run check` 输出为准**（最近一次实跑：2026-10-30，测试 **340 例**、
+> 多册配对 **476 条**、EXIT=0）。
 
-- **交接快照日期**：2026-10-28
+- **交接快照日期**：2026-10-28（**历史快照**，数字不要当现状）
 - **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **259 例** + audit:render + audit:numbering
   + **bank:all**；题号审计判定项归零，基线 **5 条**全为源文档限制；多册配对 **419 条**，
   唯一键无重复、`quizId` 归属自检通过；题册 **83/83** 配对 —— 2026-10-28 实跑复验）
-- **快照时的 git HEAD**：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
-  其后还有 OXR 收口提交（`--parser oxr` 接入 → 8 卷交叉核对 → 106 条修正落地）—— **以 `git log -1` 为准**。
-  两侧自 `076bcd0` 分叉时：main 侧 +4、功能侧 +9，见下表；`main` 已快进到功能分支，未 push
+- **快照时的 git HEAD**：`feature/oxr` 曾把 `main` merge 进本分支（合并提交 `cfbce09`），
+  其后还有 OXR 收口提交（`--parser oxr` 接入 → 8 卷交叉核对 → 106 条修正落地）。
+  ⚠️ **但该分支至今未并入 `main`**，两侧提交数请用 `git rev-list --count origin/main..<branch>` 现算，
+  本文不写死数字（写死的已经过期过一次）。
 
 ### 分支与 worktree（2026-10-28 起的工作方式）
 
 | 位置 | 分支 | 用途 |
 |---|---|---|
-| 本仓库目录（含 `data/`、`books/`） | **`main`** | **日常改动的基线**——新 Agent 默认从这里开始 |
-| `/Users/john/WorkBuddy/Worktrees/question-seg-engine/feature-oxr-6b3489a1` | **`feature/oxr`** | **功能开发专用 worktree**（OXR 第二解析源）。2026-10-28 已把 `main` merge 进本分支并解冲突，此后合回 main 可 fast-forward |
+| 本仓库目录（含 `data/`、`books/`） | **`main`** / 当前检出的功能分支 | 日常改动的基线；功能线也在这里开发（2026-10-30 起 `feat/pick-classify`） |
+| `/Users/john/WorkBuddy/Worktrees/question-seg-engine/feature-oxr-6b3489a1` | **`feature/oxr`** | OXR 第二解析源专用 worktree。目录名带旧后缀，**目录名 ≠ 分支名** |
 
-⚠️ 功能分支合回 main 前先跑 `npm run check`。**本次合并的实际冲突只有两处**：
+⚠️ 功能分支合回 main 前先跑 `npm run check`。**2026-10-28 那次合并的实际冲突只有两处**（历史记录）：
 `docs/HANDOFF.md`（即本段，已按实跑重写）与 `scripts/daily.ts`
-（保留本分支的 `async main` + `--parser oxr`，同时保留 main 侧的 MinerU 代理检测 —— 两者都要）。
-`docs/DECISIONS.md` 只在 main 侧改动，自动合并无冲突。
+（保留该分支的 `async main` + `--parser oxr`，同时保留 main 侧的 MinerU 代理检测 —— 两者都要）。
+`docs/DECISIONS.md` 当时只在 main 侧改动，自动合并无冲突。
 
 ---
 
