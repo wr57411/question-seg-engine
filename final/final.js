@@ -208,9 +208,11 @@ function updatePickTray() {
     return;
   }
   const { q, p } = state.picked;
+  const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), q.id);
+  const counts = a.topicIds.length || a.categoryIds.length ? ` · 已归 ${a.topicIds.length} 专题 / ${a.categoryIds.length} 类别` : "";
+  title.textContent = `p${p.index + 1} · 第${q.number}题${counts}`;
   const full = state.byId?.get(q.id);
-  const first = String(full?.stem ?? "").split("\n")[0]?.trim().slice(0, 42) ?? "";
-  title.textContent = `p${p.index + 1} · 第${q.number}题${first ? ` · ${first}` : ""}`;
+  title.title = String(full?.stem ?? "").split("\n")[0]?.trim().slice(0, 80) ?? "";
 }
 
 function renderPickRows() {
@@ -221,8 +223,8 @@ function renderPickRows() {
   if (!rows || !hint || !topicBox || !categoryBox) return;
   if (!state.picked) {
     rows.hidden = true;
-    hint.hidden = false;
-    hint.textContent = state.pickMode ? "先点一道题" : "";
+    hint.hidden = true;
+    hint.textContent = "";
     topicBox.replaceChildren();
     categoryBox.replaceChildren();
     return;
@@ -321,6 +323,7 @@ function openCreate(kind) {
   const form = $("pick-create");
   const input = $("pick-create-name");
   form.hidden = false;
+  document.querySelector(".pick-tray")?.classList.add("creating");
   input.value = "";
   input.placeholder = kind === "topics" ? "新专题名" : "新类别名";
   input.focus();
@@ -330,6 +333,7 @@ function closeCreate() {
   state.creating = null;
   const form = $("pick-create");
   if (form) form.hidden = true;
+  document.querySelector(".pick-tray")?.classList.remove("creating");
   const input = $("pick-create-name");
   if (input) input.value = "";
 }
@@ -777,7 +781,8 @@ function updatePageIndicator() {
     const r = s.getBoundingClientRect();
     if (r.top <= mid) cur = Number(s.id.replace("pg-", ""));
   }
-  $("page-now").textContent = `第 ${cur} / ${secs.length} 页`;
+  $("page-now").textContent = `${cur} / ${secs.length}`;
+  $("page-now").title = `第 ${cur} / ${secs.length} 页`;
   savePosition(cur);
 }
 
@@ -1129,6 +1134,31 @@ function initBar() {
     state.ocrStyle = e.target.checked;
     renderBook();
   });
+  const more = $("t-more");
+  const menu = $("more-menu");
+  more.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    more.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  document.addEventListener("click", (e) => {
+    if (menu.hidden) return;
+    if (e.target.closest?.(".fb-right")) return;
+    menu.hidden = true;
+    more.setAttribute("aria-expanded", "false");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || menu.hidden) return;
+    menu.hidden = true;
+    more.setAttribute("aria-expanded", "false");
+  });
+  for (const a of menu.querySelectorAll("a")) {
+    a.addEventListener("click", () => {
+      menu.hidden = true;
+      more.setAttribute("aria-expanded", "false");
+    });
+  }
+
   $("t-pick").addEventListener("click", () => setPickMode(!state.pickMode));
   $("pick-close").addEventListener("click", () => setPickMode(false));
   $("pick-add-topics").addEventListener("click", () => openCreate("topics"));
