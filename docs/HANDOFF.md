@@ -253,6 +253,7 @@ layout.json / content_list.json
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |
 | `docs/specs/2026-10-30-topic-knowledge-base-spec.md` | 专题知识库需求 / 数据合同 / 阶段规划（S01 MVP） | 2026-10-30 实施完成；种子与答案池风险见 §2 / §6-17 |
+| `docs/specs/2026-10-30-pick-and-classify.md` | **iPad 挑题与归类 v2**：专题/类别/业务标签三套清单、挑题模式、托盘、迁移与验收 | 已对齐待实施；术语见 `CONTEXT.md`，决策见 `docs/adr/0001-…` |
 | `docs/PRD-viewer.md` | viewer 的产品需求（设计输入稿） | 状态为「待设计验证」，实现以 viewer/ 实际为准 |
 | `docs/real-api-notes.md` | MinerU API 字段事实 | 字段争议以它为准 |
 | `docs/第二章答案-结构化提取.md` | 答案册首跑报告 | 含首尾边界与 46 处待校对的如实说明 |
