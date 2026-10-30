@@ -38,10 +38,13 @@
   推荐 **B → A → C/D**。
 - HANDOFF §6 的 4 条未闭合项已在报告 §4.1 登记归属：§6-11 纳入本轮（C）；
   §6-28 / §6-6 不纳入；§6-7 部分（DOM 门 + 截图，大卷性能不做）。
-- C 已开工：`stages/uncovered-layout.js`（37→0）与 `stages/reconstruct.js`（80→0）已清零并纳管（**6/11**）；
+- **G05（P2，新发现）**：删 `.d.ts` 会让实现进入主程序（`noUncheckedIndexedAccess:true`）⇒ 实测 113 处新错，
+  **已回退**；后果是"纳管"只覆盖实现侧、消费者仍拿 `any` 签名。删除前置与过渡规矩见 `DECISIONS §94` / `HANDOFF §6-29`。
+- C 已开工：`stages/uncovered-layout.js`（37→0）、`stages/reconstruct.js`（80→0）、`final/tag-panel.js`（16→0）
+  已清零并纳管（**7/11**）；
   `view:test` 在本机无 IAB 时 SKIP，用 Chrome headless 截图/DOM 替代（平板 1024 → `paper-wrap`×13；
   375 实际视口 500，测不到 <500 分支，`§88.3` 已知）。reconstruct 是 `final/` 全家与 `stages.js` 的导入前置，已解锁。
-  剩余顺序：`stages.js`（144）/ `entry-paper.js`（49）/ `tag-panel.js`（16）/ `viewer.js`（40）/ `final.js`（192）。
+  剩余顺序：`entry-paper.js`（49）/ `viewer.js`（40）/ `stages.js`（144）/ `final.js`（192）。
 - §6-6 检测侧护栏已加：`npm run audit:suspicious`（S1 行首 `N.$数字` / S2 题干以 `$数字` 开头），已入 `check`；
   14 册 **0 命中**，反向验证通过（假 fixture ⇒ exit 1）；**不改切题判据、不动数据**（`DECISIONS §93`）。
 

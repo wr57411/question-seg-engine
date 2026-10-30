@@ -73,7 +73,9 @@ const page = {
   width: 1000,
   height: 1400,
   columns: 1,
-  blocks: [] as Record<string, unknown>[],
+  /** 页内题目（渲染器要求字段存在；表格测试只关心块，故留空） */
+  questions: [] as { id: string; number: string; blocks: number[] }[],
+  blocks: [] as { i: number; kind?: string; bbox: number[]; text?: string; html?: string }[],
 };
 
 const tableBlock = (i: number, html: string, bbox: number[]) => ({

@@ -177,7 +177,7 @@ test("② OCR 候选绿框画在证据 bbox 上（p13 避让回归）", () => {
     accepted: true,
     source: "crop" as const,
   };
-  const page = { width: 595, height: 842, blocks: [] };
+  const page = { width: 595, height: 842, blocks: [], questions: [] };
   const node = ocrFillNode(it, page, 760, 14, true);
   const ev = node.children.find((c: Stub) => c.classList.contains("ocr-evidence"));
   assert.ok(ev, "候选缺少 ocr-evidence 子节点（绿框仍画在 win 上）");

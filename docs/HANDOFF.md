@@ -73,9 +73,10 @@
   `?flow=1` / `?flow=0` 可手动切换。实测平板 1024 仍 `paper-wrap`×13、手机横屏 `flow-page`×13。
 - ✅ §6-1 已收口（`§86`）：审计判定按「非二维 / 二维」分档 + `clampByWidth` 补画布夹；
   上线即抓到答案册 p17 溢出 0.6px，修复后 7 卷全通过。
-- §6-11 分批进行中（`§87`）：独立 `tsconfig.viewer.json` 已接进 check，**6/11** 纳入
-  （本轮 +`stages/uncovered-layout.js`、`stages/reconstruct.js`；`reconstruct` 这个前置已清，
-  剩余 5 个：`stages.js` / `entry-paper.js` / `tag-panel.js` / `viewer.js` / `final.js`）。
+- §6-11 分批进行中（`§87`）：独立 `tsconfig.viewer.json` 已接进 check，**7/11** 纳入
+  （本轮 +`stages/uncovered-layout.js`、`stages/reconstruct.js`、`final/tag-panel.js`；
+  剩余 4 个：`stages.js` / `entry-paper.js` / `viewer.js` / `final.js`）。
+  ⚠️ **但消费者侧看到的仍是 `.d.ts` 的宽松签名**（见 §6-29）——实现自带类型只保证"实现自己被检查"。
 - ✅ 已修：`§90` 上游把**知识清单表格压平成 N 行纯文本**（`|` 分隔）→ 归一化层还原成表格网格，
   电路 p1 42 块→33 块、曲线 58→56（少的 2 题是图片路径残片假题）；`tests/flat-table.test.ts` 5 例。
 - ✅ 已修：`§91` OCR 补行默认不画（整页 OCR 无位置信息、硬配回洞会错位），`?fill=1` 或工具栏
@@ -429,7 +430,7 @@ layout.json / content_list.json
 |---|---|---|
 | `README.md` | 架构总览、核心机制、快速开始 | 主干有效；个别统计数字是历史时点值，以本文件为准 |
 | **`docs/HANDOFF.md`（本文件）** | 当前状态、风险、红线、交接动作 | 唯一的跨 Agent 入口 |
-| `docs/DECISIONS.md` | **93 条决策全记录**（§1–§93，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
+| `docs/DECISIONS.md` | **94 条决策全记录**（§1–§94，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
 | `tasks/lessons.md` | 3 条工程纪律（验收清单 / 启发式判据 / 逐块匹配） | 每条都有真实事故佐证，短小必读 |
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |
@@ -514,6 +515,7 @@ layout.json / content_list.json
 | **6-26** | **实验题：黏连题号已被并进上一题（非内容丢失）；曲线 p14/p15 仍 0% 归属** | **主体已修（`§77`，+8 题）；剩 2 页未闭合** |
 | **6-27** | **上游把知识清单表格压平成 N 行纯文本（`|` 分隔）⇒ 成品页字号参差、碎字一团** | **已修（`§90`）**：归一化层按几何合并回 `kind:"table"`；电路 p1 42→33 块、曲线 58→56 |
 | **6-28** | **整页 OCR 补行没有位置信息，硬配回洞会错位（表格文字画到页眉）** | **已收敛（`§91`）**：默认不画 + `?fill=1`/工具栏开关；根治需动 `classifyUncovered` 家具体级判据 |
+| **6-29** | **展示层 `.d.ts` 遮蔽实现：`dts-drift` 只锁名字、不锁形状；删它需先收口 113 处严格模式数组读取** | **未做（本轮试删已回退，`DECISIONS §94`）** |
 
 13. **字母 `O` 被 MinerU 读成数字 `0`（2026-10-15 用第二套 OCR 交叉核对发现，未修）**：
     物理题里的**点标号 O**（"悬挂于O点""对O点受力分析""将结点拉至O点"）被系统性读成数字 0。
@@ -760,6 +762,17 @@ layout.json / content_list.json
     → **前置已就绪（2026-10-29，`DECISIONS §72`）**：绑定表与内容尺子已落地，
     现在补章号只需在 `bank-bindings.json` 登记 `quiz → answer` 并跑 `npm run audit:pair` 复核，
     不会再自动配错。**光学是最接近可绑的一本**（答案池里已有「第十五章 光学」34 题）。
+
+29. **展示层 `.d.ts` 遮蔽实现（2026-10-30 实测，未做）**：把 `reconstruct.js` / `uncovered-layout.js`
+    纳入 `tsconfig.viewer.json` 后试删它们旁边的手写 `.d.ts`，主 `tsc --noEmit` 立刻多
+    **113 处**错误（`reconstruct.js` 72 / `uncovered-layout.js` 41 + 1 处测试夹具）——主 tsconfig 带
+    `noUncheckedIndexedAccess: true`，展示层满页的 `bbox[0]` / `blocks[i]` 在它眼里都"可能 undefined"；
+    `tsconfig.viewer.json` 刻意关了这条，两份口径不同。**已回退删除**。
+    后果（现在仍在）：`final/`、`stages/` 拿到的签名来自 `.d.ts`（多为 `any`），实现自带的 JSDoc 类型
+    **不跨文件生效**；`dts-drift` 门只锁"名字集合"，**形状说谎它不报**（正是 §31 警告过的洞）。
+    删除前置与做法见 `DECISIONS §94`（先加唯一的 bbox 读取口收口，再删 + 从 PAIRS 移除）。
+    过渡期规矩：调用处**显式收窄**（如 `final/tag-panel.js` 的 `/** @type {HTMLElement} */ (el(...))`），
+    不许靠 `any` 蒙过检查。
 
 ## 7. 新接手者的前 30 分钟
 

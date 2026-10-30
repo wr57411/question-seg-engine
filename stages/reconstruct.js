@@ -25,7 +25,7 @@ import { parseTableHtml } from "./table-html.js";
  * - `Block` / `Uncovered` / `OcrItem` 来自 `stages.json` 的页内数据；
  * - `PageQuestion` 是页内 `questions[]`（`blocks` 是块下标，不是块对象）；
  * - `RenderOpts` 是 `renderPaper` 的选项。
- * @typedef {number[]} Rect
+ * @typedef {[number, number, number, number]} Rect
  * @typedef {{ i: number, kind?: string, bbox: number[], text?: string, html?: string, img?: string, dtype?: string, ocr?: boolean, correction?: boolean }} Block
  * @typedef {{ bbox: number[], area: number, kind?: string }} Uncovered
  * @typedef {{ bbox: number[], win?: number[], text?: string, source?: string, accepted?: boolean, ratio?: number, crop?: string, raw?: string }} OcrItem

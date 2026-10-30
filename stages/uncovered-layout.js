@@ -18,12 +18,12 @@
  * 本模块的几何输入输出（纯数字，不含 DOM）：
  * - `Rect` / `BBox`：`[x0, y0, x1, y1]`，单位随调用方（PDF 点或画布 px，本模块只做相对运算）
  * - `HasBBox`：解析块——只要求 `bbox` 存在且是数字数组（块的其他字段一律不读）
- * @typedef {number[]} Rect
+ * @typedef {[number, number, number, number]} Rect
  * @typedef {{ bbox?: number[] | null }} HasBBox
  * @typedef {{ bbox: number[] }} Region
  * @typedef {{ bbox?: number[] | null, label?: string, compact?: string }} ChipItem
- * @typedef {{ rect: number[], label: string }} ChipPlacement
- * @typedef {{ rect: number[], count: number }} LabelPlacement
+ * @typedef {{ rect: Rect, label: string }} ChipPlacement
+ * @typedef {{ rect: Rect, count: number }} LabelPlacement
  */
 
 /** 相邻内容级区域聚合成一个标签的垂直间隙上限（pt）。 */
@@ -98,11 +98,12 @@ export function groupContentForLabels(regions) {
  * @param {number} pageW
  * @param {number} pageH
  * @param {HasBBox[] | null | undefined} blocks
- * @returns {number[] | null}
+ * @returns {Rect | null}
  */
 export function pickLabelRect(bbox, w, h, pageW, pageH, blocks) {
   const [ax, ay, ax1, ay1] = bbox;
   const bh = ay1 - ay;
+  /** @type {[number, number][]} */
   const cands = [
     [ax, ay], // 左上角
     [ax, ay - h - 1], // 上方
@@ -112,7 +113,7 @@ export function pickLabelRect(bbox, w, h, pageW, pageH, blocks) {
     [ax1 - w, ay + (bh - h) / 2], // 右-垂直居中
   ];
   for (const [x, y] of cands) {
-    const rect = [x, y, x + w, y + h];
+    const rect = /** @type {Rect} */ ([x, y, x + w, y + h]);
     if (rect[0] < 0 || rect[1] < 0 || rect[2] > pageW || rect[3] > pageH) continue;
     if (!labelOverlapsBlock(rect, blocks)) return rect;
   }
@@ -139,10 +140,11 @@ export const CHIP_H_PX = 15;
  * @param {number} pageW
  * @param {number} pageH
  * @param {HasBBox[] | null | undefined} blocks
- * @returns {number[] | null}
+ * @returns {Rect | null}
  */
 export function pickChipRect(bbox, w, h, pageW, pageH, blocks) {
   const [x0, y0, x1, y1] = bbox;
+  /** @type {[number, number][]} */
   const cands = [
     [x0 - w - 1, y0], // 左侧页边距
     [x1 + 1, y0], // 右侧页边距
@@ -151,7 +153,7 @@ export function pickChipRect(bbox, w, h, pageW, pageH, blocks) {
     [x0, y1 + 1], // 下方
   ];
   for (const [x, y] of cands) {
-    const rect = [x, y, x + w, y + h];
+    const rect = /** @type {Rect} */ ([x, y, x + w, y + h]);
     if (rect[0] < 0 || rect[1] < 0 || rect[2] > pageW || rect[3] > pageH) continue;
     if (!labelOverlapsBlock(rect, blocks)) return rect;
   }
@@ -211,11 +213,15 @@ export function contentLabelPlacements(regions, blocks, pageW, pageH, canvasW) {
   const pxPerPt = canvasW / pageW;
   const w = UNCOVERED_LABEL_W_PX / pxPerPt;
   const h = UNCOVERED_LABEL_H_PX / pxPerPt;
+  /** @type {LabelPlacement[]} */
   const out = [];
+  /** 区域宽（pt）。bbox 少于 4 个元素时按 0 宽 ⇒ 该组不挂标签，绝不 NaN。 */
+  /** @param {number[]} bb @returns {number} */
+  const widthOf = (bb) => (bb[2] ?? 0) - (bb[0] ?? 0);
   for (const group of groupContentForLabels(regions)) {
     // 锚 = 组内**最宽**区域（不是最靠上——最靠上的常是细碎条，会因过窄误弃整组标签）
-    const anchor = group.reduce((a, b) => (b.bbox[2] - b.bbox[0] > a.bbox[2] - a.bbox[0] ? b : a));
-    const wPx = ((anchor.bbox[2] - anchor.bbox[0]) / pageW) * canvasW;
+    const anchor = group.reduce((a, b) => (widthOf(b.bbox) > widthOf(a.bbox) ? b : a));
+    const wPx = (widthOf(anchor.bbox) / pageW) * canvasW;
     if (wPx < UNCOVERED_LABEL_MIN_W_PX) continue; // 框宽放不下标签 → 不挂（title 已够）
     const rect = pickLabelRect(anchor.bbox, w, h, pageW, pageH, blocks);
     if (!rect) continue; // 候选位都会压正文 → 不挂（title 已够）
