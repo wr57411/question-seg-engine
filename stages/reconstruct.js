@@ -1,4 +1,6 @@
-// @ts-check
+// 类型权威检查器：`tsconfig.viewer.json`（checkJs:true + DOM lib）。本文件是 DOM 代码，
+// **不要**加 `// @ts-check` —— 主 `tsconfig.json` 的 lib 没有 DOM，一旦本文件被 TS 测试 import
+// 进主程序，`HTMLElement` / `document` 会被判成未知名字（DECISIONS §95）。
 /**
  * reconstruct.js —— 「按原坐标重建纸面」的共享渲染器（展示层；DOM 构造 + 纯函数消费）
  *

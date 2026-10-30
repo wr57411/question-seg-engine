@@ -1,6 +1,6 @@
 # 切片决策记录（DECISIONS）
 
-> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§94，按时间序；顶部有索引）。
+> 📍 交接导航：本文件是**决策与口径的唯一权威记录**（§1–§95，按时间序；顶部有索引）。
 > 当前状态、未闭合风险与红线见 **[docs/HANDOFF.md](HANDOFF.md)**；通用约定见 **[AGENTS.md](../AGENTS.md)**。
 
 垂直演进模型的两份交付物：可运行的骨架代码 + 本决策记录。
@@ -97,6 +97,7 @@
 | 92 | **体检摘要一致性**：`--meta-only` 数字重算、来源沿用旧记录；新增 meta 与产物一致性门 | 2026-10-30 |
 | 93 | **可疑题号行只报警**：S1 行首 `N.$数字` / S2 题干以 `$数字` 开头；不改切题、不动数据 | 2026-10-30 |
 | 94 | **展示层 `.d.ts` 暂不删**：删它先收口 113 处严格模式数组读取；过渡期调用处显式收窄 | 2026-10-30 |
+| 95 | **DOM 文件不写 `@ts-check`**：类型权威检查器是 `tsconfig.viewer.json`（主程序无 DOM lib） | 2026-10-30 |
 
 ## 1. 公式指标修正：语义正确率替代可编译率
 
@@ -4143,3 +4144,27 @@ prebuilt 目录后来也有 `layout.json`），实测会把 `oxr` 误记成 `min
 
 **代价（如实登记）**：`.d.ts` 与实现的一致性目前只锁"名字集合"，**不锁形状** —— 形状说谎时 tsc 不报，
 这正是 `§31` 警告过的洞。已登记为 `HANDOFF §6-29`。
+
+## 95. 展示层 DOM 文件的类型权威检查器只有 `tsconfig.viewer.json`
+
+**背景**：§6-11 纳管 `final/entry-paper.js` 时，按 AGENTS 的惯例在文件头加了 `// @ts-check`。
+`npm run typecheck:viewer` 绿、`tests/entry-paper.test.ts` 15 例全过，但**主 `npm run typecheck` 被弄坏了**：
+该文件被 TS 测试 import 进主程序，而主 `tsconfig.json` 的 `lib` 只有 ES2022（**没有 DOM** —— 那是
+"`src/` 里误用 `document` 就该报错"这条红线的体现），于是 `HTMLElement` / `document` 全成未知名字，
+**38 处红**（实现 32 + 测试 6）。本轮并行子代理也独立撞见同一批残留红。
+
+**决策**：DOM 类展示层文件（`viewer/viewer.js`、`stages/stages.js`、`stages/reconstruct.js`、
+`stages/uncovered-layout.js`、`final/final.js`、`final/tag-panel.js`、`final/entry-paper.js`）
+**不加** `// @ts-check`，文件头改为一行"权威检查器是谁"的说明；它们的类型由 `tsconfig.viewer.json`
+（`checkJs: true` + DOM lib）逐文件校验。纯逻辑无 DOM 的模块（`stages/tag-layout.js`、
+`final/tag-store.js`、`stages/table-html.js`）保留 `@ts-check`。
+
+**为什么不选别的做法**：① 给主 tsconfig 加 DOM lib ⇒ 直接废掉 `src/` 无 DOM 红线；
+② 给 entry-paper 再手写一份 `.d.ts` ⇒ 又多一个会遮蔽实现的影子文件（正是 §6-29 的债）；
+③ 把测试从主程序里摘出去 ⇒ 少一个被类型检查的测试文件。三者都比撤 `@ts-check` 贵。
+
+**自证（新判据先证伪）**：撤掉后故意往 entry-paper 注入一处类型错（把 `unionBbox([])` 的 `null`
+赋给 `number`）⇒ `typecheck:viewer` 立刻报 1 条；还原后归零。文件仍在被检查，只是换了正确的检查器。
+
+**顺带修正 §94 的不完整处**：删 `.d.ts` 的阻塞不止"`noUncheckedIndexedAccess` 下 113 处数组读取"，
+**还有"主程序没有 DOM lib"这条硬约束**。`§6-29` 的前置条件以本条为准。

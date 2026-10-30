@@ -1,4 +1,6 @@
-// @ts-check
+// 类型权威检查器：`tsconfig.viewer.json`（checkJs:true + DOM lib）。本文件是 DOM 代码，
+// **不要**加 `// @ts-check` —— 主 `tsconfig.json` 的 lib 没有 DOM，一旦本文件被 TS 测试 import
+// 进主程序，`HTMLElement` / `document` 会被判成未知名字（DECISIONS §95）。
 // stages/stages.js —— 阶段样品展示前端。
 // 解耦红线：本文件不 import 引擎代码，只消费
 //   /data/out/<docId>/stages.json（快照契约，见 scripts/export-stages.ts）

@@ -1,4 +1,6 @@
-// @ts-check
+// 类型权威检查器：`tsconfig.viewer.json`（checkJs:true + DOM lib）。本文件是 DOM 代码，
+// **不要**加 `// @ts-check` —— 主 `tsconfig.json` 的 lib 没有 DOM，一旦本文件被 TS 测试 import
+// 进主程序，`HTMLElement` / `document` 会被判成未知名字（DECISIONS §95）。
 /**
  * entry-paper.js —— 把「一道题 / 一条答案」按**书上的位置**裁出来（展示层自有模块）
  *
@@ -61,6 +63,10 @@ export function unionBbox(blocks) {
  * @property {SnapBlock} [blk]
  * @property {OcrItem} [ocr]
  *
+ * @typedef {Object} PageGeom 只用到几何的页（判栏与切段够用）
+ * @property {number} width
+ * @property {number} [columns]
+ *
  * @typedef {Object} MergeCtx
  * @property {Set<number>} drop
  *
@@ -113,7 +119,7 @@ export function columnOf(block, page) {
  * 段内**留白是事实**（那部分墨迹不属于本条目），纸面那份同样有这块白 —— 不该由裁切来掩盖。
  *
  * @param {EntryItem[]} blocks 已按阅读顺序排列
- * @param {PageRef} page 所在页（要 columns 与 width）
+ * @param {PageGeom} page 所在页（只用 columns 与 width）
  * @returns {EntryItem[][]}
  */
 export function splitSegments(blocks, page) {
@@ -297,14 +303,18 @@ export function collectEntryItems(page, own, mergeCtx = null) {
  * 每一页各出一条**，每条的 `blocks` 只含该页那一段（见 export-stages 的 perPageBlocks）。
  * 只取第一条就把续段整段丢掉 —— 实测热狗题的答案裁出 3 行、书上有 14 行（2026-10-15 用户报出）。
  *
- * @param {Array<PageRef & { questions?: Array<{id: string, blocks: number[]}> }> | undefined} pages
+ * @param {Array<{ questions?: Array<{ id: string, blocks: number[] }> } | undefined> | undefined} pages
  * @param {string} qid
  * @returns {Array<{ page: PageRef, blocks: number[] }>}
  */
 export function entrySegments(pages, qid) {
   /** @type {Array<{ page: PageRef, blocks: number[] }>} */
   const out = [];
-  for (const p of pages ?? []) for (const q of p.questions ?? []) if (q.id === qid) out.push({ page: p, blocks: q.blocks });
+  for (const p of pages ?? [])
+    for (const q of p?.questions ?? [])
+      // 本函数只按 questions 分组，不读页的其余字段 ⇒ 页形状由调用方（快照）保证，这里不收窄。
+      // `p?.` 只为类型收窄；页数组里出现 null 属坏数据，旧代码在此处会抛，现在跳过。
+      if (q.id === qid) out.push({ page: /** @type {PageRef} */ (p), blocks: q.blocks });
   return out;
 }
 

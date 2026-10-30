@@ -1,4 +1,6 @@
-// @ts-check
+// 类型权威检查器：`tsconfig.viewer.json`（checkJs:true + DOM lib）。本文件是 DOM 代码，
+// **不要**加 `// @ts-check` —— 主 `tsconfig.json` 的 lib 没有 DOM，一旦本文件被 TS 测试 import
+// 进主程序，`HTMLElement` / `document` 会被判成未知名字（DECISIONS §95）。
 /**
  * tag-panel.js —— 题目面板里的「标签」区（展示层自有模块，不 import 引擎 src/）
  *

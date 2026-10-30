@@ -40,6 +40,16 @@
   §6-28 / §6-6 不纳入；§6-7 部分（DOM 门 + 截图，大卷性能不做）。
 - **G05（P2，新发现）**：删 `.d.ts` 会让实现进入主程序（`noUncheckedIndexedAccess:true`）⇒ 实测 113 处新错，
   **已回退**；后果是"纳管"只覆盖实现侧、消费者仍拿 `any` 签名。删除前置与过渡规矩见 `DECISIONS §94` / `HANDOFF §6-29`。
+- **§6-11 已收口（11/11）**：HOTL loop `viewer-types-final-20261030T065044Z-af7cabfd31ba` 清完
+  `entry-paper.js`（49→0）、`viewer.js`（40→0）、`stages.js`（144→0）、`final.js`（193→0）；
+  后两者由并行子代理执行，已逐处复核 diff 并与 HEAD 做**同页对照**：stages 对比页 p1 `blk 33 / table 1 / chip 2`、
+  p3 `blk 81 / table 0 / chip 6`；成品页 `text 752 / img 67 / table 3 / chip 30`、审计标记开 904 个、
+  面板 5 行标签、搜索 60 处命中可跳转 —— 逐项与改前相同（截图 `tmp/review-types/`）。
+- **G06（P2，本轮已修）**：给 DOM 文件加 `// @ts-check` ⇒ 主 `npm run typecheck` 冒 **38 处假红**
+  （主 tsconfig 无 DOM lib，entry-paper 被测试 import 进主程序）。已撤 7 个 DOM 文件的该标记，
+  改由 `typecheck:viewer` 权威校验，并反向自证（注入类型错 → viewer 立刻报 1 条，还原归零）；
+  规矩落 `DECISIONS §95` + AGENTS 红线。§6-29 的删除前置补第二条阻塞（主程序无 DOM lib）。
+
 - C 已开工：`stages/uncovered-layout.js`（37→0）、`stages/reconstruct.js`（80→0）、`final/tag-panel.js`（16→0）
   已清零并纳管（**7/11**）；
   `view:test` 在本机无 IAB 时 SKIP，用 Chrome headless 截图/DOM 替代（平板 1024 → `paper-wrap`×13；
