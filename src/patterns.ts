@@ -333,7 +333,15 @@ export function isPageNoiseLine(text: string): boolean {
   return /^\[?答案\s*[A-Z]?\d+\]?$/.test(t) || /^[（）()\s]+$/.test(t);
 }
 
-export function matchFirstLine(line: string): LineMatch {
+/**
+ * 块首行 → 语言层标签。
+ *
+ * @param line 块首行
+ * @param expectedNext 期望的下一题题号（上一题 + 1）；**只用于「徽标题号」弱信号分支的
+ *   序号佐证**（`DECISIONS §97`）。未知（首题 / 刚过节标题）时传 `null` 或省略，
+ *   此时不施加该守卫，行为与加守卫前一致。
+ */
+export function matchFirstLine(line: string, expectedNext: number | null = null): LineMatch {
   const s = line.trimStart();
 
   if (ANSWER_ZONE_GUARD(s)) {
@@ -414,6 +422,29 @@ export function matchFirstLine(line: string): LineMatch {
 
   const badge = BARE_BADGE_QUESTION.exec(s);
   if (badge) {
+    /**
+     * **弱信号守卫**（2026-10-31，`DECISIONS §97`）：
+     * `BARE_BADGE_QUESTION` 有两条分支 ——
+     *   ① 数字 + `[`/`【` 或四位年份（**有出处标注/年份佐证**，强信号）；
+     *   ② 数字 + 空格 + 汉字（**纯形状**，弱信号）。
+     * ② 当初是为「题号印在彩色方块里、OCR 只拿到数字」而开的，但形状太松：
+     * 实测《教材基础练 磁场》原卷页图 —— `10 月 5 日晚,我国多地出现绝美极光…`
+     * 被判成题号 **10**（真相是第 3 题，`10` 来自「2024 年 10 月 5 日」）；
+     * `16 第3题设问变式]Oxy坐标…` 被判成题号 **16**（真相是变式 2 的第 3 题，
+     * `16` 来自出处标注「人教版选修二 P16」）。两处都切出了「题号错 + 题干从中间起 +
+     * 与真题重复」的假题 —— 而假题会污染题库/配对/题号审计，比漏切危险。
+     *
+     * 守卫（只作用于弱信号分支）：必须有**序号佐证**才认 ——
+     * 等于上一题 + 1（强信号），或是本组第一题（`1`，题号重启的正规形态）。
+     * 两者都不是 ⇒ 不放行，退回普通文本（正文并入当前题，不丢内容）。
+     * 代价：徽标题号若真跳号会漏切 —— 按 L2「宁可漏判也不能误判」取此口径。
+     * `expectedNext === null`（无上下文：首题/刚过节标题）时不判，保持原行为。
+     */
+    const weak = badge[1] === undefined;
+    if (weak && expectedNext !== null) {
+      const num = Number(badge[2]);
+      if (num !== expectedNext && num !== 1) return { ok: false, kind: "other" };
+    }
     return { ok: true, kind: "question_no", captured: badge[1] ?? badge[2] ?? "" };
   }
 

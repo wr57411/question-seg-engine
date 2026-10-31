@@ -340,7 +340,17 @@ class Ctx {
       return;
     }
 
-    const m = matchFirstLine(block.firstLine);
+    /**
+     * 期望题号（供「徽标题号」弱信号守卫用，`DECISIONS §97`）：
+     * 有当前题 ⇒ 上一题 + 1；无当前题（首题 / 刚过年节标题）⇒ null（不施加守卫）。
+     * 注意与下方「黏连通道」的期望值**不同**：那里无当前题时取 `1`（节内题号重启），
+     * 属于"主动认题"；这里取 null 属于"不拦"，两者语义不同，故不合并。
+     */
+    const expectedNext =
+      this.current && /^\d{1,2}$/.test(this.current.number)
+        ? Number(this.current.number) + 1
+        : null;
+    const m = matchFirstLine(block.firstLine, expectedNext);
 
     /**
      * **题号黏正文**（`DECISIONS §77`）：`2为了减少阻力…` —— 数字紧跟汉字，无分隔符。
