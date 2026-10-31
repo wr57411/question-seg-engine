@@ -382,3 +382,60 @@ Step 14/15 全量门 + 合回 main。注意：现在数据是空的，审板要�
 
 **Step 13 真机 iPad Safari 人工验收**（触控精度、键盘顶起托盘、滚动惯性、sheet 手感），
 然后 Step 14/15 全量门 + 合回 main（HANDOFF/DECISIONS 两侧都改过 ⇒ 预期冲突，按实跑重写）。
+
+## 交接 3 补记 4：Step 14/15 合并预演（**只读**，未动任何分支）
+
+### 拓扑（实跑 `git merge-base` / `rev-list --count`）
+
+```
+841536b ──(5)── 68d805c (main) ──(21)── 6cc6185 (feat/pick-classify, 当前)
+    └────(85)──── 9edf857 (feature/oxr, 仍在推进: ahead origin 3)
+```
+
+- **`main` 是 `feat/pick-classify` 的祖先** ⇒ 本分支合回 main 是 **fast-forward，零冲突**。
+- `feature/oxr` 与我们在 `841536b` 分叉，它比 main **少 5 个 main 侧提交**（专题 MVP 那一批）。
+
+### 冲突面（`git merge-tree --write-tree` 实跑，不是估）
+
+pick 侧改 61 个文件、oxr 侧改 135 个，**交集 11 个**；实跑合并得 **9 个冲突文件**（7 个只有 1 块，HANDOFF 4 块）。
+
+| 文件 | pick 侧 | oxr 侧 | 冲突块 | 处置原则 |
+|---|---|---|---|---|
+| `.gitignore` | +4 | +6 | 1 | 并集（`inbox/` + `.hotl/` + `tmp/`） |
+| `AGENTS.md` | +2/−2 | +3/−1 | 1 | 手写：保留「L1–L5」，§ 号**合并后现算**（oxr 写的是 §95） |
+| `docs/HANDOFF.md` | +68/−12 | +453/−24 | 4 | **必须手写重写**：oxr 的 §0 交接要点 + 我们的三线表 + 合并后门禁数字 |
+| `docs/dev/bgx/INDEX.md` | +25 | +216 | 1（add/add） | 两段合并（pick 主题 + oxr 交接包），都留着 |
+| `final/final.js` | +1260/−9 | +472/−51 | 1 | 并集：`onChipClick` 分派（挑题）+ oxr 新增的 `ocrFill` 参数 |
+| `final/index.html` | +89/−10 | +4/−1 | 1 | 并集：挑题按钮 + 审计/OCR 开关（默认关） |
+| `package.json` | +4/−1 | +21/−4 | 1 | 脚本并集；**`check` 取超集**（见下） |
+| `scripts/view-server.ts` | +238/−4 | +26/−10 | 1 | import 并集；**`READ_ONLY` 必须覆盖 `/api/teach*`**（见下） |
+| `stages/reconstruct.js` | +9 | +364/−20 | 1 | 并集：`assignmentBadge` + `ocrFill` 两个选项 |
+| `final/final.css` | +362/−15 | +47 | 自动合并 ✓ | 仍需目视（两段新样式都在末尾） |
+| `tests/layout-invariant.test.ts` | +17 | +35/−1 | 自动合并 ✓ | 合并后必须真跑（见下） |
+
+### 三个必须人判的语义点（不是"选一边"能解决的）
+
+1. **`check` 取超集**：pick 是 `typecheck && test && audit:render && audit:numbering && bank:all`；
+   oxr 是 `typecheck && typecheck:viewer && test && audit:render:baseline && audit:numbering && audit:suspicious && bank:all`。
+   合并后必须是**超集**，且 `audit:render:baseline`（7 卷基线）要重跑——我们改过 `renderPaper`，
+   拿两边的绿当合并后的绿是错的。
+2. **`READ_ONLY`（`TAGS_WRITE=0`）覆盖范围**：oxr 的只读开关只管 `tags`；合并后 `/api/teach`、
+   `/api/teach-manage` 是我们新加的写入口，**必须一并受它控制**，否则「只读」被绕过。
+3. **渲染路径叠加**：oxr 把 `ocrFill` 默认从 true 改成 **false**、并新增表格网格渲染；
+   我们的 `assignmentBadge` 只在号牌内加角标（不改几何）。两者叠加后**必须重跑全量审板**
+   （14 页 888 块那套），并额外看「表格页 + OCR 补行页」。
+
+### 推荐合并顺序（在**独立 worktree** 做，不动主目录与 oxr worktree）
+
+1. `git worktree add --detach ../merge-int feat/pick-classify`
+2. 在 merge-int 里 `git merge feature/oxr`，按上表解 9 个冲突（7 个并集、HANDOFF 手写、INDEX 两段）
+3. 合并后跑：`npm run check`（超集）→ `topic:export` + `audit:topic` → 全量审板（副本 4175）
+4. 全绿后回主目录：`git checkout main && git merge --ff-only <merge-int 的提交>`（main 是祖先，可快进）
+5. `git push origin main feat/pick-classify`
+
+### 风险与前提
+
+- **oxr 仍在推进**（本地 ahead origin 3）：这次合并是「阶段性对齐」，不是终局。
+  合完后建议让 oxr 从新 main 重新分叉，否则会出现第三次分叉。
+- 主目录的 4174 正在服务、`data/` 是用户资产 ⇒ **绝不在主目录切分支做合并**，用 worktree。
+- `data/` 不进 git，合并不碰用户数据；但合并后要重跑 `topic:export`（schema 没变，基线卷可能变）。
