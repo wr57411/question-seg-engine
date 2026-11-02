@@ -439,3 +439,48 @@ pick 侧改 61 个文件、oxr 侧改 135 个，**交集 11 个**；实跑合并
   合完后建议让 oxr 从新 main 重新分叉，否则会出现第三次分叉。
 - 主目录的 4174 正在服务、`data/` 是用户资产 ⇒ **绝不在主目录切分支做合并**，用 worktree。
 - `data/` 不进 git，合并不碰用户数据；但合并后要重跑 `topic:export`（schema 没变，基线卷可能变）。
+
+## 交接 3 补记 5：Step 14/15 已完成 —— `feature/oxr` 已并入，`main` 已快进（2026-11-02）
+
+- 合并提交 **`123622b`**（在独立 worktree `…/Worktrees/question-seg-engine/merge-int` 里做，
+  主目录与 oxr worktree 全程未切分支）；`main` 与 `feat/pick-classify` 都指向它，**均已 push**。
+- 合并前 oxr 已走到 `d068cde`（比预演时的 `9edf857` 又多了若干提交），实际冲突 **10 个**
+  （多出 `tasks/lessons.md`）。
+- 冲突全部按「两边都要」解决，**没有为了通过而删功能**：
+  `.gitignore` / `AGENTS.md` / `package.json` / `view-server.ts` / `reconstruct.js` / `final.js` /
+  `index.html` 并集；`docs/HANDOFF.md` 手写重写（头部改「工作线已收敛」+ oxr §0 降级为历史）；
+  `tasks/lessons.md` 两条 L4 撞号 ⇒ oxr 的「归因先验」改为 **L6**。
+- 合并暴露并修掉的三个真问题（都不是"选一边"能解决的）：
+  1. **只读开关漏网**：`TAGS_WRITE=0` 原本只罩 `/api/tags`，本线的 `/api/teach`、`/api/teach-manage`
+     是新增写入口 ⇒ 已一并 403，否则「只读」是假承诺。
+  2. **手机文本流 × 挑题冲突**：`flowPaper` 只返回 wrap、没有 canvas ⇒ 单页重绘/点选命中会崩。
+     `paper()` 改为统一返回 `{wrap, canvas}`（文本流 canvas 指回 wrap），并在文本流下**明确拒绝**
+     进挑题（提示 `?flow=0` 切回纸面），不做静默失效。
+  3. **本线代码从未被 `typecheck:viewer` 覆盖**（该门是 oxr 新加的）：合并后报 **103 处**，
+     全部补齐（隐式 any、`$()` 元素类型、`state` 类型缺字段、`PageSlot` 缺 `paper`、
+     `manageTeach` 的 action 联合漏 retire/restore、手写 `reconstruct.d.ts` 缺 `assignmentBadge`）。
+- **服务端默认监听变了**：oxr 把默认改成 `127.0.0.1`（`DECISIONS §57`）⇒ **iPad 必须用 LAN 模式**：
+  `HOST=0.0.0.0 PORT=4174 npm run view`（或 `npm run view:lan`，默认 4173）。
+  当前 4174 已用 LAN 模式重启，日志会提示「同网段可写；共享网络请加 TAGS_WRITE=0」。
+
+### 合并态验证（全部实跑，主仓库 `main`）
+
+| 门 | 结果 |
+|---|---|
+| `typecheck` / `typecheck:viewer` | 0 / 0 |
+| `npm test` | **466/466**（含 oxr 新增的 meta 一致性门） |
+| `audit:render:baseline` | **7/7 卷通过**（本线角标改动未造成渲染回退） |
+| `audit:numbering` | 判定项通过；基线 5 条、**新增 0** |
+| `audit:suspicious` | 0 条 |
+| `bank:all` | 420 条，唯一键无重复、内容尺子达标 |
+| `topic:export` + `audit:topic` | 绿（0 专题 0 题，符合清理后的空态） |
+| 浏览器（LAN 地址，820×1100） | 14 页 / 67 号牌 / 挑题键在 / ⋯ 菜单有「显示 OCR 补行」/ 详情教学归类正常 / 零异常 |
+
+⚠️ 顺带修了数据侧的陈旧项：7 份 `meta.json` 的题数与产物不一致（oxr 新门抓出来的），
+已用 `npm run daily -- <dir> --id <id> --meta-only` 全部刷新（主仓库与合并 worktree 都刷了）。
+
+### 下一位的第一步
+
+1. `npm run check` 建基线（现在应全绿，466 例）。
+2. **oxr 仍在推进**（合并后它又走到 `efd8441`，比我们新 14 个提交）⇒ 下次同步用同一套 worktree 流程。
+3. Step 13 真机 iPad Safari 仍未做（触控精度、键盘顶起托盘、滚动惯性、文本流下的挑题拒绝）。
