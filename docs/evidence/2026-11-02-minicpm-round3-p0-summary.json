@@ -1,0 +1,862 @@
+{
+  "logical": {
+    "n": 54,
+    "auc": 0.5823,
+    "correct_mean": 0.0129,
+    "correct_median": 0.0026,
+    "wrong_mean": 0.00663,
+    "best_at_correct": 0.6852,
+    "thresholds": {
+      "0.005": {
+        "correct_pass": 0.3889,
+        "wrong_pass": 0.2037,
+        "false_review": 0.6111
+      },
+      "0.01": {
+        "correct_pass": 0.2407,
+        "wrong_pass": 0.1296,
+        "false_review": 0.7593
+      },
+      "0.02": {
+        "correct_pass": 0.1111,
+        "wrong_pass": 0.1111,
+        "false_review": 0.8889
+      },
+      "0.05": {
+        "correct_pass": 0.1111,
+        "wrong_pass": 0.037,
+        "false_review": 0.8889
+      },
+      "0.1": {
+        "correct_pass": 0.0,
+        "wrong_pass": 0.0,
+        "false_review": 1.0
+      },
+      "0.2": {
+        "correct_pass": 0.0,
+        "wrong_pass": 0.0,
+        "false_review": 1.0
+      },
+      "0.5": {
+        "correct_pass": 0.0,
+        "wrong_pass": 0.0,
+        "false_review": 1.0
+      }
+    }
+  },
+  "logical_by_type": {
+    "insert_line": {
+      "n": 39,
+      "auc": 0.5996,
+      "correct_mean": 0.0161,
+      "correct_median": 0.0045,
+      "wrong_mean": 0.0082,
+      "best_at_correct": 0.7949,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.4359,
+          "wrong_pass": 0.2564,
+          "false_review": 0.5641
+        },
+        "0.01": {
+          "correct_pass": 0.2308,
+          "wrong_pass": 0.1538,
+          "false_review": 0.7692
+        },
+        "0.02": {
+          "correct_pass": 0.1538,
+          "wrong_pass": 0.1538,
+          "false_review": 0.8462
+        },
+        "0.05": {
+          "correct_pass": 0.1538,
+          "wrong_pass": 0.0513,
+          "false_review": 0.8462
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "o_to_zero": {
+      "n": 14,
+      "auc": 0.5,
+      "correct_mean": 0.0048,
+      "correct_median": 0.0018,
+      "wrong_mean": 0.00267,
+      "best_at_correct": 0.4286,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.2857,
+          "wrong_pass": 0.0714,
+          "false_review": 0.7143
+        },
+        "0.01": {
+          "correct_pass": 0.2857,
+          "wrong_pass": 0.0714,
+          "false_review": 0.7143
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "prefix_missing": {
+      "n": 1,
+      "auc": 0.0,
+      "correct_mean": 0.0006,
+      "correct_median": 0.0006,
+      "wrong_mean": 0.00093,
+      "best_at_correct": 0.0,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.01": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    }
+  },
+  "logical_by_book": {
+    "23必刷题 1 直线运动": {
+      "n": 7,
+      "auc": 0.4898,
+      "correct_mean": 0.0026,
+      "correct_median": 0.0045,
+      "wrong_mean": 0.00237,
+      "best_at_correct": 0.4286,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.2857,
+          "false_review": 1.0
+        },
+        "0.01": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "23必刷题 2相互作用": {
+      "n": 7,
+      "auc": 0.3673,
+      "correct_mean": 0.0007,
+      "correct_median": 0.0007,
+      "wrong_mean": 0.00109,
+      "best_at_correct": 0.2857,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.01": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "23必刷题 3 运动和力的关系": {
+      "n": 10,
+      "auc": 0.76,
+      "correct_mean": 0.0036,
+      "correct_median": 0.002,
+      "wrong_mean": 0.00125,
+      "best_at_correct": 0.8,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.4,
+          "wrong_pass": 0.0,
+          "false_review": 0.6
+        },
+        "0.01": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "23必刷题 4 曲线运动": {
+      "n": 8,
+      "auc": 0.6719,
+      "correct_mean": 0.0074,
+      "correct_median": 0.0086,
+      "wrong_mean": 0.00465,
+      "best_at_correct": 0.75,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.625,
+          "wrong_pass": 0.25,
+          "false_review": 0.375
+        },
+        "0.01": {
+          "correct_pass": 0.375,
+          "wrong_pass": 0.0,
+          "false_review": 0.625
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "动量守恒定律23必刷题": {
+      "n": 8,
+      "auc": 0.5938,
+      "correct_mean": 0.021,
+      "correct_median": 0.0016,
+      "wrong_mean": 0.00798,
+      "best_at_correct": 0.875,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.25,
+          "wrong_pass": 0.25,
+          "false_review": 0.75
+        },
+        "0.01": {
+          "correct_pass": 0.25,
+          "wrong_pass": 0.25,
+          "false_review": 0.75
+        },
+        "0.02": {
+          "correct_pass": 0.25,
+          "wrong_pass": 0.25,
+          "false_review": 0.75
+        },
+        "0.05": {
+          "correct_pass": 0.25,
+          "wrong_pass": 0.0,
+          "false_review": 0.75
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "机械能23必刷题": {
+      "n": 7,
+      "auc": 0.6939,
+      "correct_mean": 0.0522,
+      "correct_median": 0.0847,
+      "wrong_mean": 0.02987,
+      "best_at_correct": 0.8571,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 1.0,
+          "wrong_pass": 0.7143,
+          "false_review": 0.0
+        },
+        "0.01": {
+          "correct_pass": 0.7143,
+          "wrong_pass": 0.7143,
+          "false_review": 0.2857
+        },
+        "0.02": {
+          "correct_pass": 0.5714,
+          "wrong_pass": 0.5714,
+          "false_review": 0.4286
+        },
+        "0.05": {
+          "correct_pass": 0.5714,
+          "wrong_pass": 0.2857,
+          "false_review": 0.4286
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "第二章相互作用-答案与解析": {
+      "n": 6,
+      "auc": 0.8333,
+      "correct_mean": 0.0073,
+      "correct_median": 0.0073,
+      "wrong_mean": 0.0017,
+      "best_at_correct": 0.8333,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.5,
+          "wrong_pass": 0.0,
+          "false_review": 0.5
+        },
+        "0.01": {
+          "correct_pass": 0.5,
+          "wrong_pass": 0.0,
+          "false_review": 0.5
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "答案册-合订本": {
+      "n": 1,
+      "auc": 0.0,
+      "correct_mean": 0.0006,
+      "correct_median": 0.0006,
+      "wrong_mean": 0.00093,
+      "best_at_correct": 0.0,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.01": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    }
+  },
+  "line_block": {
+    "n": 123,
+    "auc": 0.9417,
+    "correct_mean": 0.7276,
+    "correct_median": 0.9247,
+    "wrong_mean": 0.00526,
+    "best_at_correct": 0.9431,
+    "thresholds": {
+      "0.005": {
+        "correct_pass": 0.8455,
+        "wrong_pass": 0.0407,
+        "false_review": 0.1545
+      },
+      "0.01": {
+        "correct_pass": 0.8374,
+        "wrong_pass": 0.0244,
+        "false_review": 0.1626
+      },
+      "0.02": {
+        "correct_pass": 0.8049,
+        "wrong_pass": 0.0163,
+        "false_review": 0.1951
+      },
+      "0.05": {
+        "correct_pass": 0.7967,
+        "wrong_pass": 0.0163,
+        "false_review": 0.2033
+      },
+      "0.1": {
+        "correct_pass": 0.7967,
+        "wrong_pass": 0.0081,
+        "false_review": 0.2033
+      },
+      "0.2": {
+        "correct_pass": 0.7967,
+        "wrong_pass": 0.0081,
+        "false_review": 0.2033
+      },
+      "0.5": {
+        "correct_pass": 0.7805,
+        "wrong_pass": 0.0081,
+        "false_review": 0.2195
+      }
+    }
+  },
+  "line_all": {
+    "n": 131,
+    "auc": 0.9192,
+    "correct_mean": 0.6944,
+    "correct_median": 0.9215,
+    "wrong_mean": 0.02006,
+    "best_at_correct": 0.916,
+    "thresholds": {
+      "0.005": {
+        "correct_pass": 0.8168,
+        "wrong_pass": 0.0611,
+        "false_review": 0.1832
+      },
+      "0.01": {
+        "correct_pass": 0.8092,
+        "wrong_pass": 0.0458,
+        "false_review": 0.1908
+      },
+      "0.02": {
+        "correct_pass": 0.7786,
+        "wrong_pass": 0.0382,
+        "false_review": 0.2214
+      },
+      "0.05": {
+        "correct_pass": 0.771,
+        "wrong_pass": 0.0305,
+        "false_review": 0.229
+      },
+      "0.1": {
+        "correct_pass": 0.771,
+        "wrong_pass": 0.0229,
+        "false_review": 0.229
+      },
+      "0.2": {
+        "correct_pass": 0.7634,
+        "wrong_pass": 0.0229,
+        "false_review": 0.2366
+      },
+      "0.5": {
+        "correct_pass": 0.7405,
+        "wrong_pass": 0.0229,
+        "false_review": 0.2595
+      }
+    }
+  },
+  "logical_unique_blocks": 28,
+  "logical_unique_books": 8,
+  "line_n": 131,
+  "logical_failures": [
+    {
+      "id": "23必刷题 2相互作用:p4:q25:c4",
+      "book": "23必刷题 2相互作用",
+      "page": 5,
+      "type": "o_to_zero",
+      "scores": [
+        0.0004897244087913263,
+        0.0020332475033903443
+      ],
+      "best": 1,
+      "correct": "[江苏宿迁中学2022月考]如 图所示，在“共点力合成”的实 验中，橡皮条一端固定于P 点，另一端连接两个弹簧测力 计,分别用力$F _ { 1 }$和$F _",
+      "wrong": "[江苏宿迁中学2022月考]如 图所示，在“共点力合成”的实 验中，橡皮条一端固定于P 点，另一端连接两个弹簧测力 计,分别用力$F _ { 1 }$和$F _"
+    },
+    {
+      "id": "23必刷题 2相互作用:p4:q25:c5",
+      "book": "23必刷题 2相互作用",
+      "page": 5,
+      "type": "o_to_zero",
+      "scores": [
+        0.0005011293718011743,
+        0.0020523914610422506
+      ],
+      "best": 1,
+      "correct": "[江苏宿迁中学2022月考]如 图所示，在“共点力合成”的实 验中，橡皮条一端固定于P 点，另一端连接两个弹簧测力 计,分别用力$F _ { 1 }$和$F _",
+      "wrong": "[江苏宿迁中学2022月考]如 图所示，在“共点力合成”的实 验中，橡皮条一端固定于P 点，另一端连接两个弹簧测力 计,分别用力$F _ { 1 }$和$F _"
+    },
+    {
+      "id": "23必刷题 2相互作用:p8:q44:c6",
+      "book": "23必刷题 2相互作用",
+      "page": 9,
+      "type": "o_to_zero",
+      "scores": [
+        0.0010251388959590213,
+        0.0011147495900129818
+      ],
+      "best": 1,
+      "correct": "「上海崇明区2022模拟]如图所示，木板P下 端通过光滑铰链固定于水平地面上的O点，物 体A、B叠放在木板上且处于静止状态，此时物 体B的上表面水平.现使木板P",
+      "wrong": "「上海崇明区2022模拟]如图所示，木板P下 端通过光滑铰链固定于水平地面上的0点，物 体A、B叠放在木板上且处于静止状态，此时物 体B的上表面水平.现使木板P"
+    },
+    {
+      "id": "23必刷题 2相互作用:p8:q44:c7",
+      "book": "23必刷题 2相互作用",
+      "page": 9,
+      "type": "o_to_zero",
+      "scores": [
+        0.0010251388959590213,
+        0.0011147495900129818
+      ],
+      "best": 1,
+      "correct": "「上海崇明区2022模拟]如图所示，木板P下 端通过光滑铰链固定于水平地面上的O点，物 体A、B叠放在木板上且处于静止状态，此时物 体B的上表面水平.现使木板P",
+      "wrong": "「上海崇明区2022模拟]如图所示，木板P下 端通过光滑铰链固定于水平地面上的0点，物 体A、B叠放在木板上且处于静止状态，此时物 体B的上表面水平.现使木板P"
+    },
+    {
+      "id": "23必刷题 2相互作用:p9:q50:c8",
+      "book": "23必刷题 2相互作用",
+      "page": 10,
+      "type": "o_to_zero",
+      "scores": [
+        0.0006507231741756554,
+        0.0006755258713839882
+      ],
+      "best": 1,
+      "correct": "[河南驻马店2022检测]两金属小球A、B用一 轻质弹簧连接，球A用轻绳悬挂于O点，在水平 拉力F的作用下，两小球处于如图所示的位置， 此时轻绳与竖直方向的夹角",
+      "wrong": "[河南驻马店2022检测]两金属小球A、B用一 轻质弹簧连接，球A用轻绳悬挂于0点，在水平 拉力F的作用下，两小球处于如图所示的位置， 此时轻绳与竖直方向的夹角"
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p7:q33:c6",
+      "book": "23必刷题 3 运动和力的关系",
+      "page": 8,
+      "type": "insert_line",
+      "scores": [
+        0.001995117965672088,
+        0.002824532673575508
+      ],
+      "best": 1,
+      "correct": "[重庆名校联盟2022模拟]如图甲所示，水平 地面上有一静止平板车，平板车上表面水平， 车上放一物块，物块与平板车表面间的动摩擦 因数为$0 . 1 , t =",
+      "wrong": "[重庆名校联盟2022模拟]如图所示，水平 地面上有一静止平板车，平板车上表面水平， 车上放一物块，物块与平板车表面间的动摩擦 因数为$0 . 1 , t = "
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p7:q33:c7",
+      "book": "23必刷题 3 运动和力的关系",
+      "page": 8,
+      "type": "insert_line",
+      "scores": [
+        0.001985142871019189,
+        0.0026929817236926936
+      ],
+      "best": 1,
+      "correct": "[重庆名校联盟2022模拟]如图甲所示，水平 地面上有一静止平板车，平板车上表面水平， 车上放一物块，物块与平板车表面间的动摩擦 因数为$0 . 1 , t =",
+      "wrong": "[重庆名校联盟2022模拟]如图甲所示，水平 地面上有一静止平板车，平板车上表面水平， 车上放一物块，物块与平板车表面间的动摩擦 因数为$0 . 1 , t ="
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p3:q19:c4",
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "type": "insert_line",
+      "scores": [
+        0.0022646205273329383,
+        0.0025855919109318243
+      ],
+      "best": 1,
+      "correct": "[河南驻马店2022一模](多选)若物体被抛出 时的速度不沿水平方向，而是向斜上方或向斜 下方(这种情况常称为斜抛），则它的受力情况 与平抛运动完全相同.如图甲",
+      "wrong": "[河南驻马店2022一模](多选)若物体被抛出 时的速度不沿水平方向，而是向斜上方或向斜 下方(这种情况常称为斜抛），则它的受力情况 与平抛运动完全相同.如图甲"
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p4:q20:c6",
+      "book": "23必刷题 4 曲线运动",
+      "page": 5,
+      "type": "insert_line",
+      "scores": [
+        0.008729675872555645,
+        0.00966573083955661
+      ],
+      "best": 1,
+      "correct": "[重庆七中2022月考]如图 所示，同一竖直平面内有四 分之一圆弧 BC 和倾角为 $\\theta = 5 3 ^ { \\circ }$的斜面 AC 相接于 C",
+      "wrong": "[重庆七中2022月考]如图 所示，同一竖直平面内有四 分之一圆弧 BC 和倾角为 $\\theta = 5 3 ^ { \\circ }$的斜面 AC 相接于 C"
+    },
+    {
+      "id": "第二章相互作用-答案与解析:p7:q57:c5",
+      "book": "第二章相互作用-答案与解析",
+      "page": 8,
+      "type": "o_to_zero",
+      "scores": [
+        0.0010352783948396945,
+        0.0010464981422349604
+      ],
+      "best": 1,
+      "correct": "C必刷考点·受约束的动态平衡问题 【解析】任意状态的受力如图甲所示，对B的受力分析如图乙 所示，可以构成如图丙所示的矢量三角形，设与B相连的细线 与竖直方向的夹",
+      "wrong": "C必刷考点·受约束的动态平衡问题 【解析】任意状态的受力如图甲所示，对B的受力分析如图乙 所示，可以构成如图丙所示的矢量三角形，设与B相连的细线 与竖直方向的夹"
+    },
+    {
+      "id": "答案册-合订本:p80:q523:c4",
+      "book": "答案册-合订本",
+      "page": 81,
+      "type": "prefix_missing",
+      "scores": [
+        0.000620187021345436,
+        0.0009261849330855425
+      ],
+      "best": 1,
+      "correct": "CD必刷知识·波的叠加 【解析$\\ d _ { 1 } S _ { 1 }$和$S _ { 2 }$是两个振幅相同、振动频率相同、相位相同的 波源，所以到两波源",
+      "wrong": "CD必刷知识·波的叠加 【解析$\\ d _ { 1 } S _ { 1 }$和$S _ { 2 }$是两个振幅相同、振动频率相同、相位相同的 波源，所以到两波源"
+    },
+    {
+      "id": "动量守恒定律23必刷题:p4:q20:c5",
+      "book": "动量守恒定律23必刷题",
+      "page": 5,
+      "type": "insert_line",
+      "scores": [
+        0.0006445158590516816,
+        0.0007211113116696016
+      ],
+      "best": 1,
+      "correct": "[山东潍坊2022模拟]如图所甲乙 示，光滑水平面上甲、乙两小球 沿同一直线向右运动,甲的动量为$8 ~ \\mathrm { k g } \\cdot \\math",
+      "wrong": "[山东潍坊2022模拟]如图所甲 示，光滑水平面上甲、乙两小球 沿同一直线向右运动,甲的动量为$8 ~ \\mathrm { k g } \\cdot \\mathr"
+    },
+    {
+      "id": "23必刷题 1 直线运动:p3:q18:c0",
+      "book": "23必刷题 1 直线运动",
+      "page": 4,
+      "type": "o_to_zero",
+      "scores": [
+        7.308403317396815e-05,
+        0.0002789939299175473
+      ],
+      "best": 1,
+      "correct": "[黑龙江双鸭山一中2022摸底]如图所示，物 体从O点由静止开始做匀加速直线运动，途经 A、B、C三点，其中$\\mid A B \\mid = 2 \\mathrm",
+      "wrong": "[黑龙江双鸭山一中2022摸底]如图所示，物 体从0点由静止开始做匀加速直线运动，途经 A、B、C三点，其中$\\mid A B \\mid = 2 \\mathrm"
+    },
+    {
+      "id": "23必刷题 1 直线运动:p5:q28:c1",
+      "book": "23必刷题 1 直线运动",
+      "page": 6,
+      "type": "insert_line",
+      "scores": [
+        0.004539928111723825,
+        0.005572122694660773
+      ],
+      "best": 1,
+      "correct": "[上海浦东新区2022模拟]（多选)如图甲所 示，水平桌面上有一算盘.算珠穿在固定的杆 上滑动，算珠与杆之间的动摩擦因数为0.1.使 用时发现某一根杆上有A、B",
+      "wrong": "[上海浦东新区2022模拟]（多选)如图所 示，水平桌面上有一算盘.算珠穿在固定的杆 上滑动，算珠与杆之间的动摩擦因数为0.1.使 用时发现某一根杆上有A、B两"
+    },
+    {
+      "id": "23必刷题 1 直线运动:p5:q28:c3",
+      "book": "23必刷题 1 直线运动",
+      "page": 6,
+      "type": "insert_line",
+      "scores": [
+        0.004515612814403193,
+        0.005572122694660773
+      ],
+      "best": 1,
+      "correct": "[上海浦东新区2022模拟]（多选)如图甲所 示，水平桌面上有一算盘.算珠穿在固定的杆 上滑动，算珠与杆之间的动摩擦因数为0.1.使 用时发现某一根杆上有A、B",
+      "wrong": "[上海浦东新区2022模拟]（多选)如图所 示，水平桌面上有一算盘.算珠穿在固定的杆 上滑动，算珠与杆之间的动摩擦因数为0.1.使 用时发现某一根杆上有A、B两"
+    },
+    {
+      "id": "23必刷题 1 直线运动:p11:q62:c12",
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "type": "insert_line",
+      "scores": [
+        1.435964423701526e-05,
+        1.568334900294933e-05
+      ],
+      "best": 1,
+      "correct": "[湖南名校联合体2022联考]（多选)甲、乙两 质点在同一直线上运动，从t=0时刻起同时出 发，甲做匀加速直线运动，x-t图像如图甲所 示.乙做匀减速直线运动，",
+      "wrong": "[湖南名校联合体2022联考]（多选)甲、两 质点在同一直线上运动，从t=0时刻起同时出 发，甲做匀加速直线运动，x-t图像如图甲所 示.乙做匀减速直线运动，整"
+    },
+    {
+      "id": "机械能23必刷题:p3:q15:c4",
+      "book": "机械能23必刷题",
+      "page": 4,
+      "type": "o_to_zero",
+      "scores": [
+        0.015049192237872171,
+        0.015527824103263017
+      ],
+      "best": 1,
+      "correct": "[河北保定七校2022模拟]如图所示，固定光 滑斜面的倾角为$3 7 ^ { \\circ }$，轻弹簧的一端固定在斜 面上C点正上方的固定转轴O处，另一端与一 ",
+      "wrong": "[河北保定七校2022模拟]如图所示，固定光 滑斜面的倾角为$3 7 ^ { \\circ }$，轻弹簧的一端固定在斜 面上C点正上方的固定转轴O处，另一端与一 "
+    }
+  ]
+}
