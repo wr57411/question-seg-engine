@@ -42,37 +42,37 @@ loop: until tests pass
 max_iterations: 3
 verify: node --import tsx --test tests/teach-store.test.ts
 
-- [ ] **Step 6: 托盘搜索（ticket 005）**
+- [x] **Step 6: 托盘搜索（ticket 005）** ✅ 2026-10-30
 action: `teach-store` 增加 `filterTeach` 纯函数（忽略大小写/首尾空格）；`final.js` 托盘搜索框同时过滤专题/类别，无结果时显示「新建专题/类别『关键词』」，点结果直接归给当前题；补 `tests/teach-store.test.ts`。
 loop: until tests pass
 max_iterations: 3
 verify: node --import tsx --test tests/teach-store.test.ts
 
-- [ ] **Step 7: 管理改名 / 删除（ticket 006）**
+- [x] **Step 7: 管理改名 / 删除（ticket 006）** ✅ 2026-10-30（**删除改为软删除**：下架/恢复，见 SPEC U19 落地修订）
 action: `teach-store` 增加 `renameTopic`/`renameCategory`（名称唯一）、`affectedCount`、`deleteTopic`/`deleteCategory`（级联 bindings + stale）；`final.js` 管理面板两栏列表、使用题数、改名输入、删除两步确认；补 `tests/teach-store.test.ts`。
 loop: until tests pass
 max_iterations: 3
 verify: node --import tsx --test tests/teach-store.test.ts
 
-- [ ] **Step 8: 导出 v2 + 专题页类别单选（ticket 007）**
+- [x] **Step 8: 导出 v2 + 专题页类别单选（ticket 007）** ✅ 2026-10-30
 action: 改 `scripts/topic-export.ts` 读 `data/out/teach/*` 输出 v2 index（`categories[]` 取代 `level`）；`scripts/audit-topic.ts` 独立复核清单/归属/类别 stats；`topic/topic-model.js` 与 `topic/topic.js` 改为类别单选筛选与类别 chips；补导出/审计 fixture 与反向验证。
 loop: until tests pass
 max_iterations: 3
 verify: npm run topic:export && npm run audit:topic && node --import tsx --test tests/topic-export.test.ts tests/audit-topic.test.ts
 
-- [ ] **Step 9: 阅读模式回显（ticket 008）**
+- [x] **Step 9: 阅读模式回显（ticket 008）** ✅ 2026-10-30
 action: 阅读模式角标透明度约 0.55；`final.js` 详情面板增加只读「教学归类」区（专题 + 类别 chips）与「去挑题修改」按钮（进入挑题并选中该题）；业务标签区保持原样；扩展 `tests/layout-invariant.test.ts` 锁淡显不改几何。
 loop: until tests pass
 max_iterations: 3
 verify: node --import tsx --test tests/layout-invariant.test.ts
 
-- [ ] **Step 10: 旧数据迁移 dry-run（ticket 009a）**
+- [x] **Step 10: 旧数据迁移 dry-run（ticket 009a）** ✅ 2026-10-31（**降级为清理**：数据核查后无需迁移，见 SPEC U27 落地修订与「交接 3 补记 2」）
 action: 新增 `scripts/migrate-teach.ts`，默认 dry-run：解析 `data/out/tags/*` 的 `专题名#层级` 与 `data/out/topics/*.topic.json`，打印将创建的专题/类别、影响的题、将摘除的标签；不写任何文件；报告 0 条归属丢失；同时在报告里列出备份目标路径。
 loop: false
 verify: node --import tsx scripts/migrate-teach.ts --dry-run
 gate: human
 
-- [ ] **Step 11: 旧数据迁移写盘 + 幂等（ticket 009b）**
+- [x] **Step 11: 旧数据迁移写盘 + 幂等（ticket 009b）** ✅ 2026-10-31（**降级为清理写盘**：`npm run cleanup:topic-tags --apply`，写前整份备份）
 action: 执行 `node --import tsx scripts/migrate-teach.ts --write`：先备份 `data/out/tags`、`data/out/topics` 到 `data/archive/<date>-teach-migration/`，再写 `data/out/teach/*`、从业务标签库摘除已迁移项；随后跑 `topic:export` + `audit:topic`；再跑一次 `--dry-run` 必须报“已迁移，无变化”。
 loop: false
 verify:
@@ -92,25 +92,25 @@ verify:
       kind: matches-glob
       value: "*.json"
 
-- [ ] **Step 12: iPad 截图审板（ticket 010a）**
+- [x] **Step 12: iPad 截图审板（ticket 010a）** ✅ 2026-10-31（14 页 888 块零缺失，证据 `docs/evidence/2026-10-31-step12-board.md`）
 action: 扩展现有截图脚本（或新增 `scripts/pick-shots.mjs`）覆盖：挑题开/关、选中高亮、两行托盘、N·M 角标、新建输入、同上题、撤销条、管理列表、删除确认、阅读模式详情、专题页类别筛选；820×1100，落 `tmp/review-pick/`；量可点元素 ≥44px、题干 ≥13px、无横向溢出、托盘不遮挡选中题、角标不改几何；首项内容齐全性抽 3 题。
 loop: false
 verify: test $(ls tmp/review-pick/*.png 2>/dev/null | wc -l) -ge 8
 
-- [ ] **Step 13: 真机 iPad Safari 验收（ticket 010b）**
+- [ ] **Step 13: 真机 iPad Safari 验收（ticket 010b）** ⬜ **未做（唯一剩余项，human gate）**
 action: 在 iPad Safari 打开局域网地址，逐项检查：点击 vs 滚动、键盘顶托盘、搜索、快速连点、刷新后数据仍在、角标淡显/挑题清晰；记录设备/系统/Safari 版本与发现项。
 loop: false
 verify:
   type: human-review
   prompt: 在 iPad Safari 上按清单验收挑题托盘（点击/滚动、键盘、搜索、连点、刷新持久化、角标），确认通过或列出问题
 
-- [ ] **Step 14: 全量门 + 改动汇总（提交前）**
+- [x] **Step 14: 全量门 + 改动汇总（提交前）** ✅ 2026-11-02（合并态 466 例全绿，见「交接 3 补记 5」）
 action: 跑 `npm run check` 与 `npm run audit:topic`，汇总本次改动文件、截图证据、迁移报告与未闭合项；不提交。
 loop: false
 verify: npm run check && npm run audit:topic
 gate: human
 
-- [ ] **Step 15: 合回 main（不推送）**
+- [x] **Step 15: 合回 main（不推送）** ✅ 2026-11-02（`123622b`；实际**已推送**——用户另行授权，见「交接 3 补记 5」）
 action: 确认所有检查点已提交到 `feat/pick-classify`；跑最终门；把 `feat/pick-classify` 合回 `main`（fast-forward 或 `--no-ff` 按实际）；切回 `main`；不 push、不部署。
 loop: false
 verify: test -z "$(git status --porcelain)" && [ "$(git branch --show-current)" = main ]
