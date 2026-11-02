@@ -35,7 +35,12 @@ TypeScript ESM + node:test，零运行时依赖。
 
 ```bash
 npm install && npm run check   # 必须全绿；不绿先修门，勿带病开发
+npm run preflight              # 产物新鲜度自检：data/out 里哪些快照已过期
 ```
+
+> **`data/` 下的一切都是快照，不是事实**（`tasks/lessons.md` **L7**）。
+> 要说「代码现在的行为」必须用 `src/` 重跑；引用产物数字必须写明来源。
+> 数据血缘见 **[docs/DATA-MAP.md](docs/DATA-MAP.md)**，开工套路见技能 `qseg-context`。
 
 - 声称「完成」的条件：`npm run check` 全绿 +（显示层改动）全量逐页截图审板过。
   「后台数字达标」≠「页面上看得见」≠「没被 overflow:hidden 裁掉」。
