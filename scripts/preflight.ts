@@ -27,6 +27,8 @@ interface Row {
   doc: string;
   questions?: number;
   qTime?: Date;
+  commit?: string;
+  engine?: string;
   layoutBackend?: string;
   stale: boolean;
   note: string;
@@ -64,6 +66,8 @@ function newestTs(dir: string): Date | undefined {
 
 const branch = sh(["rev-parse", "--abbrev-ref", "HEAD"]) || "—";
 const head = (sh(["rev-parse", "--short", "HEAD"]) || "—").trim();
+/** 产物该跟的是 `src/` 子树指纹，不是提交号（改文档也会产生新提交） */
+const engineTree = (sh(["rev-parse", "--short", "HEAD:src"]) || "").trim();
 const dirty = sh(["status", "--porcelain"]).split("\n").filter(Boolean).length;
 
 const engineTs = [newestTs("src"), newestTs("scripts")].filter(Boolean) as Date[];
@@ -96,10 +100,30 @@ if (existsSync(OUT)) {
         row.layoutBackend = "解析失败";
       }
     }
-    // 过期判据：产物时间早于引擎最新改动 ⇒ 该产物不能代表当前代码行为
-    if (row.qTime && engineTime && row.qTime < engineTime) {
+    // 版本戳优先：meta.build.commit 是产出时的 HEAD，比 mtime 可靠
+    // （mtime 会被 checkout / 复制 / touch 污染 —— 改一行再回退，它就"变新"了）
+    const mPath = join(dir, "meta.json");
+    if (existsSync(mPath)) {
+      try {
+        const m = JSON.parse(readFileSync(mPath, "utf8")) as { build?: { commit?: string; engine?: string } };
+        row.commit = m.build?.commit;
+        row.engine = m.build?.engine;
+      } catch {
+        /* meta 坏了就当没有版本戳，退回 mtime */
+      }
+    }
+    // 过期判据：有版本戳就比提交号；没有才退回"产物时间 vs 引擎改动时间"
+    if (row.engine) {
+      if (engineTree && row.engine !== engineTree) {
+        row.stale = true;
+        row.note = `产物由 src@${row.engine} 产出，当前 src@${engineTree}`;
+      }
+    } else if (row.commit && row.commit !== head) {
       row.stale = true;
-      row.note = row.note || "产物早于引擎改动";
+      row.note = `产物由 ${row.commit} 产出（无 src 指纹），当前 HEAD ${head}`;
+    } else if (!row.commit && row.qTime && engineTime && row.qTime < engineTime) {
+      row.stale = true;
+      row.note = row.note || "无版本戳，且产物早于引擎改动";
     }
     if (row.layoutBackend === undefined && existsSync(lPath)) {
       row.note = (row.note ? row.note + "；" : "") + "layout 无 _backend（被 dedup/fuse 改过）";
@@ -123,11 +147,11 @@ console.log(`产物目录  ${rows.length} 册，其中 ${staleCount} 册早于�
 console.log("");
 
 if (rows.length) {
-  console.log(`${pad("册", 30)} ${pad("题数", 6)} ${pad("产物时间", 17)} layout    判定`);
+  console.log(`${pad("册", 30)} ${pad("题数", 6)} ${pad("src指纹", 10)} ${pad("产物时间", 17)} layout    判定`);
   for (const r of rows.slice(0, 40)) {
     const backend = r.layoutBackend === undefined ? "被改过" : r.layoutBackend;
     console.log(
-      `${pad(r.doc, 30)} ${pad(r.questions === undefined ? "—" : String(r.questions), 6)} ${pad(fmt(r.qTime), 17)} ${pad(backend, 9)} ${r.stale ? "⚠ 过期" : "✓"}`,
+      `${pad(r.doc, 30)} ${pad(r.questions === undefined ? "—" : String(r.questions), 6)} ${pad(r.engine ?? "—", 10)} ${pad(fmt(r.qTime), 17)} ${pad(backend, 9)} ${r.stale ? "⚠ 过期" : "✓"}`,
     );
   }
   if (rows.length > 40) console.log(`  … 另有 ${rows.length - 40} 册`);

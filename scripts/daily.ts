@@ -155,11 +155,44 @@ function inferSource(outDir: string): Meta["source"] {
   };
 }
 
+/** 当前 HEAD 短提交号；取不到（无 git / 非仓库）时返回 "unknown"，不抛错。 */
+function currentCommit(): string {
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim() || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * `src/` 的树哈希 —— **产物该跟的东西**。
+ *
+ * 为什么不用提交号：`docs/` 改一行也是新提交，拿提交号比对会让所有产物"变旧"，
+ * 于是版本戳退化成噪音（每次写文档都得全量重跑）。产物只依赖引擎代码，
+ * 所以只认 `src/` 子树：**`src/` 不变，产物就仍然代表当前行为。**
+ */
+function currentEngineTree(): string {
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD:src"], { encoding: "utf8" }).trim() || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 interface Meta {
   id: string;
   label: string;
   kind: "quiz" | "answer";
   importedAt: string;
+  /**
+   * 产出时的代码版本（2026-11-02 新增）。
+   *
+   * 为什么需要：`importedAt` 是"这份文档第一次被导入"的时间，重跑不会更新，
+   * 所以它**不能**回答"这份产物是不是现行代码产的"。而文件的 mtime 又会被
+   * checkout/复制/`touch` 污染（改一行再回退，mtime 就变新了）。
+   * ⇒ 只有提交号是确定的。`scripts/preflight.ts` 优先读它，读不到才退回 mtime。
+   */
+  build: { commit: string; engine: string; builtAt: string };
   source: { pdf: boolean; parser: "mineru" | "oxr" | "fuse" | "prebuilt"; ocr: "page" | "skipped" | "failed" };
   stats: {
     pages: number;
@@ -267,6 +300,7 @@ function buildMeta(
     label,
     kind,
     importedAt: importedAt ?? new Date().toISOString(),
+    build: { commit: currentCommit(), engine: currentEngineTree(), builtAt: new Date().toISOString() },
     source: src,
     stats: {
       pages: snap.pages.length,
