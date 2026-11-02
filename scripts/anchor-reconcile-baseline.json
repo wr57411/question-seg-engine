@@ -1,0 +1,44 @@
+[
+ {
+  "doc": "物理_教材基础练 运动和力",
+  "anchor": 15,
+  "diff": -2,
+  "wordCount": 8,
+  "engineCount": 10
+ },
+ {
+  "doc": "物理_教材基础练 曲线运动",
+  "anchor": 25,
+  "diff": -3,
+  "wordCount": 14,
+  "engineCount": 17
+ },
+ {
+  "doc": "物理_教材基础练万有引力",
+  "anchor": 27,
+  "diff": -2,
+  "wordCount": 5,
+  "engineCount": 7
+ },
+ {
+  "doc": "物理_教材基础练 电路",
+  "anchor": 54,
+  "diff": 4,
+  "wordCount": 6,
+  "engineCount": 2
+ },
+ {
+  "doc": "物理_教材基础练 电路",
+  "anchor": 55,
+  "diff": -4,
+  "wordCount": 6,
+  "engineCount": 10
+ },
+ {
+  "doc": "物理_教材基础练 电路",
+  "anchor": 57,
+  "diff": -4,
+  "wordCount": 11,
+  "engineCount": 15
+ }
+]

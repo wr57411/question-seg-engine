@@ -22,8 +22,8 @@
     1998,
     200
    ],
-   "verified": false,
-   "evidence": "整页 OCR p10.txt 该行为第 6 题首行；layout 完全缺失（右栏顶部插图 bbox y 207–402 之上）。下一行「固定粗糙长斜面顶端下滑…」在 layout 中存在。未回原卷页图核对。"
+   "verified": true,
+   "evidence": "整页 OCR p10.txt 该行为第 6 题首行；layout 完全缺失（右栏顶部插图 bbox y 207–402 之上）。下一行「固定粗糙长斜面顶端下滑…」在 layout 中存在。｜**已回原卷 page-10.png 核对（2026-11-02）**：题号/出处标注/选项与清单一致。"
   }
  ]
 }
