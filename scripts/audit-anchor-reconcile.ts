@@ -107,6 +107,16 @@ function layoutAnchors(doc: string): { pageOf: Map<number, number>; pages: numbe
   return { pageOf, pages: pages.length };
 }
 
+interface BaselineEntry {
+  doc: string;
+  anchor: number;
+  diff: number;
+  /** 人工判定：A=边界错位 / C=Word 少认 / 口径=实验区计数口径未定 / MIX=混合 */
+  kind?: string;
+  /** 一行说明，打印在异常行后面 */
+  note?: string;
+}
+
 interface Row {
   doc: string;
   anchor: number;
@@ -185,6 +195,12 @@ function main(): void {
     });
   }
 
+  const key = (doc: string, anchor: number) => `${doc}|${anchor}`;
+  const baseline: BaselineEntry[] = existsSync(BASELINE_PATH)
+    ? (JSON.parse(readFileSync(BASELINE_PATH, "utf8")) as BaselineEntry[])
+    : [];
+  const notes = new Map(baseline.map((e) => [key(e.doc, e.anchor), e]));
+
   const abnormal = rows.filter((r) => Math.abs(r.diff) >= DIFF_THRESHOLD);
   console.log(`教材知识锚点对账：${DOCS.length} 册 / ${rows.length} 段`);
   console.log(
@@ -192,9 +208,12 @@ function main(): void {
   );
   console.log(`异常（|差| ≥ ${DIFF_THRESHOLD}）：**${abnormal.length}** 段\n`);
   for (const r of abnormal) {
+    const b = notes.get(key(r.doc, r.anchor));
     console.log(
       `  ${r.doc} · 教材知识${r.anchor} · Word ${r.wordLines} / ${r.pages} · Word ${r.wordCount} vs 引擎 ${r.engineCount}  ⇒ ${r.diff > 0 ? "+" : ""}${r.diff}`,
     );
+    // 已判定的异常把结论直接打出来 —— 否则下一个人还得回来重判一遍
+    if (b?.kind) console.log(`      └ 已判定【${b.kind}】${b.note ?? ""}`);
   }
   if (abnormal.length === 0) console.log("  （无）");
 
@@ -211,10 +230,6 @@ function main(): void {
     return;
   }
 
-  const key = (doc: string, anchor: number) => `${doc}|${anchor}`;
-  const baseline = existsSync(BASELINE_PATH)
-    ? (JSON.parse(readFileSync(BASELINE_PATH, "utf8")) as { doc: string; anchor: number }[])
-    : [];
   const known = new Set(baseline.map((e) => key(e.doc, e.anchor)));
   const fresh = abnormal.filter((r) => !known.has(key(r.doc, r.anchor)));
   const seen = new Set(abnormal.map((r) => key(r.doc, r.anchor)));
