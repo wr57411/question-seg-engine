@@ -1,0 +1,53 @@
+{
+ "version": 1,
+ "tags": [
+  {
+   "id": "t-hao",
+   "name": "好题",
+   "short": "好",
+   "color": "#4d7c2f"
+  },
+  {
+   "id": "t-gai",
+   "name": "待改",
+   "short": "改",
+   "color": "#5b3a8c"
+  },
+  {
+   "id": "t-jiao",
+   "name": "已校对",
+   "short": "校",
+   "color": "#3f3f8c"
+  },
+  {
+   "id": "t-liu",
+   "name": "留着组卷",
+   "short": "留",
+   "color": "#8a5a1e"
+  },
+  {
+   "id": "t-nan",
+   "name": "偏题难题",
+   "short": "难",
+   "color": "#7a2f86"
+  },
+  {
+   "id": "t-topic-ping",
+   "name": "平抛运动#基础",
+   "short": "平基",
+   "color": "#2F6B4F"
+  },
+  {
+   "id": "t-topic-yuan-pei",
+   "name": "圆周运动#培优",
+   "short": "圆培",
+   "color": "#7a2f86"
+  },
+  {
+   "id": "t-topic-yuan-ji",
+   "name": "圆周运动#基础",
+   "short": "圆基",
+   "color": "#3f3f8c"
+  }
+ ]
+}

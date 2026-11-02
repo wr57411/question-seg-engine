@@ -1,0 +1,486 @@
+---
+intent: 在成品页实现 iPad 挑题与归类（专题 / 类别 / 业务标签三套独立清单），完成导出 v2、旧数据迁移与 iPad 验收。
+success_criteria: 000-011 工单全部完成（011 = 自定义常用组合）；npm run check 全绿；topic:export/audit:topic v2 绿；迁移 dry-run/备份/幂等通过且 0 条归属丢失；纸面几何不变量全绿；iPad 820×1100 截图审板 ≥8 张且内容齐全；真机 Safari 人工验收记录在案；每步绿后在 feat/pick-classify 有检查点提交；全部完成后合回 main（不推送）。
+risk_level: high
+auto_approve: true
+branch: feat/pick-classify
+worktree: false
+dirty_worktree: allow
+---
+
+## Steps
+
+- [x] **Step 1: 教学写通道（ticket 000）**
+action: 新增 `scripts/teach-write-guards.ts`（scope=topics|categories|bindings、doc 白名单、路径断言、形状校验、2MB 上限）；在 `scripts/view-server.ts` 增加 `POST /api/teach`，原子写 `data/out/teach/{topics.json,categories.json,bindings/<doc>.json}`；新增 `tests/teach-write-guards.test.ts` 覆盖非法 scope/doc/路径/形状/超限；现有 `/api/tags` 行为不变。
+loop: until tests pass
+max_iterations: 3
+verify: node --import tsx --test tests/teach-write-guards.test.ts tests/tag-write-guards.test.ts
+
+- [x] **Step 2: 挑题模式 + 整题命中 + 高亮（ticket 001）**
+action: 新增 `final/pick-hit.js` 纯函数 `pickQuestionAt`；`final/final.js` 增加顶部「挑题」开关、pointer 移动 >10px 判滚动、点块/6pt 容差选中、`.blk[data-bi]` 高亮；`final/final.css` 加托盘空壳；选中态只加 outline/box-shadow，不改 bbox/页高/字号/留白；新增 `tests/pick-hit.test.ts`，扩展 `tests/layout-invariant.test.ts`。
+loop: until tests pass
+max_iterations: 3
+verify: node --import tsx --test tests/pick-hit.test.ts tests/layout-invariant.test.ts
+
+- [x] **Step 3: 核心归类：两行 + 立即写 + N·M 角标（ticket 002）**
+action: 新增 `final/teach-store.js`（normalize/toggleTopic/toggleCategory/assignmentFor/badgeCounts/recentOrder）与 `fixtures/teach-seed/` 开发种子，并复制到 `data/out/teach/`（不覆盖已有文件）；`final.js` 托盘专题/类别两行、点 chip 立即 `POST /api/teach?scope=bindings`、串行写与失败回滚；`stages/reconstruct.js` 增加 `assignmentBadge`/`dimBadges` 选项，只在 q-chip 内加角标；新增 `tests/teach-store.test.ts`，扩展 layout invariant。
+loop: until tests pass
+max_iterations: 3
+verify: node --import tsx --test tests/teach-store.test.ts tests/teach-write-guards.test.ts tests/layout-invariant.test.ts
+
+- [x] **Step 4: 内联新建专题/类别（ticket 003）**
+action: `teach-store` 增加 `createTopic`/`createCategory`（服务端生成 id、name 去空格后唯一、重名复用）；`final.js` 两行行尾「＋」、单字段输入、`建好并打上`、创建后滚动到新 chip 并高亮；用 `visualViewport`/CSS 变量抬升托盘避开 iPad 键盘；补 `tests/teach-store.test.ts`。
+loop: until tests pass
+max_iterations: 3
+verify: node --import tsx --test tests/teach-store.test.ts
+
+- [x] **Step 5: 同上题 + 撤销 + 写失败回滚（ticket 004）**
+> 2026-10-30 追加（用户）：自定义常用组合（ticket 011）已实现——托盘标题栏「组合」浮层、
+  用户命名、套用替换当前题归属、复用撤销；测试在 `tmp/pick-test-app` 独立数据副本上跑。
+action: `teach-store` 增加 `sameAsPrevious`（替换语义）、动作快照与 `undoLast`；`final.js` 增加「同上题」按钮（无上一题/当前就是上一题时禁用）、5 秒撤销条、错误提示条；写入失败时 chip 与角标恢复写前状态；补 `tests/teach-store.test.ts` 与失败注入。
+loop: until tests pass
+max_iterations: 3
+verify: node --import tsx --test tests/teach-store.test.ts
+
+- [x] **Step 6: 托盘搜索（ticket 005）** ✅ 2026-10-30
+action: `teach-store` 增加 `filterTeach` 纯函数（忽略大小写/首尾空格）；`final.js` 托盘搜索框同时过滤专题/类别，无结果时显示「新建专题/类别『关键词』」，点结果直接归给当前题；补 `tests/teach-store.test.ts`。
+loop: until tests pass
+max_iterations: 3
+verify: node --import tsx --test tests/teach-store.test.ts
+
+- [x] **Step 7: 管理改名 / 删除（ticket 006）** ✅ 2026-10-30（**删除改为软删除**：下架/恢复，见 SPEC U19 落地修订）
+action: `teach-store` 增加 `renameTopic`/`renameCategory`（名称唯一）、`affectedCount`、`deleteTopic`/`deleteCategory`（级联 bindings + stale）；`final.js` 管理面板两栏列表、使用题数、改名输入、删除两步确认；补 `tests/teach-store.test.ts`。
+loop: until tests pass
+max_iterations: 3
+verify: node --import tsx --test tests/teach-store.test.ts
+
+- [x] **Step 8: 导出 v2 + 专题页类别单选（ticket 007）** ✅ 2026-10-30
+action: 改 `scripts/topic-export.ts` 读 `data/out/teach/*` 输出 v2 index（`categories[]` 取代 `level`）；`scripts/audit-topic.ts` 独立复核清单/归属/类别 stats；`topic/topic-model.js` 与 `topic/topic.js` 改为类别单选筛选与类别 chips；补导出/审计 fixture 与反向验证。
+loop: until tests pass
+max_iterations: 3
+verify: npm run topic:export && npm run audit:topic && node --import tsx --test tests/topic-export.test.ts tests/audit-topic.test.ts
+
+- [x] **Step 9: 阅读模式回显（ticket 008）** ✅ 2026-10-30
+action: 阅读模式角标透明度约 0.55；`final.js` 详情面板增加只读「教学归类」区（专题 + 类别 chips）与「去挑题修改」按钮（进入挑题并选中该题）；业务标签区保持原样；扩展 `tests/layout-invariant.test.ts` 锁淡显不改几何。
+loop: until tests pass
+max_iterations: 3
+verify: node --import tsx --test tests/layout-invariant.test.ts
+
+- [x] **Step 10: 旧数据迁移 dry-run（ticket 009a）** ✅ 2026-10-31（**降级为清理**：数据核查后无需迁移，见 SPEC U27 落地修订与「交接 3 补记 2」）
+action: 新增 `scripts/migrate-teach.ts`，默认 dry-run：解析 `data/out/tags/*` 的 `专题名#层级` 与 `data/out/topics/*.topic.json`，打印将创建的专题/类别、影响的题、将摘除的标签；不写任何文件；报告 0 条归属丢失；同时在报告里列出备份目标路径。
+loop: false
+verify: node --import tsx scripts/migrate-teach.ts --dry-run
+gate: human
+
+- [x] **Step 11: 旧数据迁移写盘 + 幂等（ticket 009b）** ✅ 2026-10-31（**降级为清理写盘**：`npm run cleanup:topic-tags --apply`，写前整份备份）
+action: 执行 `node --import tsx scripts/migrate-teach.ts --write`：先备份 `data/out/tags`、`data/out/topics` 到 `data/archive/<date>-teach-migration/`，再写 `data/out/teach/*`、从业务标签库摘除已迁移项；随后跑 `topic:export` + `audit:topic`；再跑一次 `--dry-run` 必须报“已迁移，无变化”。
+loop: false
+verify:
+  - type: shell
+    command: node --import tsx scripts/migrate-teach.ts --write && npm run topic:export && npm run audit:topic && node --import tsx scripts/migrate-teach.ts --dry-run
+  - type: artifact
+    path: data/out/teach/topics.json
+    assert:
+      kind: exists
+  - type: artifact
+    path: data/out/teach/categories.json
+    assert:
+      kind: exists
+  - type: artifact
+    path: data/out/teach/bindings
+    assert:
+      kind: matches-glob
+      value: "*.json"
+
+- [x] **Step 12: iPad 截图审板（ticket 010a）** ✅ 2026-10-31（14 页 888 块零缺失，证据 `docs/evidence/2026-10-31-step12-board.md`）
+action: 扩展现有截图脚本（或新增 `scripts/pick-shots.mjs`）覆盖：挑题开/关、选中高亮、两行托盘、N·M 角标、新建输入、同上题、撤销条、管理列表、删除确认、阅读模式详情、专题页类别筛选；820×1100，落 `tmp/review-pick/`；量可点元素 ≥44px、题干 ≥13px、无横向溢出、托盘不遮挡选中题、角标不改几何；首项内容齐全性抽 3 题。
+loop: false
+verify: test $(ls tmp/review-pick/*.png 2>/dev/null | wc -l) -ge 8
+
+- [ ] **Step 13: 真机 iPad Safari 验收（ticket 010b）** ⬜ **未做（唯一剩余项，human gate）**
+action: 在 iPad Safari 打开局域网地址，逐项检查：点击 vs 滚动、键盘顶托盘、搜索、快速连点、刷新后数据仍在、角标淡显/挑题清晰；记录设备/系统/Safari 版本与发现项。
+loop: false
+verify:
+  type: human-review
+  prompt: 在 iPad Safari 上按清单验收挑题托盘（点击/滚动、键盘、搜索、连点、刷新持久化、角标），确认通过或列出问题
+
+- [x] **Step 14: 全量门 + 改动汇总（提交前）** ✅ 2026-11-02（合并态 466 例全绿，见「交接 3 补记 5」）
+action: 跑 `npm run check` 与 `npm run audit:topic`，汇总本次改动文件、截图证据、迁移报告与未闭合项；不提交。
+loop: false
+verify: npm run check && npm run audit:topic
+gate: human
+
+- [x] **Step 15: 合回 main（不推送）** ✅ 2026-11-02（`123622b`；实际**已推送**——用户另行授权，见「交接 3 补记 5」）
+action: 确认所有检查点已提交到 `feat/pick-classify`；跑最终门；把 `feat/pick-classify` 合回 `main`（fast-forward 或 `--no-ff` 按实际）；切回 `main`；不 push、不部署。
+loop: false
+verify: test -z "$(git status --porcelain)" && [ "$(git branch --show-current)" = main ]
+
+## 检查点策略
+
+本 run 最初在 `main` 初始化；确认「长任务每步绿就提交」后，执行 checkout 已切到 `feat/pick-classify`。
+- 每个 Step 的 `verify` 通过后立即在 `feat/pick-classify` 做一次检查点提交（commit message 带 step 号），不攒到最后。
+- `main` 只在最后 Step 15 合并一次，保持干净；不 push、不部署。
+- HOTL state 的 `branch` 字段仍是初始化时的 `main`（不手改状态文件）；以 git 实际分支为准，finish 记 `merged` / target `main`。
+
+## 风险（为什么是 high）
+
+- **R1 旧数据迁移不可逆**：现有 `专题名#层级` 标签与 `.topic.json` 要拆成专题/类别/归属；映射错会丢失或错挂老师的分类。缓解：dry-run、写盘前备份、幂等、100% 归属对账、迁移后 export/audit 双绿。
+- **R2 新写通道会改数据**：`/api/teach` 是第二条写路径；路径穿越/形状错误/并发写可能污染清单或归属。缓解：服务端白名单 + 路径断言 + 形状校验 + 原子写 + 串行队列；失败回滚；现有 `/api/tags` 回归。
+- **R3 纸面几何红线**：角标/高亮/托盘可能改变页高、字号、留白或号牌位置。缓解：`tests/layout-invariant.test.ts` 锁逐字节几何；只有 outline/box-shadow，不改布局。
+- **R4 真机触控不可自动化**：点击 vs 滚动、iPad 键盘、触控热区、Safari 惯性滚动只能在真机验；截图是 headless Chrome。缓解：human-review 门 + 真机清单。
+- **R5 范围大**：11 个切片、跨数据/脚本/纸面/UI；中途半成品可能不可用。缓解：每步独立 verify，002 后核心闭环可用，后续并行推进。
+
+## 可验收指标（数字）
+
+- **M01 质量门**：`npm run check` 退出码 0；现有 297 条测试 + 新增专题/挑题测试全部通过，0 fail。
+- **M02 纸面几何**：挑题开/关、角标开/关、选中/未选中四种状态，`layout-invariant` 的纸面几何逐字节相同（0 差异）；留白宽度不变。
+- **M03 迁移守恒**：`专题名#层级` 与 `.topic.json` 的每条归属都有去向（迁移或显式报告），丢失 **0** 条；迁移后第二次 dry-run 变化 **0** 条；备份目录存在。
+- **M04 导出/审计**：`topic:export` + `audit:topic` 退出码 0；类别计数与 index 一致；断链/重复/整专题消失的反向用例全部必红（0 漏报）。
+- **M05 交互**：iPad 820×1100 截图 ≥8 张；控制台异常 0；可点元素最小高度 ≥44px；题干字号 ≥13px；横向溢出 0；托盘不遮挡选中题。
+- **M06 持久化**：点 chip 后刷新，归属保留率 100%；快速连点后最终状态与最后一次操作一致（0 乱序）。
+- **M07 失败不静默**：模拟写失败时 UI 回退并显示错误，0 次“假成功”；非法 scope/doc/路径/形状的写请求 0 次落盘。
+- **M08 真机**：iPad Safari 清单逐项通过；发现项全部登记 HANDOFF §6（未闭合不冒充通过）。
+
+## 交接要点（2026-10-30 暂停，模型卡顿，换模型续做）
+
+- **当前分支**：`feat/pick-classify`；`main` 未合并（main 仍为 `68d805c`）。最新检查点 **`0572e6e`**
+  （组合常驻条），前序 `985aa70`（组合初版）、`79e92be`（同上题+撤销）、`6e41f70`（顶栏/托盘压缩）、
+  `8b5dac9`（内联新建）、`b680f51`（写通道/挑题）、`ecb8d87`（SPEC/工单）。
+- **HOTL run**：`pick-classify-20261030T024035Z-9fa769d0a516`；Step 1–5 已 done，**Step 6（托盘搜索）
+  尚未开始**；run 状态 running，owner 已 release（接手者重新 `owner claim --run-id ...`）。
+  状态文件在 `.hotl/state/`，报告在 `.hotl/reports/`。
+- **用户真实数据（不要覆盖）**：`data/out/teach/` 目前有专题 `平抛运动 / 圆周运动 / 曲线运动`；
+  bindings 含 q16/q31/q58 + q0/q1（q0/q1 -> 曲线运动 + 基础）；用户自己建了一个组合
+  `曲线基础`（`cb-mvujgdzldavzra`）。**绝不能用 `fixtures/teach-seed` 覆盖真实目录**。
+- **测试安全**：所有会写 `data/out/teach` 的浏览器测试必须用 `tmp/pick-test-app`（APFS 克隆）
+  + 独立端口 4175 + `.test-root` 标记；`tmp/combo-smoke.mjs` 已带 marker 守卫。
+  真实服务在 **4174**（当前 nohup 运行）；临时 4175 服务测试完已停。`tasks/lessons.md` L5 记录过
+  一次冒烟用种子覆盖用户数据的真实事故。
+- **本次组合 UI 已实现**：组合常驻在托盘标题行，一屏 3 槽、12px 小字、超出横滑；点 chip 套用
+  （替换当前题归属、复用撤销）；`＋` 起名小浮层；长按 380ms 拖动排序并写 `combos.json`。
+  独立副本实测：5 条组合、3 个可见槽、横滑到最后一个、拖动后顺序落盘、套用/撤销/刷新持久化全过；
+  `npm run check` 退出码 0。
+- **组合改名/删除已完成**（换模型后续做，用户优先级 1）：托盘标题行新增「管理」→ 面板列出全部组合
+  （名字 + 成员摘要 + 条数）；改名按 id 更新、成员不动，重名/空名/不存在的 id 一律拒并在面板内提示；
+  删除两步确认（6 秒不点第二下自动退回），且**不动任何题的归属**（实测 bindings 文件逐字节不变）。
+  新建/改名/删除/排序统一走 `saveComboList` 串行写 + 失败回滚。
+  验收：`tests/teach-store.test.ts` 13 条全绿；`tmp/combo-manage-smoke.mjs`（独立副本 4175）
+  改名落盘/重名拒绝/两步确认/删除落盘/刷新持久化/触控 44px/标题行零溢出/控制台零异常 全过；
+  `tmp/manage-live-check.mjs` 在真实页 4174 **只读**核对（跑完比对 `data/out/teach` 全目录 hash+mtime，
+  证明零写入）。SPEC 新增 U38。
+- **踩到并已修的坑**：面板内按钮点下去会同步重绘，`e.target` 当场脱离 DOM，
+  用 `closest('#manage-pop')` 判断"点的是不是面板里"会失效并把刚打开的面板关掉。
+  改用 `e.composedPath()`（派发时就固定，不受重绘影响）。**同类浮层别再写 closest 判外点。**
+- **本地服务**：4174（真实数据）中途掉了，已用 `PORT=4174 nohup node --import tsx scripts/view-server.ts`
+  重启，日志 `tmp/view-4174.log`，平板地址 `http://192.168.2.64:4174/final/?doc=…`；4175 测试副本服务用完即停。
+- **Step 6 托盘搜索已完成**（HOTL `step 6 verify` 通过）：`filterTeach` 纯函数（忽略首尾空格/英文大小写，
+  空词不过滤、只读不改清单）；搜索框与组合条共用标题行同一格（实测开搜索托盘高度 97px 不变、
+  标题行零横向溢出、输入框 44px）；两行同步过滤并显示命中数（命中数与标签同行）；
+  点搜索结果即归类（可撤销、角标同步）；搜不到 → 「新建专题『词』/新建类别『词』」，
+  建好打上并自动收起，刷新后保留。内联新建与搜索新建统一走 `applyCreate` 一条路径。
+  验收：`tests/teach-store.test.ts` 14 条全绿；`tmp/search-smoke.mjs`（副本 4175，coarse pointer 实测）
+  EXIT=0、控制台零异常；截图 `tmp/review-pick/search-{open,hit-topic,hit-category,applied,nomatch,created,reloaded}.png`。
+  顺带修：`.pick-lane-label` 固定 26px 宽会把命中数挤到下一行 → 改 `min-width + nowrap`。
+  副本测试数据（6 个「磁场*」测试类别）已清理，真实 `data/out/teach` 实测未受影响。
+- **Step 7 专题/类别管理已完成**（HOTL `step 7 verify` 通过）：管理面板扩成三区（专题/类别/组合），
+  每行「改名 + 两步删除」，删除按钮上直接写明影响几题。跨卷题数与新端点：
+  `GET /api/teach-usage`（跨所有卷数活题与 stale，分开计）、`POST /api/teach-manage`
+  （服务端一次算出清单 + 所有卷 bindings + combos 的新内容，逐个过 `validateTeachPayload` 再落盘，
+  任一文件写失败就把已写的全部回滚）。删除只摘这一项、其余归类保留，两集合都空才删整条；
+  引用它的组合同步摘掉、只剩这一项的组合一并删；改名不碰任何 bindings 文件。
+  级联逻辑放在纯函数 `scripts/teach-manage.ts`（`planTeachManage`/`countTeachUsage`/`validateManageRequest`），
+  view-server 只做 I/O，两边分别可测。
+  验收：`tests/teach-manage.test.ts` 8 条（含"未知字段必须原样带过去""没引用这一项的卷一个字节都不写"
+  "坏输入不猜"）；`tmp/manage-topics-smoke.mjs` 在副本上造**第二卷**归属，实测
+  改名不动 bindings、删除跨两卷摘干净、空归属整条消失、stale 也摘、组合跟着清、
+  角标 `1·1→1·0` 且刷新一致、四类非法请求 403/400 且**盘上 hash 一字不变**、取消删除数据不变、
+  控制台零异常，EXIT=0。
+  ⚠️ 新增端点要**重启**本地 view-server 才生效（4174 已重启；接手者改了 `scripts/` 记得重启）。
+- **未做**：Step 8 导出 v2 + 专题页类别单选（含把 teach bindings 接进 `topic:export`/`audit:topic`）；
+  Step 9 阅读回显；Step 10/11 旧数据迁移（human gate）；Step 12 截图审板；
+  Step 13 真机（human gate）；Step 14/15 全量门 + 合回 main。
+- **接手第一步**：读本文件前文 + `AGENTS.md` + `docs/HANDOFF.md`；`npm run check` 全绿；
+  在 `feat/pick-classify` 上 `owner claim` 当前 run；从 Step 6 继续，**不要重跑会写真实 teach 的冒烟**。
+
+## 交接 2（2026-10-30 第二次暂停：软删除做到一半，换 Agent 续做）
+
+### 已测完并已提交的部分（可以放心当基线）
+
+分支 `feat/pick-classify`，最新提交 `fd27984`；HOTL run `pick-classify-20261030T024035Z-9fa769d0a516`
+Step 1–7 全部 `pass`（Step 6 托盘搜索、Step 7 专题/类别管理）。`npm run check` 退出码 0（实测，非管道尾码）。
+证据：`tests/teach-manage.test.ts` 8 条、`tests/teach-store.test.ts` 14 条、
+`tmp/combo-manage-smoke.mjs` / `tmp/search-smoke.mjs` / `tmp/manage-topics-smoke.mjs` 三套副本冒烟 EXIT=0、
+`tmp/manage-live-check.mjs` 真实页只读核对（跑完比对 `data/out/teach` 全目录 hash+mtime 证明零写入）。
+
+### 半成品：软删除「下架 / 恢复」（用户 2026-10-30 拍板：删除要软删，题上不动）
+
+这一半**未测、界面未接**，单独一笔 WIP 提交固化。已经落到位的：
+
+- 数据合同：`topics.json` / `categories.json` / `combos.json` 的条目可带 `retired: true` + `retiredAt`；
+  `scripts/teach-write-guards.ts` 已放行这两个字段（`retired` 只允许 true，别的值仍拒）。
+- 服务端 `scripts/teach-manage.ts`：`planTeachManage` 新增 `retire` / `restore` 两个 action，
+  **只改清单一个文件**，不碰任何 bindings、不碰 combos；返回 `stillAssigned`（题上还挂着几题）。
+  原来的 `delete`（跨所有卷级联摘引用）保留且仍有测试，但界面不再用它 —— 留给将来「彻底清除」。
+- 数据层 `final/teach-store.js`：`normalizeTeachList` / `normalizeCombos` 带出 `retired`；
+  新增 `splitRetired(list)`、`retireCombo`、`restoreCombo`；
+  `addTeachItem` 复用同名时若那一项已下架，会摘掉标记并返回 `revived: true`。
+- 界面 `final/final.js` 已过滤下架项的四处：托盘 chip、组合条、`applyCombo`（下架成员跳过并明说）、
+  `comboSummary`（显示「某某（已下架）」）。
+
+### 接手必做的四件事（顺序即依赖）
+
+1. **拼面板**：`.scratch/pick-classify/handoff/soft-delete-panel-block.js`（随本次 WIP 提交进版本库）
+   是写好的新面板块，
+   替换 `final/final.js` 第 632–829 行区间（行号按提交 `fd27984`+WIP 计，拼前先 grep 定位）（`renderManageList` → `commitManageDelete`），
+   把「删除 + 两步确认」换成「下架（一次点）+ 已下架分区 + 恢复」。
+   ⚠️ 里面 `el("div", "mg-acts", null)` 那行要改成先建 div 再 `append` 子节点：
+   `stages/reconstruct.js` 的 `el(tag, cls, text)` 判的是 `text !== undefined`，传 null 会把文本设成 "null"。
+2. **补落盘**：`final.js` 的 `applyCreate` 现在只在 `res.created` 时写清单；
+   要改成 `res.created || res.revived`，否则「重建同名 = 复活下架项」只改内存，刷新又变回下架。
+3. **补测试**：`planTeachManage` 的 retire/restore（只写清单、不碰 bindings、重复下架要报错、
+   恢复未下架项要报错）；`splitRetired` / `retireCombo` / `restoreCombo` / `addTeachItem` 复活路径；
+   然后把 `tmp/manage-topics-smoke.mjs` 的断言从「删除后 bindings 被摘干净」改成
+   「下架后 bindings 一字不动、挑题时选不到、恢复后又能选、题上归类始终保留」。
+4. **Step 8 导出/审计必须跳过 `retired`**：`scripts/topic-export.ts` 与 `scripts/audit-topic.ts`
+   接 teach 数据时，下架项既不能出现在专题页清单里，也不能被算进统计；
+   专题页 `/topic/` 的类别筛选同样要过滤。否则下架项会冒充在用。
+
+### 仍然有效的红线（本轮又踩过的地方）
+
+- 绝不用 `fixtures/teach-seed` 覆盖 `data/out/teach`；会写 teach 的浏览器测试只能跑
+  `tmp/pick-test-app`（APFS 副本）+ 端口 4175 + `.test-root` 标记（见 `tasks/lessons.md` L5）。
+- 真实服务在 **4174**（`PORT=4174 nohup node --import tsx scripts/view-server.ts`，日志 `tmp/view-4174.log`）；
+  **改了 `scripts/` 必须重启才生效**（新端点 `/api/teach-usage`、`/api/teach-manage` 已经过重启验证）。
+- HOTL 租约很短（几分钟），每次 `step start/verify` 前先 `owner heartbeat`，过期就 `owner takeover --reason`。
+- 只本地提交，不 push、不部署。
+
+### 下一位的第一步
+
+`git log --oneline -3` 确认在 `feat/pick-classify`；`npm run check` 建基线；
+读本节 + 上面「交接要点」；按 1→2→3 做完软删除这一片，再进 Step 8。
+另外两件已拍板未开工的：**题册下拉折叠**（同一章的 `-OXR`/`-MinerU` 实验版收进「旧版/实验版」分组，
+默认只显示正式版；实测四对变体题干只能对上 70%–90%，所以不做跨版本同步，避免张冠李戴）；
+以及旧数据迁移（Step 10/11，human gate，先 dry-run 给用户看影响面）。
+
+## 交接 3（2026-10-30 第三次暂停：软删除收尾 + Step 8 导出 v2 完成）
+
+### 这一轮做完的（可当基线）
+
+分支 `feat/pick-classify`。`npm run check` **EXIT=0 / 351 例**；
+`npm run topic:export` + `npm run audit:topic` 全绿（**3 专题 / 5 题 / 类别 基础 4 · 培优 1**）。
+
+- **交接 2 第 1–3 条（软删除界面）已完成**：一次点「下架」→ 进「已下架」分区 → 一键「恢复」；
+  `applyCreate` 落盘条件补 `revived`（否则重建同名只改内存、刷新变回下架）；
+  `el("div","mg-acts",null)` 的 `"null"` 文本坑已修；测试 +7；
+  `tmp/manage-topics-smoke.mjs` 改为软删除口径并在副本 4175 跑通（bindings/combos hash 一字不动）。
+- **Step 8（导出 v2）已完成**：
+  - `scripts/topic-export.ts` 输出 **v2**：条目带 `categories: [{id,name}]`、**删掉 `level`**、
+    `stats.byCategory` 按类别 id 计数。输入三路：**教学归类（权威）** + 旧标签（过渡兼容，
+    层级按**类别名**映射到 v2 类别）+ 手工题单。
+  - **下架项全链路排除**：`retired: true` 的专题/类别不导出、不进统计、不出现在任何条目里；
+    但仍被引用时给 warning 说明「恢复后自动回来」（不假装没这回事）。
+  - `scripts/audit-topic.ts` 独立复核 v2 契约：版本必须 2、条目**不许带 level**、
+    类别逐项回源比对（id + name 都要对）、`stats.byCategory` 独立重算、**下架项零出现**。
+  - `topic/topic-model.js` + `topic/topic.js`：类别**单选**筛选（只列该专题里实际出现的类别），
+    题卡显示类别徽标；`topic/index.html` 的 `level-filter` → `category-filter`，副标题去掉「基础/培优分层」。
+- 测试：`tests/topic-export.test.ts` 26 例、`tests/audit-topic.test.ts` 22 例，
+  含「下架专题/类别」「归属断链」「stats 说谎」「版本不是 2」「level 残留」等反向用例。
+- 只读核对：`tmp/topic-v2-check.mjs`（820×1100 CDP）确认类别筛选条渲染、按钮 44px、
+  零控制台异常、零横向溢出；截图 `tmp/review-pick/topic-v2.png`。
+
+### 仍然有效的红线
+
+- 会写 `data/out/teach` 的测试只准跑副本（`tmp/pick-test-app` + 4175 + `.test-root`）。
+- 改了 `scripts/` 必须重启 4174 才生效；静态 `.js` 不用重启。
+- `data/out/topics/index.json` 是**派生数据**，可随时重生成；`data/out/teach/*` 是**用户资产**，不可重生成。
+
+### 下一位的第一步
+
+`npm run check` 建基线 → 读本节 → 进 **Step 9（阅读回显）**：
+详情面板里加只读「教学归类」区（专题/类别 chips + 「去挑题修改」）。
+之后：Step 10/11 旧数据迁移（human gate，先 dry-run 给影响面）、Step 12 截图审板、Step 13 真机、Step 14/15 合回 main。
+
+### 已知未做（故意留着，别当 bug 顺手改）
+
+`disappearedCheck` 对「下架专题」**不豁免**：下架时导出会先告警，若该专题一条题都不剩会红。
+这是故意的——防止把「误删标签」和「主动下架」混为一谈。若将来觉得太吵，再单独决定是否开豁免。
+
+## 交接 3 补记：Step 9（阅读回显）已完成（2026-10-30 晚）
+
+- **`final/final.js` 新增 `teachReadonlySection(q, p)`**：详情面板里的只读「教学归类」区
+  （专题行 / 类别行，各显示 chips；没有就写「未归类」）。
+- **位置放在标题之后、业务标签区之前**：标签区是 7 行 × 44px，放它后面等于要滚一屏才看得见。
+  面板顺序因此调整为：题目标题 → 页/题型/可信度 → **教学归类** → 业务标签 → 题面/答案。
+- **下架项照样显示并标注「（已下架）」**（虚线灰 chip）：题上的归属确实还在（软删除语义），
+  藏起来会让人以为归类丢了。清单里查不到 id 的（彻底删除过）如实写「（清单里找不到）」，不编名字。
+- **「去挑题修改」**：`setPickMode(true)` + `pickQuestion(q, p)`，自动关掉详情、选中该题并滚到可见。
+- 验证（都是实跑）：
+  - `tmp/teach-readonly-check.mjs`（真实数据 4174，`23必刷题 4 曲线运动:p3:q16`）：
+    专题「平抛运动」/ 类别「基础」正确显示、按钮 44px、教学归类在标签区之前、
+    点按钮后 `body.pick-mode` 生效、托盘出现、详情关闭、选中正是该题、零控制台异常。
+  - `tmp/teach-retired-chip-check.mjs`（副本 4175）：下架 `ct-ji` → chip 变「基础（已下架）」且带 retired 样式
+    → 跑完自动 restore。
+  - `npm run check` **EXIT=0 / 351 例**（本次无新增单测：该区是纯 DOM，靠上述两个浏览器核对兜住）。
+- 顺手：4174 真实服务此前已挂（端口无监听），已重启（日志 `tmp/view-4174.log`）。
+
+### 下一位的第一步
+
+**Step 10/11 旧数据迁移（human gate）**：`scripts/migrate-teach.ts` 先 dry-run 给影响面
+（`data/out/tags` 里的 `专题名#层级` 与种子 → teach 的专题/类别/归属），确认后再写盘 + 备份。
+迁移完成后可移除导出侧的「旧标签通道」（现在是过渡兼容，两套并存）。
+
+## 交接 3 补记 2：Step 10/11 从「迁移」降级为「清理」并已执行（2026-10-31）
+
+### 为什么降级
+
+查数据发现 `data/out/tags` 里混着两类东西（`docs/adr/0001` 早就说要拆）：
+
+- **5 个业务标签**（好题 / 待改 / 已校对 / 留着组卷 / 偏题难题）= 录入/校对流程状态，**不动**；
+- **3 个 `专题名#基础` 形状的标签** = S01 专题页的**演示种子**
+  （`docs/plans/2026-10-30-topic-mvp-workflow.md:38` 明写「在 `data/out/tags/library.json` 建 3 个专题标签，
+  绑定 q16 / q31 / q58」，种子另存 `fixtures/topic-seed/`）。
+
+且这 3 条与 teach 侧 3 条**完全重合**（同题、同锚点、同专题/类别）⇒ 摘掉**零信息损失**，
+不需要"搬家"。所以 Step 10/11 的实际内容是**清理演示残留**，不是数据迁移。
+
+### 做了什么（`npm run cleanup:topic-tags`，默认 dry-run）
+
+- 删 3 个专题形状标签 + 对应 3 条标签绑定（曲线运动卷的标签绑定文件现在 0 条）；
+- **业务标签 17 处引用一字未动**（好题 5 / 待改 4 / 已校对 3 / 留着组卷 2 / 偏题难题 3）；
+- `--clear-teach`：清空 teach 的 5 条演示归属（其中只有 3 条来自种子，另 2 条是开发期点出来的，
+  一并清掉才叫"白纸"）；
+- 旧 `topics/{index,export-status}.json` **归档后删除** —— 否则下次导出会因「专题消失」报红
+  （`disappearedCheck` 不豁免是故意的）；
+- 备份：`data/archive/2026-10-31-topic-tag-cleanup/`（tags 整份 + teach-bindings + 两个索引），可整目录回滚。
+
+### 结果与验证
+
+- `topic:export` → **0 专题 / 0 题**，并如实告警「没有发现任何教学归类」；`audit:topic` 绿；
+- **词表保留**（4 专题 / 2 类别 / 1 组合），题上归属为空 ⇒ 从白纸开始自己标；
+- 新增 `tests/cleanup-topic-tags.test.ts`（4 例：只删 `#` 形状 / 业务标签与 anchor 不动 /
+  `--clear-teach` 才碰 teach / 库形状坏时拒绝写盘且文件原样）。
+
+### 下一位的第一步
+
+**Step 12 截图审板**（iPad 820×1100 全量逐页，首项仍是内容齐全性）→ Step 13 真机 →
+Step 14/15 全量门 + 合回 main。注意：现在数据是空的，审板要用自己的归类或临时夹具（副本）。
+
+## 交接 3 补记 3：Step 12 全量逐页审板已过（2026-10-31）
+
+- 对象 `23必刷题 4 曲线运动`（14 页 / 67 题 / 74 图片块），iPad 820×1100，**副本 4175**，
+  脚本 `tmp/board-step12.mjs`（可重跑），截图 `tmp/review-step12/`（18 张）。
+- **第一项内容齐全性（全量，不抽样）**：快照 888 块 → DOM 888 块（缺 0）、74 图片块全部渲染、
+  汉字 9849 逐块精确相等（不符 0）、零尺寸块 0、异常页 0。
+  期望值用渲染层既有口径（`mergePlan` + `renderedTextOf`），不另立第三套。
+- 本轮改动全过：角标 `2·1`/`1·2`/`1·1`、详情「教学归类」含**已下架类别虚线灰**、
+  「去挑题修改」44px 且跳转正确、托盘词表与高亮正确、专题页类别单选与卡片内容齐全、
+  已下架类别不导出不计数但有告警、控制台 0 异常。
+- 唯一偏差：**托盘 97px**（U37 目标 ≤96px），超 1px，属四舍五入级，未改，留真机验收一并看。
+- 证据文档：`docs/evidence/2026-10-31-step12-board.md`。
+
+### 下一位的第一步
+
+**Step 13 真机 iPad Safari 人工验收**（触控精度、键盘顶起托盘、滚动惯性、sheet 手感），
+然后 Step 14/15 全量门 + 合回 main（HANDOFF/DECISIONS 两侧都改过 ⇒ 预期冲突，按实跑重写）。
+
+## 交接 3 补记 4：Step 14/15 合并预演（**只读**，未动任何分支）
+
+### 拓扑（实跑 `git merge-base` / `rev-list --count`）
+
+```
+841536b ──(5)── 68d805c (main) ──(21)── 6cc6185 (feat/pick-classify, 当前)
+    └────(85)──── 9edf857 (feature/oxr, 仍在推进: ahead origin 3)
+```
+
+- **`main` 是 `feat/pick-classify` 的祖先** ⇒ 本分支合回 main 是 **fast-forward，零冲突**。
+- `feature/oxr` 与我们在 `841536b` 分叉，它比 main **少 5 个 main 侧提交**（专题 MVP 那一批）。
+
+### 冲突面（`git merge-tree --write-tree` 实跑，不是估）
+
+pick 侧改 61 个文件、oxr 侧改 135 个，**交集 11 个**；实跑合并得 **9 个冲突文件**（7 个只有 1 块，HANDOFF 4 块）。
+
+| 文件 | pick 侧 | oxr 侧 | 冲突块 | 处置原则 |
+|---|---|---|---|---|
+| `.gitignore` | +4 | +6 | 1 | 并集（`inbox/` + `.hotl/` + `tmp/`） |
+| `AGENTS.md` | +2/−2 | +3/−1 | 1 | 手写：保留「L1–L5」，§ 号**合并后现算**（oxr 写的是 §95） |
+| `docs/HANDOFF.md` | +68/−12 | +453/−24 | 4 | **必须手写重写**：oxr 的 §0 交接要点 + 我们的三线表 + 合并后门禁数字 |
+| `docs/dev/bgx/INDEX.md` | +25 | +216 | 1（add/add） | 两段合并（pick 主题 + oxr 交接包），都留着 |
+| `final/final.js` | +1260/−9 | +472/−51 | 1 | 并集：`onChipClick` 分派（挑题）+ oxr 新增的 `ocrFill` 参数 |
+| `final/index.html` | +89/−10 | +4/−1 | 1 | 并集：挑题按钮 + 审计/OCR 开关（默认关） |
+| `package.json` | +4/−1 | +21/−4 | 1 | 脚本并集；**`check` 取超集**（见下） |
+| `scripts/view-server.ts` | +238/−4 | +26/−10 | 1 | import 并集；**`READ_ONLY` 必须覆盖 `/api/teach*`**（见下） |
+| `stages/reconstruct.js` | +9 | +364/−20 | 1 | 并集：`assignmentBadge` + `ocrFill` 两个选项 |
+| `final/final.css` | +362/−15 | +47 | 自动合并 ✓ | 仍需目视（两段新样式都在末尾） |
+| `tests/layout-invariant.test.ts` | +17 | +35/−1 | 自动合并 ✓ | 合并后必须真跑（见下） |
+
+### 三个必须人判的语义点（不是"选一边"能解决的）
+
+1. **`check` 取超集**：pick 是 `typecheck && test && audit:render && audit:numbering && bank:all`；
+   oxr 是 `typecheck && typecheck:viewer && test && audit:render:baseline && audit:numbering && audit:suspicious && bank:all`。
+   合并后必须是**超集**，且 `audit:render:baseline`（7 卷基线）要重跑——我们改过 `renderPaper`，
+   拿两边的绿当合并后的绿是错的。
+2. **`READ_ONLY`（`TAGS_WRITE=0`）覆盖范围**：oxr 的只读开关只管 `tags`；合并后 `/api/teach`、
+   `/api/teach-manage` 是我们新加的写入口，**必须一并受它控制**，否则「只读」被绕过。
+3. **渲染路径叠加**：oxr 把 `ocrFill` 默认从 true 改成 **false**、并新增表格网格渲染；
+   我们的 `assignmentBadge` 只在号牌内加角标（不改几何）。两者叠加后**必须重跑全量审板**
+   （14 页 888 块那套），并额外看「表格页 + OCR 补行页」。
+
+### 推荐合并顺序（在**独立 worktree** 做，不动主目录与 oxr worktree）
+
+1. `git worktree add --detach ../merge-int feat/pick-classify`
+2. 在 merge-int 里 `git merge feature/oxr`，按上表解 9 个冲突（7 个并集、HANDOFF 手写、INDEX 两段）
+3. 合并后跑：`npm run check`（超集）→ `topic:export` + `audit:topic` → 全量审板（副本 4175）
+4. 全绿后回主目录：`git checkout main && git merge --ff-only <merge-int 的提交>`（main 是祖先，可快进）
+5. `git push origin main feat/pick-classify`
+
+### 风险与前提
+
+- **oxr 仍在推进**（本地 ahead origin 3）：这次合并是「阶段性对齐」，不是终局。
+  合完后建议让 oxr 从新 main 重新分叉，否则会出现第三次分叉。
+- 主目录的 4174 正在服务、`data/` 是用户资产 ⇒ **绝不在主目录切分支做合并**，用 worktree。
+- `data/` 不进 git，合并不碰用户数据；但合并后要重跑 `topic:export`（schema 没变，基线卷可能变）。
+
+## 交接 3 补记 5：Step 14/15 已完成 —— `feature/oxr` 已并入，`main` 已快进（2026-11-02）
+
+- 合并提交 **`123622b`**（在独立 worktree `…/Worktrees/question-seg-engine/merge-int` 里做，
+  主目录与 oxr worktree 全程未切分支）；`main` 与 `feat/pick-classify` 都指向它，**均已 push**。
+- 合并前 oxr 已走到 `d068cde`（比预演时的 `9edf857` 又多了若干提交），实际冲突 **10 个**
+  （多出 `tasks/lessons.md`）。
+- 冲突全部按「两边都要」解决，**没有为了通过而删功能**：
+  `.gitignore` / `AGENTS.md` / `package.json` / `view-server.ts` / `reconstruct.js` / `final.js` /
+  `index.html` 并集；`docs/HANDOFF.md` 手写重写（头部改「工作线已收敛」+ oxr §0 降级为历史）；
+  `tasks/lessons.md` 两条 L4 撞号 ⇒ oxr 的「归因先验」改为 **L6**。
+- 合并暴露并修掉的三个真问题（都不是"选一边"能解决的）：
+  1. **只读开关漏网**：`TAGS_WRITE=0` 原本只罩 `/api/tags`，本线的 `/api/teach`、`/api/teach-manage`
+     是新增写入口 ⇒ 已一并 403，否则「只读」是假承诺。
+  2. **手机文本流 × 挑题冲突**：`flowPaper` 只返回 wrap、没有 canvas ⇒ 单页重绘/点选命中会崩。
+     `paper()` 改为统一返回 `{wrap, canvas}`（文本流 canvas 指回 wrap），并在文本流下**明确拒绝**
+     进挑题（提示 `?flow=0` 切回纸面），不做静默失效。
+  3. **本线代码从未被 `typecheck:viewer` 覆盖**（该门是 oxr 新加的）：合并后报 **103 处**，
+     全部补齐（隐式 any、`$()` 元素类型、`state` 类型缺字段、`PageSlot` 缺 `paper`、
+     `manageTeach` 的 action 联合漏 retire/restore、手写 `reconstruct.d.ts` 缺 `assignmentBadge`）。
+- **服务端默认监听变了**：oxr 把默认改成 `127.0.0.1`（`DECISIONS §57`）⇒ **iPad 必须用 LAN 模式**：
+  `HOST=0.0.0.0 PORT=4174 npm run view`（或 `npm run view:lan`，默认 4173）。
+  当前 4174 已用 LAN 模式重启，日志会提示「同网段可写；共享网络请加 TAGS_WRITE=0」。
+
+### 合并态验证（全部实跑，主仓库 `main`）
+
+| 门 | 结果 |
+|---|---|
+| `typecheck` / `typecheck:viewer` | 0 / 0 |
+| `npm test` | **466/466**（含 oxr 新增的 meta 一致性门） |
+| `audit:render:baseline` | **7/7 卷通过**（本线角标改动未造成渲染回退） |
+| `audit:numbering` | 判定项通过；基线 5 条、**新增 0** |
+| `audit:suspicious` | 0 条 |
+| `bank:all` | 420 条，唯一键无重复、内容尺子达标 |
+| `topic:export` + `audit:topic` | 绿（0 专题 0 题，符合清理后的空态） |
+| 浏览器（LAN 地址，820×1100） | 14 页 / 67 号牌 / 挑题键在 / ⋯ 菜单有「显示 OCR 补行」/ 详情教学归类正常 / 零异常 |
+
+⚠️ 顺带修了数据侧的陈旧项：7 份 `meta.json` 的题数与产物不一致（oxr 新门抓出来的），
+已用 `npm run daily -- <dir> --id <id> --meta-only` 全部刷新（主仓库与合并 worktree 都刷了）。
+
+### 下一位的第一步
+
+1. `npm run check` 建基线（现在应全绿，466 例）。
+2. **oxr 仍在推进**（合并后它又走到 `efd8441`，比我们新 14 个提交）⇒ 下次同步用同一套 worktree 流程。
+3. Step 13 真机 iPad Safari 仍未做（触控精度、键盘顶起托盘、滚动惯性、文本流下的挑题拒绝）。

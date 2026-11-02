@@ -6,6 +6,7 @@
   "description": "试题结构化切分引擎骨架（MinerU 后处理）——版面层 + 语言层双层组合规则，垂直演进模型的起点",
   "scripts": {
     "demo": "tsx scripts/demo.ts",
+    "preflight": "tsx scripts/preflight.ts",
     "daily": "tsx scripts/daily.ts",
     "view": "tsx scripts/view-server.ts",
     "view:server": "tsx scripts/view-server.ts",
@@ -26,6 +27,9 @@
     "audit:attribution": "tsx scripts/audit-attribution.ts",
     "report:generalization": "tsx scripts/generalization.ts",
     "bank:all": "tsx scripts/bank-all.ts",
+    "topic:export": "tsx scripts/topic-export.ts",
+    "audit:topic": "tsx scripts/audit-topic.ts",
+    "cleanup:topic-tags": "tsx scripts/cleanup-topic-tags.ts",
     "audit:pair": "tsx scripts/pair-quality.ts",
     "audit:arbitration": "tsx scripts/arbitration-rate.ts",
     "audit:render:all": "node scripts/audit-render-all.mjs",

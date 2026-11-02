@@ -35,7 +35,7 @@ import { parseTableHtml } from "./table-html.js";
  * @typedef {{ width: number, height: number, blocks: Block[], questions: PageQuestion[], columns?: number, discarded?: Block[], uncovered?: Uncovered[], ocrFill?: OcrItem[] }} Page
  * @typedef {{ text: string, short: string, name: string, color: string }} TagLike
  * @typedef {{ key: string, q: PageQuestion, tags: TagLike[], side: "left" | "right", topPx: number }} TagEntry
- * @typedef {{ doc?: string, paneW: number, diagnostics?: boolean, candidateStyle?: boolean, onChipClick?: ((q: PageQuestion, p: Page) => void) | null, resolveTags?: ((q: PageQuestion, p: Page) => TagLike[] | null) | null, ocrFill?: boolean }} RenderOpts
+ * @typedef {{ doc?: string, paneW: number, diagnostics?: boolean, candidateStyle?: boolean, onChipClick?: ((q: PageQuestion, p: Page) => void) | null, resolveTags?: ((q: PageQuestion, p: Page) => TagLike[] | null) | null, ocrFill?: boolean, assignmentBadge?: ((q: PageQuestion, p: Page) => { topics: number, categories: number } | null) | null }} RenderOpts
  * @typedef {import("./table-html.js").ParsedTable} ParsedTable
  */
 
@@ -616,6 +616,8 @@ export function legend(items) {
  * @param opts.candidateStyle  是否给 OCR 补入内容加候选样式。**默认 true**
  *                             —— 红线 G1：候选不得与引擎原文混淆
  * @param opts.onChipClick     点题号牌的回调 `(question, page) => void`
+ * @param opts.assignmentBadge 教学归类角标 `(question, page) => {topics,categories} | null`；
+ *                             只挂在号牌内（`N·M`），不改变纸面几何。阅读/挑题模式用 CSS 调透明度。
  * @param opts.resolveTags     标签解析器 `(question, page) => [{short,name,color}] | null`。
  *                             **只读渲染**：留白里 12px 高的短码目标在触屏上点不准（会与相邻题的
  *                             列互相遮挡并误触），所以标签的增删一律走题号牌 → 面板，不在纸面上做。
@@ -634,6 +636,7 @@ export function renderPaper(p, opts = {}) {
     candidateStyle = true,
     onChipClick = null,
     resolveTags = null,
+    assignmentBadge = null,
     /**
      * **是否把 OCR 补行画到纸面上**（`DECISIONS §91`）：默认 **false**。
      *
@@ -727,6 +730,12 @@ export function renderPaper(p, opts = {}) {
     // chip 级降级：留白里放不下独立短码列，但**标签必须在页面上留痕**（绝不静默，U6）
     const badge = badgeOf(q.id);
     if (badge) chip.append(el("span", "qtag-badge", String(badge)));
+    const asg = assignmentBadge ? assignmentBadge(q, p) : null;
+    if (asg && (asg.topics || asg.categories)) {
+      const tb = el("span", "teach-badge", `${asg.topics}·${asg.categories}`);
+      tb.title = `${asg.topics} 个专题 · ${asg.categories} 个类别`;
+      chip.append(tb);
+    }
     if (onChipClick) chip.addEventListener("click", () => onChipClick(q, p));
     wrap.append(chip);
   });

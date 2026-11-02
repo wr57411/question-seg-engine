@@ -7,23 +7,67 @@
 > 维护规则：每轮有实质进展后更新「当前状态」与「未闭合风险」两节；事实必须可复现
 > （有命令、有页图、有提交号三者之一佐证），推测必须显式标注。
 
-- **交接快照日期**：2026-10-30
-- **快照时的质量门**：`npm run check` 全绿（typecheck + 测试 **357 例** + audit:render:baseline + audit:numbering
-  + **bank:all**；多册配对 **420 条**，唯一键无重复，内容尺子全部达标 —— 2026-10-30 实跑复验）
-- **快照时的 git HEAD**：`feature/oxr` @ `e19e9fb`（2026-10-30 22:04 **会话交接**；已推送，本地/远端一致，
-  以 `git log -1 origin/feature/oxr` 为准）。**本次交接包**：
-  [`docs/dev/bgx/reports/2026-10-30-2204-REPORT-会话交接给下一位Agent.md`](dev/bgx/reports/2026-10-30-2204-REPORT-会话交接给下一位Agent.md)。
-- **渲染审计基线卷**：**7 卷**（2026-10-30 起；`23必刷题 光学` 已删书，见 `DECISIONS §83`）。
-  分支由来：`feature/oxr` 已把 `main` merge 进来（合并提交 `cfbce09`，冲突按实跑解决），
-  其后是 OXR 收口（`--parser oxr` 接入 → 8 卷交叉核对 → 106 条修正落地）与 2026-10-29 的
-  答案区守卫 / 配对显式绑定 / 逐题选源 / 表格链路 / 题号黏正文（§71–§77）。
-  ⚠️ **`main` 与本分支已再次分叉（2026-10-30 实测，见 §6-30）**：merge-base `841536b`（10-28 16:59）之后
-  main 侧有 **5 个独有提交**（专题知识库 MVP，21 文件 / +4,074 行），本分支有 132 个文件的改动，
-  两侧都碰了 `.gitignore` / `package.json` / `scripts/view-server.ts` / `docs/HANDOFF.md`；
-  且 `main` 自身领先 `origin/main` **34 个提交未 push**（origin/main 还停在 10-15 的 `ec30200`）。
-  ⇒ "合回 main 可 fast-forward" 的说法**已失效**，以 `git log -1` 与 §6-30 为准。
+> ⚠️ **工作线已收敛（2026-11-02 合并）** —— `feature/oxr` 已并入本线，`main` 随后 fast-forward。
+> 下表保留分叉时的状态，是为了读懂旧提交与旧文档；**别再照它切分支**。
+>
+> | 线 | 位置 | 合并时状态 |
+> |---|---|---|
+> | `main` | 本仓库目录 | 快进前 `68d805c`；本线是它的直系后代 ⇒ `--ff-only` 合入，零冲突 |
+> | `feature/oxr` | worktree `…/Worktrees/question-seg-engine/feature-oxr-6b3489a1` | 2026-11-02 已并入本线（10 个冲突，逐文件处置见合并提交说明） |
+> | `feat/pick-classify` | 本仓库目录 | iPad 挑题归类 v2（Step 1–12 完成） |
+>
+> **合并后当前值以 `npm run check` 输出为准**，本文不写死数字（写死的已过期两次）。
+> 多会话并行注意 `tasks/lessons.md` **L4**（产物目录/测试副本）与 **L5**（测试只许跑副本）。
 
-## 0. 本次交接要点（2026-10-30 更新）
+- **合并前各线快照（历史，勿当现状）**：`feature/oxr` @ `e19e9fb`（2026-10-30 22:04 会话交接：
+  测试 357 例 / 配对 420 条 / 渲染基线 7 卷）；`feat/pick-classify` @ `6cc6185`（测试 355 例）。
+  oxr 线交接包：[`docs/dev/bgx/reports/2026-10-30-2204-REPORT-会话交接给下一位Agent.md`](dev/bgx/reports/2026-10-30-2204-REPORT-会话交接给下一位Agent.md)
+
+## 0. 本轮（2026-11-02 · MinerU 生态评估 + 产物新鲜度基建）的交接要点
+
+**一句话**：主线结论没变（**B01 金标准仍是唯一卡点**），但本轮**清掉了一个假病灶**、**补上了上下文基建**。
+
+**本轮完成**（提交 `a79771d` → `b0df793` → `17d7d91`；本节只写结论，细节见 `docs/DATA-MAP.md` 与 `tasks/lessons.md` **L7**）
+
+| 做了什么 | 证据 |
+|---|---|
+| **评估 MinerU-Ecosystem 的 Skill**：结论 = **不能替代现管线**。`model_version=vlm` 服务端实为 `hybrid`（布局沿用 pipeline、识别换 VLM），行数 63→14 ⇒「一行一选项」失效，实喂引擎选项组 10→3、review 2→8 | 4 页双模型对照 `tmp/vlm-probe/` |
+| **捡到 3 条该记的事实**：精准解析 **200MB / 200 页**硬限；每账号 **1000 页/天**最高优先级；`model_version` 默认 `pipeline` | API 文档 + 实测 |
+| **上下文基建**：`npm run preflight`（开工自检）、`docs/DATA-MAP.md`（数据血缘五级）、项目级技能 `.workbuddy/skills/qseg-context/`（强制入库）、`meta.build.engine` = `src/` 树指纹 | `a79771d` / `b0df793` / `17d7d91` |
+| **产物可信化**：磁场 39→**36** 题、回退 3→**0**、断档 2→**0**；4 本必刷题重跑前后**都是 0/0** | `npm run daily -- <layout.json> --id <册>`（不烧额度） |
+
+**已证伪的假设 —— 别再挖**（每条都做过实测或页图核对，详见 `docs/DECISIONS.md` 与 `lessons.md`）
+
+1. 「换 vlm 模型能提升识别精度所以值得换源」→ **不可替换**：行结构被砍，选项组塌陷（见上表）。
+2. 「题号误认是切错主因」→ 全库仅 **19 行**命中该形态，且 `DECISIONS §97` 的序号佐证守卫**早已覆盖**。
+3. 「跨页泄漏规则把行搬错了页」→ **判据与搬迁都正确**：原卷第 11 页底部「…故位」被切断，第 12 页顶部接「移大小为 1.8 km…」，搬迁正确。
+4. 「磁场 p2 切错（题号 1,2,3,10,4）」→ **产物过期**，现行代码该页就是 1,2,3,4；题 10/16 是早已修掉的假题。
+
+**当前状态（2026-11-02 14:30 实跑）**
+
+- `npm run preflight`：30 册中 **5 册 ✓**（磁场 + 4 本必刷题，src 指纹 `450b476`）、**25 册 ⚠ 旧快照**。
+- `npm test` **466/466 全绿**、`npm run typecheck` 干净。
+
+**下一步建议（按「先拿可信数据」排序；前两条是本轮的直接续接）**
+
+1. **重跑 `答案册-合订本`**（187 页 / 1108 题）—— 它是**唯一还可能藏着真问题**的册
+   （旧产物上测得 9 回退 / 29 断档）。`layout.json` 已有 ⇒ `npm run daily -- "data/out/答案册-合订本/layout.json" --id "答案册-合订本"`，
+   **不烧解析额度**，约 10–15 分钟；跑完用 `tmp/column-audit/seq.ts` 复算回退/断档。
+2. **重跑 5 本教材基础练正册**（各 10–18 页）：现价 25 册旧快照里的一半是它们。
+3. `-OXR` 变体最后跑（它们是对照源，优先级最低）。
+4. **B01 金标准集（主线卡点，Agent 替不了）**：13 本 / 1,086 题只转写了 39 题、0 本 `complete`。
+   详见 `docs/BACKLOG.md` **B-08**；`books/*.docx` 里的夸克真文字可做自动交叉比对（0 token）。
+
+**今天交的学费（写给下一个 Agent）**
+
+- **产物不是事实**：`data/` 全是快照，`questions.json` 只代表"某次运行"⇒ 任何"哪几页错了"的清单**先重跑再统计**（`lessons.md` L7）。
+- **涉及页面事实必须裁原图**：推演与"问别的模型是不是这样"都会得到假结论；
+  裁图用技能 `screenshot-evidence` 的 `crop.sh`（**别用 `sips -c --cropOffset`，它忽略偏移按居中裁**）。
+- **同源数据不能互相当裁判**：`content_list.json` 与 `layout.json` 同一次解析，错得一样；唯一独立来源是原卷页图。
+
+---
+
+## 0.1 上一条工作线（`feature/oxr`）的交接要点（2026-10-30，**历史记录**）
 
 **一句话现状**：引擎能跑、门全绿（`check` **357/357**，2026-10-30 22:04 复跑）、配对 **420** 条内容达标、
 工作区干净、已推送；展示层类型 **11/11 已收口**（§6-11）。**但主线仍缺金标准**——见下面"下一步建议"第 1 条。
@@ -155,13 +199,13 @@
 
 | 位置 | 分支 | 用途 |
 |---|---|---|
-| 本仓库目录（含 `data/`、`books/`） | **`main`** | **日常改动的基线**——新 Agent 默认从这里开始 |
-| `/Users/john/WorkBuddy/Worktrees/question-seg-engine/feature-oxr-6b3489a1` | **`feature/oxr`** | **功能开发专用 worktree**（OXR 第二解析源）。2026-10-28 已把 `main` merge 进本分支并解冲突，此后合回 main 可 fast-forward |
+| 本仓库目录（含 `data/`、`books/`） | **`main`** / 当前检出的功能分支 | 日常改动的基线；功能线也在这里开发（2026-10-30 起 `feat/pick-classify`） |
+| `/Users/john/WorkBuddy/Worktrees/question-seg-engine/feature-oxr-6b3489a1` | **`feature/oxr`** | OXR 第二解析源专用 worktree。目录名带旧后缀，**目录名 ≠ 分支名** |
 
-⚠️ 功能分支合回 main 前先跑 `npm run check`。**本次合并的实际冲突只有两处**：
+⚠️ 功能分支合回 main 前先跑 `npm run check`。**2026-10-28 那次合并的实际冲突只有两处**（历史记录）：
 `docs/HANDOFF.md`（即本段，已按实跑重写）与 `scripts/daily.ts`
-（保留本分支的 `async main` + `--parser oxr`，同时保留 main 侧的 MinerU 代理检测 —— 两者都要）。
-`docs/DECISIONS.md` 只在 main 侧改动，自动合并无冲突。
+（保留该分支的 `async main` + `--parser oxr`，同时保留 main 侧的 MinerU 代理检测 —— 两者都要）。
+`docs/DECISIONS.md` 当时只在 main 侧改动，自动合并无冲突。
 
 ---
 
@@ -250,7 +294,29 @@ layout.json / content_list.json
   **配对正确性的独立证据**：题册块头 T 行（印在题册）与答案册答案标签（印在答案册）互不相关 ——
   一致 **55/55（100%）**，对照组（同块内错位一位）29/55（52.7%）⇒ 指标有判别力。
   覆盖缺口：10 块里只有 6 块的 T 行被上游读到，故 28 条只有结构证据、无语义证据。
-- 展示层**三套**（都只消费快照，不 import 引擎）：
+- **专题知识库 MVP（2026-10-30，SPEC S01，main）→ 已被 v2 取代，标签通道 2026-10-31 退役**：
+  当年是给成品页题目打 `专题名#基础/#培优` 标签（借业务标签库）→ `npm run topic:export` → `/topic/`。
+  **这条通道已停用**：`专题名#层级` 不再是合法输入，`npm run cleanup:topic-tags` 已把演示种子
+  从 `data/out/tags` 摘掉（业务标签 好题/待改/已校对/留着组卷/偏题难题 **一字未动**）。
+  现在归类只走 `data/out/teach/`（见下一条）。`topic:export` 仍保留旧标签通道的**读取**能力，
+  只为兼容可能存在的历史数据；**新数据不要再造 `#` 形状的标签**（ADR-0001：业务标签不承载专题）。
+  导出侧的门槛不变：缺题/缺题干/缺答案/缺图/归属漂移/归属失效/整个专题消失 ⇒ 退出码 1；
+  anchor 首行为空或有效字符 <6（题号独占一行、图题等）⇒ **告警**（只能核对页码+题号，
+  页面上可见，不阻断整本书）。
+- **挑题与归类 v2（2026-10-30 起，**已合回 `main`**：合并提交 `123622b`，2026-11-02）**：iPad 成品页「挑题」模式
+  → 点整道题 → 底部托盘点专题/类别 chip 立即写入（第二条写路径 `POST /api/teach`）→ 纸面号牌上 `N·M` 角标。
+  已做（Step 1–12、14、15；**仅 Step 13 真机 iPad 验收待做**）：内联新建、同上题、撤销、写失败回滚、常用组合（常驻 3 槽/横滑/长按拖动/改名）、
+  托盘搜索（与组合条共用一行，搜不到可直接新建并打上）、管理面板（改名/下架/恢复，跨所有卷）、
+  **软删除**（下架只改清单一个文件，题上归属与组合一字不动）、
+  **导出 v2**（条目带 `categories`、删掉 `level`，**下架项不导出/不计数/不进条目**）、
+  **阅读模式只读「教学归类」区 + 去挑题修改**（U09）。
+  进度与下一步见 `docs/plans/2026-10-30-pick-classify-workflow.md`「交接 3」及其补记。
+  数据现状（2026-10-31 清理后）：`data/out/teach/` 保留 4 专题 / 2 类别 / 1 组合的**词表**，
+  **题上归属已清空**（演示种子全部摘除，从一张白纸开始自己标）；此时专题页是 0 专题，如实显示空态。
+  **测试只能用 `tmp/pick-test-app` 副本 + 端口 4175**（教训见 `tasks/lessons.md` L5）。
+- 展示层**四套**（都只消费快照，不 import 引擎）：
+  - **专题页 `/topic/`**：iPad 优先的专题/类别浏览（只读 `topics/index.json`，不重建纸面）；
+    数据提示条会明说「上次导出失败 / 旧数据 / 单条坏数据」，不拿旧 index 冒充新结果；
   - **成品页 `/final/`**：按原坐标重建的纸面，整册滚动翻 —— 用户 2026-10-14 定的「成品 = 对比右侧那个」，
     为的是"用起来像原版书"；两个开关（审计标记默认关 / OCR 候选样式默认开，均可 URL 参数）；
   - `stages/`：阶段样品 + 对比模式（主验收/审计入口，审计标记全开）；
@@ -464,6 +530,7 @@ layout.json / content_list.json
 
 | 目的 | 命令 |
 |---|---|
+| **开工第一条命令：看产物新不新** | `npm run preflight`（逐册比对 `src/` 指纹；`--strict` 时过期即 exit 1） |
 | **每天的第一条命令：导入新卷** | `npm run daily -- <pdf>`（解析→导出→OCR→体检一条龙） |
 | **换 OXR 解析引擎（本分支专用）** | `npm run daily -- <pdf> --parser oxr`（免费档，超 20 页/10MB **自动分片**；`src/` 零改动） |
 | 已有解析结果、只重导 | `npm run daily -- <layout.json> --id <docId> --no-ocr` |
@@ -486,6 +553,9 @@ layout.json / content_list.json
 | 泛化矩阵（各卷切题质量） | `npm run report:generalization` → `data/out/generalization.md` |
 | OCR 补全 | `npm run stages:ocr-fill` / `npm run stages:ocr-page`；后者加 `--all-pages` 时**无洞的页也跑**（题号被漏识别的页只有这条路） |
 | OCR 局部重跑 | ⚠️ `--pages N` 经 `npm run` **传不进去**（实测跑成全卷）⇒ 直接 `node --import tsx scripts/ocr-page-fill.ts "<docId>" --pages N` |
+| **导出专题（标签/题单 → index.json）** | `npm run topic:export` —— 缺题/缺答案/缺图 ⇒ 退出码 1 并逐条列出 |
+| **专题量化门（独立复核）** | `npm run audit:topic` —— 重读源与文件系统，不信 index 自带 stats；暂未接入 `check` |
+| **专题页（iPad 优先）** | `npm run view` → http://localhost:4173/topic/ （专题选择 + 基础/培优筛选 + 答案开关） |
 | 底层：MinerU 解析（`npm run daily` 内部调用） | `node --import tsx scripts/real-pipeline.ts <文件或目录> [outRoot]` |
 
 ## 4. 文档地图（按需取，不必全读）
@@ -495,9 +565,12 @@ layout.json / content_list.json
 | `README.md` | 架构总览、核心机制、快速开始 | 主干有效；个别统计数字是历史时点值，以本文件为准 |
 | **`docs/HANDOFF.md`（本文件）** | 当前状态、风险、红线、交接动作 | 唯一的跨 Agent 入口 |
 | `docs/DECISIONS.md` | **95 条决策全记录**（§1–§95，按时间序） | 改任何口径/阈值前先查这里找定案依据；顶部有索引 |
-| `tasks/lessons.md` | 3 条工程纪律（验收清单 / 启发式判据 / 逐块匹配） | 每条都有真实事故佐证，短小必读 |
+| **`docs/DATA-MAP.md`** | **哪些数据能信、哪些只是快照**（权威五级 + `data/` 逐目录血缘） | 2026-11-02 新增；配合 `npm run preflight` 用 |
+| `tasks/lessons.md` | 工程纪律 L1–L7（验收 / 启发式判据 / 逐块匹配 / 归因先验 / **产物新鲜度**） | 每条都有真实事故佐证，短小必读 |
 | `tasks/todo.md` | 2026-10-08~10-10「重建字号保真」专项账本 | 历史专项记录；其未闭合项已并入本文件 §6 |
 | `docs/specs/2026-10-15-paper-question-tags.md` | 题目标签的需求细化稿（触屏优先、约束与验收口径） | 实施已完成一期，§8 拍板项均已采纳推荐 |
+| `docs/specs/2026-10-30-topic-knowledge-base-spec.md` | 专题知识库需求 / 数据合同 / 阶段规划（S01 MVP） | 2026-10-30 实施完成；种子与答案池风险见 §2 / §6-17 |
+| `docs/specs/2026-10-30-pick-and-classify.md` | **iPad 挑题与归类 v2**：专题/类别/业务标签三套清单、挑题模式、托盘、迁移与验收 | **已实施并合回 main**（2026-11-02，`123622b`）；U01–U38 中 U19/U27 有落地修订（见该文件条内注记）；**仅 Step 13 真机 iPad 验收待做**，进度见 `docs/plans/2026-10-30-pick-classify-workflow.md`「交接 3」 |
 | `docs/specs/2026-10-28-batch-book-ingestion-spec.md` | 批量扫书目标、可量化指标、待办清单（B01–B14） | 草案；待拍板 Q1–Q5 |
 | `docs/PRD-viewer.md` | viewer 的产品需求（设计输入稿） | 状态为「待设计验证」，实现以 viewer/ 实际为准 |
 | `docs/real-api-notes.md` | MinerU API 字段事实 | 字段争议以它为准 |
@@ -838,20 +911,31 @@ layout.json / content_list.json
     删除前置与做法见 `DECISIONS §94`（先加唯一的 bbox 读取口收口，再删 + 从 PAIRS 移除）。
     过渡期规矩：调用处**显式收窄**（如 `final/tag-panel.js` 的 `/** @type {HTMLElement} */ (el(...))`），
     不许靠 `any` 蒙过检查。
+> **合并备注（2026-11-02）**：原 `feat/pick-classify` 线在 §6-17 记过「答案池把不同系列的书配到一起」
+> （`教材基础练 曲线运动` × `答案册-合订本`，37 条结构齐全但内容对不上）。本线 §6-23 的显式绑定修复
+> 覆盖同一根因（提交 `64af281`）；是否还有残留以 `npm run audit:pair` 的实跑结果为准。
+
 
 ## 7. 新接手者的前 30 分钟
 
-1. 读根目录 `AGENTS.md` → 本文件 → `README.md`。需要设计/口径依据时再按 §4 取 `DECISIONS.md` 对应章节。
-2. `npm install && npm run check` —— **必须全绿才能动手**；不绿先修门，勿带病开发。
-   ⚠️ **新建/换 worktree 时门会红 2 例 contract + audit:render**（`tests/contract*.test.ts` 读
+1. 读根目录 `AGENTS.md` → 本文件 → `README.md` → **`docs/DATA-MAP.md`**（哪些数据能信、哪些只是快照）。
+   需要设计/口径依据时再按 §4 取 `DECISIONS.md` 对应章节。
+2. **`npm run preflight`** —— 看 `data/out/` 里哪些产物是旧快照（2026-11-02 新增；`src/` 指纹比对）。
+   ⚠️ 看到 `⚠ 过期` 的册，**它的 `questions.json` 不能代表当前代码行为**（`tasks/lessons.md` L7）。
+   要谈「哪几页切错」，先 `npm run daily -- "data/out/<册>/layout.json" --id "<册>"` 重跑（不烧解析额度）。
+3. `npm install && npm run check` —— **必须全绿才能动手**；不绿先修门，勿带病开发。
+   ⚠️ **新建/换 worktree 时门会红 3 类**（`tests/contract*.test.ts` 读
    `data/out/23必刷题 2相互作用/questions.json`；`audit:render` 缺快照现在默认 `exit 2`，见 §52）：
-   `data/` 是 git 忽略的运行时产物，新 worktree 里没有。不是代码缺陷 —— 把已有产物接过来即可
-   （软链或复制整个 `data/`），或用 `npm run daily` 重新生成。判据：这 3 类之外的任何红都是真红。
-3. 先看**成品页**（`npm run view` → `/final/?doc=<docId>`）：这就是交付物的样子，
+   `data/` 是 git 忽略的运行时产物，新 worktree 里没有。不是代码缺陷 —— 在 worktree 根目录
+   **`cp -Rc <主仓库>/data data` 做 APFS 克隆**（秒级、写时复制不占双倍空间；**不要用软链**：
+   两个 worktree 会共用同一个产物目录，并行会话互相覆盖，见 `tasks/lessons.md` L4），
+   或用 `npm run daily` 重新生成。`books/` 是只读源 PDF，保持软链共享即可。
+   判据：这 3 类之外的任何红都是真红。
+4. 先看**成品页**（`npm run view` → `/final/?doc=<docId>`）：这就是交付物的样子，
    逐页按原坐标重建、像翻原版书。再看 `npm run stages` 的**对比模式**
    （`?doc=第二章相互作用-答案与解析`）对照原卷页图看 5 分钟——建立「这套系统现在长什么样」的直觉。
-4. 认领任务前：先查 §6 是否已有登记，避免重复立任务；改动遵循 §5 红线。
-5. 声称「完成」的条件：质量门全绿 +（显示层改动）全量截图审板过 + 文档按 §4 归属更新。
+5. 认领任务前：先查 §6 是否已有登记，避免重复立任务；改动遵循 §5 红线。
+6. 声称「完成」的条件：质量门全绿 +（显示层改动）全量截图审板过 + 文档按 §4 归属更新。
    **「后台数字达标」≠「页面上看得见」≠「看得见就一定没被裁切」—— 截图必须覆盖目标区域。**
 
 **§6-35（新增 2026-11-02）：实验区口径定案 —— 整块一道题，不切小问（`§103`）**
@@ -889,6 +973,20 @@ layout.json / content_list.json
 - 实测 15 册 **17 处，逐条核完 17 真 0 假**，清单与根因见 `BACKLOG B-01`。
 - **已接入 `npm run check`**：登记表 `scripts/numbering-cross-baseline.json`（当前 17 条），
   已登记不红、**未登记的新命中才 exit 1**。⚠️ 登记表不豁免缺陷；修完一处须重写，**条目数只减不增**。
+
+**§6-36（新增 2026-11-02）：`main` 已并入本分支（合并完成，冲突 4 处按「两边都要」解决）**
+
+- `main` 侧 6 个提交（`a79771d`…`af0e296`：产物新鲜度预检、数据血缘地图、`qseg-context` 技能、
+  挑题归类 v2 收口、路由台账）已并入 `feature/oxr`。**回滚点**：`backup/pre-merge-main-20261102`。
+- 冲突 4 处：`tasks/lessons.md`（我的 L4 归因先验 → 并入 main 的 **L6**，我的 L5 粒度口径 → **L8**，
+  结果 **L1–L8**）、`AGENTS.md`（纪律编号现算、指向唯一注册表）、`docs/BACKLOG.md`（更新时间）、
+  `.route-eval/ledger.jsonl`（两边 13 条记录按类型合并去重，保留 12 条）。
+- **注册表合并为唯一一份** `.route-eval/registry-qseg.json`（12 条路线 × 7 个场景，`id=question-seg-engine`）；
+  原两份（`registry.json` / `registry-qseg.json`）**合一**，台账的 `registry` 字段统一。
+- `check` 取**超集**：`typecheck + typecheck:viewer + test + audit:render:baseline + audit:numbering
+  + audit:numbering:cross + audit:anchor + audit:suspicious + bank:all`（main 侧原有的全在其中）。
+- 合并后 **`check` 497/497 绿**（合并前本分支 401、main 侧 361），两份登记表「新增 0」，配对 420 不漂移。
+- ⚠️ `main` 本身仍领先 `origin/main` 6 个提交；本次只推 `feature/oxr`（main 的提交随之进入远端分支历史）。
 
 **§6-32（新增 2026-10-31）：全量对账已跑通，确认 4 道真漏题**
 

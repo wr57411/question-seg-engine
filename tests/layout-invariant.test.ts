@@ -142,6 +142,23 @@ test("③ 留白与画布宽度钉死成字面量（给标签腾地方=把页面
   assert.equal(on.canvas.style.width, "716px");
 });
 
+test("②b 教学角标只挂进号牌，不改纸面几何；N·M 文案正确", () => {
+  const off = renderPaper(PAGE, { paneW: 760 } as never);
+  const on = renderPaper(PAGE, { paneW: 760, assignmentBadge: () => ({ topics: 2, categories: 3 }) } as never);
+  assert.deepEqual(paperGeometry(on.wrap), paperGeometry(off.wrap), "角标不得改变块/号牌几何");
+  assert.equal(on.innerW, 716);
+  const badges = (n: Stub, acc: Stub[] = []): Stub[] => {
+    for (const c of n.children) {
+      if (c.classList.contains("teach-badge")) acc.push(c);
+      badges(c, acc);
+    }
+    return acc;
+  };
+  assert.equal(badges(off.wrap).length, 0);
+  assert.equal(badges(on.wrap).length, 2, "两道题各一个角标");
+  assert.equal(badges(on.wrap)[0]!.textContent, "2·3");
+});
+
 test("③b 单栏页只留一侧留白：738（号牌全在左侧，右侧不该被白占）", () => {
   const single = { ...PAGE, columns: 1, questions: [PAGE.questions[0]] };
   const { innerW } = renderPaper(single, { paneW: 760, resolveTags: () => TAGS } as never);

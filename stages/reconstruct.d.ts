@@ -22,6 +22,8 @@ export interface PaperOptions {
   resolveTags?: ((q: any, p: any) => PaperTag[] | null) | null;
   /** 是否把 OCR 补行画到纸面上（`DECISIONS §91`；默认 false，补行是核查证据不是阅读内容）。 */
   ocrFill?: boolean;
+  /** 教学归类角标：返回该题的 `{topics,categories}` 计数；`null` = 不画（挑题归类 v2）。 */
+  assignmentBadge?: ((q: any, p: any) => { topics: number; categories: number } | null) | null;
 }
 
 export const CANVAS_W: number;

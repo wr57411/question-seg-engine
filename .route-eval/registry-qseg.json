@@ -1,0 +1,495 @@
+{
+ "version": 1,
+ "id": "question-seg-engine",
+ "title": "题库切分引擎 · 路线表（排查 + 修复 + 口径）",
+ "description": "question-seg-engine 的路线选择记录：漏题/假题定位、补丁落地、归因争议、口径未定、换解析源评估、排查切错。两个会话的注册表已合并为这一份（2026-11-02）。",
+ "updated": "2026-11-02",
+ "defaults": {
+  "prior_weight": 2,
+  "weights": {
+   "outcome": 0.35,
+   "fit": 0.25,
+   "efficiency": 0.15,
+   "safety": 0.15,
+   "evidence": 0.1
+  },
+  "eval_after_days": 1
+ },
+ "routes": [
+  {
+   "id": "doc-only",
+   "title": "只读文档+推理回答",
+   "description": "不实测，凭代码阅读与推演给结论",
+   "summary": "不实测，凭代码阅读与推演给结论"
+  },
+  {
+   "id": "minimal-probe",
+   "title": "最小实测（调 API/跑脚本对比输出）",
+   "description": "用真实数据做小样本对照，再下结论",
+   "summary": "用真实数据做小样本对照，再下结论"
+  },
+  {
+   "id": "full-integration",
+   "title": "直接接入管线试跑",
+   "description": "改动生产管线后跑全库回归",
+   "summary": "改动生产管线后跑全库回归"
+  },
+  {
+   "id": "ai-vision-transcribe",
+   "kind": "workflow",
+   "summary": "AI 逐页看扫描图、人工（视觉模型）抄题，建立金标准。",
+   "best_for": [
+    "没有任何文本源可用",
+    "需要理解图形/版式语义"
+   ],
+   "not_for": [
+    "已有 OCR 文本可用",
+    "只需比对题号与题数"
+   ],
+   "prerequisites": [
+    "页图",
+    "充足的 token 预算"
+   ],
+   "cost": "high",
+   "risk": "medium",
+   "entry": "vision model on data/out/*/pages/page-NN.png",
+   "prior_fit": 1,
+   "tags": [
+    "gold-standard",
+    "expensive",
+    "rejected"
+   ],
+   "title": "AI 逐页看扫描图、人工（视觉模型）抄题，建立金标准。"
+  },
+  {
+   "id": "docx-crosscheck",
+   "kind": "workflow",
+   "summary": "用夸克扫描王导出的 Word 真文字做独立第二源，跟产物逐段/逐题对账。",
+   "best_for": [
+    "有第三方 OCR 的 Word 版",
+    "需要不花看图 token 的全量核对"
+   ],
+   "not_for": [
+    "Word 是图片壳（无 w:t 文本）",
+    "需要公式/插图内容比对"
+   ],
+   "prerequisites": [
+    "docx 且 word/document.xml 含真文字"
+   ],
+   "cost": "low",
+   "risk": "low",
+   "entry": "unzip -p <docx> word/document.xml | 取 w:t",
+   "prior_fit": 5,
+   "tags": [
+    "zero-token",
+    "independent-source",
+    "anchor"
+   ],
+   "title": "用夸克扫描王导出的 Word 真文字做独立第二源，跟产物逐段/逐题对账。"
+  },
+  {
+   "id": "anchor-reconcile",
+   "kind": "script",
+   "summary": "§98/§102 教材知识锚点法：Word 段落区间 ↔ PDF 页区间逐段比题数。",
+   "best_for": [
+    "全册覆盖",
+    "发现『题号还在但内容错位』"
+   ],
+   "not_for": [
+    "Word 章标题是图片且无锚点",
+    "单点定位（太重）"
+   ],
+   "prerequisites": [
+    "docx 真文字",
+    "layout.json",
+    "questions.json"
+   ],
+   "cost": "low",
+   "risk": "low",
+   "entry": "npm run audit:anchor",
+   "prior_fit": 4,
+   "tags": [
+    "audit",
+    "gate",
+    "baseline"
+   ],
+   "title": "§98/§102 教材知识锚点法：Word 段落区间 ↔ PDF 页区间逐段比题数。"
+  },
+  {
+   "id": "numbering-audit",
+   "kind": "script",
+   "summary": "§99 题号行交叉核对：整页 OCR 的题号行 vs 产物题池，判 X1 上游丢字 / X2 切分丢题。",
+   "best_for": [
+    "定位『整题消失』",
+    "看图前先缩小范围"
+   ],
+   "not_for": [
+    "本册没有 ocr-page",
+    "需要判公式/图文"
+   ],
+   "prerequisites": [
+    "ocr-page/pNN.txt",
+    "layout.json",
+    "questions.json"
+   ],
+   "cost": "low",
+   "risk": "low",
+   "entry": "npm run audit:numbering:cross",
+   "prior_fit": 5,
+   "tags": [
+    "audit",
+    "gate",
+    "baseline",
+    "zero-token"
+   ],
+   "title": "§99 题号行交叉核对：整页 OCR 的题号行 vs 产物题池，判 X1 上游丢字 / X2 切分丢题。"
+  },
+  {
+   "id": "screenshot-verify",
+   "kind": "workflow",
+   "summary": "回原卷页图确认单点事实（题号、出处标注、选项）。",
+   "best_for": [
+    "两源结论冲突",
+    "要写『原书就是这样』之前"
+   ],
+   "not_for": [
+    "已两源一致",
+    "全量核对（成本爆炸）"
+   ],
+   "prerequisites": [
+    "pages/page-NN.png"
+   ],
+   "cost": "medium",
+   "risk": "low",
+   "entry": "ViewImage on pages/page-NN.png",
+   "prior_fit": 5,
+   "tags": [
+    "evidence",
+    "attribution",
+    "gate"
+   ],
+   "title": "回原卷页图确认单点事实（题号、出处标注、选项）。"
+  },
+  {
+   "id": "targeted-repair",
+   "kind": "workflow",
+   "summary": "corrections 清单（replace_text / insert / split）定向补题号与正文，导出时应用，引擎保持纯净。",
+   "best_for": [
+    "上游识别错误且逐处可定位",
+    "必须可整体回滚"
+   ],
+   "not_for": [
+    "形态不可枚举的通用缺陷（应改判据）"
+   ],
+   "prerequisites": [
+    "精确 blockText",
+    "OCR 或页图作证据"
+   ],
+   "cost": "low",
+   "risk": "medium",
+   "entry": "corrections/<docId>.json + npm run daily --no-ocr",
+   "prior_fit": 4,
+   "tags": [
+    "repair",
+    "reversible",
+    "verified-field"
+   ],
+   "title": "corrections 清单（replace_text / insert / split）定向补题号与正文，导出时应用，引擎保持纯净。"
+  },
+  {
+   "id": "normalize-cleanup",
+   "kind": "workflow",
+   "summary": "归一化层清洗上游残渣（带圈题号、纯符号噪声行），一次性覆盖整类。",
+   "best_for": [
+    "同类残渣在多册重复出现",
+    "可给强信号 AND 判据"
+   ],
+   "not_for": [
+    "单例（为一个样本改流水线不划算）"
+   ],
+   "prerequisites": [
+    "A/B 全库指纹对比",
+    "计数上抛（不静默）"
+   ],
+   "cost": "low",
+   "risk": "medium",
+   "entry": "src/normalize.ts",
+   "prior_fit": 4,
+   "tags": [
+    "root-cause",
+    "normalize"
+   ],
+   "title": "归一化层清洗上游残渣（带圈题号、纯符号噪声行），一次性覆盖整类。"
+  },
+  {
+   "id": "code-probe-ab",
+   "kind": "workflow",
+   "summary": "临时改判据跑全库 A/B（segmentFromLayout 直跑 layout.json）看差异，无效即回退。",
+   "best_for": [
+    "验证某个开关/判据是否真有效",
+    "重跑产物会同时变输入时做归因"
+   ],
+   "not_for": [
+    "改动本身高风险且无回退手段"
+   ],
+   "prerequisites": [
+    "git 可回退",
+    "可直跑 layout.json"
+   ],
+   "cost": "low",
+   "risk": "low",
+   "entry": "git checkout -- src/... && npx tsx tmp/.../ab-questions.ts",
+   "prior_fit": 5,
+   "tags": [
+    "verify",
+    "attribution",
+    "reversible"
+   ],
+   "title": "临时改判据跑全库 A/B（segmentFromLayout 直跑 layout.json）看差异，无效即回退。"
+  },
+  {
+   "id": "backlog-ledger",
+   "kind": "workflow",
+   "summary": "docs/BACKLOG.md 待办台账：做没做、为什么不做、口径矛盾。",
+   "best_for": [
+    "跨多轮的长期工程",
+    "防止『决定不做』被当成『没做』"
+   ],
+   "not_for": [
+    "一次性小任务"
+   ],
+   "prerequisites": [
+    "每批结束更新"
+   ],
+   "cost": "low",
+   "risk": "low",
+   "entry": "docs/BACKLOG.md",
+   "prior_fit": 5,
+   "tags": [
+    "process",
+    "memory"
+   ],
+   "title": "docs/BACKLOG.md 待办台账：做没做、为什么不做、口径矛盾。"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "third-party-parser-eval",
+   "title": "评估外部解析能力是否值得接入",
+   "signals": [
+    "MinerU",
+    "vlm",
+    "模型对比",
+    "要不要换解析源",
+    "Skill 有没有用"
+   ],
+   "constraints": [
+    "不得改动生产管线",
+    "不得烧大量解析额度"
+   ],
+   "candidates": [
+    {
+     "route": "minimal-probe",
+     "prior": 5,
+     "why": "换源类判断必须实测，推演会错"
+    },
+    {
+     "route": "doc-only",
+     "prior": 2,
+     "why": "快，但容易把机制想反"
+    },
+    {
+     "route": "full-integration",
+     "prior": 1,
+     "why": "成本高、污染基线"
+    }
+   ],
+   "default_eval_after": "after-task"
+  },
+  {
+   "id": "segment-defect-hunt",
+   "title": "定位切题错误的根因",
+   "signals": [
+    "切错",
+    "断档",
+    "回退",
+    "漏题",
+    "题号乱"
+   ],
+   "constraints": [
+    "判据改动须过测试",
+    "涉及页面事实须回原卷页图"
+   ],
+   "candidates": [
+    {
+     "route": "minimal-probe",
+     "prior": 4,
+     "why": "先量化定位，再改判据"
+    },
+    {
+     "route": "full-integration",
+     "prior": 2,
+     "why": "直接改代码风险高"
+    },
+    {
+     "route": "doc-only",
+     "prior": 1,
+     "why": "本项目历史证明推演会错"
+    }
+   ],
+   "default_eval_after": "after-task"
+  },
+  {
+   "id": "find-missing-questions",
+   "title": "定位漏题（整题消失）",
+   "signals": [
+    "漏题",
+    "题号断档",
+    "少了题",
+    "题数对不上",
+    "missing question"
+   ],
+   "constraints": [
+    "不静默改数据",
+    "可回滚"
+   ],
+   "candidates": [
+    {
+     "route": "numbering-audit",
+     "prior": 5,
+     "why": "零 token、逐页定位、已入闸"
+    },
+    {
+     "route": "anchor-reconcile",
+     "prior": 4,
+     "why": "全册兜底，覆盖审计看不到的错位"
+    },
+    {
+     "route": "screenshot-verify",
+     "prior": 4,
+     "why": "单点确证"
+    },
+    {
+     "route": "ai-vision-transcribe",
+     "prior": 1,
+     "why": "token 成本过高，仅在无文本源时"
+    }
+   ],
+   "default_eval_after": "after-task"
+  },
+  {
+   "id": "false-question-detection",
+   "title": "定位假题（多切/重复/错题号）",
+   "signals": [
+    "假题",
+    "多了一道",
+    "题号错",
+    "日期被当题号",
+    "重复题干"
+   ],
+   "constraints": [
+    "宁可漏判不可误判（L2）"
+   ],
+   "candidates": [
+    {
+     "route": "code-probe-ab",
+     "prior": 5,
+     "why": "直接对判据做 A/B，能定位到规则"
+    },
+    {
+     "route": "screenshot-verify",
+     "prior": 5,
+     "why": "假题必须回原卷确证"
+    },
+    {
+     "route": "normalize-cleanup",
+     "prior": 3,
+     "why": "若是上游残渣污染输入"
+    }
+   ],
+   "default_eval_after": "after-task"
+  },
+  {
+   "id": "apply-fix-safely",
+   "title": "补丁落地（改输入/改判据）",
+   "signals": [
+    "修补",
+    "补回",
+    "改判据",
+    "重生成产物"
+   ],
+   "constraints": [
+    "先备份",
+    "A/B 归因",
+    "无效改动不留"
+   ],
+   "candidates": [
+    {
+     "route": "targeted-repair",
+     "prior": 5,
+     "why": "逐处可定位且有证据时最省"
+    },
+    {
+     "route": "normalize-cleanup",
+     "prior": 4,
+     "why": "同类多册重复时一次覆盖"
+    },
+    {
+     "route": "code-probe-ab",
+     "prior": 5,
+     "why": "任何判据改动都必须做"
+    }
+   ],
+   "default_eval_after": "after-task"
+  },
+  {
+   "id": "attribution-dispute",
+   "title": "归因争议（到底是原书错还是机器错）",
+   "signals": [
+    "原书缺",
+    "原书错",
+    "不可能",
+    "你截图看了吗",
+    "归因"
+   ],
+   "constraints": [
+    "按 docs/ATTRIBUTION.md 三条件",
+    "结构性错误一律先怀疑流水线"
+   ],
+   "candidates": [
+    {
+     "route": "screenshot-verify",
+     "prior": 5,
+     "why": "唯一可信证据"
+    },
+    {
+     "route": "docx-crosscheck",
+     "prior": 4,
+     "why": "独立第二源"
+    }
+   ],
+   "default_eval_after": "after-task"
+  },
+  {
+   "id": "undefined-policy-blocker",
+   "title": "口径未定导致长期挂账",
+   "signals": [
+    "口径",
+    "到底算不算",
+    "实验区",
+    "怎么数"
+   ],
+   "constraints": [
+    "未定前只能登记，不能判对错"
+   ],
+   "candidates": [
+    {
+     "route": "backlog-ledger",
+     "prior": 5,
+     "why": "登记待定案，避免反复重判"
+    }
+   ],
+   "default_eval_after": "after-task"
+  }
+ ]
+}

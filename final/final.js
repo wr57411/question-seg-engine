@@ -26,9 +26,39 @@
  */
 import { CANVAS_W, el, enc, mergeContext, renderPaper } from "../stages/reconstruct.js";
 import { entryCrop, entrySegments, fitEntryCrops } from "./entry-paper.js";
+import { pickQuestionAt } from "./pick-hit.js";
 import { prettifyLatex } from "../stages/latex-display.js";
 import { tagSection } from "./tag-panel.js";
 import { anchorOf, loadBindings, loadLibrary, reconcile, saveBindings, saveLibrary, tagIdsFor } from "./tag-store.js";
+import {
+  addCombo,
+  addTeachItem,
+  assignmentFor,
+  badgeCounts,
+  bindingFor,
+  comboMatches,
+  emptyTeachBindings,
+  filterTeach,
+  loadTeachBindings,
+  loadTeachLibrary,
+  loadTeachUsage,
+  manageTeach,
+  moveToFront,
+  normalizeCombos,
+  normalizeTeachBindings,
+  normalizeTeachList,
+  orderByRecent,
+  renameCombo,
+  replaceBinding,
+  restoreCombo,
+  retireCombo,
+  sameAsPrevious,
+  saveTeach,
+  saveTeachBindings,
+  splitRetired,
+  toggleCategory,
+  toggleTopic,
+} from "./teach-store.js";
 
 /**
  * ── 类型声明 ──
@@ -117,7 +147,8 @@ import { anchorOf, loadBindings, loadLibrary, reconcile, saveBindings, saveLibra
  * @typedef {{ index: number, width: number, height: number }} PageRef
  *
  * @typedef {{ q: SnapQuestion, p: SnapPage }} SheetRef 当前面板打开的题/页
- * @typedef {{ sec: HTMLElement, head: HTMLElement, p: SnapPage }} PageSlot 每页的三段（重绘单页要用）
+ * @typedef {{ doc: string, qid: string, pageIndex: number, prevBinding: import('./teach-store.js').TeachBinding | null, nextBinding: import('./teach-store.js').TeachBinding | null }} UndoRecord 一次可撤销动作
+ * @typedef {{ sec: HTMLElement, head: HTMLElement, p: SnapPage, paper: { wrap: HTMLElement, canvas: HTMLElement } }} PageSlot 每页的四段（重绘单页、给号牌加选中态都要用）
  * @typedef {HTMLElement & { foreignBlocks: number, holes: number }} CropBox entryCrop 容器（契约见 entry-paper.js:326-327：容器上挂这两个计数）
  * @typedef {{ drop: Set<number>, keep: Map<number, { text: string }> }} MergeCtx mergeContext 返回（与 entry-paper.js:64 同形，另加 keep）
  * @typedef {{ kind?: string, blk?: SnapBlock, text?: string, last?: SnapBlock }} FlowItem 文本流的一条（text 段或块段）
@@ -146,6 +177,9 @@ let DEFAULT_DOC = "";
  */
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
+/** 跨所有卷的「某项被几题在用」：`{topics: {id: {live,stale}}, categories: {...}}` */
+/** @typedef {{ topics: Record<string, { live: number, stale: number }>, categories: Record<string, { live: number, stale: number }> }} TeachUsage */
+
 /**
  * 单一可变对象（纪律 7：整体声明一次，下游 never/隐式 any 自然消失，不靠逐点断言）。
  * @type {{
@@ -164,7 +198,17 @@ const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
  *   tagsOn: boolean,
  *   tags: TagState | null,
  *   pages: PageSlot[],
- *   sheet: SheetRef | null
+ *   sheet: SheetRef | null,
+ *   pickMode: boolean,
+ *   picked: { q: SnapQuestion, p: SnapPage } | null,
+ *   teach: (import('./teach-store.js').TeachLibrary & { bindings: import('./teach-store.js').TeachBindings, error: string }) | null,
+ *   recent: { topics: string[], categories: string[] },
+ *   creating: 'topics' | 'categories' | null,
+ *   lastClassified: { doc: string, questionId: string, assignment: { topicIds: string[], categoryIds: string[] }, label: string } | null,
+ *   undo: UndoRecord | null,
+ *   manage: { renaming: string | null, usage: TeachUsage | null } | null,
+ *   teachUsage: TeachUsage | null,
+ *   search: { on: boolean, q: string }
  * }}
  */
 const state = {
@@ -184,8 +228,18 @@ const state = {
   byIdError: "", // 读不到 questions.json 时面板要如实说，不能拿 undefined 冒充题干
   tagsOn: true, // ?tags=0 关掉标签层（版式不变门的对照态，与 ?audit/?ocr 同构）
   tags: null, // {library, bindings}：标签库 + 本题标签（独立文件，与快照解耦）
-  pages: [], // 每页的 {sec, head, p}，供打标后**只重绘那一页**（整册重绘在平板上会闪）
+  pages: [], // 每页的 {sec, head, p, paper}，供打标后**只重绘那一页**（整册重绘在平板上会闪）
   sheet: null, // 当前面板打开的 {q, p}
+  pickMode: false, // 挑题模式：点题目任意块选中；关掉即正常阅读
+  picked: null, // 当前选中的 {q, p}
+  teach: null, // {topics, categories, bindings, error}
+  recent: { topics: [], categories: [] }, // 最近使用的专题/类别（本机 localStorage）
+  creating: null, // 'topics' | 'categories' | null：托盘内联新建
+  lastClassified: null, // 本会话最近一次已归类题 {doc, questionId, assignment, label}
+  undo: null, // 最近一次可撤销动作 {doc, qid, pageIndex, prevBinding, nextBinding}
+  manage: null, // 管理面板状态 {renaming: id|null, usage}；null=面板关着
+  teachUsage: null, // 跨所有卷的「某个专题/类别被几题在用」，管理面板删除前要摆出来
+  search: { on: false, q: "" }, // 托盘搜索：开着时组合条让位给搜索框，两行同步过滤
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
@@ -223,6 +277,18 @@ function notice(parts, kind) {
 }
 
 /* ── 标签：加载与漂移核对 ── */
+
+/** @param {string} doc */
+async function loadTeach(doc) {
+  state.teach = { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: "" };
+  try {
+    const [lib, bindings] = await Promise.all([loadTeachLibrary(), loadTeachBindings(doc)]);
+    state.teach = { ...lib, bindings, error: "" };
+  } catch (e) {
+    state.teach = { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: String(e).slice(0, 80) };
+    notice([`教学归类读取失败（${state.teach?.error ?? ""}）：托盘会空着，不影响阅读。`], "warn");
+  }
+}
 
 async function loadTags() {
   const [library, bindings] = await Promise.all([loadLibrary(), loadBindings(state.doc)]);
@@ -275,7 +341,10 @@ function tagsForQuestion(q) {
 function repaintPage(pageIndex) {
   const slot = state.pages[pageIndex];
   if (!slot) return;
-  slot.sec.replaceChildren(slot.head, paper(slot.p));
+  const pr = paper(slot.p);
+  slot.paper = pr;
+  slot.sec.replaceChildren(slot.head, pr.wrap);
+  if (state.picked?.p === slot.p) paintPickSelection(slot);
 }
 
 /**
@@ -427,20 +496,1121 @@ function flowPaper(p) {
 
 /**
  * @param {SnapPage} p
- * @returns {HTMLElement} `renderPaper(...).wrap` —— d.ts 把它写成 any（遮蔽债，HANDOFF §6-29），
- *          实现侧 reconstruct.js:625 声明的是 HTMLElement，这里按实现收窄。
+ * @returns {{ wrap: HTMLElement, canvas: HTMLElement }} 纸面与文本流**统一形状**：
+ *          文本流没有独立 canvas 层，`canvas` 指回 `wrap`（否则单页重绘/点选命中在手机上会崩）。
  */
 function paper(p) {
-  if (isPhoneViewport()) return flowPaper(p);
+  if (isPhoneViewport()) {
+    // 文本流（oxr 线的手机视图）只有一层 wrap，没有独立 canvas。
+    // 调用方（repaintPage / paintPickSelection / 点选命中）统一按 `{wrap, canvas}` 取，
+    // 所以这里把 canvas 指回 wrap —— 形状一致，行为在文本流下自然退化为「无高亮、无命中」。
+    const wrap = flowPaper(p);
+    return { wrap, canvas: wrap };
+  }
   return renderPaper(p, {
     doc: state.doc,
     paneW: state.paneW,
     diagnostics: state.audit,
     candidateStyle: state.ocrStyle,
     ocrFill: state.ocrFill,
-    onChipClick: openSheet,
+    onChipClick: (q, page) => {
+      if (state.pickMode) pickQuestion(q, page);
+      else void openSheet(q, page);
+    },
     resolveTags: state.tagsOn ? tagsForQuestion : null,
-  }).wrap;
+    assignmentBadge: (/** @type {SnapQuestion} */ q) => {
+      const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), q.id);
+      return a.topicIds.length || a.categoryIds.length ? badgeCounts(a) : null;
+    },
+  });
+}
+
+/* ── 挑题模式（第一步：选中 + 高亮 + 托盘空壳；归类在下一步接入） ── */
+
+const RECENT_KEY = "final:teach:recent";
+function loadRecent() {
+  try {
+    const j = JSON.parse(localStorage.getItem(RECENT_KEY) || "{}");
+    state.recent = {
+      topics: Array.isArray(j.topics) ? j.topics.filter((/** @type {unknown} */ x) => typeof x === "string") : [],
+      categories: Array.isArray(j.categories) ? j.categories.filter((/** @type {unknown} */ x) => typeof x === "string") : [],
+    };
+  } catch {
+    state.recent = { topics: [], categories: [] };
+  }
+}
+/** @param {'topics'|'categories'} kind @param {string} id */
+function bumpRecent(kind, id) {
+  state.recent[kind] = moveToFront(state.recent[kind], id);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(state.recent));
+  } catch {
+    /* 存不了不影响本次归类 */
+  }
+}
+
+function updatePickTray() {
+  const title = $("pick-title");
+  if (!title) return;
+  renderPickRows();
+  renderComboStrip();
+  if (!state.picked) {
+    title.textContent = state.pickMode ? "先点一道题" : "未选题";
+    updateSameButton();
+    closeComboPop();
+    return;
+  }
+  const { q, p } = state.picked;
+  title.textContent = `p${p.index + 1} · 第${q.number}题`;
+  const full = state.byId?.get(q.id);
+  title.title = String(full?.stem ?? "").split("\n")[0]?.trim().slice(0, 80) ?? "";
+  updateSameButton();
+}
+
+function renderPickRows() {
+  const rows = $("pick-rows");
+  const hint = $("pick-hint");
+  const topicBox = $("pick-topics");
+  const categoryBox = $("pick-categories");
+  const nomatch = $("pick-nomatch");
+  if (!rows || !hint || !topicBox || !categoryBox) return;
+  /** @param {'topics'|'categories'} kind @param {number} n @param {boolean} shown */
+  const setCount = (kind, n, shown) => {
+    const node = $(kind === "topics" ? "count-topics" : "count-categories");
+    if (!node) return;
+    node.hidden = !shown;
+    node.textContent = String(n);
+  };
+  if (!state.picked) {
+    rows.hidden = true;
+    hint.hidden = true;
+    hint.textContent = "";
+    if (nomatch) nomatch.hidden = true;
+    topicBox.replaceChildren();
+    categoryBox.replaceChildren();
+    setCount("topics", 0, false);
+    setCount("categories", 0, false);
+    return;
+  }
+  const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), state.picked.q.id);
+  const rawTopics = state.teach?.topics ?? [];
+  const rawCats = state.teach?.categories ?? [];
+  const all = {
+    topics: orderByRecent(splitRetired(rawTopics).active, state.recent.topics),
+    categories: orderByRecent(splitRetired(rawCats).active, state.recent.categories),
+  };
+  const searching = state.search.on && !!state.search.q.trim();
+  const view = searching
+    ? filterTeach(state.search.q, all)
+    : { topics: all.topics, categories: all.categories, total: all.topics.length + all.categories.length };
+  setCount("topics", view.topics.length, searching);
+  setCount("categories", view.categories.length, searching);
+  const nothing = searching && view.total === 0;
+  rows.hidden = nothing;
+  if (nomatch) {
+    nomatch.hidden = !nothing;
+    if (nothing) {
+      const q = state.search.q.trim();
+      const text = $("pick-nomatch-text");
+      const bt = $("nomatch-topics");
+      const bc = $("nomatch-categories");
+      if (text) text.textContent = `没有叫「${q}」的专题或类别`;
+      if (bt) bt.textContent = `新建专题「${q}」`;
+      if (bc) bc.textContent = `新建类别「${q}」`;
+    }
+  }
+
+  /** @param {'topics'|'categories'} kind @param {{id:string,name:string}} item @param {boolean} on */
+  const chip = (kind, item, on) => {
+    const b = el("button", "pick-chip", item.name);
+    b.type = "button";
+    b.dataset.id = item.id;
+    b.setAttribute("aria-pressed", String(on));
+    b.title = on ? `点一下移出：${item.name}` : `点一下放入：${item.name}`;
+    b.addEventListener("click", () => togglePick(kind, item.id, item.name));
+    return b;
+  };
+  topicBox.replaceChildren(...view.topics.map((t) => chip("topics", t, a.topicIds.includes(t.id))));
+  categoryBox.replaceChildren(...view.categories.map((c) => chip("categories", c, a.categoryIds.includes(c.id))));
+  if (!all.topics.length && !all.categories.length) {
+    hint.hidden = false;
+    hint.textContent = state.teach?.error
+      ? `教学归类读取失败：${state.teach.error}`
+      : rawTopics.length || rawCats.length
+        ? "专题和类别都下架了（去「管理」里恢复，或点 ＋ 新建）"
+        : "还没有专题/类别（点每行末尾的 ＋ 新建）";
+  } else {
+    hint.hidden = true;
+    hint.textContent = "";
+  }
+}
+
+/* ── 托盘搜索：一个框同时过滤两行；搜不到直接建 ── */
+
+/** @param {boolean} on */
+function setSearchOn(on) {
+  state.search.on = on;
+  const box = $("pick-search");
+  const input = $("pick-search-q");
+  const btn = $("pick-find");
+  if (box) box.hidden = !on;
+  btn?.setAttribute("aria-pressed", String(on));
+  if (!on) {
+    state.search.q = "";
+    if (input) (/** @type {HTMLInputElement} */ (input)).value = "";
+  }
+  renderComboStrip();
+  renderPickRows();
+  if (on) input?.focus();
+}
+
+/** 搜不到 → 就地新建并打上，成功后自动收起搜索（新 chip 立刻看得见）。 */
+/** @param {'topics'|'categories'} kind */
+async function createFromSearch(kind) {
+  const q = state.search.q.trim();
+  if (!q) return;
+  if (!state.picked) {
+    flash("先点一道题");
+    return;
+  }
+  const ok = await applyCreate(kind, q);
+  if (ok) setSearchOn(false);
+}
+
+/** @param {'topics'|'categories'} kind @param {string} id @param {string} name */
+function togglePick(kind, id, name) {
+  if (!state.picked || !state.teach) {
+    flash("先点一道题");
+    return;
+  }
+  const { q, p } = state.picked;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
+  const cur = assignmentFor(before, q.id);
+  const on = kind === "topics" ? cur.topicIds.includes(id) : cur.categoryIds.includes(id);
+  const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
+  const next = kind === "topics" ? toggleTopic(before, q.id, id, anchor) : toggleCategory(before, q.id, id, anchor);
+  bumpRecent(kind, id);
+  commitTeach(next, `${on ? "已移出" : "已放入"}：${name}`, before, { qid: q.id, pageIndex: p.index });
+}
+
+function clearTeachNotice() {
+  const n = $("notice");
+  if (!n || n.hidden) return;
+  const t = n.textContent ?? "";
+  if (t.includes("教学归类未能保存") || t.includes("教学归类保存异常") || t.includes("新建失败")) {
+    n.hidden = true;
+    n.replaceChildren();
+  }
+}
+
+/** @param {import('./teach-store.js').TeachBinding | null} b */
+const cloneBinding = (b) =>
+  b
+    ? {
+        questionId: b.questionId,
+        topicIds: [...b.topicIds],
+        categoryIds: [...b.categoryIds],
+        ...(b.anchor ? { anchor: { ...b.anchor } } : {}),
+      }
+    : null;
+
+/** @param {{topicIds:string[],categoryIds:string[]}} a */
+function assignmentLabel(a) {
+  const names = [
+    ...a.topicIds.map((id) => state.teach?.topics.find((t) => t.id === id)?.name ?? id),
+    ...a.categoryIds.map((id) => state.teach?.categories.find((c) => c.id === id)?.name ?? id),
+  ];
+  return names.join(" · ");
+}
+
+function updateSameButton() {
+  const btn = $("pick-same");
+  if (!btn) return;
+  const prev = state.lastClassified;
+  const cur = state.picked;
+  const can = !!(prev && cur && prev.doc === state.doc && prev.questionId !== cur.q.id);
+  (/** @type {HTMLButtonElement} */ (btn)).disabled = !can;
+  btn.title = can ? `复制「${prev.label}」到本题` : "先给另一道题归类后才能同上题";
+}
+
+/** @param {import('./teach-store.js').TeachCombo} combo */
+function comboSummary(combo) {
+  const t = combo.topicIds.map((id) => {
+    const x = state.teach?.topics.find((v) => v.id === id);
+    return x ? (x.retired ? `${x.name}（已下架）` : x.name) : "已删除专题";
+  });
+  const c = combo.categoryIds.map((id) => {
+    const x = state.teach?.categories.find((v) => v.id === id);
+    return x ? (x.retired ? `${x.name}（已下架）` : x.name) : "已删除类别";
+  });
+  return [...t, ...c].join(" · ");
+}
+
+function currentAssignment() {
+  if (!state.picked) return { topicIds: [], categoryIds: [] };
+  return assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), state.picked.q.id);
+}
+
+function updateComboAdd() {
+  const btn = $("combo-add");
+  if (!btn) return;
+  const a = currentAssignment();
+  (/** @type {HTMLButtonElement} */ (btn)).disabled = !state.picked || (!a.topicIds.length && !a.categoryIds.length);
+  (/** @type {HTMLButtonElement} */ (btn)).title = (/** @type {HTMLButtonElement} */ (btn)).disabled ? "先给当前题归类，再存为组合" : "把当前题存为组合";
+}
+
+function renderComboStrip() {
+  const strip = $("combo-strip");
+  if (!strip) return;
+  updateComboAdd();
+  if (!state.picked) {
+    strip.hidden = true;
+    strip.replaceChildren();
+    return;
+  }
+  // 搜索框和组合条共用同一格：开着搜索就让位给它（托盘不加行、不加高）
+  strip.hidden = state.search.on === true;
+  if (strip.hidden) {
+    strip.replaceChildren();
+    return;
+  }
+  const a = currentAssignment();
+  const combos = splitRetired(state.teach?.combos ?? []).active;
+  /** @type {HTMLElement[]} */
+  const nodes = combos.map((combo) => {
+    const b = el("button", "combo-chip" + (comboMatches(combo, a) ? " on" : ""));
+    b.type = "button";
+    b.dataset.id = combo.id;
+    b.textContent = combo.name;
+    b.title = `${combo.name}：${comboSummary(combo)}（长按拖动排序）`;
+    b.addEventListener("click", () => {
+      if (suppressComboClick) return;
+      applyCombo(combo);
+    });
+    return b;
+  });
+  if (!nodes.length) nodes.push(el("span", "combo-empty-chip", "暂无组合"));
+  strip.replaceChildren(...nodes);
+}
+
+function closeComboPop() {
+  const pop = $("combo-pop");
+  if (pop) pop.hidden = true;
+  const hint = $("combo-hint");
+  if (hint) hint.hidden = true;
+  const input = $("combo-name");
+  if (input) (/** @type {HTMLInputElement} */ (input)).value = "";
+}
+
+function openComboForm() {
+  const a = currentAssignment();
+  if (!state.picked || (!a.topicIds.length && !a.categoryIds.length)) {
+    flash("先给当前题归类，再存组合");
+    return;
+  }
+  const pop = $("combo-pop");
+  const input = $("combo-name");
+  const hint = $("combo-hint");
+  if (!pop || !input) return;
+  const t = $("toast");
+  if (t) {
+    t.hidden = true;
+    t.classList.remove("on");
+  }
+  pop.hidden = false;
+  if (hint) hint.hidden = true;
+  (/** @type {HTMLInputElement} */ (input)).value = "";
+  input.focus();
+}
+
+/**
+ * 组合清单的唯一写路径：新建/改名/删除/排序都走这里。
+ * 串行发写请求（同一份 combos.json 不能两条并发写，后写的会盖掉前写的），
+ * 失败回滚到本次改动前的清单并明说，不留「屏幕上有、文件里没有」的假成功。
+ * @param {import('./teach-store.js').TeachCombo[]} next
+ * @param {string} label 用于提示的主语，如「组合「曲线基础」」
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+let comboSaveChain = Promise.resolve();
+/** @param {import('./teach-store.js').TeachCombo[]} next @param {string} label */
+async function saveComboList(next, label) {
+  if (!state.teach) return { ok: false, error: "教学清单没加载" };
+  const prev = state.teach.combos ?? [];
+  state.teach = { ...state.teach, combos: next };
+  renderComboStrip();
+  if (state.manage) renderManageList();
+  const run = comboSaveChain.then(() =>
+    saveTeach("combos", { version: 1, updatedAt: new Date().toISOString(), combos: next }),
+  );
+  comboSaveChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  const r = await run;
+  if (!r.ok) {
+    state.teach = { ...state.teach, combos: prev };
+    renderComboStrip();
+    if (state.manage) renderManageList();
+    notice([`${label}未能保存：${r.error ?? "未知错误"}（已回退）`], "err");
+    return r;
+  }
+  return r;
+}
+
+/** @param {Event} e */
+async function submitCombo(e) {
+  e.preventDefault();
+  if (!state.picked || !state.teach) return;
+  const a = currentAssignment();
+  const input = $("combo-name");
+  const hint = $("combo-hint");
+  const res = addCombo(state.teach.combos ?? [], (/** @type {HTMLInputElement} */ (input)).value, a.topicIds, a.categoryIds);
+  if (!res.item) {
+    hint.hidden = false;
+    hint.textContent = res.error ?? "保存失败";
+    input.focus();
+    return;
+  }
+  const saved = await saveComboList(res.list, `组合「${res.item.name}」`);
+  if (!saved.ok) {
+    input.focus();
+    return;
+  }
+  closeComboPop();
+  flash(`组合「${res.item.name}」已保存`);
+}
+
+/** @param {import('./teach-store.js').TeachCombo} combo */
+function applyCombo(combo) {
+  if (!state.picked || !state.teach) return;
+  const { q, p } = state.picked;
+  /** @param {'topics'|'categories'} k @param {string} id */
+  const live = (k, id) => state.teach?.[k].some((x) => x.id === id && !x.retired);
+  const validTopics = combo.topicIds.filter((id) => live("topics", id));
+  const validCategories = combo.categoryIds.filter((id) => live("categories", id));
+  const missing = combo.topicIds.length + combo.categoryIds.length - validTopics.length - validCategories.length;
+  if (!validTopics.length && !validCategories.length) {
+    notice([`组合「${combo.name}」里的专题/类别都已下架或不存在，不能套用`], "err");
+    return;
+  }
+  const cur = currentAssignment();
+  if (comboMatches({ ...combo, topicIds: validTopics, categoryIds: validCategories }, cur)) {
+    flash(`已经是「${combo.name}」`);
+    return;
+  }
+  const before = state.teach?.bindings ?? emptyTeachBindings();
+  const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
+  const next = sameAsPrevious(before, q.id, { topicIds: validTopics, categoryIds: validCategories }, anchor);
+  commitTeach(next, `应用组合：${combo.name}`, before, { qid: q.id, pageIndex: p.index });
+  if (missing) {
+    notice([`组合「${combo.name}」有 ${missing} 项专题/类别已不存在，已跳过`], "warn");
+  }
+}
+
+/* ── 管理面板：专题 / 类别 / 组合的改名、下架（软删除）与恢复 ── */
+
+/** @param {string} text @param {'ok'|undefined} [kind] */
+function showManageHint(text, kind) {
+  const hint = $("manage-hint");
+  if (!hint) return;
+  hint.hidden = false;
+  hint.textContent = text;
+  hint.classList.toggle("ok", kind === "ok");
+}
+
+function clearManageHint() {
+  const hint = $("manage-hint");
+  if (!hint) return;
+  hint.hidden = true;
+  hint.textContent = "";
+  hint.classList.remove("ok");
+}
+
+function openManage() {
+  if (!state.teach) {
+    flash("教学清单还没加载好");
+    return;
+  }
+  const pop = $("manage-pop");
+  if (!pop) return;
+  closeComboPop();
+  state.manage = { renaming: null, usage: state.teachUsage };
+  clearManageHint();
+  const t = $("toast");
+  if (t) {
+    t.hidden = true;
+    t.classList.remove("on");
+  }
+  pop.hidden = false;
+  $("pick-manage")?.setAttribute("aria-pressed", "true");
+  renderManageList();
+  refreshManageUsage();
+}
+
+function closeManage() {
+  if (!state.manage) return;
+  state.manage = null;
+  const pop = $("manage-pop");
+  if (pop) pop.hidden = true;
+  $("pick-manage")?.setAttribute("aria-pressed", "false");
+}
+
+/** 「会影响几题」必须跨**所有卷**数，客户端只看得见当前卷 → 问服务端再补数字。 */
+function refreshManageUsage() {
+  void loadTeachUsage().then((usage) => {
+    state.teachUsage = usage;
+    if (!state.manage) return;
+    state.manage.usage = usage;
+    renderManageList();
+  });
+}
+
+function renderManageList() {
+  const box = $("manage-list");
+  if (!box || !state.teach || !state.manage) return;
+  /** @type {HTMLElement[]} */
+  const nodes = [];
+  /** @param {string} label @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string,retired?:true}[]} items @param {string} emptyText */
+  const section = (label, kind, items, emptyText) => {
+    const { active, retired } = splitRetired(items);
+    nodes.push(el("p", "mg-label", `${label}（${active.length}）`));
+    if (!active.length) nodes.push(el("p", "mg-empty", emptyText));
+    for (const item of active) nodes.push(manageRow(kind, item, false));
+    // 已下架单独一堆：清单里还在、题上的归类一个没动，所以随时能恢复
+    if (retired.length) {
+      nodes.push(el("p", "mg-label mg-sublabel", `已下架（${retired.length}）· 题上的归类都还在`));
+      for (const item of retired) nodes.push(manageRow(kind, item, true));
+    }
+  };
+  section("专题", "topics", state.teach.topics ?? [], "还没有专题。");
+  section("类别", "categories", state.teach.categories ?? [], "还没有类别。");
+  section(
+    "常用组合",
+    "combos",
+    state.teach.combos ?? [],
+    "还没有组合。先点一道题、选好专题/类别，再按托盘里的 ＋ 存成组合。",
+  );
+  box.replaceChildren(...nodes);
+}
+
+/** 这一项现在被多少题在用（跨卷；数字没回来前如实说"题数未知"）。 */
+/** @param {'topics'|'categories'|'combos'} kind @param {string} id */
+function usageLabel(kind, id) {
+  if (!state.manage?.usage) return "题数未知";
+  const bucket = kind === "combos" ? undefined : state.manage.usage[kind];
+  const u = bucket?.[id];
+  if (!u) return "还没用过";
+  return `用在 ${u.live} 题上${u.stale ? `（另 ${u.stale} 题已漂移）` : ""}`;
+}
+
+/**
+ * 一行：名字 + 说明（专题/类别显示在用题数，组合显示成员）+ 改名/下架。
+ * 下架是软删除（用户 2026-10-30 拍板）：点一下就下架、随时可恢复，
+ * 所以不再需要「两步确认 + 影响几题」那套防手滑设计。
+ * @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item @param {boolean} retired
+ */
+function manageRow(kind, item, retired) {
+  const key = `${kind}:${item.id}`;
+  const renaming = !retired && state.manage?.renaming === key;
+  const row = el("div", "mg-row" + (retired ? " mg-retired" : ""));
+  row.dataset.kind = kind;
+  row.dataset.id = item.id;
+  const main = el("div", "mg-main");
+  if (renaming) {
+    const form = el("form", "mg-edit");
+    const input = el("input", "mg-input");
+    input.type = "text";
+    input.maxLength = 60;
+    input.value = item.name;
+    input.setAttribute("aria-label", "新名字");
+    const ok = el("button", "mg-btn primary", "保存");
+    ok.type = "submit";
+    form.append(input, ok);
+    form.addEventListener("submit", /** @param {Event} e */ (e) => {
+      e.preventDefault();
+      void commitManageRename(kind, item, input.value);
+    });
+    main.append(form);
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
+  } else {
+    main.append(el("span", "mg-name", item.name));
+    main.append(el("span", "mg-sum", kind === "combos" ? comboSummary(/** @type {import('./teach-store.js').TeachCombo} */ (item)) : usageLabel(kind, item.id)));
+  }
+  row.append(main);
+  /** @type {HTMLElement[]} */
+  const acts = [];
+  if (retired) {
+    const back = el("button", "mg-btn primary", "恢复");
+    back.type = "button";
+    back.addEventListener("click", () => void commitManageRestore(kind, item));
+    acts.push(back);
+  } else if (!renaming) {
+    const rn = el("button", "mg-btn", "改名");
+    rn.type = "button";
+    rn.addEventListener("click", () => {
+      if (!state.manage) return;
+      state.manage.renaming = key;
+      clearManageHint();
+      renderManageList();
+    });
+    const off = el("button", "mg-btn danger", "下架");
+    off.type = "button";
+    off.title = "下架后挑题时不再出现，题上已归的类保留，可随时恢复";
+    off.addEventListener("click", () => void commitManageRetire(kind, item));
+    acts.push(rn, off);
+  }
+  if (acts.length) {
+    // ⚠️ el(tag, cls, text) 判的是 text !== undefined：传 null 会把文本设成 "null"
+    const box = el("div", "mg-acts");
+    box.append(...acts);
+    row.append(box);
+  }
+  return row;
+}
+
+/** 管理成功后把服务端返回的新清单/新归属装回内存，并重画纸面角标。 */
+/** @param {'topics'|'categories'|'combos'} kind @param {any} res */
+function applyManageResult(kind, res) {
+  if (!state.teach) return;
+  if (Array.isArray(res.list)) {
+    const listKind = /** @type {'topics'|'categories'} */ (kind);
+    state.teach = { ...(state.teach ?? { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: "" }), [listKind]: normalizeTeachList({ [listKind]: res.list }, listKind) };
+  }
+  if (Array.isArray(res.combos)) {
+    state.teach = { ...state.teach, combos: normalizeCombos({ combos: res.combos }) };
+  }
+  const docPayload = res.bindings ? res.bindings[state.doc] : undefined;
+  if (docPayload) {
+    state.teach = { ...state.teach, bindings: normalizeTeachBindings(docPayload) };
+    for (let i = 0; i < state.pages.length; i++) repaintPage(i);
+  }
+  updatePickTray();
+  if (!state.manage) return;
+  state.manage.usage = null; // 数字随清单一起过期，重新问
+  state.manage.renaming = null;
+  renderManageList();
+  refreshManageUsage();
+}
+
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item @param {string} name */
+async function commitManageRename(kind, item, name) {
+  if (!state.teach) return;
+  const clean = String(name ?? "").trim();
+  if (kind === "combos") {
+    const res = renameCombo(state.teach.combos ?? [], item.id, clean);
+    if (!res.item) {
+      showManageHint(res.error ?? "改名失败");
+      return;
+    }
+    const saved = await saveComboList(res.list, `组合「${res.item.name}」`);
+    if (!saved.ok || !state.manage) return;
+    renderManageList();
+    showManageHint(`已改名为「${res.item.name}」`, "ok");
+    return;
+  }
+  if (!clean) {
+    showManageHint("名字不能为空");
+    return;
+  }
+  const dup = (state.teach[kind] ?? []).some((x) => x.id !== item.id && x.name.trim() === clean);
+  if (dup) {
+    showManageHint(`已有同名：${clean}`);
+    return;
+  }
+  const res = await manageTeach("rename", kind, item.id, clean);
+  if (!res.ok) {
+    showManageHint(res.error ?? "改名失败");
+    return;
+  }
+  applyManageResult(kind, res);
+  showManageHint(`已改名为「${clean}」`, "ok");
+}
+
+/** 下架（软删除）：题上的归属一个都不动。 @param {'topics'|'categories'|'combos'} kind */
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
+async function commitManageRetire(kind, item) {
+  if (!state.teach) return;
+  clearManageHint();
+  if (kind === "combos") {
+    const res = retireCombo(state.teach.combos ?? [], item.id);
+    if (!res.item) {
+      showManageHint(res.error ?? "下架失败");
+      return;
+    }
+    const saved = await saveComboList(res.list, `组合「${item.name}」`);
+    if (!saved.ok || !state.manage) return;
+    renderManageList();
+    showManageHint(`已下架「${item.name}」，在「已下架」里可以恢复`, "ok");
+    return;
+  }
+  const res = await manageTeach("retire", kind, item.id);
+  if (!res.ok) {
+    showManageHint(res.error ?? "下架失败");
+    renderManageList();
+    return;
+  }
+  applyManageResult(kind, res);
+  showManageHint(
+    `已下架「${res.item ?? item.name}」（${res.stillAssigned ?? 0} 题上的归类保留，随时可恢复）`,
+    "ok",
+  );
+}
+
+/** 恢复已下架项。 @param {'topics'|'categories'|'combos'} kind */
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
+async function commitManageRestore(kind, item) {
+  if (!state.teach) return;
+  clearManageHint();
+  if (kind === "combos") {
+    const res = restoreCombo(state.teach.combos ?? [], item.id);
+    if (!res.item) {
+      showManageHint(res.error ?? "恢复失败");
+      return;
+    }
+    const saved = await saveComboList(res.list, `组合「${item.name}」`);
+    if (!saved.ok || !state.manage) return;
+    renderManageList();
+    showManageHint(`已恢复「${item.name}」`, "ok");
+    return;
+  }
+  const res = await manageTeach("restore", kind, item.id);
+  if (!res.ok) {
+    showManageHint(res.error ?? "恢复失败");
+    renderManageList();
+    return;
+  }
+  applyManageResult(kind, res);
+  showManageHint(`已恢复「${res.item ?? item.name}」，挑题时又能选了`, "ok");
+}
+
+/* ── 组合条拖动排序：长按 380ms 进入拖动，松手写回 combos.json ── */
+let suppressComboClick = false;
+/** @type {any} */
+let comboPress = null;
+/** @type {any} */
+let comboTimer = null;
+/** @type {any} */
+let comboDrag = null;
+
+function comboOrder() {
+  const strip = $("combo-strip");
+  if (!strip) return [];
+  return [...strip.querySelectorAll(".combo-chip")].map((b) => /** @type {HTMLElement} */ (b).dataset.id ?? "");
+}
+
+function bindComboDrag() {
+  const strip = $("combo-strip");
+  if (!strip) return;
+  const finish = () => {
+    clearTimeout(comboTimer);
+    comboTimer = null;
+    if (!comboDrag) {
+      comboPress = null;
+      return;
+    }
+    const drag = comboDrag;
+    comboDrag = null;
+    drag.chip.classList.remove("dragging");
+    strip.classList.remove("dragging");
+    try {
+      strip.releasePointerCapture(drag.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const ids = comboOrder();
+    setTimeout(() => (suppressComboClick = false), 350);
+    if (JSON.stringify(ids) === JSON.stringify(drag.before)) return;
+    const prev = state.teach?.combos ?? [];
+    const byId = new Map(prev.map((c) => [c.id, c]));
+    const next = /** @type {import('./teach-store.js').TeachCombo[]} */ (ids.map((id) => byId.get(id)).filter((c) => !!c));
+    if (next.length !== prev.length) return;
+    if (JSON.stringify(next.map((c) => c.id)) === JSON.stringify(prev.map((c) => c.id))) return;
+    void saveComboList(next, "组合顺序").then((r) => {
+      if (r.ok) flash("组合顺序已保存");
+    });
+  };
+
+  strip.addEventListener("pointerdown", (e) => {
+    if (!state.picked) return;
+    const chip = /** @type {HTMLElement} */ (e.target).closest?.(".combo-chip");
+    if (!chip) return;
+    clearTimeout(comboTimer);
+    comboPress = { chip, x: e.clientX, y: e.clientY, pointerId: e.pointerId };
+    comboTimer = setTimeout(() => {
+      if (!comboPress) return;
+      comboDrag = { ...comboPress, before: comboOrder() };
+      comboPress = null;
+      comboDrag.chip.classList.add("dragging");
+      strip.classList.add("dragging");
+      suppressComboClick = true;
+      try {
+        strip.setPointerCapture(comboDrag.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }, 380);
+  });
+
+  strip.addEventListener("pointermove", (e) => {
+    if (comboDrag) {
+      e.preventDefault();
+      const chip = comboDrag.chip;
+      const chips = [...strip.querySelectorAll(".combo-chip")];
+      let before = null;
+      for (const c of chips) {
+        if (c === chip) continue;
+        const r = c.getBoundingClientRect();
+        if (e.clientX < r.left + r.width / 2) {
+          before = c;
+          break;
+        }
+      }
+      if (before) {
+        if (chip.nextElementSibling !== before) strip.insertBefore(chip, before);
+      } else if (strip.lastElementChild !== chip) {
+        strip.appendChild(chip);
+      }
+      return;
+    }
+    if (!comboPress) return;
+    if (Math.abs(e.clientX - comboPress.x) > 8 || Math.abs(e.clientY - comboPress.y) > 8) {
+      clearTimeout(comboTimer);
+      comboTimer = null;
+      comboPress = null;
+      suppressComboClick = true;
+      setTimeout(() => (suppressComboClick = false), 350);
+    }
+  });
+
+  strip.addEventListener("pointerup", finish);
+  strip.addEventListener("pointercancel", () => {
+    clearTimeout(comboTimer);
+    comboTimer = null;
+    comboPress = null;
+    if (comboDrag) {
+      comboDrag.chip.classList.remove("dragging");
+      strip.classList.remove("dragging");
+      comboDrag = null;
+    }
+  });
+}
+
+/** @param {string} qid @param {{topicIds:string[],categoryIds:string[]}} assignment */
+function rememberClassified(qid, assignment) {
+  if (assignment.topicIds.length || assignment.categoryIds.length) {
+    state.lastClassified = {
+      doc: state.doc,
+      questionId: qid,
+      assignment: { topicIds: [...assignment.topicIds], categoryIds: [...assignment.categoryIds] },
+      label: assignmentLabel(assignment),
+    };
+  } else if (state.lastClassified?.questionId === qid) {
+    state.lastClassified = null;
+  }
+  updateSameButton();
+}
+
+/** @type {any} */
+let undoTimer = null;
+/** @param {string} label @param {UndoRecord} action */
+function showUndo(label, action) {
+  state.undo = action;
+  $("pick-undo-text").textContent = label;
+  $("pick-undo").hidden = false;
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => hideUndo(), 5000);
+  const t = $("toast");
+  if (t) {
+    t.hidden = true;
+    t.classList.remove("on");
+  }
+}
+
+function hideUndo() {
+  clearTimeout(undoTimer);
+  state.undo = null;
+  const box = $("pick-undo");
+  if (box) box.hidden = true;
+}
+
+function undoLast() {
+  const a = state.undo;
+  if (!a) return;
+  hideUndo();
+  if (state.doc !== a.doc) {
+    flash("换卷后不能撤销");
+    return;
+  }
+  if (state.lastClassified?.questionId === a.qid) state.lastClassified = null;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
+  const next = replaceBinding(before, a.qid, a.prevBinding);
+  commitTeach(next, "已撤销", before, { qid: a.qid, pageIndex: a.pageIndex }, { undoable: false, remember: false });
+  flash("已撤销");
+  updateSameButton();
+}
+
+function applySameAsPrevious() {
+  if (!state.picked || !state.lastClassified) return;
+  const { q, p } = state.picked;
+  const prev = state.lastClassified;
+  if (prev.doc !== state.doc || prev.questionId === q.id) return;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
+  const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
+  const next = sameAsPrevious(before, q.id, prev.assignment, anchor);
+  commitTeach(next, `同上题：${prev.label}`, before, { qid: q.id, pageIndex: p.index });
+}
+
+let teachSaveChain = Promise.resolve();
+/** @param {import('./teach-store.js').TeachBindings} next @param {string} label @param {import('./teach-store.js').TeachBindings} prev @param {{qid:string,pageIndex:number}} ctx @param {{undoable?:boolean,remember?:boolean}} [opts] */
+function commitTeach(next, label, prev, ctx, opts = {}) {
+  const { qid, pageIndex } = ctx;
+  state.teach = { ...(state.teach ?? { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: "" }), bindings: next };
+  updatePickTray();
+  repaintPage(pageIndex);
+  if (opts.undoable === false) flash(label);
+
+  const doc = state.doc;
+  const prevBinding = cloneBinding(bindingFor(prev, qid));
+  const nextBinding = cloneBinding(bindingFor(next, qid));
+  const payload = JSON.parse(JSON.stringify(next));
+  const nextRef = next;
+  teachSaveChain = teachSaveChain
+    .then(async () => {
+      const r = await saveTeachBindings(doc, payload);
+      if (r.ok) {
+        clearTeachNotice();
+        if (opts.remember !== false) rememberClassified(qid, assignmentFor(next, qid));
+        if (opts.undoable !== false && JSON.stringify(prevBinding) !== JSON.stringify(nextBinding)) {
+          showUndo(label, { doc, qid, pageIndex, prevBinding, nextBinding });
+        }
+        return;
+      }
+      hideUndo();
+      const rolledBack = state.doc === doc && state.teach?.bindings === nextRef;
+      if (rolledBack) {
+        state.teach = { ...(state.teach ?? { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: "" }), bindings: prev };
+        updatePickTray();
+        repaintPage(pageIndex);
+      }
+      notice(
+        [`教学归类未能保存：${r.error ?? "未知错误"}${rolledBack ? "（本次改动已回退）" : "（后续改动仍在，未回退）"}`],
+        "err",
+      );
+    })
+    .catch((e) => {
+      hideUndo();
+      notice([`教学归类保存异常：${String(e).slice(0, 100)}`], "err");
+    });
+}
+
+/** @param {'topics'|'categories'} kind */
+function openCreate(kind) {
+  if (!state.picked) {
+    flash("先点一道题");
+    return;
+  }
+  state.creating = kind;
+  const form = $("pick-create");
+  const input = $("pick-create-name");
+  form.hidden = false;
+  document.querySelector(".pick-tray")?.classList.add("creating");
+  (/** @type {HTMLInputElement} */ (input)).value = "";
+  (/** @type {HTMLInputElement} */ (input)).placeholder = kind === "topics" ? "新专题名" : "新类别名";
+  input.focus();
+}
+
+function closeCreate() {
+  state.creating = null;
+  const form = $("pick-create");
+  if (form) form.hidden = true;
+  document.querySelector(".pick-tray")?.classList.remove("creating");
+  const input = $("pick-create-name");
+  if (input) (/** @type {HTMLInputElement} */ (input)).value = "";
+}
+
+/** @param {'topics'|'categories'} kind @param {string} id */
+function revealChip(kind, id) {
+  const box = $(kind === "topics" ? "pick-topics" : "pick-categories");
+  const chip = [...box.querySelectorAll(".pick-chip")].find((b) => /** @type {HTMLElement} */ (b).dataset.id === id);
+  chip?.scrollIntoView?.({ inline: "center", block: "nearest" });
+}
+
+/**
+ * 新建专题/类别并立刻打给当前题（内联表单与「搜不到就新建」共用一条路径）。
+ * 名字已存在时复用既有条目，不重复写清单。
+ * @param {'topics'|'categories'} kind @param {string} name
+ */
+async function applyCreate(kind, name) {
+  if (!state.picked || !state.teach) return false;
+  const prefix = kind === "topics" ? "tp" : "ct";
+  const list = kind === "topics" ? state.teach.topics : state.teach.categories;
+  const res = addTeachItem(list, name, prefix);
+  if (!res.item) {
+    flash(res.error ?? "新建失败");
+    return false;
+  }
+  // created = 真新建；revived = 同名的那一项原本已下架，这次要**落盘**摘掉下架标记，
+  // 否则只改内存、刷新又变回下架态（2026-10-30 交接 2 第 2 条）
+  if (res.created || res.revived) {
+    const payload =
+      kind === "topics"
+        ? { version: 1, updatedAt: new Date().toISOString(), topics: res.list }
+        : { version: 1, updatedAt: new Date().toISOString(), categories: res.list };
+    const saved = await saveTeach(kind, payload);
+    if (!saved.ok) {
+      notice([`${res.revived ? "恢复" : "新建"}失败：${saved.error ?? "未知错误"}`], "err");
+      return false;
+    }
+    state.teach = { ...state.teach, [kind]: res.list };
+    clearTeachNotice();
+  }
+  const { q, p } = state.picked;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
+  const cur = assignmentFor(before, q.id);
+  const already = kind === "topics" ? cur.topicIds.includes(res.item.id) : cur.categoryIds.includes(res.item.id);
+  closeCreate();
+  bumpRecent(kind, res.item.id);
+  if (already) {
+    renderPickRows();
+    revealChip(kind, res.item.id);
+    flash(`已经在「${res.item.name}」里`);
+    return true;
+  }
+  const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
+  const next =
+    kind === "topics" ? toggleTopic(before, q.id, res.item.id, anchor) : toggleCategory(before, q.id, res.item.id, anchor);
+  commitTeach(next, `已放入：${res.item.name}`, before, { qid: q.id, pageIndex: p.index });
+  revealChip(kind, res.item.id);
+  return true;
+}
+
+/** @param {Event} e */
+async function submitCreate(e) {
+  e.preventDefault();
+  const kind = state.creating;
+  if (!kind || !state.picked || !state.teach) return;
+  const input = $("pick-create-name");
+  const ok = await applyCreate(kind, (/** @type {HTMLInputElement} */ (input)).value);
+  if (!ok) input.focus();
+}
+
+
+function bindKeyboardLift() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const update = () => {
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty("--pick-kb", `${Math.round(kb)}px`);
+  };
+  vv.addEventListener("resize", update);
+  vv.addEventListener("scroll", update);
+  update();
+}
+
+function clearPickSelection() {
+  state.picked = null;
+  for (const node of document.querySelectorAll(".blk.pick-selected, .q-chip.pick-selected")) {
+    node.classList.remove("pick-selected");
+  }
+  updatePickTray();
+}
+
+/** 给选中题的所有块与号牌加高亮；只加 class/outline，不改任何几何。
+ * @param {PageSlot | undefined} slot */
+function paintPickSelection(slot) {
+  const q = state.picked?.q;
+  if (!q || !slot?.paper) return;
+  const blocks = new Set((q.blocks ?? []).map(String));
+  for (const node of slot.paper.canvas.querySelectorAll(".blk")) {
+    const bi = /** @type {HTMLElement} */ (node).dataset?.bi;
+    if (bi !== undefined && blocks.has(bi)) node.classList.add("pick-selected");
+  }
+  for (const chip of slot.paper.wrap.querySelectorAll(".q-chip")) {
+    if (/** @type {HTMLElement} */ (chip).dataset?.qid === q.id) chip.classList.add("pick-selected");
+  }
+}
+
+/** @param {SnapQuestion} q @param {SnapPage} p */
+function pickQuestion(q, p) {
+  if (!state.pickMode) return;
+  closeCreate();
+  clearPickSelection();
+  state.picked = { q, p };
+  const slot = state.pages[p.index];
+  paintPickSelection(slot);
+  const chip = slot?.paper?.wrap.querySelector(".q-chip.pick-selected");
+  chip?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  updatePickTray();
+}
+
+/** @param {boolean} on */
+function setPickMode(on) {
+  if (on && isPhoneViewport()) {
+    // 挑题依赖「号牌 + 块坐标」，文本流两者都没有 ⇒ 明确拒绝并给出出路，不做静默失效
+    flash("文本流视图不支持挑题：加 ?flow=0 切回纸面再挑");
+    return;
+  }
+  state.pickMode = on;
+  document.body.classList.toggle("pick-mode", on);
+  const btn = $("t-pick");
+  btn.setAttribute("aria-pressed", String(on));
+  btn.textContent = on ? "退出挑题" : "挑题";
+  $("pick-tray").hidden = !on;
+  if (on) {
+    $("detail").hidden = true;
+    state.sheet = null;
+    updatePickTray();
+  } else {
+    closeCreate();
+    closeComboPop();
+    closeManage();
+    if (state.search.on) setSearchOn(false);
+    hideUndo();
+    clearPickSelection();
+  }
+}
+
+/** 点整道题：按下到抬起移动 >10px 视为滚动，不选。 */
+/** @type {{ x: number, y: number } | null} */
+let pickDown = null;
+function bindPickPointer() {
+  const book = $("book");
+  book.addEventListener("pointerdown", (e) => {
+    if (!state.pickMode) return;
+    pickDown = { x: e.clientX, y: e.clientY };
+  });
+  book.addEventListener("pointerup", (e) => {
+    if (!state.pickMode || !pickDown) return;
+    const down = pickDown;
+    pickDown = null;
+    if (Math.abs(e.clientX - down.x) > 10 || Math.abs(e.clientY - down.y) > 10) return;
+    const target = /** @type {HTMLElement | null} */ (e.target);
+    if (!target) return;
+    const sec = target.closest?.(".bk-page");
+    if (!sec) return;
+    const idx = Number(sec.id.replace("pg-", "")) - 1;
+    const slot = state.pages[idx];
+    if (!slot?.paper) return;
+    const chip = /** @type {HTMLElement | null} */ (target.closest?.(".q-chip"));
+    if (chip?.dataset?.qid) {
+      const q = slot.p.questions.find((x) => x.id === chip.dataset.qid);
+      if (q) pickQuestion(/** @type {SnapQuestion} */ (q), slot.p);
+      return;
+    }
+    const rect = slot.paper.canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const xPt = ((e.clientX - rect.left) * slot.p.width) / rect.width;
+    const yPt = ((e.clientY - rect.top) * slot.p.height) / rect.height;
+    const q = pickQuestionAt(slot.p, xPt, yPt, 6);
+    if (q) pickQuestion(/** @type {SnapQuestion} */ (q), slot.p);
+  });
+  book.addEventListener("pointercancel", () => {
+    pickDown = null;
+  });
 }
 
 /** 标签面板拿的「应用」句柄：写路径只有 commitBindings / commitLibrary 两条 */
@@ -475,6 +1645,10 @@ const tagApp = {
  * @param {SnapPage} p
  */
 async function openSheet(q, p) {
+  if (state.pickMode) {
+    pickQuestion(q, p);
+    return;
+  }
   const d = $("detail");
   const token = (state.sheetToken = {}); // 连点两个号牌时，后点开的才算数
   d.replaceChildren();
@@ -484,10 +1658,10 @@ async function openSheet(q, p) {
     state.sheet = null;
   });
   d.append(close);
-
-  if (state.tags) d.append(tagSection(tagApp, q, p, anchorOf(q, p, p.blocks[q.blocks?.[0]])));
   state.sheet = { q, p };
 
+  // 顺序即优先级：先「这是哪道题」，再「归了什么类」，然后才是业务标签与题面/答案。
+  // 教学归类提到标签区之前，是因为标签区有 7 行 × 44px，放它后面等于要滚一屏才看得见（U09）。
   d.append(el("h3", "", `第 ${q.number} 题（${q.section || "未识别大题"}）`));
   d.append(
     el(
@@ -497,6 +1671,8 @@ async function openSheet(q, p) {
         `可信度 ${Math.round(q.confidence * 100)}%${q.status === "needs_review" ? " · 需人工校对" : ""}`,
     ),
   );
+  d.append(teachReadonlySection(q, p));
+  if (state.tags) d.append(tagSection(tagApp, q, p, anchorOf(q, p, p.blocks[q.blocks?.[0]])));
 
   const entry = bankEntryFor(q);
   // 「自己这一面」永远显示（未配对也显示），「另一面」只有配上对才有
@@ -545,6 +1721,59 @@ async function openSheet(q, p) {
  */
 function docKind(doc) {
   return DOCS.find((x) => x.id === doc)?.kind ?? "quiz";
+}
+
+/**
+ * 阅读模式里的**只读**「教学归类」区（U09）。
+ *
+ * 为什么要有：挑题归类是在成品页底部托盘里完成的，离开挑题模式后**看不见归了什么** ——
+ * 只靠号牌上的 `N·M` 角标，既不知道是哪几个专题，也没法核对。这里把归属原样列出来，
+ * 并给一个「去挑题修改」直接跳过去（进挑题模式 + 选中该题），不用自己再找一遍。
+ *
+ * 只读 = 不在这里增删（增删只走托盘，避免两套写入口）。**下架项照样显示**并标注「已下架」：
+ * 题上的归属确实还在（软删除语义），藏起来会让人以为归类丢了。
+ */
+/** @param {SnapQuestion} q @param {SnapPage} p */
+function teachReadonlySection(q, p) {
+  const box = el("section", "teach-read");
+  box.append(el("h4", "", "教学归类"));
+  const teach = state.teach;
+  if (!teach) {
+    box.append(el("p", "kv", "归类清单还没加载好：刷新一次再试。"));
+    return box;
+  }
+  if (teach.error) {
+    box.append(el("p", "kv", `归类清单读取失败：${teach.error}（角标与这里都会显示为空，不代表没归类）`));
+  }
+  const a = assignmentFor(teach.bindings ?? emptyTeachBindings(), q.id);
+  /** @param {'topics'|'categories'} kind */
+  /** @param {string} label @param {'topics'|'categories'} kind @param {string[]} ids */
+  const row = (label, kind, ids) => {
+    const line = el("div", "teach-read-row");
+    line.append(el("span", "teach-read-label", label));
+    const chips = el("div", "teach-read-chips");
+    if (!ids.length) chips.append(el("span", "teach-read-none", "未归类"));
+    for (const id of ids) {
+      const item = (teach[kind] ?? []).find((x) => x.id === id) ?? null;
+      const cls = "teach-read-chip" + (item?.retired ? " retired" : "");
+      // 清单里找不到 = 断链（被彻底删过），如实说，不编名字
+      chips.append(el("span", cls, item ? `${item.name}${item.retired ? "（已下架）" : ""}` : `${id}（清单里找不到）`));
+    }
+    line.append(chips);
+    return line;
+  };
+  box.append(row("专题", "topics", a.topicIds));
+  box.append(row("类别", "categories", a.categoryIds));
+  const go = el("button", "teach-read-go", "去挑题修改");
+  go.type = "button";
+  go.addEventListener("click", () => {
+    setPickMode(true); // 会顺手把详情面板关掉
+    pickQuestion(q, p);
+    const chip = state.pages[p.index]?.paper?.wrap.querySelector(".q-chip.pick-selected");
+    chip?.scrollIntoView?.({ block: "center" });
+  });
+  box.append(go);
+  return box;
 }
 
 /**
@@ -764,10 +1993,12 @@ function renderBook() {
     const sec = el("section", "bk-page");
     sec.id = `pg-${i + 1}`;
     const head = el("p", "bk-head", `第 ${i + 1} / ${data.pages.length} 页`);
-    sec.append(head, paper(p));
+    const pr = paper(p);
+    sec.append(head, pr.wrap);
     book.append(sec);
-    state.pages[i] = { sec, head, p };
+    state.pages[i] = { sec, head, p, paper: pr };
   });
+  if (state.picked) paintPickSelection(state.pages[state.picked.p.index]);
   updatePageIndicator();
 }
 
@@ -781,7 +2012,8 @@ function updatePageIndicator() {
     const r = s.getBoundingClientRect();
     if (r.top <= mid) cur = Number(s.id.replace("pg-", ""));
   }
-  $("page-now").textContent = `第 ${cur} / ${secs.length} 页`;
+  $("page-now").textContent = `${cur} / ${secs.length}`;
+  $("page-now").title = `第 ${cur} / ${secs.length} 页`;
   savePosition(cur);
 }
 
@@ -879,9 +2111,16 @@ async function loadDoc(doc) {
     $("notice").hidden = true;
     $("detail").hidden = true; // 换卷时关掉面板，避免标签区指着上一卷的题目
     state.sheet = null;
+    state.picked = null;
+    state.lastClassified = null;
+    hideUndo();
+    closeCreate();
+    closeComboPop();
+    updatePickTray();
     await loadQuestions(doc);
     state.snap = state.data;
     await loadTags();
+    await loadTeach(doc);
     renderBook();
     renderHealth(doc);
     if (!/^#pg-\d+$/.test(location.hash)) restorePosition();
@@ -1184,6 +2423,80 @@ function initBar() {
     state.ocrStyle = /** @type {HTMLInputElement} */ (e.target).checked;
     renderBook();
   });
+  const more = $("t-more");
+  const menu = $("more-menu");
+  more.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    more.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  document.addEventListener("click", (e) => {
+    if (menu.hidden) return;
+    if (/** @type {HTMLElement | null} */ (e.target)?.closest?.(".fb-right")) return;
+    menu.hidden = true;
+    more.setAttribute("aria-expanded", "false");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || menu.hidden) return;
+    menu.hidden = true;
+    more.setAttribute("aria-expanded", "false");
+  });
+  for (const a of menu.querySelectorAll("a")) {
+    a.addEventListener("click", () => {
+      menu.hidden = true;
+      more.setAttribute("aria-expanded", "false");
+    });
+  }
+
+  $("t-pick").addEventListener("click", () => setPickMode(!state.pickMode));
+  $("pick-close").addEventListener("click", () => setPickMode(false));
+  $("pick-same").addEventListener("click", applySameAsPrevious);
+  $("pick-undo-btn").addEventListener("click", undoLast);
+  $("combo-close").addEventListener("click", closeComboPop);
+  $("combo-add").addEventListener("click", openComboForm);
+  $("combo-form").addEventListener("submit", (e) => void submitCombo(e));
+  $("combo-cancel").addEventListener("click", closeComboPop);
+  $("pick-manage").addEventListener("click", () => (state.manage ? closeManage() : openManage()));
+  $("manage-close").addEventListener("click", closeManage);
+  $("pick-find").addEventListener("click", () => setSearchOn(!state.search.on));
+  $("pick-search-q").addEventListener("input", (e) => {
+    state.search.q = /** @type {HTMLInputElement} */ (e.target).value;
+    renderPickRows();
+  });
+  $("pick-search-clear").addEventListener("click", () => {
+    const input = /** @type {HTMLInputElement | null} */ ($("pick-search-q"));
+    state.search.q = "";
+    if (input) (/** @type {HTMLInputElement} */ (input)).value = "";
+    renderPickRows();
+    input?.focus();
+  });
+  $("nomatch-topics").addEventListener("click", () => void createFromSearch("topics"));
+  $("nomatch-categories").addEventListener("click", () => void createFromSearch("categories"));
+  document.addEventListener("click", (e) => {
+    // 用 composedPath 而不是 closest()：面板里的按钮点下去会同步重绘，
+    // 那时 e.target 已经从 DOM 上摘下来了，closest 找不到祖先 → 会把刚打开的面板又关掉。
+    const path = typeof e.composedPath === "function" ? e.composedPath() : [];
+    /** @param {string} id */
+    const has = (id) => path.some((n) => /** @type {{ id?: string }} */ (n)?.id === id) || !!/** @type {HTMLElement} */ (e.target)?.closest?.(`#${id}`);
+    if (!has("manage-pop") && !has("pick-manage")) closeManage();
+    const pop = $("combo-pop");
+    if (!pop || pop.hidden) return;
+    if (has("combo-pop") || has("combo-add")) return;
+    closeComboPop();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    closeManage();
+    closeComboPop();
+    if (state.search.on) setSearchOn(false);
+  });
+  $("pick-add-topics").addEventListener("click", () => openCreate("topics"));
+  $("pick-add-categories").addEventListener("click", () => openCreate("categories"));
+  $("pick-create").addEventListener("submit", (e) => void submitCreate(e));
+  $("pick-create-cancel").addEventListener("click", closeCreate);
+  bindPickPointer();
+  bindComboDrag();
+  bindKeyboardLift();
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} 同上：空句柄对 clearTimeout 等价（stages.js:716） */
@@ -1201,6 +2514,7 @@ window.addEventListener("scroll", updatePageIndicator, { passive: true });
 
 async function main() {
   state.paneW = paperWidth();
+  loadRecent();
   // 开关支持 URL 参数（可分享/收藏某个视图）：?audit=1 开审计标记、?ocr=0 关候选样式
   const qs = new URLSearchParams(location.search);
   state.audit = qs.get("audit") === "1";
@@ -1217,6 +2531,7 @@ async function main() {
   const asked = qs.get("doc") || DEFAULT_DOC;
   await loadBank();
   await loadDoc(asked);
+  if (qs.get("pick") === "1") setPickMode(true);
   const hash = /^#pg-(\d+)$/.exec(location.hash);
   if (hash) document.getElementById(`pg-${hash[1]}`)?.scrollIntoView();
   // ?q= 打开即执行一次跳转/搜索（方便收藏"某个搜索"，也让交互可被自动化核对）

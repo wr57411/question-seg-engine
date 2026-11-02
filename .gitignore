@@ -1,4 +1,5 @@
-node_modules/
+# 依赖目录（写成不带斜杠的形式：带斜杠只忽略**目录**，会把误建的软链放进来）
+node_modules
 data/
 sample/*
 !sample/README.md
@@ -14,5 +15,7 @@ sample/*
 # 批量导入的运行时输入（PDF 已在上面忽略；layout 目录也一并忽略）
 inbox/
 
-# HOTL 运行时状态（报告/锁/边车，不入库）
+# HOTL 运行状态（本地产物，不入库）
 .hotl/
+# 截图/临时审板产物（本地产物，不入库）
+tmp/

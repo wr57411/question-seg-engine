@@ -68,6 +68,19 @@ test("同一标签点两次 = 加上再摘掉；不产生空绑定", () => {
   assert.deepEqual(tagIdsFor(s, "q1"), ["t-gai"]);
 });
 
+test("已有绑定的 anchor 不被无关点击重写；摘光重打才接受新 anchor", () => {
+  const old = anc("1", 1);
+  const fresh = anc("9", 9);
+  let s = doc([{ questionId: "q1", tagIds: ["t-hao"], anchor: old }]);
+  s = toggleTag(s, "q1", "t-gai", fresh);
+  assert.deepEqual(s.bindings[0]!.anchor, old, "加一个无关标签不能把旧 anchor 洗成当前题");
+  s = toggleTag(s, "q1", "t-hao", fresh); // 只剩 t-gai
+  s = toggleTag(s, "q1", "t-gai", fresh); // 摘光 → 绑定消失
+  assert.equal(s.bindings.length, 0);
+  s = toggleTag(s, "q1", "t-gai", fresh); // 重新打 = 接受当前 anchor
+  assert.deepEqual(s.bindings[0]!.anchor, fresh);
+});
+
 /* ── ③ 级联删除 ── */
 
 test("从库里删标签：剥掉所有绑定里的该 id，并如实报影响题数（含 stale）", () => {
