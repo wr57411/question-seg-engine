@@ -1,0 +1,3782 @@
+{
+  "tables": [
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "index": 0,
+      "mini_cells": 14,
+      "mineru_cells": 14,
+      "ref_available": true,
+      "exact_matches": 8,
+      "exact_rate": 0.571,
+      "mini_first": [
+        "方法",
+        "应用动能定理",
+        "微元法"
+      ],
+      "mineru_first": [
+        "方法",
+        "应用动能定理",
+        "微元法"
+      ]
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "index": 0,
+      "mini_cells": 18,
+      "mineru_cells": 18,
+      "ref_available": true,
+      "exact_matches": 10,
+      "exact_rate": 0.556,
+      "mini_first": [
+        "方式",
+        "恒定功率启动",
+        "恒定加速度启动"
+      ],
+      "mineru_first": [
+        "方式",
+        "恒定功率启动",
+        "恒定加速度启动"
+      ]
+    },
+    {
+      "book": "物理_教材基础练 电路",
+      "page": 4,
+      "index": 0,
+      "mini_cells": 15,
+      "mineru_cells": 0,
+      "ref_available": false,
+      "exact_matches": 0,
+      "exact_rate": 0.0,
+      "mini_first": [
+        "电源的总功率",
+        "任意电路:$P_{\\text{总}} = EI = P_{\\text{出}} + P_{\\text{内}}$",
+        "电源的输出功率"
+      ],
+      "mineru_first": []
+    },
+    {
+      "book": "教材基础练 磁场",
+      "page": 0,
+      "index": 0,
+      "mini_cells": 18,
+      "mineru_cells": 0,
+      "ref_available": false,
+      "exact_matches": 0,
+      "exact_rate": 0.0,
+      "mini_first": [
+        "研究对象",
+        "磁感应强度 B",
+        "研究对象"
+      ],
+      "mineru_first": []
+    },
+    {
+      "book": "物理_教材基础练 电路",
+      "page": 0,
+      "index": 0,
+      "mini_cells": 15,
+      "mineru_cells": 0,
+      "ref_available": false,
+      "exact_matches": 0,
+      "exact_rate": 0.0,
+      "mini_first": [
+        "欧姆定律(纯电阻电路)",
+        "电流的三个表达式",
+        "(1) $I = \\frac{q}{t}$(定义式); (2) $I = \\frac{U}{R}$(决定式); (3) $I = neSv$(微观决定式)"
+      ],
+      "mineru_first": []
+    },
+    {
+      "book": "物理_教材基础练 电路",
+      "page": 1,
+      "index": 0,
+      "mini_cells": 17,
+      "mineru_cells": 0,
+      "ref_available": false,
+      "exact_matches": 0,
+      "exact_rate": 0.0,
+      "mini_first": [
+        "电功",
+        "电热",
+        "电功率"
+      ],
+      "mineru_first": []
+    },
+    {
+      "book": "教材基础练 磁场",
+      "page": 2,
+      "index": 0,
+      "mini_cells": 14,
+      "mineru_cells": 0,
+      "ref_available": false,
+      "exact_matches": 0,
+      "exact_rate": 0.0,
+      "mini_first": [
+        "研究对象",
+        "洛伦兹力",
+        "研究对象"
+      ],
+      "mineru_first": []
+    },
+    {
+      "book": "物理_教材基础练 电路",
+      "page": 11,
+      "index": 0,
+      "mini_cells": 10,
+      "mineru_cells": 0,
+      "ref_available": false,
+      "exact_matches": 0,
+      "exact_rate": 0.0,
+      "mini_first": [
+        "最高速度:约25 km/h",
+        "充电时间:约4 h",
+        "车轮尺寸:直径为35.56 cm"
+      ],
+      "mineru_first": []
+    }
+  ],
+  "formulas": [
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 0,
+      "mineru": "v = { \\frac { \\Delta x } { \\Delta t } }",
+      "minicpm": "v = \\frac{\\Delta x}{\\Delta t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 0,
+      "mineru": "\\frac { \\Delta x } { \\Delta t }",
+      "minicpm": "\\frac{\\Delta x}{\\Delta t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 0,
+      "mineru": "a = { \\frac { \\Delta v } { \\Delta t } }",
+      "minicpm": "a = \\frac{\\Delta v}{\\Delta t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "x _ { 0 }",
+      "minicpm": "x_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "\\frac { 2 } { 3 } x _ { 0 }",
+      "minicpm": "\\frac{2}{3}x_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "\\frac { 5 } { 3 } x _ { 0 }",
+      "minicpm": "\\frac{5}{3}x_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "\\frac { 3 } { 2 } x _ { 0 }",
+      "minicpm": "\\frac{3}{2}x_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "2 x _ { 0 }",
+      "minicpm": "2x_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "t _ { 1 }",
+      "minicpm": "t_1",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "t _ { 2 }",
+      "minicpm": "t_2",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "t _ { 1 }",
+      "minicpm": "t_1",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "t _ { 2 }",
+      "minicpm": "t_2",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "t _ { 1 }",
+      "minicpm": "t_1",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "t _ { 2 }",
+      "minicpm": "t_2",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "t _ { 1 }",
+      "minicpm": "t_1",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "c , d",
+      "minicpm": "d",
+      "fuzzy": 0.5,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "t _ { 2 }",
+      "minicpm": "t_2",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "\\setminus ^ { d }",
+      "minicpm": "0 \\sim 9\\text{ s}",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "v _ { 0 } ~ = ~ 3 0 ~ \\mathrm { ~ m / s }",
+      "minicpm": "v_{0} = 30 \\mathrm{~m/s}",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "s _ { 0 } = 1 0 0 \\ \\mathrm { m } . \\ t = 0",
+      "minicpm": "s_{0} = 100 \\mathrm{~m}",
+      "fuzzy": 0.737,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "\\triangle { O P Q }",
+      "minicpm": "\\triangle OPQ",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "\\triangle { O Q T }",
+      "minicpm": "\\triangle OQT",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "S _ { 1 }",
+      "minicpm": "S_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "S _ { 2 } \\left( S _ { 1 } < S _ { 2 } \\right)",
+      "minicpm": "S_{2}(S_{1}<S_{2})",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "S _ { 0 }",
+      "minicpm": "S_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 10,
+      "mineru": "S _ { 0 } = S _ { 1 }",
+      "minicpm": "S_{0}=S_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "m \\ =",
+      "minicpm": "m=1\\ kg",
+      "fuzzy": 0.571,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\theta = 3 7 ^ { \\circ }",
+      "minicpm": "\\theta=37^{\\circ}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\omega _ { 0 }",
+      "minicpm": "\\omega_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "1 0 \\mathrm { ~ m ~ } / \\mathrm { s } ^ { 2 } )",
+      "minicpm": "10\\ m/s^{2}",
+      "fuzzy": 0.8,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\sqrt { 2 } \\mathrm { \\ r a d s }",
+      "minicpm": "\\sqrt{2}",
+      "fuzzy": 0.714,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\bf { r a d } \\zeta \\bf { s }",
+      "minicpm": "\\frac{5}{2}\\sqrt{2}",
+      "fuzzy": 0.348,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\frac { 5 } { 2 } \\sqrt { 2 } \\ \\mathrm { r a d / s }",
+      "minicpm": "\\frac{2}{5}\\sqrt{5}",
+      "fuzzy": 0.667,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "5 \\sqrt { 2 } \\mathrm { \\ r a d { s } }",
+      "minicpm": "5\\sqrt{2}",
+      "fuzzy": 0.75,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "m = 0 . 5 ~ \\mathrm { k g }",
+      "minicpm": "m=0.5\\ kg",
+      "fuzzy": 0.933,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "g = 1 0 \\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "g=10\\ m/s^{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\mathrm { { \\ m } } / \\mathrm { { s } }",
+      "minicpm": "g = 10 \\, m/s^{2}",
+      "fuzzy": 0.5,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "4 \\sqrt { 2 } \\ \\mathrm { m / s }",
+      "minicpm": "4\\sqrt{2}",
+      "fuzzy": 0.8,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\mathrm { m } / \\mathrm { s }",
+      "minicpm": "(g = 10 \\, \\text{m/s}^{2})",
+      "fuzzy": 0.429,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "1 0 ~ \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "l=1\\ m",
+      "fuzzy": 0.364,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\sqrt { 2 } \\mathrm { \\ r a d { s } }",
+      "minicpm": "\\sqrt{2}",
+      "fuzzy": 0.714,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "1 . 0 \\ \\mathrm { r a d / s }",
+      "minicpm": "\\frac{2}{5}\\sqrt{10}",
+      "fuzzy": 0.3,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\frac { 2 } { 5 } \\sqrt { 1 0 } \\ \\mathrm { r a d / s }",
+      "minicpm": "\\mu = \\frac{\\sqrt{3}}{2}",
+      "fuzzy": 0.533,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\frac { 2 } { 5 } \\sqrt { 5 } \\ \\mathrm { r a d / s }",
+      "minicpm": "2\\sqrt{5}",
+      "fuzzy": 0.545,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "A C , B C",
+      "minicpm": "30^{\\circ}",
+      "fuzzy": 0.364,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "L =",
+      "minicpm": "L = 2 \\, m",
+      "fuzzy": 0.571,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "3 0 ^ { \\circ }",
+      "minicpm": "30^{\\circ}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\left( { { g = 1 0 } \\ m / { \\mathrm { s } ^ { 2 } } } \\right)",
+      "minicpm": "l = 1 \\, m",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\mathrm { r a d } / \\mathrm { s }",
+      "minicpm": "\\omega",
+      "fuzzy": 0.2,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\mathrm { r a d } \\mathrm { / s }",
+      "minicpm": "\\omega",
+      "fuzzy": 0.2,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "3 0 ^ { \\circ }",
+      "minicpm": "45^{\\circ}",
+      "fuzzy": 0.667,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "M = 4 \\ \\mathrm { k g } .",
+      "minicpm": "M = 4 \\, kg",
+      "fuzzy": 0.833,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "l = 1 \\mathrm { ~ m ~ }",
+      "minicpm": "m = 1 \\, kg",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\mu = \\frac { \\sqrt { 3 } } { 2 }",
+      "minicpm": "\\sqrt{5}",
+      "fuzzy": 0.444,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\mathrm { \\Delta } , \\mathrm { \\Delta } g = 1 0 \\mathrm { \\ m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "\\sqrt{10}",
+      "fuzzy": 0.24,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\sqrt { 5 } \\mathrm { \\ r a d { s } }",
+      "minicpm": "\\sqrt{15}",
+      "fuzzy": 0.667,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "{ \\sqrt { 1 0 } } { \\mathrm { ~ r a d } } / { \\mathrm { s } }",
+      "minicpm": "0.4\\ m",
+      "fuzzy": 0.125,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "\\sqrt { 1 5 } \\mathrm { \\ r a d { s } }",
+      "minicpm": "m = 0.1 \\, kg",
+      "fuzzy": 0.111,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 8,
+      "mineru": "2 \\sqrt { 5 } \\mathrm { \\ r a d { s } }",
+      "minicpm": "^{2}",
+      "fuzzy": 0.182,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "L \\ =",
+      "minicpm": "x = 5 \\, m",
+      "fuzzy": 0.286,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "8 0 \\mathrm { ~ m ~ }",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "k = 2 5 \\mathrm { ~ N / m } _ { \\circ }",
+      "minicpm": "45^{\\circ}",
+      "fuzzy": 0.556,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "m \\ : =",
+      "minicpm": "\\mu=0.2",
+      "fuzzy": 0.444,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "g",
+      "minicpm": "g",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "1 0 ~ \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "g=10 \\, m/s^{2}",
+      "fuzzy": 0.75,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "3 0 ^ { \\circ }",
+      "minicpm": "30^{\\circ}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "4 5 ^ { \\circ }",
+      "minicpm": "37^{\\circ}",
+      "fuzzy": 0.667,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "g _ { \\circ }",
+      "minicpm": "\\sin 37^{\\circ}=0.6, \\cos 37^{\\circ}=0.8",
+      "fuzzy": 0.25,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "m g h",
+      "minicpm": "m = 50 \\, kg",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "{ \\sqrt { 2 } } m g h",
+      "minicpm": "\\sqrt{2}",
+      "fuzzy": 0.769,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "{ \\frac { 2 { \\sqrt { 3 } } } { 3 } } m g h",
+      "minicpm": "\\frac{2\\sqrt{3}}{3}mgh",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "{ \\frac { 3 { \\sqrt { 2 } } - 2 { \\sqrt { 3 } } } { 3 } } m g h",
+      "minicpm": "\\frac{3\\sqrt{2}-2\\sqrt{3}}{3}mgh",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "m = 2 , 0",
+      "minicpm": "m=2.0 \\, kg",
+      "fuzzy": 0.615,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "F = 1 0 ~ \\mathrm { N } , F",
+      "minicpm": "40 \\, J",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "3 7 ^ { \\circ } { _ { \\circ } }",
+      "minicpm": "W = F \\cdot (\\frac{h}{\\sin \\alpha} - \\frac{h}{\\sin \\beta})",
+      "fuzzy": 0.222,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "\\mu = 0 . 2",
+      "minicpm": "3 \\, m/s^{2}",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "g = 1 0 \\mathrm { m } / \\mathrm { s } ^ { 2 } , \\mathrm { s i n } 3 7 ^ { \\circ } =",
+      "minicpm": "0 \\sim 3 \\, m",
+      "fuzzy": 0.308,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "0 . 6 , \\cos 3 7 ^ { \\circ } = 0 .",
+      "minicpm": "W_{F} - mgL(1 - \\cos \\theta) = 0",
+      "fuzzy": 0.278,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "1 6 \\pi \\mathrm { ~ J ~ }",
+      "minicpm": "16\\pi \\, J",
+      "fuzzy": 0.769,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "8 \\pi \\mathrm { ~ J ~ }",
+      "minicpm": "8\\pi \\, J",
+      "fuzzy": 0.727,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "1 6 \\pi \\mathrm { ~ J ~ }",
+      "minicpm": "16\\pi \\, J",
+      "fuzzy": 0.769,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "4 \\pi \\mathrm { ~ J ~ }",
+      "minicpm": "4\\pi \\, J",
+      "fuzzy": 0.727,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "F ",
+      "minicpm": "W_{F}",
+      "fuzzy": 0.667,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "x = 5 \\mathrm { ~ m ~ }",
+      "minicpm": "x_{1}",
+      "fuzzy": 0.25,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "mineru": "3 \\ \\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "x_{2}",
+      "fuzzy": 0.286,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "t _ { 0 } = 1 6 \\mathrm { ~ s ~ }",
+      "minicpm": "t_{0}=16 \\, s",
+      "fuzzy": 0.8,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "v _ { \\mathrm { { m } } } = 3 0 ~ \\mathrm { { m } \\mathrm { { s } } }",
+      "minicpm": "v_{m}=30 \\, m/s",
+      "fuzzy": 0.824,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "m = 2 \\ 0 0 0 \\ \\mathrm { k g }",
+      "minicpm": "m=2\\ 000 \\, kg",
+      "fuzzy": 0.941,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "\\frac { 1 } { 5 }",
+      "minicpm": "\\frac{1}{5}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "\\mathrm { g } = 1 0 \\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "g=10 \\, m/s^{2}",
+      "fuzzy": 0.941,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "0 \\sim t _ { 0 }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "a =",
+      "minicpm": "a_{0}",
+      "fuzzy": 0.5,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "2 ~ { \\mathrm { m } } / { \\mathrm { s } } ^ { 2 }",
+      "minicpm": "a = 2 \\, m/s^{2}",
+      "fuzzy": 0.714,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "0 \\sim t _ { 0 }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "t _ { 1 }",
+      "minicpm": "t_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "t _ { 1 } \\sim t _ { 2 }",
+      "minicpm": "t_{1} \\sim t_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "a _ { 0 } \\ldots t _ { 1 } \\ldots t _ { 2 }",
+      "minicpm": "0 \\sim t_{1}, t_{1} \\sim t_{2}",
+      "fuzzy": 0.533,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "0 \\sim t _ { 1 }",
+      "minicpm": "0 \\sim t_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "m a _ { 0 }",
+      "minicpm": "ma_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "\\frac { 1 } { 2 } ( k m g + m a _ { 0 } ) a _ { 0 } t _ { 1 }",
+      "minicpm": "\\frac{1}{2}(kmg + ma_{0})a_{0}t_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "0 \\sim t _ { 1 } \\ldots t _ { 1 } \\sim t _ { 2 }",
+      "minicpm": "t_{1} \\sim t_{2}",
+      "fuzzy": 0.56,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "\\frac { t _ { 1 } } { t _ { 2 } - t _ { 1 } }",
+      "minicpm": "\\frac{t_{1}}{t_{2} - t_{1}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "0 \\sim t _ { 1 } \\ , t _ { 1 } \\sim t _ { 2 }",
+      "minicpm": "0 \\sim t_{1}",
+      "fuzzy": 0.6,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "I _ { 2 ( t _ { 2 } - t _ { 1 } ) }",
+      "minicpm": "\\frac{t_{1}}{2(t_{2} - t_{1})}",
+      "fuzzy": 0.696,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "\\frac { 1 } { 1 0 }",
+      "minicpm": "\\frac{1}{10}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "1 0 \\mathrm { ~ m ~ s ~ } ^ { 2 } .",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.625,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "mineru": "v _ { 0 } = 7 . 5 ~ \\mathrm { m / s }",
+      "minicpm": "v_{0}=7.5 \\, m/s",
+      "fuzzy": 0.9,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "\\sqrt { 6 ^ { 2 } + 8 ^ { 2 } } \\ m =",
+      "minicpm": "\\sqrt{6^{2}+8^{2}}",
+      "fuzzy": 0.9,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "v = { \\frac { \\Delta x } { \\Delta t } }",
+      "minicpm": "v=\\frac{\\Delta x}{\\Delta t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "\\frac { \\Delta x } { \\Delta t }",
+      "minicpm": "\\frac{\\Delta x}{\\Delta t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "a = { \\frac { \\Delta v } { \\Delta t } }",
+      "minicpm": "a=\\frac{\\Delta v}{\\Delta t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "\\stackrel { - } { v } =",
+      "minicpm": "a = \\frac{\\Delta v}{\\Delta t}",
+      "fuzzy": 0.276,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "\\frac { 1 0 0 } { 9 . 9 5 } ~ \\mathrm { { m / s } \\approx 1 0 . 1 ~ \\mathrm { { m / s } } }",
+      "minicpm": "a_{1} = \\frac{100}{10} \\, m/s^{2} = 10 \\, m/s^{2}",
+      "fuzzy": 0.556,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "\\Delta v = 1 0 0 \\mathrm { \\ m } / \\mathrm { s } - 0 = 1 0 0 \\mathrm { \\ m } / \\mathrm { s } , \\mathrm { A }",
+      "minicpm": "\\Delta v = 100 \\, m/s - 0 = 100 \\, m/s",
+      "fuzzy": 0.917,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "1 0 8 ~ \\mathrm { k m / h } = 3 0 ~ \\mathrm { m / s }",
+      "minicpm": "108 \\, km/h = 30 \\, m/s",
+      "fuzzy": 0.867,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "\\Delta v ^ { \\prime } = 0 \\mathrm { ~ - } 3 0 \\mathrm { ~ m / s } = \\mathrm { ~ - } 3 0 \\mathrm { ~ m / s }",
+      "minicpm": "\\Delta v' = 0 - 30 \\, m/s = -30 \\, m/s",
+      "fuzzy": 0.778,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "a = { \\frac { \\Delta v } { \\Delta t } }",
+      "minicpm": "\\Delta t",
+      "fuzzy": 0.5,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "a _ { 1 } = { \\frac { 1 0 0 } { 1 0 } } ~ { \\mathrm { m / s } } ^ { 2 } = 1 0 ~ { \\mathrm { m / s } } ^ { 2 }",
+      "minicpm": "a_{2} = \\frac{-30}{2.5} \\, m/s^{2} = -12 \\, m/s^{2}",
+      "fuzzy": 0.654,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "a _ { 2 } = { \\frac { - 3 0 } { 2 . 5 } } ~ { \\mathrm { m / s } } ^ { 2 } = \\mathrm { - } 1 2 ~ { \\mathrm { m / s } } ^ { 2 }",
+      "minicpm": "\\bar{a} = \\frac{v - v_{0}}{t} = \\frac{30 - 0}{10} \\, m/s^{2} = 3 \\, m/s^{2}",
+      "fuzzy": 0.562,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "\\overline { { a } } \\ = \\ \\frac { v - v _ { 0 } } { t } \\ = \\ \\frac { 3 0 - 0 } { 1 0 } \\ \\mathrm { m / s ^ { 2 } } \\ =",
+      "minicpm": "x=\\frac{v+v_{0}}{2}t=\\frac{30+0}{2}\\times10\\ m=150\\ m",
+      "fuzzy": 0.6,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "3 \\ \\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "a_{\\min} < \\bar{a} = 3 \\, m/s^{2}",
+      "fuzzy": 0.476,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "a _ { \\mathrm { m i n } } < \\overline { { a } } = 3 \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "\\bar{v}=\\frac{100}{9.95}",
+      "fuzzy": 0.222,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "x = \\frac { v + v _ { 0 } } { 2 } t = \\frac { 3 0 + 0 } { 2 } \\times 1 0 \\ \\mathrm { m } = 1 5 0 \\ \\mathrm { m }",
+      "minicpm": "x' > x = 150\\ m",
+      "fuzzy": 0.273,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "x ^ { \\prime } > x = 1 5 0 \\mathrm { ~ m ~ }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 0.286,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "\\mathbf { m } { / } \\mathbf { s } ^ { 3 }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 0.182,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": ", 0 \\sim t _ { 0 }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 0.923,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "t _ { 0 }",
+      "minicpm": "t_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 1,
+      "mineru": "0 \\sim t _ { 0 }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "t _ { 0 }",
+      "minicpm": "t_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\left( { { t } _ { 0 } } < t \\right)",
+      "minicpm": "t_{0} < t",
+      "fuzzy": 0.8,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\frac { \\ d { } v t } { 2 }",
+      "minicpm": "\\frac{vt}{2}",
+      "fuzzy": 0.933,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\frac { v t _ { 0 } ^ { 2 } } { 2 t }",
+      "minicpm": "\\frac{vt_{0}^{2}}{2t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\frac { v ( t - t _ { 0 } ) ^ { 2 } } { 2 t }",
+      "minicpm": "\\frac{v(t-t_{0})^{2}}{2t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "v t _ { 0 } \\left( 1 - \\frac { t _ { 0 } } { 2 t } \\right)",
+      "minicpm": "vt_{0}\\left(1-\\frac{t_{0}}{2t}\\right)",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "x _ { 1 }",
+      "minicpm": "x_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "x _ { 2 }",
+      "minicpm": "x_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\frac { x _ { 2 } - 5 x _ { 1 } } { 3 0 t ^ { 2 } }",
+      "minicpm": "\\frac{x_{2}-5x_{1}}{30t^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\frac { x _ { 2 } - x _ { 1 } } { t ^ { 2 } }",
+      "minicpm": "\\frac{x_{2}-x_{1}}{t^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\frac { x _ { 2 } - 3 x _ { 1 } } { 1 2 t ^ { 2 } }",
+      "minicpm": "\\frac{x_{2}-3x_{1}}{12t^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\frac { x _ { 2 } - 3 x _ { 1 } } { 1 8 t ^ { 2 } }",
+      "minicpm": "\\frac{x_{2}-3x_{1}}{18t^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "\\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.727,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "{ \\sqrt { 3 } } : { \\sqrt { 5 } }",
+      "minicpm": "\\sqrt{3} : \\sqrt{5}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "1 { : } \\sqrt { 3 }",
+      "minicpm": "1 : \\sqrt{3}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "x = 2 0 - \\frac { 1 } { 2 0 } v ^ { 2 } ( \\mathrm { m } )",
+      "minicpm": "x = 20 - \\frac{1}{20} v^{2}",
+      "fuzzy": 0.903,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "1 0 ~ \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "510 \\mathrm{~m} / \\mathrm{s}",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 2,
+      "mineru": "2 0 ~ \\mathrm { m / s }",
+      "minicpm": "270 \\mathrm{~m} / \\mathrm{s}",
+      "fuzzy": 0.923,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "x _ { 1 }",
+      "minicpm": "x_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "x _ { 2 }",
+      "minicpm": "x_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "x _ { 1 } : x _ { 2 }",
+      "minicpm": "x_{1}:x_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "\\frac { v } { 2 }",
+      "minicpm": "\\frac{v}{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "\\frac { \\sqrt { 2 } v } { 2 }",
+      "minicpm": "\\frac{\\sqrt{2}v}{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "\\frac { v } { 3 }",
+      "minicpm": "\\frac{v}{3}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "\\frac { 2 v } { 3 }",
+      "minicpm": "\\frac{2v}{3}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "t _ { 1 } \\AA _ { 1 } t _ { 2 } \\AA _ { 3 }",
+      "minicpm": "t_{1}, t_{2}, t_{3}",
+      "fuzzy": 0.556,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "t _ { 1 } \\colon t _ { 2 } \\colon t _ { 3 } = 1 \\colon \\sqrt { 2 } \\colon \\sqrt { 3 }",
+      "minicpm": "t_{1}: t_{2}: t_{3} = 1: \\sqrt{2}: \\sqrt{3}",
+      "fuzzy": 0.6,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "\\cdot \\frac { \\ d { } x _ { 0 } } { \\ d { } t _ { 1 } }",
+      "minicpm": "\\frac{x_{0}}{t_{1}}",
+      "fuzzy": 0.727,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "\\frac { 2 x _ { 0 } } { t _ { 3 } - t _ { 1 } }",
+      "minicpm": "\\frac{2x_{0}}{t_{3}-t_{1}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "\\frac { \\mathscr { x } _ { 0 } } { t _ { 2 } - t _ { 1 } }",
+      "minicpm": "\\frac{x_{0}}{t_{2}-t_{1}}",
+      "fuzzy": 0.759,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "v _ { 1 } \\setminus v _ { 2 } \\setminus v _ { 3 }",
+      "minicpm": "v_{1}, v_{2}, v_{3}",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "t _ { 1 } \\setminus t _ { 2 } \\setminus t _ { 3 }",
+      "minicpm": "t_{1}: t_{2}: t_{3} = 1: 1: 1",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "v _ { 1 } \\colon v _ { 2 } \\colon v _ { 3 } = 3 \\colon 2 \\colon 1",
+      "minicpm": "v_{1}: v_{2}: v_{3} = 3: 2: 1",
+      "fuzzy": 0.455,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "v _ { 1 } \\colon v _ { 2 } \\colon v _ { 3 } = \\sqrt { 3 } \\colon \\sqrt { 2 } \\colon 1",
+      "minicpm": "v_{1}: v_{2}: v_{3} = \\sqrt{3} : \\sqrt{2}: 1",
+      "fuzzy": 0.6,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "t _ { 1 } \\colon t _ { 2 } \\colon t _ { 3 } = \\big ( \\sqrt { 3 } - \\sqrt { 2 } \\big ) \\colon ( \\sqrt { 2 } - 1 ) \\colon 1",
+      "minicpm": "t_{1}: t_{2}: t_{3} = (\\sqrt{3} - \\sqrt{2}) : (\\sqrt{2} - 1) : 1",
+      "fuzzy": 0.667,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 12,
+      "mineru": "t _ { 1 } \\colon t _ { 2 } \\colon t _ { 3 } = 1 \\colon 1 \\colon 1",
+      "minicpm": "t_{1}",
+      "fuzzy": 0.125,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\theta = 5 3 ^ { \\circ }",
+      "minicpm": "\\theta=53^{\\circ}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v = n L \\sqrt { \\frac { 2 g } { h } } , N = 2 n \\bigl ( n = 1 , 2 , 3 , \\cdots \\bigr )",
+      "minicpm": "N = 2n (n = 1, 2, 3, \\cdots)",
+      "fuzzy": 0.613,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v = n L \\sqrt { \\frac { 2 g } { h } } , N = 2 n - 1 \\left( n = 1 , 2 , 3 , \\cdots \\right)",
+      "minicpm": "N = 2n - 1 (n = 1, 2, 3, \\cdots)",
+      "fuzzy": 0.724,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v = n L \\sqrt { \\frac { g } { 2 h } } , N = 2 n ( n = 1 , 2 , 3 , \\cdots )",
+      "minicpm": "N = 2n (n = 1, 2, 3, \\cdots)",
+      "fuzzy": 0.704,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v = n L \\sqrt { \\frac { g } { 2 h } } , N = 2 n - 1 \\left( n = 1 , 2 , 3 , \\cdots \\right)",
+      "minicpm": "N = 2n - 1 (n = 1, 2, 3, \\cdots)",
+      "fuzzy": 0.724,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\scriptstyle y = k x ^ { 2 }",
+      "minicpm": "y = kx^{2}",
+      "fuzzy": 0.476,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\left( k = 1 \\right.",
+      "minicpm": "\\left( k = 1 \\right)",
+      "fuzzy": 0.8,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\cdot \\frac { 1 } { \\mathbf { m } } \\Big )",
+      "minicpm": "\\frac{1}{\\mathrm{m}}",
+      "fuzzy": 0.462,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "- \\frac { 3 s } { 2 }",
+      "minicpm": "-\\frac{3s}{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v _ { 0 } \\sqrt { 2 v _ { 0 } ( v _ { 0 } }",
+      "minicpm": "v_{0}, 2v_{0}",
+      "fuzzy": 0.556,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v _ { 0 } \\ldots 2 v _ { 0 }",
+      "minicpm": "v_{0}, 2v_{0}",
+      "fuzzy": 0.625,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v _ { 0 }",
+      "minicpm": "v_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "2 v _ { 0 }",
+      "minicpm": "2v_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v _ { 1 }",
+      "minicpm": "v_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v _ { 2 }",
+      "minicpm": "v_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\sqrt { \\frac { 4 s } { g } }",
+      "minicpm": "\\sqrt{\\frac{4s}{g}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "v _ { 1 }",
+      "minicpm": "v_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\sqrt { \\frac { 3 g + 1 6 g s ^ { 2 } } { 4 } }",
+      "minicpm": "\\sqrt{\\frac{3g + 16gs^{2}}{4}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "2 s ^ { 2 }",
+      "minicpm": "2s^{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "9 0 ^ { \\circ } - \\theta",
+      "minicpm": "90^{\\circ} - \\theta",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\frac { v ^ { 2 } \\cos \\theta } { 2 g }",
+      "minicpm": "\\frac{v^{2} \\cos \\theta}{2g}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\frac { 2 v \\cos \\theta } { g \\sin \\theta }",
+      "minicpm": "\\frac{2v \\cos \\theta}{g \\sin \\theta}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 4,
+      "mineru": "\\frac { 4 v ^ { 2 } \\sin \\theta } { g }",
+      "minicpm": "\\frac{4v^{2} \\sin \\theta}{g}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\omega = { \\sqrt { \\frac { g } { l \\cos \\theta } } }",
+      "minicpm": "\\omega = \\sqrt{\\frac{g}{l \\cos \\theta}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\omega = { \\sqrt { \\frac { g } { 2 l \\cos \\theta } } }",
+      "minicpm": "\\omega = \\sqrt{\\frac{g}{2l \\cos \\theta}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\omega = { \\sqrt { \\frac { 2 g } { 3 l \\tan \\theta \\sin \\theta } } }",
+      "minicpm": "\\omega = \\sqrt{\\frac{2g}{3l \\tan \\theta \\sin \\theta}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "a , b",
+      "minicpm": "ABC",
+      "fuzzy": 0.667,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\omega = { \\sqrt { \\frac { 2 g } { 3 l \\tan \\theta \\sin \\theta } } }",
+      "minicpm": "\\omega = \\sqrt{\\frac{2g}{3l \\tan \\theta \\sin \\theta}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "a , c",
+      "minicpm": "A",
+      "fuzzy": 0.5,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\theta = 5 3 ^ { \\circ }",
+      "minicpm": "\\theta = 53^{\\circ}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "O O _ { 1 }",
+      "minicpm": "OO_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\omega",
+      "minicpm": "\\omega",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\sin 5 3 ^ { \\circ } = 0 . 8 , \\cos 5 3 ^ { \\circ } =",
+      "minicpm": "\\sin 53^{\\circ} = 0.8, \\cos 53^{\\circ} = 0.6",
+      "fuzzy": 0.941,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "m g",
+      "minicpm": "mg",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\sqrt { \\frac { 5 g } { 6 L } }",
+      "minicpm": "\\sqrt{\\frac{5g}{6L}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\sqrt { \\frac { 3 3 g } { 6 L } }",
+      "minicpm": "\\sqrt{\\frac{33g}{6L}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "O O ^ { \\prime }",
+      "minicpm": "\\omega",
+      "fuzzy": 0.5,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\theta = 5 3 ^ { \\circ }",
+      "minicpm": "\\theta = 53^{\\circ}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "g , \\sin \\ 5 3 ^ { \\circ } = 0 . 8 , \\cos \\ 5 3 ^ { \\circ } = 0 . 6",
+      "minicpm": "\\sin 53^{\\circ} = 0.8",
+      "fuzzy": 0.619,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "k = \\frac { 8 m g } { 5 L }",
+      "minicpm": "k = \\frac{8mg}{5L}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\omega _ { 0 } = \\frac { 2 } { 3 } \\sqrt { \\frac { 5 g } { L } }",
+      "minicpm": "\\omega_{0} = \\frac{2}{3\\sqrt{\\frac{5g}{L}}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\omega = \\frac { 2 } { 3 } \\sqrt { \\frac { 1 0 g } { L } }",
+      "minicpm": "\\omega = \\frac{2}{3}\\sqrt{\\frac{10g}{L}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "v _ { 0 }",
+      "minicpm": "v_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "g",
+      "minicpm": "g",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\frac { L } { 2 v _ { 0 } }",
+      "minicpm": "\\frac{L}{2v_{0}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\frac { g L ^ { 2 } } { 2 v _ { 0 } ^ { 2 } }",
+      "minicpm": "\\frac{gL^{2}}{2v_{0}^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\frac { \\pi v _ { 0 } } { L }",
+      "minicpm": "\\frac{\\pi v_{0}}{L}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 9,
+      "mineru": "\\frac { \\pi g L } { 2 v _ { 0 } }",
+      "minicpm": "\\frac{\\pi g L}{2v_{0}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "t _ { 1 }",
+      "minicpm": "t_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "t _ { 2 }",
+      "minicpm": "t_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "1 0 \\ \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.923,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "t _ { 1 } \\colon t _ { 2 }",
+      "minicpm": "t_{1}:t_{2}",
+      "fuzzy": 0.571,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\frac { h } { k + 1 }",
+      "minicpm": "\\frac{h}{k+1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\frac { h } { k }",
+      "minicpm": "\\frac{h}{k}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\frac { 2 h } { k }",
+      "minicpm": "\\frac{2h}{k}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\frac { 2 h } { k - 1 }",
+      "minicpm": "\\frac{2h}{k-1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "1 0 \\ \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "100 \\, m/s^{2}",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "1\\,000 \\, m/s^{2}",
+      "fuzzy": 0.571,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\mathrm { m } { \\surd \\mathrm { s } } ^ { 2 }",
+      "minicpm": "10\\,000 \\, m/s^{2}",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "^{2}",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "3 0 ^ { \\circ }",
+      "minicpm": "\\frac{L}{v}",
+      "fuzzy": 0.167,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "6 0 ^ { \\circ }",
+      "minicpm": "\\frac{L}{v}",
+      "fuzzy": 0.167,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\frac { L } { v }",
+      "minicpm": "\\frac{L}{v}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 12,
+      "mineru": "\\cdot \\frac { L } { \\ v }",
+      "minicpm": "\\frac{L}{v}",
+      "fuzzy": 0.75,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "W = F l { \\cos \\alpha } ( \\alpha",
+      "minicpm": "W = Fl \\cos \\alpha (\\alpha",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "\\leqslant \\alpha < 9 0 ^ { \\circ }",
+      "minicpm": "0 \\leq \\alpha < 90^{\\circ}",
+      "fuzzy": 0.833,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "W > 0",
+      "minicpm": "W > 0",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "( 2 ) 9 0 ^ { \\circ } \\ < \\alpha \\leq 1 8 0 ^ { \\circ } { \\mathfrak { H } } . 5 \\ W < 0",
+      "minicpm": "90^{\\circ} < \\alpha \\leq 180^{\\circ}",
+      "fuzzy": 0.721,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "3 ) \\alpha = 9 0 ^ { \\circ } \\ C H \\ / W = 0",
+      "minicpm": "\\alpha = 90^{\\circ}",
+      "fuzzy": 0.75,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "\\boldsymbol { F } _ { \\widehat { \\mathbf { H } } }",
+      "minicpm": "W = Fl \\cos \\alpha",
+      "fuzzy": 0.216,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "W _ { \\triangle } = F _ { \\triangle } \\ l { \\cos \\ \\alpha }",
+      "minicpm": "W_{合} = F_{合} l \\cos \\alpha",
+      "fuzzy": 0.571,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "W _ { 1 } \\ 、 W _ { 2 } 、 W _ { 3 } \\cdots",
+      "minicpm": "W_{合} = W_{1} + W_{2} + W_{3} + \\cdots\\cdots",
+      "fuzzy": 0.629,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "W _ { \\triangle } = W _ { 1 } + W _ { 2 } + W _ { 3 } + \\cdots",
+      "minicpm": "W_{1}",
+      "fuzzy": 0.154,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "1 0 ~ \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "\\mu m g x",
+      "minicpm": "\\mu mgx",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "F _ { f }",
+      "minicpm": "F_{f}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "F _ { f } ( s + L )",
+      "minicpm": "F_{f}(s + L)",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "F _ { f } s",
+      "minicpm": "F_{f}s",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "Q = F _ { f } ( s + L )",
+      "minicpm": "Q = F_{f}(s + L)",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "v _ { 0 } =",
+      "minicpm": "v_{0} = 4 \\, m/s",
+      "fuzzy": 0.545,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "L = 6 \\mathrm { ~ m ~ }",
+      "minicpm": "L = 6 \\, m",
+      "fuzzy": 0.727,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "v = 6 ~ \\mathrm { m / s }",
+      "minicpm": "v = 6 \\, m/s",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "\\mu = 0 . 2",
+      "minicpm": "\\mu = 0.2",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "g",
+      "minicpm": "h = 0.5 \\, m, g",
+      "fuzzy": 0.2,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 0,
+      "mineru": "1 0 \\mathrm { ~ m ~ } \\mathrm { ~ s ~ } ^ { 2 }",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.625,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "E _ { \\mathrm { k } } = { \\frac { 1 } { 2 } } m v ^ { 2 }",
+      "minicpm": "E_{k}=\\frac{1}{2}mv^{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "W = \\Delta E _ { \\mathrm { k } } = E _ { \\mathrm { k } 2 } - E _ { \\mathrm { k } 1 }",
+      "minicpm": "\\left\\{\\begin{array}{l}1. 内容:合力对物体所做的功等于物体动能的变化 \\\\ 2. 表达式: W=\\Delta E_{k}=E_{k2}-E_{k1}\\end{array}\\right.",
+      "fuzzy": 0.41,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "E _ { 1 }",
+      "minicpm": "E_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "E _ { 2 }",
+      "minicpm": "E_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "\\frac { E _ { 2 } } { E _ { 1 } }",
+      "minicpm": "\\frac{E_{2}}{E_{1}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "m g h",
+      "minicpm": "g",
+      "fuzzy": 0.5,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "m g h",
+      "minicpm": "m = 1 \\, kg",
+      "fuzzy": 0.444,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "m g h",
+      "minicpm": "x_{\\min}",
+      "fuzzy": 0.286,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "3 0 ^ { \\circ }",
+      "minicpm": "30^{\\circ}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "m = 1 ~ \\mathrm { k g }",
+      "minicpm": "x_{min} = \\frac{9\\sqrt{3}}{10} \\, m",
+      "fuzzy": 0.24,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "v _ { 0 } = 6 \\mathrm { ~ m ~ } / \\mathrm { ~ s ~ }",
+      "minicpm": "v_{0} = 6 \\, m/s",
+      "fuzzy": 0.737,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "1 0 ~ \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "x _ { \\operatorname* { m i n } }",
+      "minicpm": "\\frac{\\sqrt{3}}{2}",
+      "fuzzy": 0.222,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "\\frac { \\sqrt { 3 } } { 2 }",
+      "minicpm": "\\theta = 45^{\\circ}",
+      "fuzzy": 0.182,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "\\theta = 4 5 ^ { \\circ }",
+      "minicpm": "\\theta",
+      "fuzzy": 0.588,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 4,
+      "mineru": "x _ { \\mathrm { m i n } } = { \\frac { 9 \\sqrt { 3 } } { 1 0 } } ~ \\mathrm { m }",
+      "minicpm": "1.8 \\, m",
+      "fuzzy": 0.083,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 7,
+      "mineru": "v _ { 0 }",
+      "minicpm": "v_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 7,
+      "mineru": "m g h",
+      "minicpm": "\\frac{1}{2}mv_{0}^{2} + mgh",
+      "fuzzy": 0.353,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 7,
+      "mineru": "m g h",
+      "minicpm": "\\frac{1}{2}mv_{0}^{2}",
+      "fuzzy": 0.154,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 7,
+      "mineru": "\\frac { 1 } { 2 } m v _ { 0 } ^ { 2 } + m g h",
+      "minicpm": "^{2}",
+      "fuzzy": 0.133,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "{ \\frac { G M m } { r ^ { 2 } } } =",
+      "minicpm": "\\frac{GMm'}{R^2} = m'g",
+      "fuzzy": 0.833,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "m { \\frac { v ^ { 2 } } { r } } = m { \\omega ^ { 2 } } r = m { \\left( { \\frac { 2 \\pi } { T } } \\right) } ^ { 2 } r",
+      "minicpm": "\\frac{GMm}{r^{2}} = m \\frac{v^{2}}{r} = m\\omega^{2} r = m \\left( \\frac{2\\pi}{T} \\right)^{2} r",
+      "fuzzy": 0.861,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "M = { \\frac { v ^ { 2 } r } { G } } = { \\frac { { \\omega } ^ { 2 } r ^ { 3 } } { G } } = { \\frac { 4 \\pi ^ { 2 } r ^ { 3 } } { G T ^ { 2 } } }",
+      "minicpm": "M = \\frac{v^{2} r}{G} = \\frac{\\omega^{2} r^{3}}{G} = \\frac{4\\pi^{2} r^{3}}{GT^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "F = \\frac { G M m } { r ^ { 2 } } , R _ { \\# } < r _ { \\# }",
+      "minicpm": "F = \\frac{GMm}{r^{2}}, R_{\\text{地}} < r_{\\text{轨}}",
+      "fuzzy": 0.882,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "G \\ \\frac { M m } { r ^ { 2 } } = m r \\ \\frac { 4 \\pi ^ { 2 } } { T ^ { 2 } }",
+      "minicpm": "G \\frac{Mm}{r^{2}} = mr \\frac{4\\pi^{2}}{T^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "r =",
+      "minicpm": "r",
+      "fuzzy": 0.667,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\sqrt [ 3 ] { \\frac { G M T ^ { 2 } } { 4 \\pi ^ { 2 } } }",
+      "minicpm": "r = \\sqrt[3]{\\frac{GMT^{2}}{4\\pi^{2}}}",
+      "fuzzy": 0.95,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "G { \\frac { M m } { r ^ { 2 } } } =",
+      "minicpm": "G \\frac{Mm}{r^{2}} = ma",
+      "fuzzy": 0.909,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "m \\ : \\frac { v ^ { 2 } } { r } = \\ m \\ : \\ : \\bigg ( \\frac { 2 \\pi } { T } \\bigg ) ^ { 2 } r = m a = m \\omega ^ { 2 } r",
+      "minicpm": "G \\frac{Mm}{r^{2}} = m \\frac{v^{2}}{r} = m \\left( \\frac{2\\pi}{T} \\right)^{2} r = ma = m\\omega^{2} r",
+      "fuzzy": 0.764,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\omega = { \\sqrt { \\frac { G M } { r ^ { 3 } } } }",
+      "minicpm": "\\omega = \\sqrt{\\frac{GM}{r^{3}}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "T = 2 \\pi \\sqrt { \\frac { r ^ { 3 } } { G M } } , a = \\frac { G M } { r ^ { 2 } } , v = \\sqrt { \\frac { G M } { r } }",
+      "minicpm": "T = 2\\pi \\sqrt{\\frac{r^{3}}{GM}}, a = \\frac{GM}{r^{2}}, v = \\sqrt{\\frac{GM}{r}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "3 6 ~ 0 0 0 ~ \\mathrm { k m }",
+      "minicpm": "6 \\times 10^{7} \\mathrm{~m}",
+      "fuzzy": 0.3,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "r _ { \\mathbb { A } \\mathbb { Q } } < r _ { \\mathbb { Q } }",
+      "minicpm": "\\sqrt{\\sin \\beta_{\\mathrm{m}}} : \\sqrt{\\sin \\alpha_{\\mathrm{m}}}",
+      "fuzzy": 0.32,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\omega _ { \\scriptscriptstyle  { \\textregistered } } > \\omega _ { \\scriptscriptstyle  { \\text G } } , T _ { \\scriptscriptstyle  { \\text G } } < T _ { \\scriptscriptstyle  { \\text G } } , a _ { \\scriptscriptstyle  { \\text G } } > a _ { \\scriptscriptstyle  { \\text G } } , \\upsilon _ { \\scriptscriptstyle  { \\text G } } >",
+      "minicpm": "\\omega_{\\text{舱}} > \\omega_{\\text{同}}, T_{\\text{舱}} < T_{\\text{同}}, a_{\\text{舱}} > a_{\\text{同}}, v_{\\text{舱}} > v_{\\text{同}}",
+      "fuzzy": 0.56,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "v _ { \\perp }",
+      "minicpm": "v",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "T _ { 0 } = \\frac { T } { n }",
+      "minicpm": "T_0 = \\frac{T}{n}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "r = h + R",
+      "minicpm": "r = h + R",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "{ \\frac { G M m } { r ^ { 2 } } } =",
+      "minicpm": "a = G \\frac{M}{r^{2}}",
+      "fuzzy": 0.7,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "m \\left( \\frac { 2 \\pi } { T _ { 0 } } \\right) ^ { 2 } r",
+      "minicpm": "\\frac{GMm}{r^2} = m\\left(\\frac{2\\pi}{T_0}\\right)^2 r",
+      "fuzzy": 0.737,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\frac { G M m ^ { \\prime } } { R ^ { 2 } } = m ^ { \\prime } g",
+      "minicpm": "G \\frac{Mm}{R^{2}} = m \\frac{v^{2}}{R}",
+      "fuzzy": 0.55,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "h = \\left( { \\frac { g R ^ { 2 } T ^ { 2 } } { 4 n ^ { 2 } \\pi ^ { 2 } } } \\right) ^ { \\frac { 1 } { 3 } } - R , \\mathrm { C }",
+      "minicpm": "h = \\left(\\frac{g R^2 T^2}{4 n^2 \\pi^2}\\right)^{\\frac{1}{3}} - R",
+      "fuzzy": 0.964,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "T = \\frac { 2 \\pi R } { v }",
+      "minicpm": "T = \\frac{2\\pi R}{v}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "G \\frac { M m } { R ^ { 2 } } = m \\frac { v ^ { 2 } } { R }",
+      "minicpm": "G \\frac{Mm}{r^{2}} = m \\frac{v^{2}}{r}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "M = { \\frac { v ^ { 3 } T } { 2 \\pi G } } ,",
+      "minicpm": "M = \\frac{v^{3} T}{2\\pi G}",
+      "fuzzy": 0.963,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "G \\ \\frac { M m } { r ^ { 2 } } = m \\ \\frac { 4 \\pi ^ { 2 } } { T ^ { 2 } } r",
+      "minicpm": "G \\frac{Mm}{r^{2}} = m \\frac{4\\pi^{2}}{T^{2}} r",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "r ^ { 3 } = { \\frac { G M T ^ { 2 } } { 4 \\pi ^ { 2 } } }",
+      "minicpm": "r^{3} = \\frac{GMt^{2}}{4\\pi^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\frac { r _ { \\mathtt { A } \\mathtt { A } } ^ { 3 } } { r _ { \\mathtt { D } } ^ { 3 } } = \\frac { M _ { \\scriptscriptstyle { \\cdot } k } } { M _ { \\mathtt { H } } } \\bigg ( \\frac { T _ { \\mathtt { A } } } { T _ { \\mathtt { D } } } \\bigg ) ^ { 2 } = \\frac { 2 } { 5 }",
+      "minicpm": "\\frac{r_{\\text{船}}^{3}}{r_{\\text{卫}}^{3}} = \\frac{M_{\\text{火}}}{M_{\\text{地}}}\\left(\\frac{T_{\\text{船}}}{T_{\\text{卫}}}\\right)^{2} = \\frac{2}{5}",
+      "fuzzy": 0.504,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\frac { r _ { \\tt A R } } { r _ { \\tt D } } = \\sqrt [ 3 ] { \\frac { 2 } { 5 } }",
+      "minicpm": "\\frac{r_{\\text{船}}}{r_{\\text{卫}}} = \\sqrt[3]{\\frac{2}{5}}",
+      "fuzzy": 0.816,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "G { \\frac { M m } { r ^ { 2 } } } = m a",
+      "minicpm": "\\frac{a^{3}}{l^{2}} = k",
+      "fuzzy": 0.545,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "a = G { \\frac { M } { r ^ { 2 } } }",
+      "minicpm": "a = \\frac{R + d_{1} + R + d_{2}}{2}",
+      "fuzzy": 0.615,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "R \\mathrm { s i n } \\ \\alpha _ { \\mathrm { m } }",
+      "minicpm": "R \\sin \\alpha_{\\mathrm{m}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "R \\sin \\beta _ { \\mathrm { { m } } }",
+      "minicpm": "R \\sin \\beta_{\\mathrm{m}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\sin \\alpha _ { \\mathrm { m } } : \\sin \\beta _ { \\mathrm { m } } , \\mathrm { C }",
+      "minicpm": "\\sin \\alpha_{\\mathrm{m}} : \\sin \\beta_{\\mathrm{m}}",
+      "fuzzy": 0.947,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "G { \\frac { M m } { r ^ { 2 } } } = m { \\frac { v ^ { 2 } } { r } }",
+      "minicpm": "\\frac{R^{3}}{T_{1}^{2}} = \\frac{a^{3}}{T_{2}^{2}}",
+      "fuzzy": 0.649,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "v = { \\sqrt { \\frac { G M } { r } } }",
+      "minicpm": "v = \\sqrt{\\frac{GM}{r}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\sqrt { \\sin \\beta _ { \\mathrm { m } } } \\colon \\sqrt { \\sin \\alpha _ { \\mathrm { m } } } , \\mathrm { D }",
+      "minicpm": "\\frac{F_{祝}}{F_{玉}} = \\frac{9}{2}",
+      "fuzzy": 0.213,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "F _ { \\mathbb { Z } } = G { \\frac { M _ { \\tt R } \\ m _ { \\mathbb { Z } } } { r _ { \\tt R } ^ { 2 } } } , F _ { \\mathbb { Z } } = G { \\frac { M _ { \\tt A } \\ m _ { \\tt R } } { r _ { \\tt A } ^ { 2 } } }",
+      "minicpm": "F_{玉} = G \\frac{M_{月} m_{玉}}{r_{月}^{2}}, F_{祝} = G \\frac{M_{火} m_{祝}}{r_{火}^{2}}",
+      "fuzzy": 0.489,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "{ \\frac { F _ { \\ast \\mathrm { \\tiny { R } } } } { F _ { \\mp } } } = { \\frac { 9 } { 2 } }",
+      "minicpm": "mg' = mR \\frac{4\\pi^{2}}{T_{1}^{2}}",
+      "fuzzy": 0.3,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "{ \\frac { a ^ { 3 } } { T ^ { 2 } } } = k .",
+      "minicpm": "a = \\sqrt[3]{\\frac{g' R^{2} T_{2}^{2}}{4\\pi^{2}}}",
+      "fuzzy": 0.343,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "a = { \\frac { R + d _ { 1 } + R + d _ { 2 } } { 2 } }",
+      "minicpm": "d_{2} = 2a - 2R - d_{1}",
+      "fuzzy": 0.296,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "T _ { \\imath }",
+      "minicpm": "\\omega",
+      "fuzzy": 0.364,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\frac { R ^ { 3 } } { T _ { 1 } ^ { 2 } } = \\frac { a ^ { 3 } } { T _ { 2 } ^ { 2 } }",
+      "minicpm": "T_{1}",
+      "fuzzy": 0.19,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "m g ^ { \\prime } = m R \\frac { 4 \\pi ^ { 2 } } { T _ { 1 } ^ { 2 } }",
+      "minicpm": "r_{\\text{舱}} < r_{\\text{同}}",
+      "fuzzy": 0.154,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "\\sqrt [ 3 ] { \\frac { g ^ { \\prime } R ^ { 2 } T _ { 2 } ^ { 2 } } { 4 \\pi ^ { 2 } } }",
+      "minicpm": "T_{2}",
+      "fuzzy": 0.143,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "d _ { 2 } = 2 a - 2 R - d _ { 1 }",
+      "minicpm": "r",
+      "fuzzy": 0.167,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "6 \\times",
+      "minicpm": "M",
+      "fuzzy": 0.286,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "r = { \\frac { 1 7 } { 1 6 } } R",
+      "minicpm": "r",
+      "fuzzy": 0.167,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "F = G { \\frac { M m } { R ^ { 2 } } }",
+      "minicpm": "G",
+      "fuzzy": 0.167,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 47,
+      "mineru": "F ^ { \\prime } = G { \\frac { M m } { r ^ { 2 } } }",
+      "minicpm": "R",
+      "fuzzy": 0.118,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "e U _ { \\mathrm { c } }",
+      "minicpm": "eU_{c}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "{ \\cal W } _ { 0 } = h \\nu - e { \\cal U } _ { \\mathrm { c } } , \\mathrm { A }",
+      "minicpm": "W_{0} = h\\nu - eU_{c}",
+      "fuzzy": 0.714,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "e \\frac { U } { d } = m a , d = \\frac { 1 } { 2 } a t ^ { 2 } , R = v _ { \\mathrm { { m } } } t , e U _ { \\mathrm { { c } } } = \\frac { 1 } { 2 } m v _ { \\mathrm { { m } } } ^ { 2 }",
+      "minicpm": "e\\frac{U}{d} = ma, d = \\frac{1}{2} a t^{2}, R = v_{m} t, e U_{c} = \\frac{1}{2} m v_{m}^{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "U = { \\frac { 4 U _ { \\mathrm { c } } d ^ { 2 } } { R ^ { 2 } } }",
+      "minicpm": "U = \\frac{4 U_{c} d^{2}}{R^{2}}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "e \\left( \\ U _ { \\mathrm { c } } + U \\right)",
+      "minicpm": "e(U_{c} + U)",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\frac { d } { 2 }",
+      "minicpm": "\\frac{d}{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "B e v _ { \\mathrm { { m } } } = m \\ \\frac { v _ { \\mathrm { { m } } } ^ { 2 } } { r } , e U _ { \\mathrm { { c } } } = \\frac { 1 } { 2 } m v _ { \\mathrm { { m } } } ^ { 2 } , r <",
+      "minicpm": "B e v_{m} = m \\frac{v_{m}^{2}}{r}, e U_{c} = \\frac{1}{2} m v_{m}^{2}, r < \\frac{d}{2}",
+      "fuzzy": 0.914,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\frac { d } { 2 }",
+      "minicpm": "\\frac{1}{2}",
+      "fuzzy": 0.833,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "B > \\frac { 2 \\sqrt { 2 m e { U _ { \\mathrm { c } } } } } { d e }",
+      "minicpm": "B > \\frac{2 \\sqrt{2 m e U_{c}}}{d e}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "m _ { \\ast \\vert { \\bf \\epsilon } } = m _ { \\ast \\vert { \\bf \\epsilon } } \\Big ( \\frac { 1 } { 2 \\AA } \\Big ) ^ { \\frac { \\imath } { \\tau } }",
+      "minicpm": "\\left(\\frac{1}{2}\\right)^{\\frac{t}{\\tau}}",
+      "fuzzy": 0.405,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\mid m _ { ☉ } =",
+      "minicpm": "m = m_{0}",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\frac { 1 } { 4 } m _ { ☉ }",
+      "minicpm": "m_{剩} = \\frac{1}{4} m_{原}",
+      "fuzzy": 0.737,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\frac { 1 } { 2 }",
+      "minicpm": "m_{剩} = m_{原} \\left(\\frac{1}{2}\\right)^{+}",
+      "fuzzy": 0.6,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "{ \\frac { 1 } { 2 ^ { 2 } } } = { \\frac { 1 } { 4 } }",
+      "minicpm": "\\frac{1}{2^{2}} = \\frac{1}{4}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "m = m _ { 0 } \\cdot",
+      "minicpm": "cd",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\left( \\frac { 1 } { 2 } \\right) ^ { \\frac { t } { \\tau } }",
+      "minicpm": "\\frac{m}{m_{0}} = \\left(\\frac{1}{2}\\right)^{\\frac{180}{60}} = \\frac{1}{8}",
+      "fuzzy": 0.542,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "{ \\frac { m } { m _ { 0 } } } = \\left( { \\frac { 1 } { 2 } } \\right) ^ { \\frac { 1 8 0 } { 6 0 } } = { \\frac { 1 } { 8 } }",
+      "minicpm": "E_{20}=\\frac{E_{1}}{20^{2}}=-0.034 \\, eV",
+      "fuzzy": 0.291,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "2 6 \\textrm { -- }",
+      "minicpm": "\\Delta m = m_{1} + m_{2} - m_{3}",
+      "fuzzy": 0.19,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "2 5 = 1",
+      "minicpm": "^{210}_{82}\\mathrm{Pb}",
+      "fuzzy": 0.364,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "1 3 - 1 2 = 1",
+      "minicpm": "^{1}_{1}H",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\Delta m = m _ { 1 } + m _ { 2 } - m _ { 3 }",
+      "minicpm": "\\Delta E = (m_{1} + m_{2} - m_{3}) c^{2}",
+      "fuzzy": 0.824,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\Delta E = { \\left( m _ { 1 } + m _ { 2 } - m _ { 3 } \\right) } c ^ { 2 }",
+      "minicpm": "H_{\\beta}",
+      "fuzzy": 0.25,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "^ { 2 1 0 } _ { 8 2 } \\mathrm { P b }",
+      "minicpm": "R \\approx 3 \\times 10^{2} \\, \\text{m}",
+      "fuzzy": 0.24,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\mathbf { \\Delta } _ { 5 } ^ { 1 0 } \\mathbf { B } + \\mathbf { \\Delta } _ { 0 } ^ { 1 } \\mathbf { n } { \\longrightarrow } \\mathbf { \\Delta } _ { 3 } ^ { 7 } \\mathrm { L i } + \\mathbf { \\Delta } _ { 2 } ^ { 4 } \\mathbf { H e }",
+      "minicpm": "^{10}_{5}\\mathrm{B} + ^{1}_{0}\\mathrm{n} \\to ^{7}_{3}\\mathrm{Li} + ^{4}_{2}\\mathrm{He}",
+      "fuzzy": 0.232,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "P t = n \\cdot 4 \\pi R ^ { 2 } \\cdot h \\frac { c } { \\lambda }",
+      "minicpm": "Pt = n \\cdot 4\\pi R^{2} \\cdot h \\frac{c}{\\lambda}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\begin{array} { r l r l r l r l r l r l } { E } & { { } = } & { P t } & { { } = } & { 1 1 3 } & { { } \\times { } } & { 1 } & { { } \\mathrm { ~ J ~ } } & { { } = } & { } \\end{array}",
+      "minicpm": "E = Pt = 113 \\times 1 \\, \\text{J} = \\frac{3 \\times 10^{14} \\times 4 \\times \\pi \\times R^{2} \\times 6.63 \\times 10^{-34} \\times 3 \\times 10^{8}}{6 \\times 10^{-7}} \\, \\text{J}",
+      "fuzzy": 0.235,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\displaystyle \\frac { 3 \\times 1 0 ^ { 1 4 } \\times 4 \\times \\pi \\times R ^ { 2 } \\times 6 . 6 3 \\times 1 0 ^ { - 3 4 } \\times 3 \\times 1 0 ^ { 8 } } { 6 \\times 1 0 ^ { - 7 } } ~ \\mathsf { J }",
+      "minicpm": "H_{\\gamma}",
+      "fuzzy": 0.088,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "R \\approx 3 ~ \\times",
+      "minicpm": "\\alpha",
+      "fuzzy": 0.211,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "1 0 ^ { 2 } { \\mathrm m }",
+      "minicpm": "t_{0}",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "E _ { 2 0 } = { \\frac { E _ { 1 } } { 2 0 ^ { 2 } } } = - 0 . 0 3 4 ~ \\mathrm { e V }",
+      "minicpm": "ab",
+      "fuzzy": 0.08,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "E =",
+      "minicpm": "eU",
+      "fuzzy": 0.5,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "t = 0",
+      "minicpm": "\\tau",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "{ \\frac { 1 } { 4 } } x + { \\frac { 1 } { 2 } } y = { \\frac { N } { 3 } }",
+      "minicpm": "\\alpha",
+      "fuzzy": 0.148,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "\\frac { 2 } { 3 } N , y = \\frac { 1 } { 3 } N",
+      "minicpm": "H_{\\alpha}",
+      "fuzzy": 0.174,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 170,
+      "mineru": "n = { \\frac { 1 } { 2 ^ { 4 } } } x + { \\frac { 1 } { 2 ^ { 2 } } } y = { \\frac { N } { 8 } }",
+      "minicpm": "H_{8}",
+      "fuzzy": 0.071,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 1,
+      "mineru": "\\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "3 \\, m/s^{2}",
+      "fuzzy": 0.8,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 1,
+      "mineru": "\\mathrm { m } \\ell \\mathrm { s } ^ { 2 }",
+      "minicpm": "1.5 \\, m/s^{2}",
+      "fuzzy": 0.429,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 1,
+      "mineru": "\\mathrm { m } / \\mathrm { s } ^ { 3 }",
+      "minicpm": "m/s^{3}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 1,
+      "mineru": "t _ { 0 }",
+      "minicpm": "t_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 1,
+      "mineru": "0 \\sim t _ { 0 }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 1,
+      "mineru": "\\mathrm { C } . 0 \\sim t _ { 0 }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 1,
+      "mineru": "\\mathrm { D } . 0 \\sim t _ { 0 }",
+      "minicpm": "0 \\sim t_{0}",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "\\mid A B \\mid = 2 \\mathrm { ~ m ~ , ~ } \\mid B C \\mid = 3 \\mathrm { ~ m } .",
+      "minicpm": "|AB| = 2 \\, m, |BC| = 3 \\, m",
+      "fuzzy": 0.489,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "\\frac { 1 } { 2 4 } \\mathrm { ~ m ~ }",
+      "minicpm": "\\frac{1}{24} \\, m",
+      "fuzzy": 0.842,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "\\frac { 9 } { 8 } \\mathrm { ~ m ~ }",
+      "minicpm": "\\frac{9}{8} \\, m",
+      "fuzzy": 0.824,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "v ^ { 2 }",
+      "minicpm": "v^{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "\\sqrt { 3 } v",
+      "minicpm": "\\sqrt{3}v",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "\\frac { v ^ { 2 } } { L }",
+      "minicpm": "\\frac{v^{2}}{L}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "\\sqrt { 2 } v",
+      "minicpm": "\\sqrt{2}v",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "\\sqrt { 2 }",
+      "minicpm": "\\sqrt{2}v",
+      "fuzzy": 0.909,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "1 \\colon ( { \\sqrt { 2 } } - 1 )",
+      "minicpm": "(\\sqrt{2}-1)",
+      "fuzzy": 0.75,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 1 直线运动",
+      "page": 3,
+      "mineru": "A B = 1 2 \\mathrm { ~ m ~ } , B C =",
+      "minicpm": "^{2}",
+      "fuzzy": 0.154,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "v _ { 0 }",
+      "minicpm": "v_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "v _ { 1 }",
+      "minicpm": "v_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "v _ { 2 }",
+      "minicpm": "v_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "\\boldsymbol { v } _ { 1 } = \\boldsymbol { v } _ { 2 }",
+      "minicpm": "v_{1} = v_{2}",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "v _ { 1 } > v _ { 2 }",
+      "minicpm": "v_{1} > v_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "\\displaystyle v _ { 1 } = \\frac { v _ { 0 } } { \\cos \\theta }",
+      "minicpm": "v_{1} = \\frac{v_{0}}{\\cos \\theta}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "v _ { 2 } = v _ { 0 } \\cos \\ \\theta",
+      "minicpm": "v_{2} = v_{0} \\cos \\theta",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "m _ { 1 } \\setminus m _ { 2 }",
+      "minicpm": "m_{1} > m_{2}",
+      "fuzzy": 0.471,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "m _ { 1 }",
+      "minicpm": "m_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "L _ { 1 }",
+      "minicpm": "L_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "m _ { 2 }",
+      "minicpm": "m_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "L _ { 2 }",
+      "minicpm": "L_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "L _ { 1 } > L _ { 2 }",
+      "minicpm": "L_{1}>L_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "m _ { 1 } > m _ { 2 }",
+      "minicpm": "m_{1} < m_{2}",
+      "fuzzy": 0.8,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "m _ { 1 } < m _ { 2 }",
+      "minicpm": "m_{1}",
+      "fuzzy": 0.571,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "\\alpha < \\theta",
+      "minicpm": "\\alpha < \\theta",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "\\alpha = \\theta",
+      "minicpm": "\\alpha = \\theta",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "4 5 ^ { \\circ } , A",
+      "minicpm": "45^{\\circ}, A",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "1 0 \\mathrm { ~ m ~ } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.8,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "v _ { 0 } = 2 \\ \\mathrm { m / s }",
+      "minicpm": "v_{0} = 2 \\, m/s",
+      "fuzzy": 0.933,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "\\sqrt { g L \\mathrm { s i n } \\ \\theta }",
+      "minicpm": "\\sqrt{g L \\sin \\theta}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "g \\sin \\theta + \\frac { v ^ { 2 } } { L }",
+      "minicpm": "g\\sin\\theta+\\frac{v^{2}}{L}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 10,
+      "mineru": "\\sqrt { g L \\mathrm { s i n } \\ \\theta }",
+      "minicpm": "\\sqrt{g L \\sin \\theta}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "1 . 2 5 \\mathrm { ~ m ~ } , g = 1 0 \\mathrm { ~ m ~ } \\dot { \\mathrm { ~ s ~ } } ^ { 2 }",
+      "minicpm": "g = 10 \\, m/s^{2}",
+      "fuzzy": 0.452,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "v _ { 0 }",
+      "minicpm": "v_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "2 v _ { 0 }",
+      "minicpm": "2v_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "\\sqrt { 2 } t",
+      "minicpm": "\\sqrt{2}t",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "1 0 ~ \\mathrm { m / s } ^ { 2 }",
+      "minicpm": "10 \\, m/s^{2}",
+      "fuzzy": 0.857,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "v = 3 \\sqrt { 2 } \\mathrm { m / s }",
+      "minicpm": "v = 3\\sqrt{2}",
+      "fuzzy": 0.842,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "v = 9 \\mathrm { ~ m ~ } / \\mathrm { ~ s ~ }",
+      "minicpm": "v = 9 \\, m/s",
+      "fuzzy": 0.706,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "x =",
+      "minicpm": "R_{甲}=8\\ m, R_{乙}=9\\ m",
+      "fuzzy": 0.154,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "R _ { \\perp } = 8 \\mathrm { ~ m ~ } , R _ { \\perp } = 9 \\mathrm { ~ m ~ }",
+      "minicpm": "v_{甲}=10\\ m/s, v_{乙}=11\\ m/s",
+      "fuzzy": 0.263,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "v _ { \\oplus } =",
+      "minicpm": "5 \\, m/s",
+      "fuzzy": 0.167,
+      "exact": false
+    },
+    {
+      "book": "23必刷题 4 曲线运动",
+      "page": 13,
+      "mineru": "1 0 \\mathrm { \\ m / s } \\mathrm { \\Omega } _ { \\mathrm { { s } } } v _ { \\mathrm { { Z } } } = 1 1 \\mathrm { \\ m / s }",
+      "minicpm": "10 \\, m/s",
+      "fuzzy": 0.4,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "P = \\frac { W } { t }",
+      "minicpm": "P=\\frac{W}{t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "P = F \\ { \\bar { v } } { \\cos \\ \\alpha }",
+      "minicpm": "P = F \\bar{v} \\cos \\alpha",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "1 0 ^ { - 4 } ~ \\mathrm { m } ^ { 2 }",
+      "minicpm": "2 \\times 10^{-4} \\mathrm{~m}^{2}",
+      "fuzzy": 0.7,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "1 0 ^ { 3 } ~ \\mathrm { k g / m } ^ { 3 }",
+      "minicpm": "1 \\times 10^{3} \\mathrm{~kg/m}^{3}",
+      "fuzzy": 0.75,
+      "exact": false
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "\\sqrt { 6 }",
+      "minicpm": "\\sqrt{6}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "v ^ { 2 }",
+      "minicpm": "v^{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "\\frac { 3 } { 5 } m g v _ { 0 }",
+      "minicpm": "\\frac{3}{5}mgv_{0}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "F _ { 1 }",
+      "minicpm": "F_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "P _ { 1 }",
+      "minicpm": "P_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "F _ { 2 }",
+      "minicpm": "F_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "P _ { 2 }",
+      "minicpm": "P_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "F _ { 2 }",
+      "minicpm": "F_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "F _ { 1 }",
+      "minicpm": "F_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "F _ { 2 }",
+      "minicpm": "F_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "F _ { 1 }",
+      "minicpm": "F_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "P _ { 2 }",
+      "minicpm": "P_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "P _ { 1 }",
+      "minicpm": "P_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "P _ { 2 }",
+      "minicpm": "P_{2}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 2,
+      "mineru": "P _ { 1 }",
+      "minicpm": "P_{1}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "\\Delta x = v \\Delta t = 2 0 \\times ( 0 . 5 - 0 . 1 ) \\ \\mathrm { m } = 8 \\ \\mathrm { m }",
+      "minicpm": "\\Delta x = v \\Delta t = 20 \\times (0.5 - 0.1) \\, m = 8 \\, m",
+      "fuzzy": 0.972,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "x ^ { \\prime } = x - \\Delta x = 2 2 \\textrm { m }",
+      "minicpm": "x' = x - \\Delta x = 22 \\, m",
+      "fuzzy": 0.757,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "x = 3 6 \\mathrm { ~ m ~ } - 0 = 3 6 \\mathrm { ~ m ~ }",
+      "minicpm": "x = 36 \\, m - 0 = 36 \\, m",
+      "fuzzy": 0.786,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "{ \\overline { { v } } } = { \\frac { x } { t } } = { \\frac { 3 6 } { 3 } } ~ { \\mathrm { m / s } } = 1 2 ~ { \\mathrm { m / s } }",
+      "minicpm": "v = \\frac{x}{t} = \\frac{36}{3} \\, m/s = 12 \\, m/s",
+      "fuzzy": 0.806,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "; 2 \\sim 2 . 5 5 \\mathrm { ~ s ~ }",
+      "minicpm": "v_{2}=\\frac{x_{2}}{5t}",
+      "fuzzy": 0.261,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "\\overline { { v ^ { \\prime } } } = \\frac { x _ { M N } } { t _ { M N } } = \\frac { 2 6 - 1 5 } { 2 . 5 5 - 2 } ~ \\mathrm { m / s } = 2 0 ~ \\mathrm { m / s }",
+      "minicpm": "\\overline{v'} = \\frac{x_{MN}}{t_{MN}} = \\frac{26 - 15}{2.55 - 2} \\, m/s = 20 \\, m/s",
+      "fuzzy": 0.9,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "2 \\sim 2 . 5 5 \\mathrm { ~ s ~ }",
+      "minicpm": "t_{1} = \\sqrt{\\frac{2 \\times 3x}{a}}",
+      "fuzzy": 0.258,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "2 0 \\ \\mathrm { m / s } , \\mathrm { C }",
+      "minicpm": "v_{0} = 20 \\, m/s",
+      "fuzzy": 0.625,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "| \\overline { { v ^ { \\prime \\prime } } } = \\frac { \\Delta x } { \\Delta t } = \\frac { 1 5 - 0 } { 2 } \\mathrm { m / s } =",
+      "minicpm": "v'' = \\frac{\\Delta x}{\\Delta t} = \\frac{15 - 0}{2} \\, m/s = 7.5 \\, m/s",
+      "fuzzy": 0.688,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "7 . 5 ~ \\mathrm { m } / \\mathrm { s } , 0 \\sim 2 ~ \\mathrm { s }",
+      "minicpm": "a = 10 \\, m/s^{2}",
+      "fuzzy": 0.333,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "0 \\sim 2 \\mathrm { ~ s ~ }",
+      "minicpm": "t_{2} = \\sqrt{\\frac{2 \\times 8x}{a}} - \\sqrt{\\frac{2 \\times 3x}{a}}",
+      "fuzzy": 0.217,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "7 . 5 \\ \\mathrm { m } / \\mathrm { s } , \\mathrm { D }",
+      "minicpm": "a = \\frac{v_{2} - v_{1}}{t} = \\frac{510 - 270}{60} \\, m/s^{2} = 4 \\, m/s^{2}",
+      "fuzzy": 0.217,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "s = \\frac { v _ { 1 } + v _ { 2 } } { 2 } t = \\frac { 2 7 0 + 5 1 0 } { 2 } \\times 6 0 \\ \\mathrm { m } =",
+      "minicpm": "s = \\frac{v_{1} + v_{2}}{2} t = \\frac{270 + 510}{2} \\times 60 \\, m = 23\\,400 \\, m",
+      "fuzzy": 0.886,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "2 3 \\ 4 0 0 \\ \\mathrm { m }",
+      "minicpm": "t_{0} (t_{0} < t)",
+      "fuzzy": 0.286,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "a = { \\frac { v _ { 2 } - v _ { 1 } } { t } } = { \\frac { 5 1 0 - 2 7 0 } { 6 0 } } \\ { \\mathrm { m } } / { \\mathrm { s } } ^ { 2 } =",
+      "minicpm": "a=\\frac{v_{2}-v_{1}}{6t}=\\frac{x_{2}-5x_{1}}{30t^{2}}",
+      "fuzzy": 0.712,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "4 ~ \\mathrm { m } / \\mathrm { s } ^ { 2 }",
+      "minicpm": "v_{c} = \\sqrt{2a \\cdot 3x}",
+      "fuzzy": 0.19,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "s = { \\frac { v _ { 2 } ^ { 2 } - v _ { 1 } ^ { 2 } } { 2 a } } = { \\frac { 5 1 0 ^ { 2 } - 2 7 0 ^ { 2 } } { 2 \\times 4 } } ~ \\mathbf { m } =",
+      "minicpm": "s = \\frac{v_{2}^{2} - v_{1}^{2}}{2a} = \\frac{510^{2} - 270^{2}}{2 \\times 4} \\, m = 23\\,400 \\, m",
+      "fuzzy": 0.826,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "2 3 \\ 4 0 0 \\ \\mathrm { m } .",
+      "minicpm": "v_{0}",
+      "fuzzy": 0.222,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "a = { \\frac { v } { t } }",
+      "minicpm": "a = \\frac{v}{t}",
+      "fuzzy": 1.0,
+      "exact": true
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "h =",
+      "minicpm": "h = \\frac{vt}{2}",
+      "fuzzy": 0.364,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "\\frac { v t } { 2 }",
+      "minicpm": "t = \\frac{v_{0}}{a} = 2 \\, s",
+      "fuzzy": 0.6,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "t _ { 0 } \\left( t _ { 0 } < t \\right)",
+      "minicpm": "\\sqrt{3} : (\\sqrt{8} - \\sqrt{3})",
+      "fuzzy": 0.37,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "h ^ { \\prime } = h -",
+      "minicpm": "v^{2} - v_{0}^{2} = -2ax",
+      "fuzzy": 0.2,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "h _ { t _ { 0 } } = { \\frac { v t } { 2 } } - \\left( v t _ { 0 } - { \\frac { 1 } { 2 } } \\cdot { \\frac { v } { t } } \\cdot t _ { 0 } ^ { 2 } \\right) = { \\frac { v \\left( { t } - t _ { 0 } \\right) ^ { 2 } } { 2 t } } , \\operatorname { C }",
+      "minicpm": "h' = h - h_{t_{0}} = \\frac{vt}{2} - \\left( v t_{0} - \\frac{1}{2} \\cdot \\frac{v}{t} \\cdot t_{0}^{2} \\right) = \\frac{v (t - t_{0})^{2}}{2t}",
+      "fuzzy": 0.855,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": ", v _ { 1 } = \\frac { x _ { 1 } } { t }",
+      "minicpm": "v_{1}=\\frac{x_{1}}{t}",
+      "fuzzy": 0.952,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "v _ { 2 } = \\frac { x _ { 2 } } { 5 t }",
+      "minicpm": "x = \\frac{v_{0}^{2}}{2a} - \\frac{v^{2}}{2a}",
+      "fuzzy": 0.387,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "a = { \\frac { v _ { 2 } - v _ { 1 } } { 6 t } } =",
+      "minicpm": "v_{d} = \\sqrt{2a \\cdot 8x}",
+      "fuzzy": 0.345,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "{ \\frac { x _ { 2 } - 5 x _ { 1 } } { 3 0 t ^ { 2 } } } , \\mathrm { A }",
+      "minicpm": "x=5v_{0}+\\frac{1}{2}a\\times5^{2}=5v_{0}+\\frac{25a}{2}=5\\left(v_{0}+\\frac{5a}{2}\\right)=20",
+      "fuzzy": 0.273,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "x _ { 3 } = 3 v _ { 0 } + \\frac { 1 } { 2 } a \\times 3 ^ { 2 } - \\left( 2 v _ { 0 } + \\frac { 1 } { 2 } a \\times 2 ^ { 2 } \\right) = v _ { 0 } +",
+      "minicpm": "x_{3}=3v_{0}+\\frac{1}{2}a\\times3^{2}-\\left(2v_{0}+\\frac{1}{2}a\\times2^{2}\\right)=v_{0}+\\frac{5a}{2}=4",
+      "fuzzy": 0.911,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "\\frac { 5 a } { 2 } = 4 \\ m",
+      "minicpm": "x_{5}=5v_{0}+\\frac{1}{2}a\\times5^{2}-\\left(4v_{0}+\\frac{1}{2}a\\times4^{2}\\right)=v_{0}+\\frac{9a}{2}=2\\left(v_{0}+\\frac{5a}{2}a\\right)-v_{0}-\\frac{1}{2}a=8-v_{0}-\\frac{1}{2}a<9",
+      "fuzzy": 0.154,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "x _ { 5 } = 5 v _ { 0 } + { \\frac { 1 } { 2 } } a \\times 5 ^ { 2 } -",
+      "minicpm": "\\sqrt{3} : \\sqrt{8}",
+      "fuzzy": 0.182,
+      "exact": false
+    },
+    {
+      "book": "答案册-合订本",
+      "page": 2,
+      "mineru": "\\left( 4 v _ { 0 } + { \\frac { 1 } { 2 } } a \\times 4 ^ { 2 } \\right) = v _ { 0 } + { \\frac { 9 a } { 2 } } = 2 \\left( v _ { 0 } + { \\frac { 5 } { 2 } } a \\right) - v _ { 0 } - { \\frac { 1 } { 2 } } a = 8 - { \\frac { 1 } { 2 } } v _ { 0 } = 0",
+      "minicpm": "v_{0}",
+      "fuzzy": 0.056,
+      "exact": false
+    }
+  ]
+}

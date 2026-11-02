@@ -1,0 +1,22 @@
+{
+  "pages": 30,
+  "unique_expected": 147,
+  "unique_matched": 147,
+  "unique_extra": 0,
+  "occ_expected": 154,
+  "occ_matched": 153,
+  "pages_missing": 0,
+  "pages_tess_only": 0,
+  "recall_mean": 0.888,
+  "recall_median": 0.891,
+  "recall_min": 0.26,
+  "table_pages": 8,
+  "cell_mini": 129,
+  "cell_mineru": 38,
+  "chart": 5,
+  "chart_table": 5,
+  "formula_expected": 512,
+  "formula_match": 364,
+  "elapsed_min": 1.2,
+  "elapsed_max": 3.19
+}
