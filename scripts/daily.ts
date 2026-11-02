@@ -485,10 +485,18 @@ async function main(): Promise<void> {
   run("export-stages.ts", [docId, layoutPath]);
 
   // ---- ③ OCR 整页补行（可选，自己会重导快照）----
-  let ocr: Meta["source"]["ocr"] = "skipped";
+  // 来源以**产物**为准：`--no-ocr` 只表示「本次不调用 OCR」，不代表产物没有 OCR 数据
+  // —— 重导快照仍会复用已有的 `ocr-page-fill.json`。记成 skipped 会让体检/成品页误报来源
+  // （2026-11-02 实测：定向 OCR 后重跑 --no-ocr，meta 仍写 skipped）。
+  const ocrArtifact = existsSync(join(outDir, "ocr-page-fill.json"));
+  let ocr: Meta["source"]["ocr"] = ocrArtifact ? "page" : "skipped";
   let ocrError: string | null = null;
   if (flags["no-ocr"] === true) {
-    console.log("\n[3/4] 跳过 OCR 补行（--no-ocr）");
+    console.log(
+      ocrArtifact
+        ? "\n[3/4] 跳过 OCR 调用（--no-ocr）；复用已有 ocr-page-fill.json"
+        : "\n[3/4] 跳过 OCR 补行（--no-ocr）",
+    );
   } else if (!hasOcrToken()) {
     console.log(
       "\n[3/4] 跳过 OCR 补行：没有 PaddleOCR 凭据\n" +
