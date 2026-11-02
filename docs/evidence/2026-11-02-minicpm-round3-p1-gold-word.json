@@ -1,0 +1,101 @@
+{
+  "tables": [
+    {
+      "word_table": 111,
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "word_rows": 3,
+      "word_text_cells": 13,
+      "mini_text_cells": 14,
+      "matched": 9,
+      "word_recall": 0.692,
+      "mini_precision": 0.643,
+      "word_unmatched": [
+        "用力 F 把小球从A 处缓慢拉到B处，F做的功为 则有  得",
+        "质量为 m 的木块在水平面内做圆周运动，运动一周克服摩擦力做的功为",
+        "恒力 F 把物块从A拉到B，绳子对物 块 做 的 功 为",
+        "弹簧由伸长量为 被继续拉至伸长量为x₂ 的过程 中，F克服弹簧弹力做 的 功 为"
+      ],
+      "mini_unmatched": [
+        "正功负功",
+        "用力 F 把小球从 A 处缓慢拉到 B 处，F 做的功为 $W_{F}$，则有 $W_{F} - mgL(1 - \\cos \\theta) = 0$，得 $W_{F} = mgL(1 - \\cos \\theta)$",
+        "质量为 m 的木块在水平面内做圆周运动，运动一周克服摩擦力做的功为 $W_{f} = F_{f} \\cdot \\Delta x_{1} + F_{f} \\cdot \\Delta x_{2} + F_{f} \\cdot \\Delta x_{3} \\cdots \\cdots = F_{f} (\\Delta x_{1} + \\Delta x_{2} + \\Delta x_{3} \\cdots \\cdots) = F_{f} \\cdot 2\\pi R$",
+        "恒力 F 把物块从 A 拉到 B，绳子对物块做的功为 $W = F \\cdot (\\frac{h}{\\sin \\alpha} - \\frac{h}{\\sin \\beta})$",
+        "弹簧由伸长量为 $x_{1}$ 被继续拉至伸长量为 $x_{2}$ 的过程中，F 克服弹簧弹力做的功为 $W = \\frac{kx_{1} + kx_{2}}{2} \\cdot (x_{2} - x_{1})$"
+      ]
+    },
+    {
+      "word_table": 112,
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "word_rows": 6,
+      "word_text_cells": 16,
+      "mini_text_cells": 18,
+      "matched": 11,
+      "word_recall": 0.688,
+      "mini_precision": 0.611,
+      "word_unmatched": [
+        "P不变；",
+        "a 不变; 不变",
+        "匀加速直线运动，维持时间",
+        "速度为 的匀速直线运动",
+        "加速度减小的加速直线运动，在B 点达到最大速度"
+      ],
+      "mini_unmatched": [
+        "P不变;$v \\uparrow \\Rightarrow F = \\frac{P}{v} \\downarrow \\Rightarrow a = \\frac{F - F_{阻}}{m} \\downarrow$",
+        "a不变; $a = \\frac{F - F_{阻}}{m} \\Rightarrow F$不变$\\Rightarrow P = Fv \\uparrow \\Rightarrow P_{额} = Fv_{1}$",
+        "匀加速直线运动,维持时间 $t_{0} = \\frac{v_{1}}{a}$",
+        "$F = F_{阻} \\Rightarrow a = 0 \\Rightarrow F_{阻} = \\frac{P}{v_{m}}$",
+        "$v \\uparrow \\Rightarrow F = \\frac{P_{额}}{v} \\downarrow \\Rightarrow a = \\frac{F - F_{阻}}{m} \\downarrow$",
+        "速度为 $v_{m}$的匀速直线运动",
+        "加速度减小的加速直线运动,在B点达到最大速度, $v_{m}^{\\prime} = \\frac{P_{额}}{F_{阻}}$"
+      ]
+    },
+    {
+      "word_table": 138,
+      "book": "物理_教材基础练 电路",
+      "page": 4,
+      "word_rows": 7,
+      "word_text_cells": 14,
+      "mini_text_cells": 15,
+      "matched": 5,
+      "word_recall": 0.357,
+      "mini_precision": 0.333,
+      "word_unmatched": [
+        "任意电路：",
+        "任意电路：",
+        "纯电阻电路：",
+        "纯电阻电路：",
+        "任意电路：",
+        "纯电阻电路：",
+        "纯电阻电路中输出功率 随外电阻R的变化关系",
+        "①当 =r时，电源的输出功率最大，为",
+        "②当 时，每个输出功率对应的外电阻阻值有两个取值 和 且"
+      ],
+      "mini_unmatched": [
+        "任意电路:$P_{\\text{总}} = EI = P_{\\text{出}} + P_{\\text{内}}$",
+        "任意电路:$P_{\\text{出}} = UI = EI - I^{2}r = P_{\\text{总}} - P_{\\text{内}}$",
+        "纯电阻电路:$E = I (R + r)$、$P_{\\text{总}} = I^{2}(R + r) = \\frac{E^{2}}{R + r}$",
+        "纯电阻电路:$P_{\\text{出}} = I^{2}R = \\frac{E^{2}R}{(R + r)^{2}}$",
+        "$P_{\\text{内}} = I^{2}r = U_{\\text{内}} I = P_{\\text{总}} - P_{\\text{出}}$",
+        "任意电路:$\\eta = \\frac{P_{\\text{出}}}{P_{\\text{总}}} \\times 100\\% = \\frac{U}{E} \\times 100\\%$",
+        "纯电阻电路:$\\eta = \\frac{R}{R + r} \\times 100\\%$",
+        "纯电阻电路中输出功率$P_{\\text{出}}$随外电阻$R$的变化关系:$P_{\\text{出}} = I^{2}R = \\frac{E^{2}}{\\frac{(R - r)^{2}}{R} + 4r}$",
+        "①当$R = r$时,电源的输出功率最大,为$P_{\\text{max}} = \\frac{E^{2}}{4r}$",
+        "②当$P_{\\text{出}} &lt; P_{\\text{max}}$时,每个输出功率对应的外电阻阻值有两个取值$R_{1}$和$R_{2}$,且$R_{1} R_{2} = r^{2}$"
+      ]
+    }
+  ],
+  "formula_all": {
+    "n": 455,
+    "exact": 186,
+    "f7": 279,
+    "covered": 285
+  },
+  "formula_sample": {
+    "n": 50,
+    "exact": 23,
+    "f7": 29,
+    "covered": 33
+  }
+}
