@@ -27,9 +27,14 @@ import type { BBox, ParsedBlock, ParsedDocument } from "./types.js";
 export interface CorrectionItem {
   /** 1-based 页号（与 JSON 清单一致） */
   page: number;
-  kind: "replace" | "replace_text" | "insert";
+  kind: "replace" | "replace_text" | "insert" | "split";
   /** replace / replace_text：整块原文（精确匹配用） */
   blockText?: string;
+  /**
+   * split：**切分点标记** —— 从该子串起算第二块（第一块 = 标记之前，第二块 = 标记原样起头）。
+   * 必须在 `blockText` 里**出现且不在开头**（开头等于没切）。
+   */
+  splitAt?: string;
   /** insert：图注文本与 pt 坐标（bbox 已在生成阶段换算为 pt） */
   text?: string;
   bbox?: number[];
@@ -64,6 +69,8 @@ export interface ApplyReport {
   replace: number;
   /** `replace_text` 的整块替换块数（人工已核对；单独计数便于审计） */
   replaceText: number;
+  /** `split` 的切分块数（一个块切两半，计 1 次） */
+  split: number;
   /** 实际插入的块数 */
   insert: number;
   /** 清单里没能命中的条目下标（不静默：调用方应打印出来） */
@@ -108,7 +115,15 @@ function nearestImageIndex(blocks: ParsedBlock[], bbox: BBox): number {
  * 会**全部**替换（图注/公式同文重复的情况在正文里罕见，且语义一致）。
  */
 export function applyCorrections(doc: ParsedDocument, file: CorrectionFile): ApplyReport {
-  const report: ApplyReport = { replace: 0, replaceText: 0, insert: 0, missed: [], unverified: [], disabled: [] };
+  const report: ApplyReport = {
+    replace: 0,
+    replaceText: 0,
+    split: 0,
+    insert: 0,
+    missed: [],
+    unverified: [],
+    disabled: [],
+  };
 
   file.items.forEach((item, idx) => {
     if (item.disabled) {
@@ -165,6 +180,60 @@ export function applyCorrections(doc: ParsedDocument, file: CorrectionFile): App
       if (hit === 0) report.missed.push(idx);
       else {
         report.replaceText += hit;
+        if (item.verified !== true) report.unverified.push(idx);
+      }
+      return;
+    }
+
+    /**
+     * split：把一个块**切成两个**（`DECISIONS §101`）。
+     *
+     * 用途：上游把「上一题的知识点末段」与「下一题的题号」粘在**同一行**里 ——
+     * 实测《电路》p5 block[4] =
+     * `②当$P_{出}<P_{max}$时…且$R_{1}R_{2}=r^{2}$1[多选][鲁科版必修三P133第10题模型变式]如图,…`。
+     * 切题只看**块首行**，所以题号在行中等于不存在 ⇒ 该题整题不入库（红线级）。
+     *
+     * 与 `replace_text` 的区别：`replace_text` 只能改文本，改完题号仍在行中；
+     * 必须**拆成两块**，题号才能落到第二块的块首。
+     * 几何：第二块 bbox 在原块基础上**下移半行高**，保证阅读顺序稳定在其后
+     * （原块只有一行高的框，两块共用同一 y 会让排序依赖插入位置以外的因素）。
+     */
+    if (item.kind === "split") {
+      const target = item.blockText ?? "";
+      const marker = item.splitAt ?? "";
+      if (!target || !marker) {
+        report.missed.push(idx);
+        return;
+      }
+      let hit = 0;
+      for (let i = 0; i < page.blocks.length; i++) {
+        const b = page.blocks[i];
+        if (!b || b.kind !== "text" || b.text !== target) continue;
+        const at = b.text.indexOf(marker);
+        if (at <= 0) continue; // 标记必须在中间；在开头等于没切
+        const head = b.text.slice(0, at).trimEnd();
+        const tail = b.text.slice(at).trimStart();
+        if (!head || !tail) continue;
+        const h = Math.max(1, (b.bbox[3] - b.bbox[1]) / 2);
+        const nb: ParsedBlock = {
+          kind: "text",
+          bbox: [b.bbox[0], b.bbox[1] + h, b.bbox[2], b.bbox[3] + h],
+          text: tail,
+          firstLine: tail,
+          lineCount: 1,
+          maxFontSize: b.maxFontSize,
+          fromCorrection: true,
+        };
+        b.text = head;
+        b.firstLine = head;
+        b.fromCorrection = true;
+        page.blocks.splice(i + 1, 0, nb);
+        i++; // 跳过刚插入的块，避免同一块被反复匹配
+        hit++;
+      }
+      if (hit === 0) report.missed.push(idx);
+      else {
+        report.split += hit;
         if (item.verified !== true) report.unverified.push(idx);
       }
       return;

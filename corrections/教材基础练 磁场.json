@@ -4,10 +4,11 @@
  "basis": "题号行交叉核对（DECISIONS §99）",
  "counts": {
   "replace": 0,
-  "replaceText": 1,
-  "insert": 0,
-  "bodyHole": 0,
-  "total": 1
+  "replaceText": 2,
+  "split": 0,
+  "insert": 2,
+  "bodyHole": 2,
+  "total": 4
  },
  "items": [
   {
@@ -18,6 +19,43 @@
    "from": "缺题号与出处标注前缀（「4[多选][…]易错如」）",
    "verified": false,
    "evidence": "整页 OCR p09.txt 该行为「4[多选][人教版选修二P12第4题设问变式]易错如图所示是磁流体发电机…」；layout 该行只剩「图所示是…」，行首 20 余字丢失。未回原卷页图核对。"
+  },
+  {
+   "page": 2,
+   "kind": "replace_text",
+   "blockText": "1 [粤教版选修二 P29 第 10 题模 × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × ",
+   "to": "1 [粤教版选修二 P29 第10题模型变式] 易错 如图所示, 由一根粗细均匀的导体棒折成的闭合正五边形 abcde, 放置在",
+   "from": "残块「…题模 ×××…」→ 补回首行（题号+出处+题干开头）",
+   "verified": false,
+   "evidence": "整页 OCR p02.txt 首行为「1 [粤教版选修二 P29 第10题模型变式] 易错 如图所示, 由一根粗细均匀的导体棒折成的闭合正五边形 abcde, 放置在」；layout 该行在「题模」后变成一串 ×（插图网格）。未回原卷页图核对。"
+  },
+  {
+   "page": 2,
+   "kind": "insert",
+   "source": "body-hole",
+   "text": "纸面上，磁场方向垂直纸面向里。一恒压电源接在正五边形的 ad 两点，若正五边形 abcde 所受的安培力为 F，则正五边形的 aed 边所受的安培力为",
+   "bbox": [
+    18,
+    290,
+    283,
+    305
+   ],
+   "verified": false,
+   "evidence": "整页 OCR p02.txt 该行在插图之后，layout 完全缺失（`§99` X1）。位置按左栏插图（bbox y 208–281）下方、下一题（y 399）之前的空带取值。未回原卷页图核对。"
+  },
+  {
+   "page": 2,
+   "kind": "insert",
+   "source": "body-hole",
+   "text": "A. $\\frac{3}{5}F$ B. $\\frac{2}{5}F$ C. $\\frac{2}{3}F$ D. $\\frac{1}{2}F$",
+   "bbox": [
+    18,
+    330,
+    283,
+    345
+   ],
+   "verified": false,
+   "evidence": "整页 OCR p02.txt 该选项行原文；layout 完全缺失。接在上一行之后按 y 递增放置。未回原卷页图核对。"
   }
  ]
 }

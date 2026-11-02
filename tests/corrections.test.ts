@@ -144,6 +144,7 @@ test("applyCorrections：caption insert 跟在图片后，verified:true 不进 u
 interface Counts {
   replace?: number;
   replaceText?: number;
+  split?: number;
   insert?: number;
   bodyHole?: number;
   disabled?: number;
@@ -156,6 +157,7 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
   assert.ok(Array.isArray(file.items), `${name}: items 不是数组`);
   let replaceN = 0;
   let replaceTextN = 0;
+  let splitN = 0;
   let insertN = 0;
   let bodyHoleN = 0;
   let unverifiedN = 0;
@@ -164,7 +166,7 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
     const at = `${name} items[${idx}]`;
     assert.ok(Number.isInteger(it.page) && it.page >= 1, `${at}: page 非法`);
     assert.ok(
-      it.kind === "replace" || it.kind === "replace_text" || it.kind === "insert",
+      it.kind === "replace" || it.kind === "replace_text" || it.kind === "insert" || it.kind === "split",
       `${at}: kind 非法`,
     );
     assert.ok(it.verified === undefined || typeof it.verified === "boolean", `${at}: verified 必须是布尔或缺省`);
@@ -186,6 +188,12 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
       assert.ok((it.to ?? "").length > 0, `${at}: replace_text 缺 to`);
       return;
     }
+    if (it.kind === "split") {
+      splitN++;
+      assert.ok((it.blockText ?? "").length > 0, `${at}: split 缺 blockText`);
+      assert.ok((it.splitAt ?? "").length > 0, `${at}: split 缺 splitAt`);
+      return;
+    }
     insertN++;
     if (it.source === "body-hole") bodyHoleN++;
     assert.ok(
@@ -197,6 +205,7 @@ function assertCorrectionFile(name: string, file: CorrectionFile & { counts?: Co
     assert.equal(file.counts.total, file.items.length, `${name}: counts.total 与 items 数不一致`);
     assert.equal(file.counts.replace, replaceN, `${name}: counts.replace 不一致`);
     assert.equal(file.counts.replaceText ?? 0, replaceTextN, `${name}: counts.replaceText 不一致`);
+    assert.equal(file.counts.split ?? 0, splitN, `${name}: counts.split 不一致`);
     assert.equal(file.counts.insert, insertN, `${name}: counts.insert 不一致`);
     assert.equal(file.counts.disabled ?? 0, disabledN, `${name}: counts.disabled 不一致`);
     if (file.counts.bodyHole !== undefined) {

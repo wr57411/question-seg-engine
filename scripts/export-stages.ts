@@ -1014,6 +1014,7 @@ function main(): void {
     console.log(
       `  已核对修正：替换 ${rep.replace} 块` +
         (rep.replaceText > 0 ? ` · 半行修补 ${rep.replaceText} 处` : "") +
+        (rep.split > 0 ? ` · 拆块 ${rep.split} 处` : "") +
         ` · 补入图注 ${rep.insert} 处` +
         (rep.unverified.length > 0 ? `（其中 ${rep.unverified.length} 条未逐条回原卷核对，已标记）` : "") +
         (rep.disabled.length > 0 ? `；跳过 ${rep.disabled.length} 条已 disabled` : "") +

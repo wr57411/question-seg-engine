@@ -1,0 +1,29 @@
+{
+ "docId": "物理_教材基础练 运动和力",
+ "generatedAt": "2026-11-02T13:03:39",
+ "basis": "题号行交叉核对（DECISIONS §99）",
+ "counts": {
+  "replace": 0,
+  "replaceText": 0,
+  "split": 0,
+  "insert": 1,
+  "bodyHole": 1,
+  "total": 1
+ },
+ "items": [
+  {
+   "page": 10,
+   "kind": "insert",
+   "source": "body-hole",
+   "text": "6[人教版必修一 P108 第4题情境变式]如图所示,一盛有水的容器自倾角为 $\\theta$ 的",
+   "bbox": [
+    1154,
+    160,
+    1998,
+    200
+   ],
+   "verified": false,
+   "evidence": "整页 OCR p10.txt 该行为第 6 题首行；layout 完全缺失（右栏顶部插图 bbox y 207–402 之上）。下一行「固定粗糙长斜面顶端下滑…」在 layout 中存在。未回原卷页图核对。"
+  }
+ ]
+}
