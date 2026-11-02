@@ -4,11 +4,11 @@
   "basis": "回原卷页图核对（DECISIONS §104）",
   "counts": {
     "replace": 0,
-    "replaceText": 5,
+    "replaceText": 4,
     "split": 0,
     "insert": 1,
     "bodyHole": 1,
-    "total": 6
+    "total": 5
   },
   "items": [
     {
@@ -19,15 +19,6 @@
       "from": "MinerU 把题号 3 认成「5.U」⇒ 刷基础 #3 变成假 #5，组内出现 1,2,5",
       "verified": true,
       "evidence": "2026-11-02 回原卷 page-002.png 核对：左栏（刷基础）依次是 1、2、3；第三行印的是「3. D 必刷知识·质点、参考系、瞬时速度、平均速度」。裁图：docs/evidence/2026-11-02-答案册-p2-刷基础3-4.png"
-    },
-    {
-      "page": 2,
-      "kind": "replace_text",
-      "blockText": "5.C必刷知识·质点、位移、平均速度、加速度",
-      "to": "1. C 必刷知识·质点、位移、平均速度、加速度",
-      "from": "刷易错栏目的 #1 被认成「5.C」⇒ 没触发新组，整栏被并进刷基础组",
-      "verified": true,
-      "evidence": "2026-11-02 回原卷 page-002.png 核对：左栏「刷易错」下方第一行是「1. C 必刷知识·质点、位移、平均速度、加速度」。裁图：docs/evidence/2026-11-02-答案册-p2-刷基础3-4.png"
     },
     {
       "page": 2,
