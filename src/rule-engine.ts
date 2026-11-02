@@ -13,7 +13,6 @@ import {
   bandOrdinal,
   hasTextbookSource,
   isBandSubheading,
-  splitExperimentSubQuestions,
   isPageFurniture,
   isPageNoiseLine,
   looksLikeAnswerEntry,
@@ -26,7 +25,6 @@ import {
   startsWithQuestionNumber,
   stripOptionPrefix,
   stripQuestionPrefix,
-  type ExperimentSplit,
 } from "./patterns.js";
 import type {
   Band,
@@ -749,73 +747,6 @@ class Ctx {
   }
 
   /**
-   * 把「教材实验 N」按小问开成 N 道题（`DECISIONS §103`）。
-   *
-   * 每题**自洽**：`stem = 栏目标题 + 公共背景 + 本小问`，`blockIndexes = 背景块 ∪ 本小问块`。
-   * 为什么要带背景：小问单独看是无主语的残句（「需选择___和___两段金属丝」），
-   * 必须带实验目的/器材/电路图参数才能独立作答；重复背景是这条路线已知的代价
-   * （7 块 → 68 题，题干总量增加约 4 万字，但不丢内容、每题可独立判对错）。
-   *
-   * 题号用小问号（1..n），并**强制单开一个编号组** —— 否则会与同册真题号撞车，
-   * `§96` 的组内连续校验会把它误报成断档。
-   */
-  private emitExperimentSubQuestions(
-    p: { title: string; ordinal: string | null; entry: IndexedBlock; blockIndexes: number[]; texts: string[] },
-    split: ExperimentSplit,
-  ): void {
-    // 扁平化：sub → (run, no, lines)，用于把块归属到具体小问
-    const flat = split.runs.flatMap((r, ri) => r.subs.map((s) => ({ ri, ...s })));
-
-    // 块归属：按「块首行落在哪一段」判定（一个块可能横跨小问边界，归它开头所在的那段）
-    const owner = new Map<number, number>();
-    for (const g of p.blockIndexes) {
-      const slot = this.blockSlots.get(g);
-      const first = (slot?.text ?? "").split("\n").map((s) => s.trim()).find(Boolean) ?? "";
-      if (!first) continue;
-      const k = flat.findIndex((s) => s.lines.includes(first));
-      owner.set(g, k); // -1 = 公共背景
-    }
-    const leadIdx = p.blockIndexes.filter((g) => (owner.get(g) ?? -1) === -1);
-
-    // 栏目标题**必须保留在最前**：它在 `split.lead` 里也出现一次（板块头块本身进 texts），
-    // 只过滤掉那份重复，不能用「等于标题就丢」—— 那会把标题整个丢掉（实测题干变成从
-    // 「一题通关 一题全练，明实验」起头）。页眉噪声（`答案 P049]`）不进题干。
-    const commonLead = [
-      p.title,
-      ...split.lead.filter((t) => t.trim() && t.trim() !== p.title.trim() && !isPageNoiseLine(t)),
-    ].filter((t) => t.trim());
-
-    let runCursor = -1;
-    for (let i = 0; i < flat.length; i++) {
-      const sub = flat[i]!;
-      // 换 run ⇒ 新开一个编号组（各小节题号都从 1 起，同一组会撞号）
-      if (sub.ri !== runCursor) {
-        this.sectionSeq++;
-        this.groupHasQuestions = false;
-        runCursor = sub.ri;
-      }
-      const runLead = sub.ri === 0 ? [] : split.runs[sub.ri]!.lead;
-      const own = p.blockIndexes.filter((g) => owner.get(g) === i);
-      this.openDraft(String(sub.no), { text: sub.lines.join("\n") }, p.entry);
-      const cur = this.current;
-      if (!cur) continue;
-      cur.stemParts = [...commonLead, ...runLead.filter((t) => t.trim()), ...cur.stemParts];
-      cur.blockIndexes = [...new Set([...leadIdx, ...own])];
-      if (cur.blockIndexes.length === 0) cur.blockIndexes = [p.entry.index];
-      this.settleOptions(null);
-    }
-    const total = flat.length;
-    const runs = split.runs.length;
-    this.review(
-      p.entry.index,
-      runs > 1
-        ? `栏目「${p.title}」按小问开为 ${total} 题（${runs} 个小节，各自题号从 1 起）`
-        : `栏目「${p.title}」按小问开为 ${total} 题（题号 1–${total}，自成一组）`,
-      null,
-    );
-  }
-
-  /**
    * 板块结束：整块没有出现过真实题号 ⇒ 把栏目本身开成一道题（`DECISIONS §79`）。
    * 题号取栏目序号（`教材实验 10` → `"10"`），并**强制新编号组** ——
    * 它不是同册的「第 10 题」，不该排在前面真题号序列里（否则 N4「组内不连续」报红）。
@@ -825,13 +756,8 @@ class Ctx {
     this.pendingBand = null;
     if (!p || !p.ordinal) return;
 
-    // 「教材实验 N」按**小问**切题（`DECISIONS §103`）：整块若含 `(1)(2)(3)…` 连续小问，
-    // 就按小问开成 N 道题；切不出来（无小问 / 编号不连续）才退回原「整块一道」。
-    const split = splitExperimentSubQuestions(p.texts);
-    if (split) {
-      this.emitExperimentSubQuestions(p, split);
-      return;
-    }
+    // **不切小问**（`DECISIONS §103` 定案）：一道大题天然带 `(1)(2)…` 小问，
+    // 同背景的小问属于同一道题 —— 整块仍按一道题开，不按小问拆。
 
     const ordinal = p.ordinal;
     this.sectionSeq++;
