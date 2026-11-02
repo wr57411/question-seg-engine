@@ -1,0 +1,2900 @@
+{
+  "results": [
+    {
+      "id": "23必刷题 2相互作用:p3:insert0",
+      "book": "23必刷题 2相互作用",
+      "page1": 3,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/27e363a899.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9535186484647197,
+        3.1925679450049483e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p3:insert1",
+      "book": "23必刷题 2相互作用",
+      "page1": 3,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/b8c20f1519.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9731464710620991,
+        0.0002861025008602537
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p4:insert2",
+      "book": "23必刷题 2相互作用",
+      "page1": 4,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/c53843b39a.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9099898361834833,
+        9.675933792384647e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p9:replace7",
+      "book": "23必刷题 2相互作用",
+      "page1": 9,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "三角形的中心，用三根轻绳将在O点处的小",
+      "wrong": "三角形的中心，用三根轻绳将在0点处的小",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/1a883f3be9.png",
+      "ocrSim": 0.8888888888888888,
+      "ocrSim2": null,
+      "scores": [
+        0.9919658394927664,
+        0.0035184763261920226
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p10:replace8",
+      "book": "23必刷题 2相互作用",
+      "page1": 10,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "轻质弹簧连接，球A用轻绳悬挂于O点，在水平",
+      "wrong": "轻质弹簧连接，球A用轻绳悬挂于0点，在水平",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/bc224a47cf.png",
+      "ocrSim": 0.8947368421052632,
+      "ocrSim2": null,
+      "scores": [
+        0.9877708712833713,
+        0.00011962047658915004
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p13:insert9",
+      "book": "23必刷题 2相互作用",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/d421531ebd.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9226598417266964,
+        3.626440872902764e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p13:insert10",
+      "book": "23必刷题 2相互作用",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4a6d202f87.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9719212622978166,
+        0.0006216900584641474
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p5:insert17",
+      "book": "23必刷题 2相互作用",
+      "page1": 5,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "A. 生“热狗”对单根金属圆柱的压力大小为",
+      "wrong": "面半径变大，重力不变.生“热狗”和熟“热狗”",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/cdd6a47b6f.png",
+      "ocrSim": 0.5517241379310345,
+      "ocrSim2": null,
+      "scores": [
+        0.006401010869389471,
+        2.2525328938463926e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p5:insert22",
+      "book": "23必刷题 2相互作用",
+      "page1": 5,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "静止时,下列说法正确的是",
+      "wrong": "面半径变大，重力不变.生“热狗”和熟“热狗”",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/c50fc33b30.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9968592823695187,
+        4.461457057821642e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p7:insert23",
+      "book": "23必刷题 2相互作用",
+      "page1": 7,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "A. 初始时 P 受到地面的摩擦力为 19 N",
+      "wrong": "列说法中正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/94677c0f6e.png",
+      "ocrSim": 0.13333333333333333,
+      "ocrSim2": 0.4666666666666667,
+      "scores": [
+        0.017411023296096406,
+        2.9316193077322954e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p14:insert28",
+      "book": "23必刷题 2相互作用",
+      "page1": 14,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "B. 支持力小于手机所受的重力",
+      "wrong": "机放在斜面上，手机处于静止状态.则斜面对",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/b8c3e832ea.png",
+      "ocrSim": 0.88,
+      "ocrSim2": null,
+      "scores": [
+        0.0197052008323019,
+        3.8672995045118266e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 2相互作用:p14:insert29",
+      "book": "23必刷题 2相互作用",
+      "page1": 14,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "A. 支持力竖直向上",
+      "wrong": "手机的()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/29306c2b35.png",
+      "ocrSim": 0.7619047619047619,
+      "ocrSim2": null,
+      "scores": [
+        0.9328976545465056,
+        2.4967326587037067e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p1:insert0",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 1,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/b80367bb3f.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.840616220865375,
+        0.00020454776901505695
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p2:insert1",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/879c75f095.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9426844014595425,
+        4.4089390869820435e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p2:insert2",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/5d41f3204b.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9736831570303592,
+        0.0006364562337184989
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p4:insert3",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 4,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/2d5904f12f.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9231597392547238,
+        5.9791631413185284e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p4:insert4",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 4,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/459ef84b2a.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.015520123045544015,
+        0.00016305396522613144
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p5:insert5",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 5,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/306d0d4403.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9518399111751673,
+        2.870989438554222e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p8:insert6",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 8,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/1138da1234.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9451570498781252,
+        4.258638486891602e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p8:insert7",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 8,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/31799a5ba0.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9775542626786334,
+        0.0003602485010116063
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p9:insert8",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/13c9269635.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9025855861273451,
+        0.0001149970670972633
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p9:insert9",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/e3b52de4f0.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9677109493971174,
+        0.00036656334066081627
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p9:insert10",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4180902431.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8949566624137901,
+        2.5376474049400553e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p9:insert11",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/20e8902a17.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9834129309691472,
+        0.00017214491892984592
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p9:insert12",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/eb58f3a6aa.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8519463590227524,
+        0.00019275784380911646
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p9:insert13",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4378e4d930.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.978307368061921,
+        0.00044927411581010304
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p10:insert14",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 10,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/af02cf8f87.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9797285255002715,
+        0.0004812732791593803
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p11:insert15",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 11,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/8e0eb7b82d.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9152671097362257,
+        4.6731315938468784e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p11:insert16",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 11,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/3c32244c3f.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9508746909455027,
+        0.0028717919120892343
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p13:insert17",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/1d46239420.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.7421418640691696,
+        0.00023697545587498913
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p13:insert18",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/842752534f.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9115164012726288,
+        6.764234731580742e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p13:insert19",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/f601d9ba13.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.980143951585309,
+        0.0001588634987309924
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p15:insert20",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 15,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图1",
+      "wrong": "图2",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/0a87bf594a.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.001463201952960189,
+        4.6449437606062177e-07
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p15:insert21",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 15,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图2",
+      "wrong": "图1",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4658b98703.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.3547921058532983,
+        1.7874501876528897e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p15:insert22",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 15,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(a)",
+      "wrong": "量.求：",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/7e0ffcd897.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.6676961790409706,
+        0.0001181022868514871
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p15:insert23",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 15,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(b)",
+      "wrong": "量.求：",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/50efcda91c.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.579635251917731,
+        8.494479342563321e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p15:insert24",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 15,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(c)",
+      "wrong": "量.求：",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/6261eb7664.png",
+      "ocrSim": 0.4,
+      "ocrSim2": null,
+      "scores": [
+        0.861221763572118,
+        1.0810902517906492e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p2:insert25",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 2,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "A. 静止时, A 对 C 的支持力",
+      "wrong": "静止.下列说法正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/71fc1140bf.png",
+      "ocrSim": 0.42857142857142855,
+      "ocrSim2": null,
+      "scores": [
+        0.8003069259851929,
+        3.323420340135633e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 3 运动和力的关系:p2:insert26",
+      "book": "23必刷题 3 运动和力的关系",
+      "page1": 2,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "与 B 对 C 的支持力大小不相等",
+      "wrong": "B. 加速时，B 对 C的弹力大小大于 C 对 B 的弹",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4d5b658456.png",
+      "ocrSim": 0.6428571428571429,
+      "ocrSim2": null,
+      "scores": [
+        0.00013092232817005944,
+        3.442901297476085e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p2:insert1",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/15e7bb8deb.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9773694552792344,
+        0.00010307690481180674
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p2:insert2",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "丙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/8a475d96da.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9754249350918549,
+        6.0550964443762104e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p4:insert3",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 4,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/59629d1e61.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9214715773162013,
+        0.00011124112063564857
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p4:insert4",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 4,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4071e158b2.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9798153719723869,
+        0.0004053497108232145
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p5:insert5",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 5,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/8e45b9c406.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9263615531530976,
+        9.350466331695385e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p5:insert6",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 5,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/1a7d71d9c2.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9652204298172591,
+        0.0005552009852209487
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p7:insert7",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 7,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/cd29c42e54.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9247503979214527,
+        4.939802531172663e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p7:insert8",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 7,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/ba5dc97264.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9733651832343669,
+        0.00022244879914682191
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p10:replace9",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 10,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "盘绕经过盘心O点的水平轴在竖直平面内匀",
+      "wrong": "盘绕经过盘心0点的水平轴在竖直平面内匀",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/c6455883f8.png",
+      "ocrSim": 0.9473684210526315,
+      "ocrSim2": null,
+      "scores": [
+        0.9873300690167429,
+        0.01944129545147938
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p11:replace10",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 11,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "绳一端固定在斜面上的O点，另一端连着一",
+      "wrong": "绳一端固定在斜面上的0点，另一端连着一",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/8c41899c0f.png",
+      "ocrSim": 0.9444444444444444,
+      "ocrSim2": null,
+      "scores": [
+        0.9788749905220978,
+        0.00044853713491562483
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p13:insert12",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图1",
+      "wrong": "图2",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/728d3a3436.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.0004972016325491148,
+        9.08962009908178e-07
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 4 曲线运动:p13:insert13",
+      "book": "23必刷题 4 曲线运动",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图2",
+      "wrong": "图1",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/cc11b59241.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.3282997146929828,
+        2.5474298132294795e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "物理_教材基础练机械能守恒定律:p7:replace_text0",
+      "book": "物理_教材基础练机械能守恒定律",
+      "page1": 7,
+      "kind": "replace_text",
+      "verified": true,
+      "source": "",
+      "correct": "2 [人教版必修二 P94 第5题模型变式] 易错 如图所示，轻弹簧一端",
+      "wrong": "式易镜如图所示，轻弹簧一端",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/e200129a94.png",
+      "ocrSim": 0.45,
+      "ocrSim2": null,
+      "scores": [
+        0.0006537147685517957,
+        0.0023834035887426333
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1,
+      "fixed_crop": true
+    },
+    {
+      "id": "物理_教材基础练机械能守恒定律:p6:replace_text1",
+      "book": "物理_教材基础练机械能守恒定律",
+      "page1": 6,
+      "kind": "replace_text",
+      "verified": true,
+      "source": "",
+      "correct": "1 [人教版必修二 P100 第4题设问变式] 如图所示，在水平的PQ面上有一小物块(可视为质点)，小物块以某",
+      "wrong": "面上有一小物块(可视为质点)，小物块以某",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/913cbc3c36.png",
+      "ocrSim": 0.5161290322580645,
+      "ocrSim2": null,
+      "scores": [
+        0.0010573930072873886,
+        0.9635240147033823
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1,
+      "fixed_crop": true
+    },
+    {
+      "id": "第二章相互作用-答案与解析:p3:replace0",
+      "book": "第二章相互作用-答案与解析",
+      "page1": 3,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "【解析】如图所示，对O点受力分析，受秤",
+      "wrong": "【解析】如图所示，对0点受力分析，受秤",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/ef77bbdf00.png",
+      "ocrSim": 0.4827586206896552,
+      "ocrSim2": null,
+      "scores": [
+        0.9818765393681941,
+        4.413170850074582e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "第二章相互作用-答案与解析:p4:replace1",
+      "book": "第二章相互作用-答案与解析",
+      "page1": 4,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "【解析】对O点受力分析，受到两个弹簧测力计的拉力和橡",
+      "wrong": "【解析】对0点受力分析，受到两个弹簧测力计的拉力和橡",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/26e658a338.png",
+      "ocrSim": 0.8695652173913043,
+      "ocrSim2": null,
+      "scores": [
+        0.9859512614520153,
+        8.336410293247083e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "第二章相互作用-答案与解析:p4:replace2",
+      "book": "第二章相互作用-答案与解析",
+      "page1": 4,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "皮条的拉力，由于O点位置不变，因此橡皮条长度不变，其拉",
+      "wrong": "皮条的拉力，由于0点位置不变，因此橡皮条长度不变，其拉",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/063c343a30.png",
+      "ocrSim": 0.9583333333333334,
+      "ocrSim2": null,
+      "scores": [
+        0.9461966486406492,
+        3.4640925978390814e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "第二章相互作用-答案与解析:p9:replace6",
+      "book": "第二章相互作用-答案与解析",
+      "page1": 9,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "【解析】对O点受力分析如图所示，",
+      "wrong": "【解析】对0点受力分析如图所示，",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/f21cef990c.png",
+      "ocrSim": 0.9230769230769231,
+      "ocrSim2": null,
+      "scores": [
+        0.9817013487843066,
+        2.43210598655123e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "第二章相互作用-答案与解析:p10:replace8",
+      "book": "第二章相互作用-答案与解析",
+      "page1": 10,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "2.D【解析】本题考查共点力的平衡.对O点进行受力分析，根",
+      "wrong": "2.D【解析】本题考查共点力的平衡.对0点进行受力分析，根",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4d51735a85.png",
+      "ocrSim": 0.9166666666666666,
+      "ocrSim2": null,
+      "scores": [
+        0.9833106488653739,
+        2.2385235439393035e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "第二章相互作用-答案与解析:p6:insert17",
+      "book": "第二章相互作用-答案与解析",
+      "page1": 6,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "最大；由几何关系可知",
+      "wrong": "F与绳子拉力T垂直时，θ最大；由几何关系可",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/cc4fbdb367.png",
+      "ocrSim": 0.20689655172413793,
+      "ocrSim2": null,
+      "scores": [
+        0.0004151987911986458,
+        0.0009320479324286693
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1
+    },
+    {
+      "id": "第二章相互作用-答案与解析:p18:replace_text21",
+      "book": "第二章相互作用-答案与解析",
+      "page1": 18,
+      "kind": "replace_text",
+      "verified": true,
+      "source": "",
+      "correct": "3. (1) 1 \\mathrm { \\ m } / \\mathrm { s } ^ { 2 } \\quad ( 2 ) 5 \\mathrm { \\ m } \\quad ( 3 ) 不能相撞 2.4 \\mathrm { \\ m }",
+      "wrong": "1 \\mathrm { \\ m } / \\mathrm { s } ^ { 2 } \\quad ( 2 ) 5 \\mathrm { \\ m } \\quad ( 3 )",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/a35d6c49ba.png",
+      "ocrSim": 0.20512820512820512,
+      "ocrSim2": null,
+      "scores": [
+        0.00011972763189423269,
+        4.799677278956934e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0,
+      "fixed_crop": true
+    },
+    {
+      "id": "答案册-合订本:p2:insert1",
+      "book": "答案册-合订本",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "body-hole",
+      "correct": "4. C 必刷考点·x-t 图像问题",
+      "wrong": "【解析】纵轴截距表示的是三人的初始位置，选项B、D图像",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/2c38643f25.png",
+      "ocrSim": 0.75,
+      "ocrSim2": null,
+      "scores": [
+        0.0005396584784230037,
+        0.0005860276373431268
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1
+    },
+    {
+      "id": "答案册-合订本:p176:replace_text2",
+      "book": "答案册-合订本",
+      "page1": 176,
+      "kind": "replace_text",
+      "verified": true,
+      "source": "",
+      "correct": "1．0.43 0.32",
+      "wrong": "1.0.430.32",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/1f498fae5d.png",
+      "ocrSim": 0.9333333333333333,
+      "ocrSim2": null,
+      "scores": [
+        0.3820860750822647,
+        0.0014129110604227625
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0,
+      "fixed_crop": true
+    },
+    {
+      "id": "答案册-合订本:p81:replace_text4",
+      "book": "答案册-合订本",
+      "page1": 81,
+      "kind": "replace_text",
+      "verified": true,
+      "source": "",
+      "correct": "即当 n 等于 1、3、5、7时为减弱点，所以线段AC上有4个减弱点，故A错",
+      "wrong": "3、5、7时为减弱点，所以线段AC上有4个减弱点，故A错",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/dd9026ff3f.png",
+      "ocrSim": 0.8518518518518519,
+      "ocrSim2": null,
+      "scores": [
+        0.00010443751257210067,
+        0.9644369628133456
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1,
+      "fixed_crop": true
+    },
+    {
+      "id": "教材基础练 磁场:p9:replace_text0",
+      "book": "教材基础练 磁场",
+      "page1": 9,
+      "kind": "replace_text",
+      "verified": true,
+      "source": "",
+      "correct": "4[多选][人教版选修二P12第4题设问变式]易错如图所示是磁流体发电机的工作原理示意图。发",
+      "wrong": "图所示是磁流体发电机的工作原理示意图。发",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/bc6d9f3668.png",
+      "ocrSim": 0.5333333333333333,
+      "ocrSim2": null,
+      "scores": [
+        1.1014547395164891e-05,
+        2.1912252966640266e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1,
+      "fixed_crop": true
+    },
+    {
+      "id": "教材基础练 磁场:p2:insert2",
+      "book": "教材基础练 磁场",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "body-hole",
+      "correct": "纸面上，磁场方向垂直纸面向里。一恒压电源接在正五边形的 ad 两点，若正五边形 abcde 所受的安培力为 F，则正五边形的 aed 边所受的安培力为",
+      "wrong": "× × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × × ×",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/edd6067cb2.png",
+      "ocrSim": 0.3170731707317073,
+      "ocrSim2": null,
+      "scores": [
+        0.018649956361493605,
+        1.9643840895956674e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p1:insert0",
+      "book": "动量守恒定律23必刷题",
+      "page1": 1,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/df5bdfee3d.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.948219388969184,
+        2.5932674975880654e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p1:insert1",
+      "book": "动量守恒定律23必刷题",
+      "page1": 1,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/d0cd61d3f0.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9708335549822991,
+        0.0005033708402676415
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p2:insert2",
+      "book": "动量守恒定律23必刷题",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/0bbd4e3304.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8854397658479988,
+        0.00012743164673366397
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p2:insert3",
+      "book": "动量守恒定律23必刷题",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/85ef9b1564.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9765737894235038,
+        0.0003873908157665432
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p5:insert4",
+      "book": "动量守恒定律23必刷题",
+      "page1": 5,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/dd2a5ab2af.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8850222043909974,
+        4.436245372904551e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p5:insert5",
+      "book": "动量守恒定律23必刷题",
+      "page1": 5,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/8e506d6771.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9708416955911119,
+        0.0010691742327883949
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p9:insert6",
+      "book": "动量守恒定律23必刷题",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/7cc1b6d0f8.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9320456055513728,
+        5.658468885304781e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p12:insert7",
+      "book": "动量守恒定律23必刷题",
+      "page1": 12,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(a)",
+      "wrong": "竖直上抛运动",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/c7965b0d62.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9633555394317853,
+        0.0003043243302483116
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p12:insert8",
+      "book": "动量守恒定律23必刷题",
+      "page1": 12,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(b)",
+      "wrong": "竖直上抛运动",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/5b20bc32ff.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9710846338107876,
+        0.00016935584090766766
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p14:insert9",
+      "book": "动量守恒定律23必刷题",
+      "page1": 14,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(a)",
+      "wrong": "法正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/569b38f1a8.png",
+      "ocrSim": 0.4,
+      "ocrSim2": null,
+      "scores": [
+        0.8580403430769237,
+        3.613827892266673e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p14:insert10",
+      "book": "动量守恒定律23必刷题",
+      "page1": 14,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(b)",
+      "wrong": "法正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/02b7f5f712.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9670892367425847,
+        1.92657877032931e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p17:insert11",
+      "book": "动量守恒定律23必刷题",
+      "page1": 17,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(a)",
+      "wrong": "率之比；",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/99f330e626.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9247089351746536,
+        2.3883161502239697e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p17:insert12",
+      "book": "动量守恒定律23必刷题",
+      "page1": 17,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(b)",
+      "wrong": "率之比；",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/e6200b443c.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9430155172591301,
+        9.672513586236363e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "动量守恒定律23必刷题:p4:insert13",
+      "book": "动量守恒定律23必刷题",
+      "page1": 4,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "D. $1.8v_{0}$",
+      "wrong": "3.[浙江名校联盟2022模拟]如图所示，光滑水",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/7bfcf1fa32.png",
+      "ocrSim": 0.26666666666666666,
+      "ocrSim2": null,
+      "scores": [
+        1.960310036922286e-05,
+        5.671419636686392e-07
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "物理_教材基础练 曲线运动:p8:replace_text0",
+      "book": "物理_教材基础练 曲线运动",
+      "page1": 8,
+      "kind": "replace_text",
+      "verified": true,
+      "source": "",
+      "correct": "1 2023 全国甲卷 [人教版必修二 P30 第 3 题考法变",
+      "wrong": "2023 全国甲卷 [人教版必修二 P30 第 3 题考法变",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/84ba1fbcda.png",
+      "ocrSim": 0.9787234042553191,
+      "ocrSim2": null,
+      "scores": [
+        0.9230986208622854,
+        0.00010477146919892967
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0,
+      "fixed_crop": true
+    },
+    {
+      "id": "物理_教材基础练 曲线运动:p16:replace_text1",
+      "book": "物理_教材基础练 曲线运动",
+      "page1": 16,
+      "kind": "replace_text",
+      "verified": true,
+      "source": "",
+      "correct": "2 2024 江西卷 [多选] [人教版必修二 P21 第 6 题",
+      "wrong": "2024 江西卷 [多选] [人教版必修二 P21 第 6 题",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/112c4444d9.png",
+      "ocrSim": 0.8695652173913043,
+      "ocrSim2": null,
+      "scores": [
+        0.173096650562995,
+        0.048725460510839216
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0,
+      "fixed_crop": true
+    },
+    {
+      "id": "23必刷题 1 直线运动:p4:replace0",
+      "book": "23必刷题 1 直线运动",
+      "page1": 4,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "体从O点由静止开始做匀加速直线运动，途经",
+      "wrong": "体从0点由静止开始做匀加速直线运动，途经",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/d4d7e44730.png",
+      "ocrSim": 0.9473684210526315,
+      "ocrSim2": null,
+      "scores": [
+        0.9943227684167764,
+        0.07090894406309584
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p6:insert1",
+      "book": "23必刷题 1 直线运动",
+      "page1": 6,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/5343ab018d.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8965839835470233,
+        0.0001638187465744667
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p6:insert2",
+      "book": "23必刷题 1 直线运动",
+      "page1": 6,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/43670f3f22.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9792885453405421,
+        0.00047268791691956047
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p6:insert3",
+      "book": "23必刷题 1 直线运动",
+      "page1": 6,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/13b87f5888.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.7384019801355821,
+        0.00033482230933265864
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p6:insert4",
+      "book": "23必刷题 1 直线运动",
+      "page1": 6,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/f0666b9708.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9706180607910639,
+        0.00047634138202765964
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p9:insert5",
+      "book": "23必刷题 1 直线运动",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/ac540e3a4d.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8978035061027817,
+        0.00027720819066472655
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p9:insert6",
+      "book": "23必刷题 1 直线运动",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/2941943536.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9741992366136286,
+        0.0005820712762720875
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p11:insert7",
+      "book": "23必刷题 1 直线运动",
+      "page1": 11,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/e909f0dc1f.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9177981708255248,
+        0.00011224812193188578
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p11:insert8",
+      "book": "23必刷题 1 直线运动",
+      "page1": 11,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/e68b153963.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9688877788261219,
+        0.0009450883210034709
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p11:insert9",
+      "book": "23必刷题 1 直线运动",
+      "page1": 11,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/ca899a558c.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8571656078064959,
+        0.00016386038026592044
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p11:insert10",
+      "book": "23必刷题 1 直线运动",
+      "page1": 11,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/3c60632f5c.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9735577548695653,
+        0.0009396770422944216
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p12:insert11",
+      "book": "23必刷题 1 直线运动",
+      "page1": 12,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/f48efea28a.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8716738310549071,
+        0.00012202684049501659
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p9:insert13",
+      "book": "23必刷题 1 直线运动",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(a)",
+      "wrong": "确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/22858c8421.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.7891015973210159,
+        5.773214001969404e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p9:insert14",
+      "book": "23必刷题 1 直线运动",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(b)",
+      "wrong": "确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/d3c5675a34.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8796366671947566,
+        1.1036565114980189e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p7:insert16",
+      "book": "23必刷题 1 直线运动",
+      "page1": 7,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "A. $b$ 与 $a$ 开始下落的时间差等于 $c$ 与 $b$ 开",
+      "wrong": "b、c，三球刚好同时落到地面上，不计空气阻力，",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/cddea8c990.png",
+      "ocrSim": 0.15,
+      "ocrSim2": 0.5,
+      "scores": [
+        8.17292891198788e-05,
+        1.4300790981712048e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p7:insert17",
+      "book": "23必刷题 1 直线运动",
+      "page1": 7,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "B. 三小球运动时间之比为 $\\sqrt{6}:2:1$",
+      "wrong": "2 \\sqrt { \\frac { L } { g } } ( \\sqrt { 3 } - \\sqrt { 2 } )",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/97c8562e6a.png",
+      "ocrSim": 0.6111111111111112,
+      "ocrSim2": null,
+      "scores": [
+        0.000921008145539588,
+        4.137169877579946e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p8:insert19",
+      "book": "23必刷题 1 直线运动",
+      "page1": 8,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "A. D",
+      "wrong": "穿过管的时间t=",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/999a7daff2.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9768338810285058,
+        6.640943115982443e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p11:insert24",
+      "book": "23必刷题 1 直线运动",
+      "page1": 11,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/715b71a3a5.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.902132715720191,
+        6.806857500392249e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p14:insert25",
+      "book": "23必刷题 1 直线运动",
+      "page1": 14,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "B. 若 $B$、$C$ 间的距离为 $s_{1}$，则 $A$、$C$ 间的",
+      "wrong": "C. 若B、C 间的距离为4 s _ { 1 },则A、C间的距离",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/896f583917.png",
+      "ocrSim": 0.43902439024390244,
+      "ocrSim2": null,
+      "scores": [
+        0.001771129027294437,
+        1.6098015163922978e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p14:insert26",
+      "book": "23必刷题 1 直线运动",
+      "page1": 14,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "A. 若 $B$、$C$ 间的距离为 $s_{1}$，则 $A$、$C$ 间的",
+      "wrong": "球，结果两球同时到达C点，则下列说法正确",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/a395fa47c7.png",
+      "ocrSim": 0.18181818181818182,
+      "ocrSim2": 0.3902439024390244,
+      "scores": [
+        0.0003979356891398559,
+        5.221593075763448e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "23必刷题 1 直线运动:p14:insert27",
+      "book": "23必刷题 1 直线运动",
+      "page1": 14,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "距离为 $5s_{1}$",
+      "wrong": "s _ { 1 } ,",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/00c3babc18.png",
+      "ocrSim": 0.38095238095238093,
+      "ocrSim2": null,
+      "scores": [
+        2.810035946787675e-05,
+        5.717270669691398e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1
+    },
+    {
+      "id": "23必刷题 1 直线运动:p14:insert28",
+      "book": "23必刷题 1 直线运动",
+      "page1": 14,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "距离为 $4s_{1}$",
+      "wrong": "s _ { 1 } ,",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/ca972de41e.png",
+      "ocrSim": 0.4166666666666667,
+      "ocrSim2": null,
+      "scores": [
+        0.00013654109201474777,
+        0.00018088402052189516
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1
+    },
+    {
+      "id": "机械能23必刷题:p2:insert0",
+      "book": "机械能23必刷题",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/613eaf64aa.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8859485112839279,
+        0.00014868691579654483
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p2:insert1",
+      "book": "机械能23必刷题",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/92a7acb1b0.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9655936034236614,
+        0.0004793365276230738
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p2:insert2",
+      "book": "机械能23必刷题",
+      "page1": 2,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/65680f90ff.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9092319431779052,
+        0.000171686098111382
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p4:replace4",
+      "book": "机械能23必刷题",
+      "page1": 4,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "O点到斜面的距离均为 d. 将滑块从与 0 点等",
+      "wrong": "0点到斜面的距离均为 d. 将滑块从与 0 点等",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/c4ec445d4c.png",
+      "ocrSim": 0.9473684210526315,
+      "ocrSim2": null,
+      "scores": [
+        0.02758305990542652,
+        0.517303445867149
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1
+    },
+    {
+      "id": "机械能23必刷题:p4:insert5",
+      "book": "机械能23必刷题",
+      "page1": 4,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4a96406fb0.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.8889590769602959,
+        0.0002491341662394523
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p4:insert6",
+      "book": "机械能23必刷题",
+      "page1": 4,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/5f5bd55dd6.png",
+      "ocrSim": 0.0,
+      "ocrSim2": 1.0,
+      "scores": [
+        0.9794339300103997,
+        0.00029812411863181155
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p7:replace8",
+      "book": "机械能23必刷题",
+      "page1": 7,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "定速度后，从跳台上O点水平飞出.某运动员",
+      "wrong": "定速度后，从跳台上0点水平飞出.某运动员",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/470f96dd4b.png",
+      "ocrSim": 0.9444444444444444,
+      "ocrSim2": null,
+      "scores": [
+        0.9944999223917972,
+        0.00026211652620602066
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p9:insert9",
+      "book": "机械能23必刷题",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/327bf29165.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9187096035134437,
+        7.05001021081777e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p9:insert11",
+      "book": "机械能23必刷题",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/68997c182b.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9378139768871492,
+        3.641712014279985e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p9:insert12",
+      "book": "机械能23必刷题",
+      "page1": 9,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/e8acd9841e.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9785777482154997,
+        0.00012286774660103553
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p12:insert13",
+      "book": "机械能23必刷题",
+      "page1": 12,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/9b11289dda.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9288198011252362,
+        9.861840812659266e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p13:insert15",
+      "book": "机械能23必刷题",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/4d539d9296.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9507783163771647,
+        3.7462489222093956e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p13:insert16",
+      "book": "机械能23必刷题",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/a57991cdcf.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9803029791907132,
+        7.82460440768813e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p13:insert17",
+      "book": "机械能23必刷题",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "甲",
+      "wrong": "乙",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/98b7108842.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9399854546907078,
+        8.423366597637877e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p13:insert18",
+      "book": "机械能23必刷题",
+      "page1": 13,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "乙",
+      "wrong": "甲",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/e9c1361105.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9797399008720383,
+        0.00011279474402831134
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p18:replace19",
+      "book": "机械能23必刷题",
+      "page1": 18,
+      "kind": "replace",
+      "verified": true,
+      "source": "",
+      "correct": "中，光滑水平轻杆固定在竖直转轴的O点，小",
+      "wrong": "中，光滑水平轻杆固定在竖直转轴的0点，小",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/b0bf2af4ae.png",
+      "ocrSim": 0.9444444444444444,
+      "ocrSim2": null,
+      "scores": [
+        0.985769074644133,
+        5.284583931976028e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p3:insert20",
+      "book": "机械能23必刷题",
+      "page1": 3,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(a)",
+      "wrong": "时速率更大",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/b10fd74eaa.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.692573241586855,
+        9.659381251889356e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p3:insert21",
+      "book": "机械能23必刷题",
+      "page1": 3,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(b)",
+      "wrong": "时速率更大",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/6626f77fe4.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.7409917047001687,
+        5.789039038928039e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p15:insert22",
+      "book": "机械能23必刷题",
+      "page1": 15,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(b)",
+      "wrong": "法正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/852e5a9bf6.png",
+      "ocrSim": 1.0,
+      "ocrSim2": null,
+      "scores": [
+        0.9404280471089914,
+        1.0242471115284094e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p15:insert23",
+      "book": "机械能23必刷题",
+      "page1": 15,
+      "kind": "insert",
+      "verified": true,
+      "source": "",
+      "correct": "图(a)",
+      "wrong": "法正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/d007e29ccb.png",
+      "ocrSim": 0.4,
+      "ocrSim2": null,
+      "scores": [
+        0.6718681774040169,
+        2.9992816915414675e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p11:insert24",
+      "book": "机械能23必刷题",
+      "page1": 11,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "A. 欲使轻杆 S 发生移动, 物体运动的",
+      "wrong": "性限度内.下列说法正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/2e12cad718.png",
+      "ocrSim": 0.8823529411764706,
+      "ocrSim2": null,
+      "scores": [
+        5.6611675441392776e-05,
+        1.9501179096700613e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p11:insert25",
+      "book": "机械能23必刷题",
+      "page1": 11,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "B. 欲使轻杆 S 发生移动, 物体运动的",
+      "wrong": "性限度内.下列说法正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/9264186d28.png",
+      "ocrSim": 0.8235294117647058,
+      "ocrSim2": null,
+      "scores": [
+        3.945182204493233e-05,
+        1.4160970127025137e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p11:insert26",
+      "book": "机械能23必刷题",
+      "page1": 11,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "D. 欲使轻杆 S 左端恰好完全进入薄",
+      "wrong": "\\frac { 2 \\sqrt { 6 } } { 3 } v _ { 0 }",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/af2e90c06f.png",
+      "ocrSim": 0.8235294117647058,
+      "ocrSim2": null,
+      "scores": [
+        0.00011595803741221943,
+        5.3655195858261325e-05
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p11:insert27",
+      "book": "机械能23必刷题",
+      "page1": 11,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "C. 欲使轻杆 S 左端恰好完全进入薄板",
+      "wrong": "\\frac { \\sqrt { 6 } } { 3 } v _ { 0 }",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/d1a3d17cd6.png",
+      "ocrSim": 0.8333333333333334,
+      "ocrSim2": null,
+      "scores": [
+        0.0005770492412303001,
+        0.00015245452668262782
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p11:insert28",
+      "book": "机械能23必刷题",
+      "page1": 11,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "板, 物体运动的速度为 $\\sqrt{6}/3v_{0}$",
+      "wrong": "\\frac { 2 \\sqrt { 6 } } { 3 } v _ { 0 }",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/3fa0f21b2d.png",
+      "ocrSim": 0.36363636363636365,
+      "ocrSim2": null,
+      "scores": [
+        9.791515288362555e-05,
+        0.007256938934128186
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1
+    },
+    {
+      "id": "机械能23必刷题:p11:insert29",
+      "book": "机械能23必刷题",
+      "page1": 11,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": ", 物体运动的速度为 $\\sqrt{6}/2v_{0}$",
+      "wrong": "\\frac { \\sqrt { 6 } } { 2 } v _ { \\scriptscriptstyle 0 }",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/8dc3acb2cc.png",
+      "ocrSim": 0.3333333333333333,
+      "ocrSim2": null,
+      "scores": [
+        0.0002512942827140604,
+        0.005541478127500189
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 1
+    },
+    {
+      "id": "机械能23必刷题:p11:insert30",
+      "book": "机械能23必刷题",
+      "page1": 11,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "最小速度为 $\\sqrt{10}v_{0}$",
+      "wrong": "性限度内.下列说法正确的是()",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/3a04383ec6.png",
+      "ocrSim": 0.25,
+      "ocrSim2": null,
+      "scores": [
+        4.748616243473597e-05,
+        1.7856447505247505e-06
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    },
+    {
+      "id": "机械能23必刷题:p14:insert32",
+      "book": "机械能23必刷题",
+      "page1": 14,
+      "kind": "insert",
+      "verified": false,
+      "source": "body-hole",
+      "correct": "(1)运动员从 M 点水平飞出的速度 $v_{M}$;",
+      "wrong": "(2)运动员在着陆坡FG上滑行的时间(结果",
+      "cropPath": "tmp/minicpm-p0p1/real-cases/1004a955f5.png",
+      "ocrSim": 0.5128205128205128,
+      "ocrSim2": null,
+      "scores": [
+        0.9867531516276219,
+        4.0070437354159685e-07
+      ],
+      "verdicts": [
+        "scored",
+        "scored"
+      ],
+      "best_index": 0
+    }
+  ],
+  "skipped": [
+    {
+      "id": "答案册-合订本:p176:replace_text3",
+      "reason": "{\"error\":{\"code\":\"content_policy_violation\",\"message\":\"这条内容暂时无法继续处理，换个话题试试吧。\",\"type\":\"invalid_request_error\"}}\n"
+    }
+  ]
+}

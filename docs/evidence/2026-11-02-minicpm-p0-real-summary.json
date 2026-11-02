@@ -1,0 +1,755 @@
+{
+  "total_scored": 131,
+  "policy_skipped": 1,
+  "block_level": {
+    "n": 123,
+    "auc": 0.9417,
+    "correct_mean": 0.7276,
+    "correct_median": 0.9247,
+    "wrong_mean": 0.00526,
+    "wrong_median": 9e-05,
+    "best_at_correct": 0.9431,
+    "thresholds": {
+      "0.005": {
+        "correct_pass": 0.8455,
+        "wrong_pass": 0.0407,
+        "false_review": 0.1545
+      },
+      "0.01": {
+        "correct_pass": 0.8374,
+        "wrong_pass": 0.0244,
+        "false_review": 0.1626
+      },
+      "0.02": {
+        "correct_pass": 0.8049,
+        "wrong_pass": 0.0163,
+        "false_review": 0.1951
+      },
+      "0.05": {
+        "correct_pass": 0.7967,
+        "wrong_pass": 0.0163,
+        "false_review": 0.2033
+      },
+      "0.1": {
+        "correct_pass": 0.7967,
+        "wrong_pass": 0.0081,
+        "false_review": 0.2033
+      },
+      "0.2": {
+        "correct_pass": 0.7967,
+        "wrong_pass": 0.0081,
+        "false_review": 0.2033
+      },
+      "0.5": {
+        "correct_pass": 0.7805,
+        "wrong_pass": 0.0081,
+        "false_review": 0.2195
+      }
+    }
+  },
+  "insert": {
+    "n": 110,
+    "auc": 0.9384,
+    "correct_mean": 0.706,
+    "correct_median": 0.9165,
+    "wrong_mean": 0.00031,
+    "wrong_median": 9e-05,
+    "best_at_correct": 0.9455,
+    "thresholds": {
+      "0.005": {
+        "correct_pass": 0.8273,
+        "wrong_pass": 0.0182,
+        "false_review": 0.1727
+      },
+      "0.01": {
+        "correct_pass": 0.8182,
+        "wrong_pass": 0.0,
+        "false_review": 0.1818
+      },
+      "0.02": {
+        "correct_pass": 0.7818,
+        "wrong_pass": 0.0,
+        "false_review": 0.2182
+      },
+      "0.05": {
+        "correct_pass": 0.7818,
+        "wrong_pass": 0.0,
+        "false_review": 0.2182
+      },
+      "0.1": {
+        "correct_pass": 0.7818,
+        "wrong_pass": 0.0,
+        "false_review": 0.2182
+      },
+      "0.2": {
+        "correct_pass": 0.7818,
+        "wrong_pass": 0.0,
+        "false_review": 0.2182
+      },
+      "0.5": {
+        "correct_pass": 0.7636,
+        "wrong_pass": 0.0,
+        "false_review": 0.2364
+      }
+    }
+  },
+  "replace": {
+    "n": 13,
+    "auc": 0.9882,
+    "correct_mean": 0.9098,
+    "correct_median": 0.9858,
+    "wrong_mean": 0.04709,
+    "wrong_median": 0.00012,
+    "best_at_correct": 0.9231,
+    "thresholds": {
+      "0.005": {
+        "correct_pass": 1.0,
+        "wrong_pass": 0.2308,
+        "false_review": 0.0
+      },
+      "0.01": {
+        "correct_pass": 1.0,
+        "wrong_pass": 0.2308,
+        "false_review": 0.0
+      },
+      "0.02": {
+        "correct_pass": 1.0,
+        "wrong_pass": 0.1538,
+        "false_review": 0.0
+      },
+      "0.05": {
+        "correct_pass": 0.9231,
+        "wrong_pass": 0.1538,
+        "false_review": 0.0769
+      },
+      "0.1": {
+        "correct_pass": 0.9231,
+        "wrong_pass": 0.0769,
+        "false_review": 0.0769
+      },
+      "0.2": {
+        "correct_pass": 0.9231,
+        "wrong_pass": 0.0769,
+        "false_review": 0.0769
+      },
+      "0.5": {
+        "correct_pass": 0.9231,
+        "wrong_pass": 0.0769,
+        "false_review": 0.0769
+      }
+    }
+  },
+  "replace_text_all": {
+    "n": 8,
+    "auc": 0.4531,
+    "correct_mean": 0.185,
+    "correct_median": 0.0009,
+    "wrong_mean": 0.24758,
+    "wrong_median": 0.0019,
+    "best_at_correct": 0.5,
+    "thresholds": {
+      "0.005": {
+        "correct_pass": 0.375,
+        "wrong_pass": 0.375,
+        "false_review": 0.625
+      },
+      "0.01": {
+        "correct_pass": 0.375,
+        "wrong_pass": 0.375,
+        "false_review": 0.625
+      },
+      "0.02": {
+        "correct_pass": 0.375,
+        "wrong_pass": 0.375,
+        "false_review": 0.625
+      },
+      "0.05": {
+        "correct_pass": 0.375,
+        "wrong_pass": 0.25,
+        "false_review": 0.625
+      },
+      "0.1": {
+        "correct_pass": 0.375,
+        "wrong_pass": 0.25,
+        "false_review": 0.625
+      },
+      "0.2": {
+        "correct_pass": 0.25,
+        "wrong_pass": 0.25,
+        "false_review": 0.75
+      },
+      "0.5": {
+        "correct_pass": 0.125,
+        "wrong_pass": 0.25,
+        "false_review": 0.875
+      }
+    }
+  },
+  "replace_text_evaluable": {
+    "n": 4,
+    "auc": 0.875,
+    "correct_mean": 0.3696,
+    "correct_median": 0.2776,
+    "wrong_mean": 0.01257,
+    "wrong_median": 0.00076,
+    "best_at_correct": 1.0,
+    "thresholds": {
+      "0.005": {
+        "correct_pass": 0.75,
+        "wrong_pass": 0.25,
+        "false_review": 0.25
+      },
+      "0.01": {
+        "correct_pass": 0.75,
+        "wrong_pass": 0.25,
+        "false_review": 0.25
+      },
+      "0.02": {
+        "correct_pass": 0.75,
+        "wrong_pass": 0.25,
+        "false_review": 0.25
+      },
+      "0.05": {
+        "correct_pass": 0.75,
+        "wrong_pass": 0.0,
+        "false_review": 0.25
+      },
+      "0.1": {
+        "correct_pass": 0.75,
+        "wrong_pass": 0.0,
+        "false_review": 0.25
+      },
+      "0.2": {
+        "correct_pass": 0.5,
+        "wrong_pass": 0.0,
+        "false_review": 0.5
+      },
+      "0.5": {
+        "correct_pass": 0.25,
+        "wrong_pass": 0.0,
+        "false_review": 0.75
+      }
+    }
+  },
+  "replace_text_not_evaluable": [
+    "物理_教材基础练机械能守恒定律:p7:replace_text0",
+    "物理_教材基础练机械能守恒定律:p6:replace_text1",
+    "答案册-合订本:p81:replace_text4",
+    "教材基础练 磁场:p9:replace_text0"
+  ],
+  "by_book": {
+    "23必刷题 1 直线运动": {
+      "n": 22,
+      "auc": 0.8905,
+      "correct_mean": 0.6632,
+      "correct_median": 0.8881,
+      "wrong_mean": 0.00346,
+      "wrong_median": 0.00014,
+      "best_at_correct": 0.9091,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.7273,
+          "wrong_pass": 0.0455,
+          "false_review": 0.2727
+        },
+        "0.01": {
+          "correct_pass": 0.7273,
+          "wrong_pass": 0.0455,
+          "false_review": 0.2727
+        },
+        "0.02": {
+          "correct_pass": 0.7273,
+          "wrong_pass": 0.0455,
+          "false_review": 0.2727
+        },
+        "0.05": {
+          "correct_pass": 0.7273,
+          "wrong_pass": 0.0455,
+          "false_review": 0.2727
+        },
+        "0.1": {
+          "correct_pass": 0.7273,
+          "wrong_pass": 0.0,
+          "false_review": 0.2727
+        },
+        "0.2": {
+          "correct_pass": 0.7273,
+          "wrong_pass": 0.0,
+          "false_review": 0.2727
+        },
+        "0.5": {
+          "correct_pass": 0.7273,
+          "wrong_pass": 0.0,
+          "false_review": 0.2727
+        }
+      }
+    },
+    "23必刷题 2相互作用": {
+      "n": 12,
+      "auc": 1.0,
+      "correct_mean": 0.7237,
+      "correct_median": 0.9432,
+      "wrong_mean": 0.0004,
+      "wrong_median": 3e-05,
+      "best_at_correct": 1.0,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 1.0,
+          "wrong_pass": 0.0,
+          "false_review": 0.0
+        },
+        "0.01": {
+          "correct_pass": 0.9167,
+          "wrong_pass": 0.0,
+          "false_review": 0.0833
+        },
+        "0.02": {
+          "correct_pass": 0.75,
+          "wrong_pass": 0.0,
+          "false_review": 0.25
+        },
+        "0.05": {
+          "correct_pass": 0.75,
+          "wrong_pass": 0.0,
+          "false_review": 0.25
+        },
+        "0.1": {
+          "correct_pass": 0.75,
+          "wrong_pass": 0.0,
+          "false_review": 0.25
+        },
+        "0.2": {
+          "correct_pass": 0.75,
+          "wrong_pass": 0.0,
+          "false_review": 0.25
+        },
+        "0.5": {
+          "correct_pass": 0.75,
+          "wrong_pass": 0.0,
+          "false_review": 0.25
+        }
+      }
+    },
+    "23必刷题 3 运动和力的关系": {
+      "n": 27,
+      "auc": 0.9822,
+      "correct_mean": 0.7739,
+      "correct_median": 0.9115,
+      "wrong_mean": 0.00026,
+      "wrong_median": 0.00011,
+      "best_at_correct": 1.0,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.9259,
+          "wrong_pass": 0.0,
+          "false_review": 0.0741
+        },
+        "0.01": {
+          "correct_pass": 0.9259,
+          "wrong_pass": 0.0,
+          "false_review": 0.0741
+        },
+        "0.02": {
+          "correct_pass": 0.8889,
+          "wrong_pass": 0.0,
+          "false_review": 0.1111
+        },
+        "0.05": {
+          "correct_pass": 0.8889,
+          "wrong_pass": 0.0,
+          "false_review": 0.1111
+        },
+        "0.1": {
+          "correct_pass": 0.8889,
+          "wrong_pass": 0.0,
+          "false_review": 0.1111
+        },
+        "0.2": {
+          "correct_pass": 0.8889,
+          "wrong_pass": 0.0,
+          "false_review": 0.1111
+        },
+        "0.5": {
+          "correct_pass": 0.8519,
+          "wrong_pass": 0.0,
+          "false_review": 0.1481
+        }
+      }
+    },
+    "23必刷题 4 曲线运动": {
+      "n": 12,
+      "auc": 0.9861,
+      "correct_mean": 0.8282,
+      "correct_median": 0.9693,
+      "wrong_mean": 0.00179,
+      "wrong_median": 0.00011,
+      "best_at_correct": 1.0,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.9167,
+          "wrong_pass": 0.0833,
+          "false_review": 0.0833
+        },
+        "0.01": {
+          "correct_pass": 0.9167,
+          "wrong_pass": 0.0833,
+          "false_review": 0.0833
+        },
+        "0.02": {
+          "correct_pass": 0.9167,
+          "wrong_pass": 0.0,
+          "false_review": 0.0833
+        },
+        "0.05": {
+          "correct_pass": 0.9167,
+          "wrong_pass": 0.0,
+          "false_review": 0.0833
+        },
+        "0.1": {
+          "correct_pass": 0.9167,
+          "wrong_pass": 0.0,
+          "false_review": 0.0833
+        },
+        "0.2": {
+          "correct_pass": 0.9167,
+          "wrong_pass": 0.0,
+          "false_review": 0.0833
+        },
+        "0.5": {
+          "correct_pass": 0.8333,
+          "wrong_pass": 0.0,
+          "false_review": 0.1667
+        }
+      }
+    },
+    "动量守恒定律23必刷题": {
+      "n": 14,
+      "auc": 0.9439,
+      "correct_mean": 0.8712,
+      "correct_median": 0.9456,
+      "wrong_mean": 0.0002,
+      "wrong_median": 5e-05,
+      "best_at_correct": 1.0,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.9286,
+          "wrong_pass": 0.0,
+          "false_review": 0.0714
+        },
+        "0.01": {
+          "correct_pass": 0.9286,
+          "wrong_pass": 0.0,
+          "false_review": 0.0714
+        },
+        "0.02": {
+          "correct_pass": 0.9286,
+          "wrong_pass": 0.0,
+          "false_review": 0.0714
+        },
+        "0.05": {
+          "correct_pass": 0.9286,
+          "wrong_pass": 0.0,
+          "false_review": 0.0714
+        },
+        "0.1": {
+          "correct_pass": 0.9286,
+          "wrong_pass": 0.0,
+          "false_review": 0.0714
+        },
+        "0.2": {
+          "correct_pass": 0.9286,
+          "wrong_pass": 0.0,
+          "false_review": 0.0714
+        },
+        "0.5": {
+          "correct_pass": 0.9286,
+          "wrong_pass": 0.0,
+          "false_review": 0.0714
+        }
+      }
+    },
+    "教材基础练 磁场": {
+      "n": 1,
+      "auc": 1.0,
+      "correct_mean": 0.0186,
+      "correct_median": 0.0186,
+      "wrong_mean": 0.0,
+      "wrong_median": 0.0,
+      "best_at_correct": 1.0,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 1.0,
+          "wrong_pass": 0.0,
+          "false_review": 0.0
+        },
+        "0.01": {
+          "correct_pass": 1.0,
+          "wrong_pass": 0.0,
+          "false_review": 0.0
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    },
+    "机械能23必刷题": {
+      "n": 28,
+      "auc": 0.8827,
+      "correct_mean": 0.6531,
+      "correct_median": 0.914,
+      "wrong_mean": 0.01903,
+      "wrong_median": 9e-05,
+      "best_at_correct": 0.8929,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.75,
+          "wrong_pass": 0.1071,
+          "false_review": 0.25
+        },
+        "0.01": {
+          "correct_pass": 0.75,
+          "wrong_pass": 0.0357,
+          "false_review": 0.25
+        },
+        "0.02": {
+          "correct_pass": 0.75,
+          "wrong_pass": 0.0357,
+          "false_review": 0.25
+        },
+        "0.05": {
+          "correct_pass": 0.7143,
+          "wrong_pass": 0.0357,
+          "false_review": 0.2857
+        },
+        "0.1": {
+          "correct_pass": 0.7143,
+          "wrong_pass": 0.0357,
+          "false_review": 0.2857
+        },
+        "0.2": {
+          "correct_pass": 0.7143,
+          "wrong_pass": 0.0357,
+          "false_review": 0.2857
+        },
+        "0.5": {
+          "correct_pass": 0.7143,
+          "wrong_pass": 0.0357,
+          "false_review": 0.2857
+        }
+      }
+    },
+    "物理_教材基础练 曲线运动": {
+      "n": 0
+    },
+    "物理_教材基础练机械能守恒定律": {
+      "n": 0
+    },
+    "第二章相互作用-答案与解析": {
+      "n": 6,
+      "auc": 0.9722,
+      "correct_mean": 0.8132,
+      "correct_median": 0.9818,
+      "wrong_mean": 0.00018,
+      "wrong_median": 3e-05,
+      "best_at_correct": 0.8333,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.8333,
+          "wrong_pass": 0.0,
+          "false_review": 0.1667
+        },
+        "0.01": {
+          "correct_pass": 0.8333,
+          "wrong_pass": 0.0,
+          "false_review": 0.1667
+        },
+        "0.02": {
+          "correct_pass": 0.8333,
+          "wrong_pass": 0.0,
+          "false_review": 0.1667
+        },
+        "0.05": {
+          "correct_pass": 0.8333,
+          "wrong_pass": 0.0,
+          "false_review": 0.1667
+        },
+        "0.1": {
+          "correct_pass": 0.8333,
+          "wrong_pass": 0.0,
+          "false_review": 0.1667
+        },
+        "0.2": {
+          "correct_pass": 0.8333,
+          "wrong_pass": 0.0,
+          "false_review": 0.1667
+        },
+        "0.5": {
+          "correct_pass": 0.8333,
+          "wrong_pass": 0.0,
+          "false_review": 0.1667
+        }
+      }
+    },
+    "答案册-合订本": {
+      "n": 1,
+      "auc": 0.0,
+      "correct_mean": 0.0005,
+      "correct_median": 0.0005,
+      "wrong_mean": 0.00059,
+      "wrong_median": 0.00059,
+      "best_at_correct": 0.0,
+      "thresholds": {
+        "0.005": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.01": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.02": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.05": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.1": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.2": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        },
+        "0.5": {
+          "correct_pass": 0.0,
+          "wrong_pass": 0.0,
+          "false_review": 1.0
+        }
+      }
+    }
+  },
+  "failures_block": [
+    {
+      "id": "第二章相互作用-答案与解析:p6:insert17",
+      "kind": "insert",
+      "book": "第二章相互作用-答案与解析",
+      "page": 6,
+      "scores": [
+        0.0004151987911986458,
+        0.0009320479324286693
+      ],
+      "best": 1,
+      "correct": "最大；由几何关系可知",
+      "wrong": "F与绳子拉力T垂直时，θ最大；由几何关系可"
+    },
+    {
+      "id": "答案册-合订本:p2:insert1",
+      "kind": "insert",
+      "book": "答案册-合订本",
+      "page": 2,
+      "scores": [
+        0.0005396584784230037,
+        0.0005860276373431268
+      ],
+      "best": 1,
+      "correct": "4. C 必刷考点·x-t 图像问题",
+      "wrong": "【解析】纵轴截距表示的是三人的初始位置，选项B、D图像"
+    },
+    {
+      "id": "23必刷题 1 直线运动:p14:insert27",
+      "kind": "insert",
+      "book": "23必刷题 1 直线运动",
+      "page": 14,
+      "scores": [
+        2.810035946787675e-05,
+        5.717270669691398e-05
+      ],
+      "best": 1,
+      "correct": "距离为 $5s_{1}$",
+      "wrong": "s _ { 1 } ,"
+    },
+    {
+      "id": "23必刷题 1 直线运动:p14:insert28",
+      "kind": "insert",
+      "book": "23必刷题 1 直线运动",
+      "page": 14,
+      "scores": [
+        0.00013654109201474777,
+        0.00018088402052189516
+      ],
+      "best": 1,
+      "correct": "距离为 $4s_{1}$",
+      "wrong": "s _ { 1 } ,"
+    },
+    {
+      "id": "机械能23必刷题:p4:replace4",
+      "kind": "replace",
+      "book": "机械能23必刷题",
+      "page": 4,
+      "scores": [
+        0.02758305990542652,
+        0.517303445867149
+      ],
+      "best": 1,
+      "correct": "O点到斜面的距离均为 d. 将滑块从与 0 点等",
+      "wrong": "0点到斜面的距离均为 d. 将滑块从与 0 点等"
+    },
+    {
+      "id": "机械能23必刷题:p11:insert28",
+      "kind": "insert",
+      "book": "机械能23必刷题",
+      "page": 11,
+      "scores": [
+        9.791515288362555e-05,
+        0.007256938934128186
+      ],
+      "best": 1,
+      "correct": "板, 物体运动的速度为 $\\sqrt{6}/3v_{0}$",
+      "wrong": "\\frac { 2 \\sqrt { 6 } } { 3 } v _ { 0 }"
+    },
+    {
+      "id": "机械能23必刷题:p11:insert29",
+      "kind": "insert",
+      "book": "机械能23必刷题",
+      "page": 11,
+      "scores": [
+        0.0002512942827140604,
+        0.005541478127500189
+      ],
+      "best": 1,
+      "correct": ", 物体运动的速度为 $\\sqrt{6}/2v_{0}$",
+      "wrong": "\\frac { \\sqrt { 6 } } { 2 } v _ { \\scriptscriptstyle 0 }"
+    }
+  ]
+}

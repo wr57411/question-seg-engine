@@ -27,7 +27,24 @@ python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/p1-parse.py
 python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/p1-compare.py
 python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/p1-fidelity.py
 python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/p1-summary.py
+
+# P0-2：真实错误（corrections/*.json）——先建 169 个候选，再两轮 OCR 对齐
+python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/build-real-cases.py
+python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/ocr-align-real.py
+python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/ocr-align-real2.py
+python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/run-jev-real-v2.py
+python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/summarize-real.py
+
+# P1-2：22 页扩页对照
+python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/p1-parse-extra.py
+python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/p1-compare-all.py
+
+# P2：只读路由原型（不改生产线）
+python3 docs/evidence/2026-11-02-minicpm-p0p1-scripts/p2-readonly.py
 ```
+
+> 真实错误脚本会读 `corrections/*.json`；`run-jev-real-v2.py` 对内容策略 400 的单条会跳过并记录。
+> `p1-compare-all.py` 会对 22 页跑 tesseract 整页 OCR，耗时约 1–2 分钟。
 
 ## 说明
 
