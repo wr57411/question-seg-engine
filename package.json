@@ -39,7 +39,8 @@
     "batch:report": "tsx scripts/batch.ts --report",
     "fuse:eval": "tsx scripts/fuse-eval.ts",
     "fuse:doc": "tsx scripts/fuse-doc.ts",
-    "audit:ab": "tsx scripts/ab-questions.ts"
+    "audit:ab": "tsx scripts/ab-questions.ts",
+    "audit:numbering:cross": "tsx scripts/audit-numbering-cross.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
