@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "id": "question-seg-engine",
+  "title": "题库切分引擎 · 排查与改进",
+  "description": "针对 question-seg-engine 的解析/切分问题做诊断与修复时的路线选择",
+  "updated": "2026-11-02",
+  "defaults": { "prior_weight": 2, "eval_after": "after-task" },
+  "routes": [
+    { "id": "doc-only", "title": "只读文档+推理回答", "description": "不实测，凭代码阅读与推演给结论" },
+    { "id": "minimal-probe", "title": "最小实测（调 API/跑脚本对比输出）", "description": "用真实数据做小样本对照，再下结论" },
+    { "id": "full-integration", "title": "直接接入管线试跑", "description": "改动生产管线后跑全库回归" }
+  ],
+  "scenarios": [
+    {
+      "id": "third-party-parser-eval",
+      "title": "评估外部解析能力是否值得接入",
+      "signals": ["MinerU", "vlm", "模型对比", "要不要换解析源", "Skill 有没有用"],
+      "constraints": ["不得改动生产管线", "不得烧大量解析额度"],
+      "candidates": [
+        { "route": "minimal-probe", "prior": 5, "why": "换源类判断必须实测，推演会错" },
+        { "route": "doc-only", "prior": 2, "why": "快，但容易把机制想反" },
+        { "route": "full-integration", "prior": 1, "why": "成本高、污染基线" }
+      ],
+      "default_eval_after": "after-task"
+    },
+    {
+      "id": "segment-defect-hunt",
+      "title": "定位切题错误的根因",
+      "signals": ["切错", "断档", "回退", "漏题", "题号乱"],
+      "constraints": ["判据改动须过测试", "涉及页面事实须回原卷页图"],
+      "candidates": [
+        { "route": "minimal-probe", "prior": 4, "why": "先量化定位，再改判据" },
+        { "route": "full-integration", "prior": 2, "why": "直接改代码风险高" },
+        { "route": "doc-only", "prior": 1, "why": "本项目历史证明推演会错" }
+      ],
+      "default_eval_after": "after-task"
+    }
+  ]
+}
