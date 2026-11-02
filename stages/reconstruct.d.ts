@@ -20,6 +20,10 @@ export interface PaperOptions {
   onChipClick?: ((q: any, p: any) => void) | null;
   /** 标签解析器：返回该题的标签（纸面**只读渲染**，不做增删）。 */
   resolveTags?: ((q: any, p: any) => PaperTag[] | null) | null;
+  /** 是否把 OCR 补行画到纸面上（`DECISIONS §91`；默认 false，补行是核查证据不是阅读内容）。 */
+  ocrFill?: boolean;
+  /** 教学归类角标：返回该题的 `{topics,categories}` 计数；`null` = 不画（挑题归类 v2）。 */
+  assignmentBadge?: ((q: any, p: any) => { topics: number; categories: number } | null) | null;
 }
 
 export const CANVAS_W: number;
@@ -30,6 +34,10 @@ export function enc(s: string): string;
 export function paperCanvas(p: any): any;
 export function posStyle(node: any, bbox: number[], w: number, h: number): any;
 export function blockNode(b: any, p: any, canvasW?: number, baseFont?: number | null, mergeCtx?: any, doc?: string): any;
+export function textWidthEm(s: string): number;
+export function tableColWidths(rows: any[], cols: number): number[];
+export function fitTables(root: any): void;
+export function tableNode(b: any, p: any, canvasW?: number, baseFont?: number | null, doc?: string): any;
 export function mergeContext(p: any): any;
 export function appendBlockNodes(
   c: any,

@@ -19,6 +19,11 @@ export interface TextMatch {
   title?: string;
   /** 选项键，如 "A" */
   optionKey?: string;
+  /**
+   * 该 `section` 是**教辅栏目板块头**（`教材实验 10 …` / `教材知识萃取 …` / `教材素材变式 …`），
+   * 不是章/节。区别很重要：节号参与「题号唯一键」，板块头不能覆盖它（`DECISIONS §78`）。
+   */
+  band?: boolean;
 }
 
 export type LineMatch = TextMatch | { ok: false; kind: "other" };
@@ -40,6 +45,26 @@ export type LineMatch = TextMatch | { ok: false; kind: "other" };
  *   （"0 . 2," 空格后仍接数字 → 仍拒）。
  */
 const ARABIC_QUESTION = /^([1-9]\d{0,2})\s*\.(?!\s*\d)|^([1-9]\d{0,2})[．、)）]/;
+
+/**
+ * 徽标题号：题号印在彩色方块/圆形图标里，OCR 只拿到数字，没有点号。
+ *
+ * 实测（2026-10-28《教材基础练 磁场》）：行首形如 `1 2024年1月浙江卷 [鲁科版…]`、
+ * `2[鲁科版必修三 P146…]`、`3[多选][人教版…]`、`4 [人教版…]`。8 卷基线扫描 **0 命中**，
+ * 新书 OXR **35 命中 / MinerU 25 命中**。
+ *
+ * 守卫（AND）：数字后必须是 `[`/`【`，或**四位年份**（后不接数字）—— 不接普通中文/字母，
+ * 避免把「10 m 的…」「2 个…」这类正文数字当成题号。年份后可能没有「年」字
+ * （实测 `4 2024 广西卷`；MinerU 还会粘成 `42024广西卷`），故不要求「年」。
+ *
+ * `题` 必须在排除名单里（2026-10-29 实测）：出处标注在折行处会留下
+ * `5 题设问变式] 如图是…` 这样的残片，行首「5 + 空格 + 题」会命中，
+ * 于是上一题题干被截成 `3[鲁科版必修三 P115 第`（14 字），正文被搬进一道
+ * 假的第 5 题、并与真正的第 5 题同号。全 15 册扫描该形态 3 处，全是这种残片。
+ * 与 `§77` 的 `GLUED_NOT_QUESTION_CHARS` 同口径：数字后接「题」是标签的一部分。
+ */
+const BARE_BADGE_QUESTION =
+  /^([1-9]\d{0,2})\s*(?=[\[【「]|\d{4}(?!\d))|^([1-9]\d{0,2})\s+(?!个|种|条|根|块|只|次|段|米|秒|名|位|张|台|辆|本|页|道|项|题)[\u4e00-\u9fa5]/;
 
 /**
  * 括号小题号：（1） / (2) / （3），常见于解答题大题内。
@@ -87,6 +112,27 @@ const SECTION_HEAD = /^第\s*(\d{1,3}|[一二三四五六七八九十]{1,3})\s*�
 const SECTION_HEAD_ALT = /^(专题[　\s]*(.{0,26})|全章综合测试\s*(.{0,26})|真题自测[　\s]*(.{0,26}))$/;
 
 /**
+ * 教材类教辅的栏目标题（不是题，也不是正文）：
+ * `教材知识萃取 回归教材，萃精华` / `教材素材变式 多维变式，夯基础`；
+ * 以及 `变式1 磁现象和磁场` 这类小节标题（题号在变式内从 1 重启）。
+ * 实测（2026-10-28《教材基础练 磁场/电路》）：漏掉它们时，栏目标题会被并进上一题
+ * 的题干/选项（电路 p1 选项 D 里混进「教材知识萃取…答案 P046」）。
+ */
+const BAND_HEAD =
+  /^[☑□▶■●◆◇○•·\-—]?\s*(教材知识萃取|教材素材变式|教材实验\s*\d+|教材知识\s*\d+|教材模型\s*\d+|教材模型攻略|大单元素养聚焦|素养演练|单元设计)/;
+/**
+ * 教辅栏目板块的**序号**（`教材实验 10 长度的测量…` → `"10"`），用于「整块无题号时按栏目序号开题」
+ * （`DECISIONS §79`）。只认 `教材实验 N`：其它板块（教材素材变式/教材知识萃取/素养演练）没有序号，
+ * 返回 null ⇒ 不开题。
+ */
+export function bandOrdinal(title: string): string | null {
+  const m = /^[☑□▶■●◆◇○•·\-—]?\s*教材实验\s*(\d{1,2})(?!\d)/.exec(title.trim());
+  return m && m[1] ? m[1] : null;
+}
+
+const VARIANT_HEAD = /^[☑□▶■●◆◇○•·\-—]?\s*变式\s*(\d{1,2})[　\s]+(.{1,30})$/;
+
+/**
  * 必刷题页顶的**分组行**：`必刷知识T1~2、4~5、7~8、10、12`
  * （可含 必刷方法/必刷考点，段间用 `&`/空格连接，也会拆成两个块）。
  * 它只在**节起点**出现，且列出该节的题号集合 ⇒ 既当节边界信号，又当**独立校验源**。
@@ -128,11 +174,28 @@ const SECOND_PAREN_TAG = /[（(]\s*\d{1,2}\s*[)）]/;
 /** 汉字大题编号：一、 / 二、 / 三四、 （顶多两位，避免误吃正文） */
 const CHINESE_SECTION = /^([一二三四五六七八九十]{1,2})[、．.]\s*/;
 
-/** 参考答案区标识：容忍「二、参考答案」「参考答案及解析」「解析」等前缀变体。
- * 注意交替分支顺序：带后缀的形态在前，裸「参考答案/解析」兜底在后（正则无回溯分支合并）。 */
+/** 参考答案区标识：只认**带答案语义的完整词形**
+ * （参考答案 / 参考答案及解析 / 答案及解析 / 答案与解析 / 试题答案 / 答案解析）。
+ *
+ * ⚠️ **不接受裸 `解析`**（2026-10-29，`DECISIONS §71`）：教辅正文里 `【解析】` 会被上游拆成
+ * 碎片块，其中一块的文本恰好就是 `解析`（实测 `答案册-合订本` p77 有个 21×11px 的碎片）。
+ * 裸 `解析` 一旦被当成答案区标识，引擎就**不可逆**切进 answers 模式，后半册全部静默变成
+ * 「答案续行」—— 该册题数从 1108 掉到 503，且零条 review。
+ * 同理不接受裸 `答案`（碎片风险一样）。
+ *
+ * 调用方还需叠加**位置守卫**（见 `rule-engine.ts` 的 `case "answer_zone"`）：
+ * 这些词形也会出现在封面/扉页/页脚上，纯文本判据分不开。
+ */
 function isAnswerZone(s: string): boolean {
-  const body = s.replace(/^[一二三四五六七八九十]{1,2}[、．.]\s*/, "");
-  return /^(参考答案?(及|与|附)?解析?|答案与解析|试题答案|答案解析?|参考答案?|解析)([:：]|$)/.test(
+  // 剥前置「一、」与**括号包裹**（`DECISIONS §82`）：夸克系题库的答案页标题长这样 ——
+  // `(答案&解析)`。原判据只认行首直接是「答案…」，括号一挡就整页失效，
+  // 于是 8 页的《23必刷题 光学》后 3 页被当成题目继续切（实测切出 16 道假题，
+  // 内容是【解析】，`【解析】` 字样与原卷页图逐字对上）。
+  const body = s
+    .replace(/^[一二三四五六七八九十]{1,2}[、．.]\s*/, "")
+    .replace(/^[(（]\s*/, "")
+    .replace(/\s*[)）]$/, "");
+  return /^(参考答案?(及|与|附|&|＆)?(解析)?|答案(及|与|附|&|＆)?解析|试题答案|答案解析?)([:：]|$)/.test(
     body,
   );
 }
@@ -195,7 +258,7 @@ export function looksLikeAnswerEntry(line: string): boolean {
  * 留在正文时会被上一页跨页未关的题吞进题干/选项（2026-10-07 p4 假第5题实证）。
  * 判定只用于「页顶带的跳过」，不影响正常题目内容。
  */
-const FURNITURE_LINE = /计划用时|必刷(?:知识|方法|考点|题型)|答案\s*[A-Z]?\d+/;
+const FURNITURE_LINE = /计划用时|必刷(?:知识|方法|考点|题型)|答案\s*[A-Z]?\d+|高考基础练|对应练见/;
 
 export function isPageFurniture(text: string): boolean {
   const s = text.trim();
@@ -214,7 +277,7 @@ export function isPageFurniture(text: string): boolean {
  */
 export function startsWithQuestionNumber(line: string): boolean {
   const s = line.trimStart();
-  return ARABIC_QUESTION.test(s) || PAREN_QUESTION.test(s);
+  return ARABIC_QUESTION.test(s) || BARE_BADGE_QUESTION.test(s) || PAREN_QUESTION.test(s);
 }
 
 /**
@@ -241,7 +304,44 @@ function matchKind(ok: boolean, kind: TextMatch["kind"]): LineMatch {
 }
 
 /** 尝试对某块首行做全部语言模式判定（按优先级：区间 > 大题 > 括号 > 题号 > 选项） */
-export function matchFirstLine(line: string): LineMatch {
+/**
+ * **页内噪声块**（不是正文，`DECISIONS §83`）：页中的答案标记（`[答案 P014]` / `答案 P049]`），
+ * 以及被上游拆出的孤立括号 `()`。
+ *
+ * 只认「整块恰好是这些形态」，不做子串删除 —— 避免误伤正文里的「答案」二字。
+ *
+ * 为什么抽成函数：这条判据原先内联在 `rule-engine.process()` 里，而**板块开题路径**
+ * 把收集到的块直接拼进题干、绕过了它 ⇒ 实测 `教材实验12` 的题干混进了 `答案 P049]`。
+ * 同一判据两处实现必然漂移，提出来共用。
+ */
+/**
+ * **真题的教材出处标注**（`DECISIONS §84`）：`[鲁科版必修二 P108 第5题设问变式]`、`[多选][人教版…]`。
+ *
+ * 用途：`教材知识萃取` 板块里混着两类东西 —— 知识条目（`定义:/内容:/表达式:/1. 公式：`）
+ * 与**带出处标注的真题**。原来的 `extractBand` 一刀切抑制**所有**编号，把真题也丢了
+ * （实测机械能守恒 p7 的 `1[粤教版必修二P114第4题拓展变式]不考虑空气`、
+ * `4[多选][鲁科版必修二P34第1题模型变式]如图所` 两道真题没有切成题）。
+ *
+ * 用「教材版本名 + 版」当白名单：知识条目不会长这样，真题一定带它。
+ */
+export function hasTextbookSource(text: string): boolean {
+  return /\[(人教|鲁科|粤教|沪科|教科|苏教|北师大|外研|冀教|湘教)版/.test(text);
+}
+
+export function isPageNoiseLine(text: string): boolean {
+  const t = text.trim();
+  return /^\[?答案\s*[A-Z]?\d+\]?$/.test(t) || /^[（）()\s]+$/.test(t);
+}
+
+/**
+ * 块首行 → 语言层标签。
+ *
+ * @param line 块首行
+ * @param expectedNext 期望的下一题题号（上一题 + 1）；**只用于「徽标题号」弱信号分支的
+ *   序号佐证**（`DECISIONS §97`）。未知（首题 / 刚过节标题）时传 `null` 或省略，
+ *   此时不施加该守卫，行为与加守卫前一致。
+ */
+export function matchFirstLine(line: string, expectedNext: number | null = null): LineMatch {
   const s = line.trimStart();
 
   if (ANSWER_ZONE_GUARD(s)) {
@@ -264,6 +364,20 @@ export function matchFirstLine(line: string): LineMatch {
     if (alt) {
       const title = (alt[2] ?? alt[3] ?? alt[4] ?? "").trim();
       return { ok: true, kind: "section", captured: "", title: title || s };
+    }
+    const band = BAND_HEAD.exec(s);
+    if (band) {
+      return { ok: true, kind: "section", captured: "", title: s, band: true };
+    }
+    const variant = VARIANT_HEAD.exec(s);
+    if (variant) {
+      return {
+        ok: true,
+        kind: "section",
+        captured: "",
+        indexNumeral: variant[1] ?? "",
+        title: s.slice((variant[0] ?? "").length).trim(),
+      };
     }
     const section = CHINESE_SECTION.exec(s);
     if (section) {
@@ -291,7 +405,47 @@ export function matchFirstLine(line: string): LineMatch {
 
   const arabic = ARABIC_QUESTION.exec(s);
   if (arabic) {
+    /**
+     * **折行残片守卫**（`DECISIONS §78`）：`1)条刻线的总长度相等。常见的几种卡尺分类`
+     * 是原文 `(n-1)条刻线…` 被 PDF 折断后的尾巴，不是题号。
+     *
+     * 判据只有一条：分隔符后**紧跟量词/标签字**（与 `§77` 的 `GLUED_NOT_QUESTION_CHARS`
+     * 同一份语义；此处内联，避免跨定义顺序引用）。真题号后面接的是「下列/如图/某」这类
+     * 起句字，不会是「条/个/种/题/页」。
+     * 宁漏不误：真出现 `1)条…` 的真题会退回题干，不会凭空造题。
+     */
+    const tail =
+      /^[1-9]\d{0,2}\s*[．、)）]([题个种条根块只张段次名位台辆本页章节道项分度所示米秒])/.exec(s);
+    if (tail) return { ok: false, kind: "other" };
     return { ok: true, kind: "question_no", captured: arabic[1] ?? arabic[2] ?? "" };
+  }
+
+  const badge = BARE_BADGE_QUESTION.exec(s);
+  if (badge) {
+    /**
+     * **弱信号守卫**（2026-10-31，`DECISIONS §97`）：
+     * `BARE_BADGE_QUESTION` 有两条分支 ——
+     *   ① 数字 + `[`/`【` 或四位年份（**有出处标注/年份佐证**，强信号）；
+     *   ② 数字 + 空格 + 汉字（**纯形状**，弱信号）。
+     * ② 当初是为「题号印在彩色方块里、OCR 只拿到数字」而开的，但形状太松：
+     * 实测《教材基础练 磁场》原卷页图 —— `10 月 5 日晚,我国多地出现绝美极光…`
+     * 被判成题号 **10**（真相是第 3 题，`10` 来自「2024 年 10 月 5 日」）；
+     * `16 第3题设问变式]Oxy坐标…` 被判成题号 **16**（真相是变式 2 的第 3 题，
+     * `16` 来自出处标注「人教版选修二 P16」）。两处都切出了「题号错 + 题干从中间起 +
+     * 与真题重复」的假题 —— 而假题会污染题库/配对/题号审计，比漏切危险。
+     *
+     * 守卫（只作用于弱信号分支）：必须有**序号佐证**才认 ——
+     * 等于上一题 + 1（强信号），或是本组第一题（`1`，题号重启的正规形态）。
+     * 两者都不是 ⇒ 不放行，退回普通文本（正文并入当前题，不丢内容）。
+     * 代价：徽标题号若真跳号会漏切 —— 按 L2「宁可漏判也不能误判」取此口径。
+     * `expectedNext === null`（无上下文：首题/刚过节标题）时不判，保持原行为。
+     */
+    const weak = badge[1] === undefined;
+    if (weak && expectedNext !== null) {
+      const num = Number(badge[2]);
+      if (num !== expectedNext && num !== 1) return { ok: false, kind: "other" };
+    }
+    return { ok: true, kind: "question_no", captured: badge[1] ?? badge[2] ?? "" };
   }
 
   const opt = OPTION_LINE.exec(s);
@@ -317,16 +471,96 @@ export function matchAnswerEntry(line: string): { number: string; text: string }
  * 分支 1 与 ARABIC_QUESTION 同款：数字与半角点间空格容忍、负前瞻跳空白后断言非数字、
  * 首位数字 1-9，保证「判定层接受的题号形态，剥离层一定剥得掉」（"1 . 设" 剥为 "设"），
  * 也保证「判定层拒的（`0.$5…`），剥离层一个字都不动」（题干原文必须原样保留）。 */
+/**
+ * **题号黏正文**识别（`DECISIONS §77`）：`2为了减少阻力对实验结果的影响…`
+ *
+ * 为什么单独一个函数而不是放宽 `ARABIC_QUESTION`：`ARABIC_QUESTION` 只认
+ * `N.` / `N、` / `N[` 等**有分隔符**的形态。而实验题的题号常直接黏在正文前
+ * （实测 `机械能守恒` p13：`2为了减少阻力…`），既没点也没空格 ⇒ 整道实验题切不出来
+ * （含实验标记的 8 页里 5 页 0 题，62%）。
+ *
+ * 为什么不能只靠形状：全量扫描「数字紧跟汉字」有 247 行，绝大多数是**续行**
+ * （`30m,汽车减速…`、`45°时…`、`2m的货车…`）或**表格/栏目**内容
+ * （`10分度、20分度`、`2必刷考点`）。放宽形状必然造出大量假题。
+ *
+ * ⇒ 判据取最严（AND，任一不满足即不认）：
+ *   1. 行首是 1~2 位数字，**紧跟**一个汉字（无空格、无标点、无单位字母）；
+ *   2. 该数字**必须等于上一题题号 + 1**（序号连续 —— 这是最强的信号，
+ *      续行里的 `30m`/`45°`/`2m` 几乎不可能恰好等于上一题 +1）；
+ *   3. 整行长度 ≥ 12（真题干是长句；`1所示`、`2所受…` 这类续行碎片更短）；
+ *   4. 调用方保证：不在答案区、不在方框列表、不在教材知识萃取区、有当前题目。
+ * @param line 块首行（已 trimStart）
+ * @param expectedNext 期望的下一题题号（上一题 + 1）；未知时传 null
+ * @returns 题号字符串；不满足判据返回 null
+ */
+/**
+ * 「数字紧跟它 ⇒ 不是题号」的字：量词、标签字、比较/连接词。
+ * 只收高置信的，宁可漏切也不造出假题（假题会污染题库与配对）。
+ */
+const GLUED_NOT_QUESTION_CHARS = /^[题个种条根块只张段次名位台辆本页章节道项分度所示米秒克牛伏安欧瓦焦倍比之与和及的了是有在]$/;
+
+export function matchGluedQuestionNumber(line: string, expectedNext: number | null): string | null {
+  if (expectedNext === null || !Number.isFinite(expectedNext) || expectedNext < 1) return null;
+  const s = line.trimStart();
+  const m = /^([1-9]\d{0,1})([\u4e00-\u9fa5])/.exec(s);
+  if (!m) return null;
+  const num = Number(m[1]);
+  if (num !== expectedNext) return null;
+  // 紧跟字守卫：数字后面接的是**量词/标签字**时，这个数字不是题号。
+  // 实测反例（磁场 p4）：原文 `3题模型变式]如图所示…` —— 「3」是标签「第3题」的一部分，
+  // 按题号切出来的题干以「题模型变式]」开头（标签残片），属于误报。
+  // 名单只收「数字后接它必然不是题号」的字，宁漏不误。
+  if (GLUED_NOT_QUESTION_CHARS.test(m[2] ?? "")) return null;
+  // 长度守卫：真题干是长句。12 是实测下界（最短的真例 `2宇宙中存在一些…` 远长于 12；
+  // 而 `1所示，粒子运动时间最长时轨` 这类续行碎片被这条挡住）
+  if (s.length < 12) return null;
+  return m[1] ?? null;
+}
+
 export function stripQuestionPrefix(line: string): string {
   return line
     .trimStart()
     .replace(/^[1-9]\d{0,2}\s*\.(?!\s*\d)|^[1-9]\d{0,2}\s*[．、)）]/, "")
+    .replace(/^[1-9]\d{0,2}\s*(?=[\[【「]|\d{4}(?!\d))|^[1-9]\d{0,2}\s+(?=(?!个|种|条|根|块|只|次|段|米|秒|名|位|张|台|辆|本|页|道|项)[\u4e00-\u9fa5])/, "")
     .replace(/^[（(]\s*\d{1,2}\s*[)）]/, "")
     .trimStart();
 }
 
-/** 剥离块首的选项前缀，返回选项文本 */
-export function stripOptionPrefix(line: string): string {
+/**
+ * 教辅栏目**板块内的知识小标题**（不是题号）——`DECISIONS §78`。
+ *
+ * 实测（2026-10-29《教材基础练 电路》p6 原卷页图）：栏目「教材实验 10 长度的测量」下面是
+ * `1. 游标卡尺` + 【工作原理】+【读数方法】、`2. 螺旋测微器` + 【工作原理】…
+ * 它们是**讲解条目**，不是题。当前引擎把它们当成题号 1、2，于是：
+ *   ① 题库混进假题；② 同组题号重号；③ 「2. 螺旋测微器」那道假题一路延伸到 p7/p9/p10，
+ *   把三页实验内容全吞进去。
+ *
+ * 判据取最严（AND，任一不满足即「是题」）：
+ *   - 剥离题号后首行**没有句读**（`。，；：！？`）—— 题干是句子，小标题不是；
+ *   - 分支 A：整块就是一行，且 ≤ 8 字（`游标卡尺` 4、`螺旋测微器` 5；`下列说法正确的是` 9 被挡）；
+ *   - 分支 B：块内有 `【…】` 小标题，且首行 ≤ 18 字（`安阻法、伏阻法测电源电动势和内阻` 16）。
+ * 宁可漏判（把知识条目当题）也不误判（把真题当知识条目）——漏判只是继续脏，误判是丢题。
+ *
+ * ⚠️ 调用方还必须保证「处于教辅栏目板块内」——本函数只看块的形状，不看上下文。
+ */
+export function isBandSubheading(text: string): boolean {
+  const lines = text
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const first = lines[0];
+  if (!first) return false;
+  const head = stripQuestionPrefix(first).trim();
+  if (!head) return false;
+  if (/[。，,；;：:！!？?]/.test(head)) return false;
+  // 顿号是**枚举标题**的特征（`安阻法、伏阻法测电源电动势和内阻`）；
+  // 题干不会只有一串并列名词而没有任何句读。带顿号且 ≤20 字 ⇒ 小标题。
+  if (/、/.test(head) && head.length <= 20) return true;
+  if (lines.length === 1) return head.length <= 8;
+  return head.length <= 18 && /【[^】]{1,12}】/.test(text);
+}
+
+/** 剥离块首的选项前缀，返回选项文本 */export function stripOptionPrefix(line: string): string {
   return line.trimStart().replace(/^[A-Ha-h]\s*[.．、)）:：]/, "").trimStart();
 }
 

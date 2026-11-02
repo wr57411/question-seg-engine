@@ -462,12 +462,13 @@ export async function loadTeachUsage() {
 
 /**
  * 改名 / 删除：一次请求让服务端跨所有卷级联改写（失败整体回滚）。
- * @param {'rename'|'delete'} action
+ * @param {'rename'|'retire'|'restore'|'delete'} action
  * @param {'topics'|'categories'} kind
  * @param {string} id
  * @param {string} [name]
  * @returns {Promise<{ok: boolean, error?: string, item?: string, affected?: number, staleAffected?: number,
- *   combosChanged?: number, combosDropped?: number, list?: unknown, combos?: unknown, bindings?: Record<string, unknown>}>}
+ *   stillAssigned?: number, combosChanged?: number, combosDropped?: number, list?: unknown, combos?: unknown,
+ *   bindings?: Record<string, unknown>}>}
  */
 export async function manageTeach(action, kind, id, name) {
   try {

@@ -36,6 +36,12 @@ export type ParsedBlock =
       /** 块内最大字号，用于大题标题/题号的启发判定 */
       maxFontSize: number;
       /**
+       * **上游表格 HTML**（`<table><tr><td rowspan colspan>…</table>`），只出现在
+       * `kind:"table"` 的块上。来源是上游 `spans[].html`，展示层据此画真网格
+       * （`DECISIONS §76`）——「按原坐标重建纸面」的同一条原则，不是从空白推断列宽。
+       */
+      html?: string;
+      /**
        * 该块是**从 OCR 候选补进来的**（不是 MinerU 的输出）。
        * 目前只用于「题号行」：MinerU 会整行漏识别，而 OCR 已读对（见 export-stages 的
        * `injectOcrQuestionLines`）。展示层以**候选**样式呈现，绝不当作引擎原文（G1）。
@@ -47,6 +53,8 @@ export type ParsedBlock =
        * 见 docs/oxr-evaluation.md §4.9。修正清单进仓库、可审计、可撤销。
        */
       fromCorrection?: boolean;
+      /** 该块文本来自两源融合（MinerU 几何 + OXR 文本）；展示/审计必须可见（G1） */
+      fromFusion?: boolean;
     }
   | {
       kind: "image";
@@ -58,6 +66,8 @@ export type ParsedBlock =
       bbox: BBox;
       /** LaTeX 表达式（不含 $ 包裹） */
       latex: string;
+      /** 该公式文本来自两源融合（MinerU 几何 + OXR 文本） */
+      fromFusion?: boolean;
     };
 
 export interface PageInfo {
@@ -121,6 +131,14 @@ export interface Question {
   stem: string;
   options: Option[];
   images: ImageRef[];
+  /**
+   * 本题目区域内出现的**表格**（`kind:"table"` 块归属而来，`DECISIONS §76`）。
+   *
+   * 为什么单独存而不是并进 `stem`：表格是**结构**，压平进 stem 就只剩一串文字，
+   * 列边界全丢（实验数据表尤其致命 —— 判分要取「第 3 次的 F 是多少」）。
+   * 这里保留上游 HTML，`stem` 一个字不改 ⇒ 切题结果与改动前逐字节一致。
+   */
+  tables?: { html: string; bbox: BBox; pageIndex: number }[];
   /** 来自参考答案区、按题号对号入座的答案 */
   answer?: string;
   /** 解析：本骨架不拆，预留字段由 LLM/人工补齐 */
@@ -161,9 +179,43 @@ export interface SegmentationStats {
   columnsPerPage: number[];
 }
 
+/**
+ * **教辅栏目板块条目**（`DECISIONS §78`）：`教材实验 10 长度的测量…` / `教材知识萃取 …` /
+ * `教材素材变式 …` 这类栏目下的内容归属。
+ *
+ * 为什么单独一个结构、不塞进 `Question`：
+ * 1) 板块**没有题号**。`audit-numbering` 的 N1（纯数字）与 N6（1–99）**不可豁免**，
+ *    编一个号进去必然判红，还会污染 `(章, 节, 题号)` 唯一键与 `bank` 配对；
+ * 2) 板块是**结构容器**，一个板块内可能既有真题、也有知识条目 —— 它不抢题目的所有权。
+ *
+ * 块被题目认领时**同时**属于板块（双重引用）：板块只增加「这一段属于哪个栏目」的信息，
+ * 不改变任何切题判定。
+ */
+export interface Band {
+  /** 条目唯一键：`<docId>:p<pageIndex>:b<page 内序号>` */
+  id: string;
+  /** 同一板块跨页时共享的键：`<docId>:band<自增>` —— 用来把跨页的多条拼回一个板块 */
+  bandKey: string;
+  /** 板块头原文（含栏目标题，如 `教材实验 10 长度的测量及其测量工具的选取`） */
+  title: string;
+  /** 本条目所属页（0 基） */
+  pageIndex: number;
+  /**
+   * 归属本板块的块索引（**该页内的下标**，与 `stages.json` 的 `pages[].blocks` 直接对齐）。
+   * 引擎内部用的是全局块序，`buildBands()` 落库前已换算成页内下标。
+   */
+  blockIndexes: number[];
+  /** 本条目覆盖的文字（拼接，供检索/预览；不含图片） */
+  text: string;
+  /** 板块内容不保证被切成了正确题目 ⇒ 一律待人确认，不静默算「已通过」 */
+  status: "needs_review";
+}
+
 export interface SegmentationResult {
   docId: string;
   questions: Question[];
+  /** 教辅栏目板块条目（见 `Band`）；没有栏目头的册为空数组 */
+  bands: Band[];
   reviews: ReviewNote[];
   stats: SegmentationStats;
   /** 答案区原始条目（供调试/演进） */

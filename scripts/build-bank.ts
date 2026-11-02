@@ -245,7 +245,19 @@ const answerTagOf = (s: string): string => /必刷(知识|方法|考点|模型|�
 
 // ---------- 主流程 ----------
 
-const quiz = load(QUIZ_DOC);
+/**
+ * **题册侧显式章号**（`DECISIONS §81`）：有的题册 PDF 本身没有章标题
+ * （`23必刷题 光学` 是夸克拍的 8 页手工节选，首块即「解答题」），引擎据此把 `chapter` 留空。
+ * 章号参与配对键 ⇒ 这类册永远进不了任何章、一条都配不上。
+ * 对策：**在绑定表里显式声明**，不信推断（§6-24 的结论就是「补章号必须显式绑定」）。
+ * 只补空章号的题 —— 已经有章号的题一个都不动。
+ */
+const QUIZ_CHAPTER = argOf("quiz-chapter") ?? "";
+const quiz = (() => {
+  const rows = load(QUIZ_DOC);
+  if (!QUIZ_CHAPTER) return rows;
+  return rows.map((q) => (q.chapter ? q : { ...q, chapter: QUIZ_CHAPTER }));
+})();
 const ans = load(ANSWER_DOC);
 const quizBlocks = toBlocks(quiz, QUIZ_DOC);
 const ansBlocks = toBlocks(ans, ANSWER_DOC);

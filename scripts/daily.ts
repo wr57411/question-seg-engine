@@ -84,6 +84,7 @@ if (!input) {
       "  --no-ocr          跳过整页 OCR 补行",
       "  --force-parse     强制重新调用 MinerU 解析（默认幂等）",
       "  --parser <name>   解析引擎：mineru（默认）| oxr（免费档，超 20 页/10MB 自动分片）",
+      "  --reuse-oxr       复用已有 oxr-response.json 重新转换（不调 OXR API；代码修复后重生成用）",
     ].join("\n"),
   );
   process.exit(2);
@@ -146,9 +147,10 @@ function hasOcrToken(): boolean {
  */
 function inferSource(outDir: string): Meta["source"] {
   const hasOxr = existsSync(join(outDir, "oxr-response.json"));
+  const hasFuse = existsSync(join(outDir, "fuse.json"));
   return {
     pdf: existsSync(join(outDir, "origin.pdf")),
-    parser: hasOxr ? "oxr" : existsSync(join(outDir, "layout.json")) ? "mineru" : "prebuilt",
+    parser: hasFuse ? "fuse" : hasOxr ? "oxr" : existsSync(join(outDir, "layout.json")) ? "mineru" : "prebuilt",
     ocr: existsSync(join(outDir, "ocr-page-fill.json")) ? "page" : "skipped",
   };
 }
@@ -158,7 +160,7 @@ interface Meta {
   label: string;
   kind: "quiz" | "answer";
   importedAt: string;
-  source: { pdf: boolean; parser: "mineru" | "oxr" | "prebuilt"; ocr: "page" | "skipped" };
+  source: { pdf: boolean; parser: "mineru" | "oxr" | "fuse" | "prebuilt"; ocr: "page" | "skipped" | "failed" };
   stats: {
     pages: number;
     questions: number;
@@ -169,13 +171,28 @@ interface Meta {
     contentUncovered: number;
     inkCoveragePct: number | null;
     missingNumberGroups: number;
+    /** 人工修正里未逐条回原卷核对但已应用的条数（2026-10-28 新增；>0 时体检告警） */
+    correctionsUnverified: number;
+    /** OCR 产物“存在但读不动”的错误条数（>0 时题号补行可能被跳过） */
+    ocrInputErrors: number;
+    /** 修正清单里已标记 disabled、未应用的条数（人工核对为重复；保留可审计） */
+    correctionsDisabled: number;
   };
   /** `short` = 顶部工具栏那一枚胶囊的文案（一行放得下）；`issues` = 展开后的完整原因 */
   health: { level: "ok" | "warn" | "fail"; short: string; issues: string[] };
+  /** OCR 补行失败的原因（source.ocr="failed" 时非空；成功/跳过为 null） */
+  ocrError: string | null;
 }
 
 /** 从产物算体检摘要 —— 数字全部来自落盘文件，不从内存里猜 */
-function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: Meta["source"]): Meta {
+function buildMeta(
+  docId: string,
+  label: string,
+  kind: "quiz" | "answer",
+  src: Meta["source"],
+  ocrError: string | null = null,
+  importedAt?: string,
+): Meta {
   const outDir = join(OUT_ROOT, docId);
   const qPath = join(outDir, "questions.json");
   const sPath = join(outDir, "stages.json");
@@ -192,6 +209,8 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
     pages: { ocrFill?: { accepted?: boolean }[]; uncovered?: { kind?: string }[] }[];
     reviews?: { reason?: string }[];
     inkCoverage?: { ratio: number; contentCount: number } | null;
+    corrections?: { unverified?: number[]; disabled?: number[] } | null;
+    ocrInputErrors?: string[];
   };
 
   // 组 = (章, 节序)；组内题号是否 1..N 连续（缺号合法但要如实报数）
@@ -212,26 +231,42 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
   );
   const suppressed = (snap.reviews ?? []).filter((r) => /未作为题目/.test(r.reason ?? "")).length;
   const needsReview = questions.filter((q) => q.status === "needs_review").length;
+  const correctionsUnverified = snap.corrections?.unverified?.length ?? 0;
+  const correctionsDisabled = snap.corrections?.disabled?.length ?? 0;
+  const ocrInputErrors = (snap.ocrInputErrors ?? []).length;
 
   const issues: string[] = [];
   if (questions.length === 0) issues.push("没有切出任何题目（先看阶段 4 质检，多半是版式未识别）");
+  if (ocrError) issues.push(`OCR 补行失败：${ocrError}（成品页仍可用，但漏读行可能未补）`);
   if (needsReview > 0) issues.push(`${needsReview} 题标记为需人工校对（点题号牌看原因）`);
   if (missingNumberGroups > 0) issues.push(`${missingNumberGroups} 个编号组的题号不连续（可能缺题）`);
+  if (ocrInputErrors > 0) {
+    issues.push(`OCR 产物有 ${ocrInputErrors} 处解析失败（题号补行可能被跳过，详见 stages.json 的 ocrInputErrors）`);
+  }
+  if (correctionsUnverified > 0) {
+    issues.push(`${correctionsUnverified} 条人工修正未逐条回原卷核对（已应用，需抽查）`);
+  }
 
   const short =
     questions.length === 0
       ? "未切出题目"
-      : needsReview > 0
+      : ocrError
+        ? "OCR 失败"
+        : needsReview > 0
         ? `${needsReview} 题待校对`
         : missingNumberGroups > 0
           ? `${missingNumberGroups} 组缺号`
-          : "通过";
+          : ocrInputErrors > 0
+            ? "OCR 输入异常"
+            : correctionsUnverified > 0
+              ? `${correctionsUnverified} 条修正待核`
+              : "通过";
 
   return {
     id: docId,
     label,
     kind,
-    importedAt: new Date().toISOString(),
+    importedAt: importedAt ?? new Date().toISOString(),
     source: src,
     stats: {
       pages: snap.pages.length,
@@ -243,8 +278,12 @@ function buildMeta(docId: string, label: string, kind: "quiz" | "answer", src: M
       contentUncovered: snap.inkCoverage?.contentCount ?? 0,
       inkCoveragePct: snap.inkCoverage ? Number((snap.inkCoverage.ratio * 100).toFixed(2)) : null,
       missingNumberGroups,
+      correctionsUnverified,
+      correctionsDisabled,
+      ocrInputErrors,
     },
     health: { level: questions.length === 0 ? "fail" : issues.length ? "warn" : "ok", short, issues },
+    ocrError,
   };
 }
 
@@ -299,8 +338,11 @@ async function main(): Promise<void> {
 
   // --meta-only：只刷新体检摘要（产物已就位时用；不重跑导出，不动快照）
   if (flags["meta-only"] === true) {
-    // source 从**产物**推断，不读旧 meta（旧 meta 可能带着上一轮的默认值，越传越错）
-    writeMeta(docId, label, kind, inferSource(outDir));
+    // 数字一律从产物重算；**来源**（pdf/parser/ocr）优先沿用旧记录：
+    // 产物文件不足以还原历史来源（OXR 响应可能已删、prebuilt 目录后来也有 layout.json），
+    // 用 inferSource 猜会把 oxr 误记成 mineru —— 来源记错比沿用旧记录更糟（2026-10-30 实测）。
+    const prev = readPrevMeta(outDir);
+    writeMeta(docId, label, kind, prev?.source ?? inferSource(outDir), null, prev?.importedAt);
     return;
   }
 
@@ -313,19 +355,29 @@ async function main(): Promise<void> {
     // 来生成页图与墨迹覆盖率。写成裸 `origin.pdf` 它会找不到 ⇒ 静默降级成「没有页图」，
     // 而页图正是「解析漏了什么」的唯一地面真值（2026-10-27 实测踩过）。
     copyFileSync(abs, join(outDir, `${docId}_origin.pdf`));
-    const needParse = flags["force-parse"] === true || !existsSync(layoutPath);
-    if (needParse && flags["parser"] === "oxr") {
+    const cachedOxr = join(outDir, "oxr-response.json");
+    const reuseOxr = flags["reuse-oxr"] === true && existsSync(cachedOxr);
+    const needParse = flags["force-parse"] === true || reuseOxr || !existsSync(layoutPath);
+    if (needParse && (flags["parser"] === "oxr" || reuseOxr)) {
       // OXR 第二解析源（分支 feature/oxr）。与 MinerU **走完全相同的下游**：
       // 产出的 layout.json 是同构格式，②导出 / ③OCR补行 / ④体检原样复用 —— 引擎一行不改。
-      console.log("\n[1/4] OXR 解析（免费档；超 20 页或 10MB 自动分片）…");
-      const resp = await parsePdfWithOxr(abs, { onProgress: (m) => console.log(`  ${m}`) });
-      // 原始响应落盘：① 便于事后复现/复核 ② inferSource 靠它判定 parser="oxr"
-      writeFileSync(join(outDir, "oxr-response.json"), JSON.stringify(resp));
-      const conv = await convertOxrResponse(resp, { docId, outDir });
+      let resp;
+      if (reuseOxr) {
+        // 代码修复后重生成：原始响应已在本地，不重复调 OXR API（省时省钱，2026-10-28）。
+        console.log("\n[1/4] OXR 复用缓存响应（--reuse-oxr，不调 API）…");
+        resp = JSON.parse(readFileSync(cachedOxr, "utf8"));
+      } else {
+        console.log("\n[1/4] OXR 解析（免费档；超 20 页或 10MB 自动分片）…");
+        resp = await parsePdfWithOxr(abs, { onProgress: (m) => console.log(`  ${m}`) });
+        // 原始响应落盘：① 便于事后复现/复核 ② inferSource 靠它判定 parser="oxr"
+        writeFileSync(cachedOxr, JSON.stringify(resp));
+      }
+      const conv = await convertOxrResponse(resp, { docId, outDir, onProgress: (m) => console.log(`  ${m}`) });
       writeFileSync(layoutPath, JSON.stringify(conv.layout, null, 1));
       console.log(
         `  ${conv.stats.pages} 页 · ${conv.stats.lines} 行 · 图片 ${conv.stats.imageOk}/${conv.stats.imageBlocks} 落盘` +
-          ` · 字号 p50 ${conv.stats.fontSize.p50}pt`,
+          ` · 字号 p50 ${conv.stats.fontSize.p50}pt` +
+          (conv.stats.dedupeDropped ? ` · 合并重复块 ${conv.stats.dedupeDropped}（补题号 ${conv.stats.dedupeMergedBadge}）` : ""),
       );
       parser = "oxr";
     } else if (needParse) {
@@ -400,6 +452,7 @@ async function main(): Promise<void> {
 
   // ---- ③ OCR 整页补行（可选，自己会重导快照）----
   let ocr: Meta["source"]["ocr"] = "skipped";
+  let ocrError: string | null = null;
   if (flags["no-ocr"] === true) {
     console.log("\n[3/4] 跳过 OCR 补行（--no-ocr）");
   } else if (!hasOcrToken()) {
@@ -415,11 +468,13 @@ async function main(): Promise<void> {
     try {
       run("ocr-page-fill.ts", [docId]);
       ocr = "page";
-    } catch {
-      // 不静默：OCR 失败是"少补了一些行"，不是"这份卷坏了"
+    } catch (e) {
+      // 不静默：OCR 失败是「少补了一些行」，不是「这份卷坏了」；但必须写进 meta/体检。
+      ocr = "failed";
+      ocrError = String((e as Error)?.message ?? e).slice(0, 200);
       console.log(
-        "      ⚠️ OCR 补行失败（服务不可用/超时）。快照仍是完整可用的，只是少补了漏读行。\n" +
-          "         稍后可单独重试：npm run stages:ocr-page -- \"" + docId + '"',
+        `      ⚠️ OCR 补行失败：${ocrError}\n` +
+          "         快照仍是完整可用的，只是少补了漏读行；稍后可单独重试：npm run stages:ocr-page -- \"" + docId + '"',
       );
     }
   }
@@ -430,21 +485,32 @@ async function main(): Promise<void> {
     pdf: existsSync(join(outDir, "origin.pdf")),
     parser,
     ocr,
-  });
+  }, ocrError);
 }
 
 /**
  * 写 `meta.json`（成品页据此发现文档 + 显示体检）。
  * 只读落盘产物算数字，不从内存里猜 —— 重算一次和重跑一遍必须得到同一个结论。
  */
+/** 读已有 meta（读不到就当没有；--meta-only 只用它保留来源与导入时刻） */
+function readPrevMeta(outDir: string): Meta | null {
+  try {
+    return JSON.parse(readFileSync(join(outDir, "meta.json"), "utf8")) as Meta;
+  } catch {
+    return null;
+  }
+}
+
 function writeMeta(
   docId: string,
   label: string,
   kind: "quiz" | "answer",
   src: Meta["source"],
+  ocrError: string | null = null,
+  importedAt?: string,
 ): Meta {
   const outDir = join(OUT_ROOT, docId);
-  const meta = buildMeta(docId, label, kind, src);
+  const meta = buildMeta(docId, label, kind, src, ocrError, importedAt);
   writeFileSync(join(outDir, "meta.json"), JSON.stringify(meta, null, 2));
 
   const s = meta.stats;

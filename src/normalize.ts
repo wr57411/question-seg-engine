@@ -215,6 +215,49 @@ function normalizeBlock(rawBlock: unknown): ParsedBlock[] {
  * `inline_equation`（brief 初稿写作 equation_inline），此处同时识别两种，
  * 保证夹具（page 1 block 4/7 含 inline_equation）的 `$..$` 内联被验证。
  */
+/**
+ * 从表格块里取上游 HTML：网格在**嵌套** `blocks[].lines[].spans[].html`。
+ * 取第一个含 `<table` 的串；没有就返回空串（调用方退回按 lines 展开）。
+ */
+function extractTableHtml(pb: Record<string, unknown>): string {
+  for (const nestedRaw of asArray(pb.blocks as unknown)) {
+    for (const lineRaw of asArray(asRecord(nestedRaw).lines as unknown)) {
+      for (const spanRaw of asArray(asRecord(lineRaw).spans as unknown)) {
+        const h = String(asRecord(spanRaw).html ?? "");
+        if (h.includes("<table")) return h;
+      }
+    }
+  }
+  return "";
+}
+
+/**
+ * 表格 HTML → 纯文本（**极简扁平化**，只给搜索/审计兜底，不承担结构还原）：
+ * 单元格按行拼接、行间换行、`<eq>` 转 `$…$`、其余标签剥掉。
+ * 结构还原由展示层的 `stages/table-html.js` 负责（那边要 rowspan/colspan）。
+ */
+function flattenTableText(html: string): string {
+  const rows: string[] = [];
+  for (const rm of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells: string[] = [];
+    for (const cm of (rm[1] ?? "").matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
+      const t = String(cm[2] ?? "")
+        .replace(/<eq>([\s\S]*?)<\/eq>/g, (_, m) => `$${String(m).trim()}$`)
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (t) cells.push(t);
+    }
+    if (cells.length) rows.push(cells.join("\t"));
+  }
+  return rows.join("\n");
+}
+
 export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocument {
   const root = asRecord(layoutRaw);
   const pages = asArray(root.pdf_info as unknown)
@@ -270,6 +313,34 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
           continue;
         }
 
+        /**
+         * **表格块**（`DECISIONS §76`）：上游把表格作为独立块给出 —— `type:"table"`、
+         * `lines` 为空、网格在**嵌套** `blocks[].lines[].spans[].html`（带 rowspan/colspan）。
+         * 旧实现走到下面 `lines.length === 0 → continue` 就把它**整块丢了**
+         * （实测 `电路-MinerU` 18 个表格、全项目 17 个，含 6 张实验数据表）。
+         *
+         * 这里产出一个 `kind:"table"` 块，`text` 只做**极简扁平化**（去标签、单元格换行拼接）
+         * 供搜索/审计兜底；结构留在 `html` 里给展示层画网格。
+         * ⚠️ 不复用 `stages/table-html.js`：解耦红线禁止 `src/` 依赖展示层。
+         */
+        if (pbType === "table") {
+          const html = extractTableHtml(pb);
+          if (html) {
+            const text = flattenTableText(html);
+            blocks.push({
+              kind: "table",
+              bbox: toBBox(pb.bbox),
+              text,
+              firstLine: text.split("\n")[0] ?? "",
+              lineCount: Math.max(1, text.split("\n").length),
+              maxFontSize: 0,
+              html,
+            });
+            continue;
+          }
+          // 取不到 html ⇒ 退回旧行为（按 lines 展开），不新增块
+        }
+
         const lines = asArray(pb.lines as unknown);
         if (lines.length === 0) continue;
         for (const lineRaw of lines) {
@@ -310,17 +381,248 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
           blocks.push(block);
         }
       }
+      // **跨行折断回接**（`DECISIONS §85`）：放在这里是因为 leak 行已被挑走
+      // （`continue` 进 leaks、不进 blocks），此刻 blocks 里剩下的才是本页真正相邻的行。
+      const joined = joinBrokenBracketLines(blocks, pageWidth, pageHeight);
+      // 再收「压平表格行」（`§90`）：顺序必须在折断回接之后 —— 先让同一行的碎片接好，
+      // 再按表格行的几何一致性分组，否则被折断的行会破坏 `x0`/宽度的一致性判定。
+      const tabled = mergeFlatTableRows(joined, pageWidth);
       return {
         index: asInt(rec.page_idx) ?? 0,
         width: asNumber(size?.[0]) ?? 1654,
         height: pageHeight,
-        blocks,
+        blocks: tabled,
         leaks,
       } satisfies PageInfo & { leaks: ParsedBlock[] };
     })
     .sort((a, b) => a.index - b.index);
   const withLeaks = pages as (PageInfo & { leaks: ParsedBlock[] })[];
   return { docId, pages: dropCrossPageLeaks(withLeaks) };
+}
+
+/**
+ * **压平表格行 → 表格块**（`DECISIONS §90`）。
+ *
+ * 现象（2026-10-30 用户截图，电路册 p1）：页面上出现一堆参差不齐的小字
+ * （`欧姆定律(纯电阻电路` / `表达式` / `-2+` / `dot` …）。根因不是渲染坏，
+ * 而是**上游把一个知识清单表格压平成了 10 行纯文本**，单元格之间用 `|` 隔开：
+ *
+ * ```
+ * #32 欧姆定律(纯电阻电路) | 电流的三个表达式 | (1)I=q/t(定义式);…
+ * #33 (决定式);(3)I=neSv(微观决定式)          ← 上一行第 3 列的续行
+ * #34 伏安特性曲线(如图所示) |
+ * #35 电阻定律 | 表达式 | R=ρl/S(也是电阻的决定式),适用于粗细均匀的
+ * ```
+ *
+ * 十行各自按 bbox 算字号（行越长被 `clampByWidth` 压得越小）⇒ 字号参差、挤成一团。
+ *
+ * **判据**（全部 AND，取自这一组行共享的几何特征）：
+ * 1. 连续 ≥ 3 个 text 块，首块含 `|`；
+ * 2. `x0` 与宽度逐块一致（±3pt）—— 表格行左边界与宽度是**同一列的**；
+ * 3. 宽度 > 页宽的 60% —— 单栏正文行不会这么宽；
+ * 4. 相邻行纵向间距 < 1.2 倍行高（同一张表内不会跳跃）。
+ *
+ * **还原列**（`|` 拆段后的对齐规则，实测这 10 行全部适用）：
+ * - 3 段 ⇒ 列1/列2/列3；
+ * - 2 段且**末段为空** ⇒ 从列1 起（`伏安特性曲线(如图所示) |` 这种）；
+ * - 2 段且末段非空 ⇒ 归列2/列3（`定义式 | R=U/I`，列1 是跨行合并单元格）；
+ * - 无 `|` ⇒ 上一行**最后一列**的续行。
+ *
+ * 产出 `kind:"table"` + 上游同款 `<table>` HTML，交给 `§76` 已有的网格渲染 ——
+ * 三处展示层（成品页 / 对比页 / 手机文本流）一次修好，不用各打各的补丁。
+ */
+function mergeFlatTableRows(blocks: ParsedBlock[], pageWidth: number): ParsedBlock[] {
+  const out: ParsedBlock[] = [];
+  const wideEnough = (b: ParsedBlock) =>
+    b.kind === "text" && b.bbox[2] - b.bbox[0] > pageWidth * 0.6;
+  const sameColumn = (a: ParsedBlock, b: ParsedBlock) =>
+    Math.abs(a.bbox[0] - b.bbox[0]) <= 3 &&
+    Math.abs((a.bbox[2] - a.bbox[0]) - (b.bbox[2] - b.bbox[0])) <= 3;
+
+  let i = 0;
+  while (i < blocks.length) {
+    const first = blocks[i];
+    if (!first) break;
+    if (!wideEnough(first) || !String((first as { text?: string }).text ?? "").includes("|")) {
+      out.push(first);
+      i++;
+      continue;
+    }
+    // 收集这一组：后续行要么同列宽且含 `|`（新行），要么同列宽且紧贴上一行（续行）
+    const group: ParsedBlock[] = [first];
+    let j = i + 1;
+    while (j < blocks.length) {
+      const b = blocks[j];
+      if (!b || !wideEnough(b) || !sameColumn(first, b)) break;
+      const prev = group[group.length - 1]!;
+      const h = prev.bbox[3] - prev.bbox[1];
+      if (b.bbox[1] - prev.bbox[3] > h * 1.2) break;
+      group.push(b);
+      j++;
+    }
+    if (group.length < 3) {
+      out.push(first);
+      i++;
+      continue;
+    }
+    const table = buildFlatTable(group, pageWidth);
+    if (!table) {
+      out.push(first);
+      i++;
+      continue;
+    }
+    out.push(table);
+    i = j;
+  }
+  return out;
+}
+
+/** 把一组压平表格行还原成 `kind:"table"` 块。列对齐规则见调用方注释。 */
+function buildFlatTable(group: ParsedBlock[], pageWidth: number): ParsedBlock | null {
+  const rows: string[][] = [];
+  for (const b of group) {
+    const text = String((b as { text?: string }).text ?? "").trim();
+    if (!text) continue;
+    if (!text.includes("|")) {
+      // 续行：接在上一行**最后一列**后面
+      const last = rows[rows.length - 1];
+      if (last && last.length) {
+        const k = last.length - 1;
+        last[k] = last[k] ? `${last[k]} ${text}` : text;
+      } else {
+        rows.push([text]);
+      }
+      continue;
+    }
+    const parts = text.split("|").map((x) => x.trim());
+    if (parts.length === 2) {
+      // 末段为空 ⇒ 这行从列1 起；否则列1 是上一行的合并单元格，本行从列2 起
+      rows.push(parts[1] ? ["", parts[0]!, parts[1]] : [parts[0]!, "", ""]);
+    } else {
+      rows.push(parts);
+    }
+  }
+  if (rows.length < 3) return null;
+
+  const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const html =
+    "<table>" +
+    rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("") +
+    "</table>";
+
+  const bb = group.reduce<[number, number, number, number]>(
+    (acc, b) => [
+      Math.min(acc[0], b.bbox[0]),
+      Math.min(acc[1], b.bbox[1]),
+      Math.max(acc[2], b.bbox[2]),
+      Math.max(acc[3], b.bbox[3]),
+    ],
+    [group[0]!.bbox[0], group[0]!.bbox[1], group[0]!.bbox[2], group[0]!.bbox[3]],
+  );
+  const text = rows.map((r) => r.join("\t")).join("\n");
+  void pageWidth;
+  return {
+    kind: "table",
+    bbox: bb,
+    text,
+    firstLine: rows[0]!.join(" "),
+    lineCount: rows.length,
+    maxFontSize: 0,
+    html,
+  };
+}
+
+/**
+ * **跨行折断回接**（`DECISIONS §85`）：把「上一行没收括号、下一行以 `数字)` 开头」的两行接回去。
+ *
+ * 现象（2026-10-30 实测，电路册 p6）：
+ * ```
+ * 行A: 是游标尺上的n条刻线的总长度与主尺上(n-      ← 行尾 `(n-`
+ * 行B: 1)条刻线的总长度相等。常见的几种卡尺分类     ← 行首 `1)`
+ * ```
+ * 原文是 `(n-1)条刻线`，被版面折开。切题层看到行 B 的 `1)` 就当题号 ——
+ * `§78` 用「量词黑名单」挡住了它，但那是**猜**：一旦正文改成 `1)滑块…` 就会漏。
+ * 真正的证据是结构性的：**行 A 的 `(` 没闭合，它一定在下面闭合**。
+ *
+ * 判据（三条 AND，缺一不可）：
+ * 1. 上一块最后一行**左括号多于右括号**（`(`/`（` > `)`/`）`）；
+ * 2. 本块首行以 `数字)` / `数字）` 开头；
+ * 3. **几何守卫**：本块在上一块正下方、行距很小、水平区间有重叠（同栏紧邻）。
+ *
+ * 为什么必须三条：只有 ① 时全项目命中 168 处，其中绝大多数是括号内正文的正常折行
+ * （`(不计空气阻` + `力,g取10…`）—— 那些合并会把整页段落结构并掉，是实打实的回归。
+ * ①+② 只剩 **2 处**，且都是真折断（电路 p6、答案册 p155 的 `(3+` + `57)K`）。
+ *
+ * 合并后文本**不加换行**（原文是同一句被折断，不是两段），`lineCount` 随之取 1，
+ * 保证 `lineCount` 与 `text.split("\n").length` 始终一致。
+ */
+function joinBrokenBracketLines(
+  blocks: ParsedBlock[],
+  pageWidth: number,
+  pageHeight: number,
+): ParsedBlock[] {
+  const out: ParsedBlock[] = [];
+  for (const b of blocks) {
+    const prev = out[out.length - 1];
+    if (
+      prev &&
+      prev.kind === "text" &&
+      b.kind === "text" &&
+      isBrokenTail(prev) &&
+      startsWithNumberClose(b) &&
+      isAdjacentBelow(prev, b, pageWidth, pageHeight)
+    ) {
+      out[out.length - 1] = {
+        ...prev,
+        bbox: [
+          Math.min(prev.bbox[0], b.bbox[0]),
+          prev.bbox[1],
+          Math.max(prev.bbox[2], b.bbox[2]),
+          b.bbox[3],
+        ] as BBox,
+        text: prev.text + b.text,
+        firstLine: prev.firstLine,
+        lineCount: 1,
+      };
+      continue;
+    }
+    out.push(b);
+  }
+  return out;
+}
+
+/** 上一块最后一行有未闭合左括号 ⇒ 它的闭合一定在下面。 */
+function isBrokenTail(b: ParsedBlock): boolean {
+  if (b.kind !== "text") return false;
+  const lastLine = b.text.split("\n").pop() ?? "";
+  const open = (lastLine.match(/[（(]/g) ?? []).length;
+  const close = (lastLine.match(/[）)]/g) ?? []).length;
+  return open > close;
+}
+
+/** 本块首行以 `数字)` / `数字）` 开头（折断后掉下来的闭合段）。 */
+function startsWithNumberClose(b: ParsedBlock): boolean {
+  if (b.kind !== "text") return false;
+  return /^\d{1,3}\s*[)）]/.test(b.firstLine.trim());
+}
+
+/**
+ * 几何守卫：本块紧贴上一块下方、同栏。
+ *
+ * - bbox 约定 `[x0, y0, x1, y1]`，**y 向下增长**（与 `isCrossPageLeakShape` 一致）；
+ * - 行距上限取页高 3%：实测折断处行距 38 / 页高 2994 ≈ 1.3%，留余量但不跨段；
+ * - 水平区间必须有重叠：双栏版面里左栏末行与右栏首行垂直相近，靠这一条挡掉。
+ */
+function isAdjacentBelow(
+  prev: ParsedBlock,
+  next: ParsedBlock,
+  pageWidth: number,
+  pageHeight: number,
+): boolean {
+  const gap = next.bbox[1] - prev.bbox[3];
+  if (gap < -2 || gap > Math.max(pageHeight * 0.03, 8)) return false;
+  const overlap = Math.min(prev.bbox[2], next.bbox[2]) - Math.max(prev.bbox[0], next.bbox[0]);
+  return overlap > Math.min(pageWidth * 0.1, 40);
 }
 
 /**

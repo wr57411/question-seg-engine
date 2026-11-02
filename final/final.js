@@ -1,3 +1,6 @@
+// 类型权威检查器：`tsconfig.viewer.json`（checkJs:true + DOM lib）。本文件是 DOM 代码，
+// **不要**加 `// @ts-check` —— 主 `tsconfig.json` 的 lib 没有 DOM，一旦本文件被 TS 测试 import
+// 进主程序，`HTMLElement` / `document` 会被判成未知名字（DECISIONS §95）。
 /**
  * final/final.js —— **成品页**（整册浏览）
  *
@@ -21,7 +24,7 @@
  * 留白 22px 里 12px 高的目标在触屏上点不准。数据独立落在 `data/out/tags/`，
  * 不碰快照（快照每次导出都会被冲掉）。
  */
-import { CANVAS_W, el, enc, renderPaper } from "../stages/reconstruct.js";
+import { CANVAS_W, el, enc, mergeContext, renderPaper } from "../stages/reconstruct.js";
 import { entryCrop, entrySegments, fitEntryCrops } from "./entry-paper.js";
 import { pickQuestionAt } from "./pick-hit.js";
 import { prettifyLatex } from "../stages/latex-display.js";
@@ -58,22 +61,165 @@ import {
 } from "./teach-store.js";
 
 /**
+ * ── 类型声明 ──
+ *
+ * 快照 typedef 为什么**在本地声明**（而不是 import `reconstruct.js` 的 `Page`/`Block`）：
+ * `stages/reconstruct.d.ts` 是手写声明、**整体遮蔽实现**（债：`HANDOFF §6-29`），它的导出形状
+ * 刻意宽松（`el`/`mergeContext`/`renderPaper` 回来的都是 `any`），跨文件也拿不到它的 typedef ——
+ * 与 `final/entry-paper.js`（本地 `PageRef`/`SnapBlock`）、`final/tag-panel.js`（本地
+ * `QuestionRef`/`PageRef`）同一口径：**只声明本文件读过的字段**，真实形状见
+ * `scripts/export-stages.ts`（快照）与 `scripts/build-bank.ts:279`（bank 条目）。
+ * 标签数据一律复用 `tag-store.js` 的导出 typedef（不另造一份，同 `tag-panel.js:30-38`）。
+ *
+ * @typedef {Object} SnapBlock 快照里的一个行级块（stages.json 的 pages[i].blocks[j]）
+ * @property {number} i
+ * @property {number[]} bbox
+ * @property {string} [text]
+ * @property {string} [kind]
+ * @property {string} [img]
+ * @property {string} [html]
+ * @property {boolean} [ocr]
+ *
+ * @typedef {Object} SnapOcrItem 一条 OCR 候选补行（`text` 取必填，与 entry-paper.js:50 OcrItem 对齐）
+ * @property {string} text
+ * @property {number[]} [bbox]
+ * @property {number[]} [win]
+ * @property {boolean} [accepted]
+ * @property {string} [source]
+ * @property {string} [raw]
+ * @property {string} [crop]
+ * @property {number} [ratio]
+ *
+ * @typedef {Object} SnapQuestion 快照题目（真实形状：export-stages.ts StageQuestion）
+ * @property {string} id
+ * @property {string} number
+ * @property {string} section
+ * @property {string} type
+ * @property {number[]} blocks
+ * @property {boolean} [startsHere]
+ * @property {number} confidence
+ * @property {string} status
+ *
+ * @typedef {Object} SnapPage 快照一页（只列本文件读过的字段；`index` 见 export-stages.ts StagePage）
+ * @property {number} index
+ * @property {number} width
+ * @property {number} height
+ * @property {number} [columns]
+ * @property {SnapBlock[]} blocks
+ * @property {SnapQuestion[]} questions
+ * @property {SnapOcrItem[]} [ocrFill]
+ *
+ * @typedef {Object} Snap 整册 stages.json 快照
+ * @property {SnapPage[]} pages
+ *
+ * @typedef {{ key: string, text: string }} OptLine 选项行（questions.json / bank.json 都是这个形状）
+ * @typedef {{ path: string, bbox?: number[] }} ImageRef 图片引用（裸文件名 + 原卷 bbox）
+ *
+ * @typedef {Object} BankQuestion questions.json 的一条（面板只读这几个字段）
+ * @property {string} id
+ * @property {string} [stem]
+ * @property {OptLine[]} [options]
+ * @property {ImageRef[]} [images]
+ *
+ * @typedef {Object} BankEntry bank.json 的一条配对条目（只读字段；真实形状 build-bank.ts Entry）
+ * @property {string} quizId
+ * @property {string} answerId
+ * @property {string} answerKey
+ * @property {string} stem
+ * @property {string} answerText
+ * @property {OptLine[]} [options]
+ * @property {ImageRef[]} answerImages
+ *
+ * @typedef {{ byQuizId: Map<string, BankEntry>, byAnswerId: Map<string, BankEntry> }} Bank
+ *
+ * @typedef {{ level: string, short?: string, issues?: string[] }} HealthInfo meta.json 体检结论（本文件读的部分）
+ * @typedef {{ questions?: number, pages?: number, ocrFilled?: number }} DocStats meta.json stats（只读这三个键）
+ * @typedef {{ id: string, label: string, kind: string, examined: boolean, stats: DocStats | null, health: HealthInfo | null }} DocMeta /api/docs 的一项（形状见 scripts/view-server.ts listDocs）
+ *
+ * @typedef {import("./tag-store.js").Tag} Tag
+ * @typedef {import("./tag-store.js").DocTags} DocTags
+ * @typedef {{ version: number, tags: Tag[] }} Library
+ * @typedef {{ library: Library, bindings: DocTags }} TagState
+ *
+ * 号牌点击回调与 `tagSection` 的 `QuestionRef`/`PageRef` 参数对得上即可（结构性兼容），
+ * 这里本地声明的理由与 `tag-panel.js:33-34` 相同（reconstruct.d.ts 遮蔽债，跨不了文件）。
+ * @typedef {{ id: string, number: string }} QuestionRef
+ * @typedef {{ index: number, width: number, height: number }} PageRef
+ *
+ * @typedef {{ q: SnapQuestion, p: SnapPage }} SheetRef 当前面板打开的题/页
+ * @typedef {{ doc: string, qid: string, pageIndex: number, prevBinding: import('./teach-store.js').TeachBinding | null, nextBinding: import('./teach-store.js').TeachBinding | null }} UndoRecord 一次可撤销动作
+ * @typedef {{ sec: HTMLElement, head: HTMLElement, p: SnapPage, paper: { wrap: HTMLElement, canvas: HTMLElement } }} PageSlot 每页的四段（重绘单页、给号牌加选中态都要用）
+ * @typedef {HTMLElement & { foreignBlocks: number, holes: number }} CropBox entryCrop 容器（契约见 entry-paper.js:326-327：容器上挂这两个计数）
+ * @typedef {{ drop: Set<number>, keep: Map<number, { text: string }> }} MergeCtx mergeContext 返回（与 entry-paper.js:64 同形，另加 keep）
+ * @typedef {{ kind?: string, blk?: SnapBlock, text?: string, last?: SnapBlock }} FlowItem 文本流的一条（text 段或块段）
+ * @typedef {{ kind: "text", text: string, last: SnapBlock }} FlowPara groupParagraphs 的进行中段落
+ * @typedef {{ kind: "question", pageIndex: number, q: SnapQuestion, snippet: string }} HitQuestion 题号候选行
+ * @typedef {{ kind?: never, pageIndex: number, blockIndex: number, snippet: string }} HitBlock 正文命中行
+ */
+
+/**
  * 文档清单来自服务端 `/api/docs`（扫 `data/out/<docId>/` 里有快照的目录），
  * **不再硬编码** —— 硬编码的代价是「导入一份新卷要改前端代码」，那不叫每天能用。
  * 每项形如 `{ id, label, kind, examined, stats, health }`，`examined=false` 表示没跑过
  * `npm run daily` 的体检（此时如实显示「未体检」，不假装健康）。
  */
+/** @type {DocMeta[]} */
 let DOCS = [];
 let DEFAULT_DOC = "";
 
-const $ = (id) => document.getElementById(id);
+/**
+ * 页面骨架里的元素**恒存在**（final/index.html 随页面一起提交）。
+ * ⚠️ 这里只做类型声明、**不加存在性检查**：真缺元素时维持原样 —— 在后续属性访问处抛
+ * TypeError。换成 viewer.js 的 `need()`（查询时抛 Error）会**提前抛、换异常类型**，
+ * 按红线「不得改变何时抛错」不采用，只做等价的返回类型收窄。
+ * @param {string} id
+ * @returns {HTMLElement}
+ */
+const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
+/** 跨所有卷的「某项被几题在用」：`{topics: {id: {live,stale}}, categories: {...}}` */
+/** @typedef {{ topics: Record<string, { live: number, stale: number }>, categories: Record<string, { live: number, stale: number }> }} TeachUsage */
+
+/**
+ * 单一可变对象（纪律 7：整体声明一次，下游 never/隐式 any 自然消失，不靠逐点断言）。
+ * @type {{
+ *   doc: string,
+ *   data: Snap | null,
+ *   paneW: number,
+ *   audit: boolean,
+ *   ocrStyle: boolean,
+ *   ocrFill: boolean,
+ *   bank: Bank | null,
+ *   snap: Snap | null,
+ *   snaps: Map<string, Snap>,
+ *   sheetToken: object | null,
+ *   byId: Map<string, BankQuestion> | null,
+ *   byIdError: string,
+ *   tagsOn: boolean,
+ *   tags: TagState | null,
+ *   pages: PageSlot[],
+ *   sheet: SheetRef | null,
+ *   pickMode: boolean,
+ *   picked: { q: SnapQuestion, p: SnapPage } | null,
+ *   teach: (import('./teach-store.js').TeachLibrary & { bindings: import('./teach-store.js').TeachBindings, error: string }) | null,
+ *   recent: { topics: string[], categories: string[] },
+ *   creating: 'topics' | 'categories' | null,
+ *   lastClassified: { doc: string, questionId: string, assignment: { topicIds: string[], categoryIds: string[] }, label: string } | null,
+ *   undo: UndoRecord | null,
+ *   manage: { renaming: string | null, usage: TeachUsage | null } | null,
+ *   teachUsage: TeachUsage | null,
+ *   search: { on: boolean, q: string }
+ * }}
+ */
 const state = {
   doc: DEFAULT_DOC,
   data: null,
   paneW: CANVAS_W,
   audit: false,
-  ocrStyle: true,
+  ocrStyle: false, // OCR 补入行的绿色候选样式：**默认关**（成品页要干净，需要核查时勾选）
+  // OCR 补行（引擎漏识别、由 OCR 补出来的**候选行**）：默认**不画**（`DECISIONS §91`）。
+  // 整页 OCR 来源没有位置信息，硬配回洞会错位（用户实测：表格单元格的文字被画到页眉）。
+  ocrFill: false,
   bank: null,
   snap: null, // 当前文档的整册快照：面板按原卷坐标裁条目要用
   snaps: new Map(), // 另一册的快照缓存（按需拉，见 snapshotOf）
@@ -97,10 +243,16 @@ const state = {
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
-function paperWidth() {
-  return Math.max(320, Math.min(CANVAS_W, window.innerWidth - 110));
+function paperWidth() {  return Math.max(320, Math.min(CANVAS_W, window.innerWidth - 110));
 }
 
+/**
+ * JSON 取数的边界。`Promise<any>` 沿用 `tag-store.js:65-67`（getJson）的既有先例：
+ * 解析结果的形状在**各个消费处**用本地 typedef + `/** @type *\/` 断言钉住（见 loadDocs /
+ * loadDoc / loadQuestions / loadBank / snapshotOf），不在这里伪造一个全局类型。
+ * @param {string} url
+ * @returns {Promise<any>}
+ */
 async function fetchJson(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -108,7 +260,10 @@ async function fetchJson(url) {
 }
 
 /** 顶部提示条。⚠️ 一律走 DOM 构造、不用 innerHTML：`doc` 来自 URL 参数，
- *  拼进 HTML 等于把 `?doc=<img onerror=…>` 变成可执行内容（本地工具也是工具）。 */
+ *  拼进 HTML 等于把 `?doc=<img onerror=…>` 变成可执行内容（本地工具也是工具）。
+ * @param {(string | [string, string])[]} parts 一段文本，或 `[标签名, 文本]` 二元组
+ * @param {string} [kind] "err" 走错误态样式，其余（如 "warn"）为普通提示
+ */
 function notice(parts, kind) {
   const n = $("notice");
   n.hidden = false;
@@ -123,21 +278,26 @@ function notice(parts, kind) {
 
 /* ── 标签：加载与漂移核对 ── */
 
+/** @param {string} doc */
 async function loadTeach(doc) {
-  state.teach = { topics: [], categories: [], bindings: emptyTeachBindings(), error: "" };
+  state.teach = { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: "" };
   try {
     const [lib, bindings] = await Promise.all([loadTeachLibrary(), loadTeachBindings(doc)]);
     state.teach = { ...lib, bindings, error: "" };
   } catch (e) {
-    state.teach = { topics: [], categories: [], bindings: emptyTeachBindings(), error: String(e).slice(0, 80) };
-    notice([`教学归类读取失败（${state.teach.error}）：托盘会空着，不影响阅读。`], "warn");
+    state.teach = { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: String(e).slice(0, 80) };
+    notice([`教学归类读取失败（${state.teach?.error ?? ""}）：托盘会空着，不影响阅读。`], "warn");
   }
 }
 
 async function loadTags() {
   const [library, bindings] = await Promise.all([loadLibrary(), loadBindings(state.doc)]);
+  /** @type {Set<string>} */
   const present = new Set();
-  for (const p of state.data.pages) for (const q of p.questions) present.add(q.id);
+  // loadTags 只在 loadDoc 里 `state.data` 就位后被调用 ⇒ 边界收窄（cast 不产生任何运行时代码，
+  // 真为 null 时依旧在 `.pages` 上抛 TypeError，抛点与原先一致）
+  const data = /** @type {Snap} */ (state.data);
+  for (const p of data.pages) for (const q of p.questions) present.add(q.id);
   const r = reconcile(bindings, present);
   state.tags = { library, bindings: r.state };
   // 对不上的绑定不删、不藏：先把状态如实写回文件，再在页面上说清楚（U21）
@@ -154,12 +314,19 @@ async function loadTags() {
 
 /* ── 题号牌点开：标签区置顶 + 详情在下（同一个浮层，不做两个并存面板） ── */
 
+/**
+ * @param {SnapQuestion} q
+ * @returns {BankEntry | null}
+ */
 function bankEntryFor(q) {
   if (!state.bank) return null;
   return state.bank.byQuizId.get(q.id) ?? state.bank.byAnswerId.get(q.id) ?? null;
 }
 
-/** 渲染用的标签解析器，交给 renderPaper（纸面只读，数据在这里） */
+/** 渲染用的标签解析器，交给 renderPaper（纸面只读，数据在这里）
+ * @param {SnapQuestion} q
+ * @returns {Tag[] | null}
+ */
 function tagsForQuestion(q) {
   if (!state.tags) return null;
   const ids = new Set(tagIdsFor(state.tags.bindings, q.id));
@@ -168,7 +335,9 @@ function tagsForQuestion(q) {
   return state.tags.library.tags.filter((t) => ids.has(t.id));
 }
 
-/** 只重绘受影响的这一页：标签层不改 innerW，页高不变，滚动位置不会跳 */
+/** 只重绘受影响的这一页：标签层不改 innerW，页高不变，滚动位置不会跳
+ * @param {number} pageIndex
+ */
 function repaintPage(pageIndex) {
   const slot = state.pages[pageIndex];
   if (!slot) return;
@@ -178,18 +347,178 @@ function repaintPage(pageIndex) {
   if (state.picked?.p === slot.p) paintPickSelection(slot);
 }
 
+/**
+ * **是否手机**（`DECISIONS §88`）：用「较短边 < 500」判，而不是宽度 ——
+ * 手机横屏是 844×390（宽度够、但屏幕仍是手机）、平板最小 768×1024。
+ * 只看宽度会把手机横屏误判成平板。
+ *
+ * 为什么按设备而不是横竖屏分：用户 2026-10-30 明确「手机横屏用原排版也别扭」。
+ * 手机上纸面按原卷坐标等比缩放后正文只有 5-6px（375 宽）/ 12px（844 横屏但行宽过大），
+ * 读起来都难受 ⇒ 手机一律走文本流；平板与桌面保留原版排版（那是这个项目的核心卖点）。
+ */
+function isPhoneViewport() {
+  // 手动覆盖：`?flow=1` 强制文本流、`?flow=0` 强制纸面。
+  // 不只是调试用 —— 平板用户可能想临时切到文本流读某个密页，反之亦然。
+  const forced = new URLSearchParams(location.search).get("flow");
+  if (forced === "1") return true;
+  if (forced === "0") return false;
+  return Math.min(window.innerWidth, window.innerHeight) < 500;
+}
+
+/**
+ * **手机端文本流**（`DECISIONS §88`）：不跟原卷坐标，按阅读顺序流式排列。
+ *
+ * 为什么能这么做而不丢内容：`p.blocks` 在版面层已按阅读顺序排好（双栏也是「左栏读完再右栏」，
+ * 与原卷阅读顺序一致），这里只是把「绝对定位的块」换成「流式块」，块集合完全相同。
+ *
+ * 三处必须与纸面渲染保持同源，否则会出现「手机能看到、平板看不到」的分叉：
+ * 1. 同页块级重复的并集合并（`mergeContext`）—— 被合并掉的块不渲染，内容已在合并文本里；
+ * 2. 公式渲染（`prettifyLatex`）—— 与纸面同一个函数，`\frac`/`\sqrt` 照样是二维排版；
+ * 3. 表格（`blk.html` 原始网格）—— 直接沿用上游 HTML，不重新推断列宽（`§76` 的同一条原则）。
+ */
+/** 下一行明显是「新块开头」的形态：编号题、选项、栏目头、方框头 —— 都不许接上一行。 */
+const FLOW_STARTS_NEW =
+  /^(?:\d{1,3}\s|\d{1,3}[.．、)）]|第[一二三四五六七八九十百\d]{1,3}[讲章节]|[【〔]|教材|答案|变式|例题|解析|[A-D][.．、])/;
+
+/** 上一行已经收句 —— 段落该断了。 */
+const FLOW_ENDS = /[。！？：；!?:;…]$/;
+
+/**
+ * **行级块 → 段落**（`DECISIONS §88`）。
+ *
+ * 为什么必须有这一步：快照的 `pages[].blocks` 是**行级**的（`normalizeLayout` 每行一块），
+ * 直接一段一行，行距 1.8em 读起来比纸面还松散 —— 实测第一版就是这样。
+ *
+ * 判据全部来自几何 + 标点，不猜内容：
+ * 1. **同栏**：`x0` 差 ≤ 8（双栏页里左栏与右栏天然差半页宽，一步就分开了）；
+ * 2. **同一行距带**：垂直间距 ≤ 1.6 × 行高（跨段空行、跨栏都超）；
+ * 3. **上一行没收句**：末尾不是 `。！？：；`；
+ * 4. **下一行不是新块开头**：编号/选项/栏目头/方框头（`FLOW_STARTS_NEW`）。
+ *
+ * 四条 AND。宁可不合并（读起来是短的独立行）也不能误合并 ——
+ * 把标题和正文粘成一行，比多一个段落更难读。
+ */
+/**
+ * @param {SnapBlock[]} blocks
+ * @param {MergeCtx} ctx mergeContext 的返回（`reconstruct.d.ts` 债 ⇒ 这里是本地声明，字段见 reconstruct.js:304 的 JSDoc）
+ * @returns {FlowItem[]}
+ */
+function groupParagraphs(blocks, ctx) {
+  /** @type {FlowItem[]} */
+  const out = [];
+  /** @type {FlowPara | null} */
+  let cur = null;
+  for (const b of blocks) {
+    if (ctx.drop.has(b.i)) continue;
+    const merged = ctx.keep.get(b.i);
+    const blk = merged ? { ...b, text: merged.text } : b;
+
+    if (blk.kind !== "text") {
+      // 图片**不**重置段落上下文：浮动图常插在两行正文之间（实测电路 p1 的 A/B 电极图
+      // 压在 `…分别接 A、` 与 `B 金属板给…` 之间），重置会把一句话劈成两段。
+      // 图后若真是新段落，下面的 x0/行距判据会自然断开。表格是块级独占，必须重置。
+      if (blk.kind === "table") cur = null;
+      out.push({ kind: blk.kind, blk });
+      continue;
+    }
+    const t = (blk.text ?? "").trim();
+    if (!t) continue;
+
+    if (cur && cur.last && cur.last.bbox && blk.bbox && sameParagraph(cur.last, cur.text, blk, t)) {
+      // 中英文/数字相邻时补一个空格，避免 `P062教材` 这种粘连
+      const glue = /[A-Za-z0-9]$/.test(cur.text) && /^[A-Za-z0-9]/.test(t) ? " " : "";
+      cur.text += glue + t;
+      cur.last = blk;
+      continue;
+    }
+    cur = { kind: "text", text: t, last: blk };
+    out.push(cur);
+  }
+  return out;
+}
+
+/**
+ * @param {SnapBlock} prevBlk
+ * @param {string} prevText
+ * @param {SnapBlock} blk
+ * @param {string} text
+ * @returns {boolean}
+ */
+function sameParagraph(prevBlk, prevText, blk, text) {
+  // 60 而不是个位数：题号行顶格、正文首行缩进，实测同一段内 x0 差可达 45
+  //（`1 [人教版必修三 P56 第 1 题情境变式]` x0=76 → `如图所示…` x0=121）。
+  // 放这么宽仍安全：双栏页两栏的 x0 相差 >1000，居中标题与正文相差 >400。
+  if (Math.abs(prevBlk.bbox[0] - blk.bbox[0]) > 60) return false;
+  const h = prevBlk.bbox[3] - prevBlk.bbox[1];
+  const gap = blk.bbox[1] - prevBlk.bbox[3];
+  if (gap > Math.max(h * 1.6, 12)) return false;
+  if (FLOW_ENDS.test(prevText)) return false;
+  if (FLOW_STARTS_NEW.test(text)) return false;
+  return true;
+}
+
+/**
+ * @param {SnapPage} p
+ * @returns {HTMLElement}
+ */
+function flowPaper(p) {
+  const wrap = el("div", "flow-page");
+  const ctx = mergeContext(p);
+  for (const item of groupParagraphs(p.blocks, ctx)) {
+    const blk = item.blk;
+    if (item.kind === "text") {
+      const para = el("p", "flow-p");
+      // prettifyLatex 返回 HTML 片段（分式/根号/上下标），与纸面同一个渲染函数
+      // （text 段由 groupParagraphs 构造时必带 text ⇒ 边界收窄，不产生运行时代码）
+      para.innerHTML = prettifyLatex(/** @type {string} */ (item.text));
+      wrap.append(para);
+      continue;
+    }
+
+    // 非 text 段必带 blk（构造保证）；`blk &&` 只是把这份不变量讲给 tsc 听，永不改变走向
+    if (blk && blk.kind === "image" && blk.img) {
+      const img = el("img", "flow-img");
+      img.src = `/data/out/${enc(state.doc)}/images/${enc(blk.img)}`;
+      img.alt = "图片块";
+      img.loading = "lazy";
+      wrap.append(img);
+      continue;
+    }
+    if (blk && blk.kind === "table" && blk.html) {
+      // 上游 HTML 直接沿用（含 rowspan/colspan）；宽度交给 CSS，不重新推断列宽
+      const box = el("div", "flow-table");
+      box.innerHTML = blk.html;
+      wrap.append(box);
+    }
+  }
+  return wrap;
+}
+
+/**
+ * @param {SnapPage} p
+ * @returns {{ wrap: HTMLElement, canvas: HTMLElement }} 纸面与文本流**统一形状**：
+ *          文本流没有独立 canvas 层，`canvas` 指回 `wrap`（否则单页重绘/点选命中在手机上会崩）。
+ */
 function paper(p) {
+  if (isPhoneViewport()) {
+    // 文本流（oxr 线的手机视图）只有一层 wrap，没有独立 canvas。
+    // 调用方（repaintPage / paintPickSelection / 点选命中）统一按 `{wrap, canvas}` 取，
+    // 所以这里把 canvas 指回 wrap —— 形状一致，行为在文本流下自然退化为「无高亮、无命中」。
+    const wrap = flowPaper(p);
+    return { wrap, canvas: wrap };
+  }
   return renderPaper(p, {
     doc: state.doc,
     paneW: state.paneW,
     diagnostics: state.audit,
     candidateStyle: state.ocrStyle,
+    ocrFill: state.ocrFill,
     onChipClick: (q, page) => {
       if (state.pickMode) pickQuestion(q, page);
       else void openSheet(q, page);
     },
     resolveTags: state.tagsOn ? tagsForQuestion : null,
-    assignmentBadge: (q) => {
+    assignmentBadge: (/** @type {SnapQuestion} */ q) => {
       const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), q.id);
       return a.topicIds.length || a.categoryIds.length ? badgeCounts(a) : null;
     },
@@ -203,13 +532,14 @@ function loadRecent() {
   try {
     const j = JSON.parse(localStorage.getItem(RECENT_KEY) || "{}");
     state.recent = {
-      topics: Array.isArray(j.topics) ? j.topics.filter((x) => typeof x === "string") : [],
-      categories: Array.isArray(j.categories) ? j.categories.filter((x) => typeof x === "string") : [],
+      topics: Array.isArray(j.topics) ? j.topics.filter((/** @type {unknown} */ x) => typeof x === "string") : [],
+      categories: Array.isArray(j.categories) ? j.categories.filter((/** @type {unknown} */ x) => typeof x === "string") : [],
     };
   } catch {
     state.recent = { topics: [], categories: [] };
   }
 }
+/** @param {'topics'|'categories'} kind @param {string} id */
 function bumpRecent(kind, id) {
   state.recent[kind] = moveToFront(state.recent[kind], id);
   try {
@@ -290,6 +620,7 @@ function renderPickRows() {
     }
   }
 
+  /** @param {'topics'|'categories'} kind @param {{id:string,name:string}} item @param {boolean} on */
   const chip = (kind, item, on) => {
     const b = el("button", "pick-chip", item.name);
     b.type = "button";
@@ -316,6 +647,7 @@ function renderPickRows() {
 
 /* ── 托盘搜索：一个框同时过滤两行；搜不到直接建 ── */
 
+/** @param {boolean} on */
 function setSearchOn(on) {
   state.search.on = on;
   const box = $("pick-search");
@@ -325,7 +657,7 @@ function setSearchOn(on) {
   btn?.setAttribute("aria-pressed", String(on));
   if (!on) {
     state.search.q = "";
-    if (input) input.value = "";
+    if (input) (/** @type {HTMLInputElement} */ (input)).value = "";
   }
   renderComboStrip();
   renderPickRows();
@@ -345,13 +677,14 @@ async function createFromSearch(kind) {
   if (ok) setSearchOn(false);
 }
 
+/** @param {'topics'|'categories'} kind @param {string} id @param {string} name */
 function togglePick(kind, id, name) {
   if (!state.picked || !state.teach) {
     flash("先点一道题");
     return;
   }
   const { q, p } = state.picked;
-  const before = state.teach.bindings;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
   const cur = assignmentFor(before, q.id);
   const on = kind === "topics" ? cur.topicIds.includes(id) : cur.categoryIds.includes(id);
   const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
@@ -370,6 +703,7 @@ function clearTeachNotice() {
   }
 }
 
+/** @param {import('./teach-store.js').TeachBinding | null} b */
 const cloneBinding = (b) =>
   b
     ? {
@@ -380,6 +714,7 @@ const cloneBinding = (b) =>
       }
     : null;
 
+/** @param {{topicIds:string[],categoryIds:string[]}} a */
 function assignmentLabel(a) {
   const names = [
     ...a.topicIds.map((id) => state.teach?.topics.find((t) => t.id === id)?.name ?? id),
@@ -394,10 +729,11 @@ function updateSameButton() {
   const prev = state.lastClassified;
   const cur = state.picked;
   const can = !!(prev && cur && prev.doc === state.doc && prev.questionId !== cur.q.id);
-  btn.disabled = !can;
+  (/** @type {HTMLButtonElement} */ (btn)).disabled = !can;
   btn.title = can ? `复制「${prev.label}」到本题` : "先给另一道题归类后才能同上题";
 }
 
+/** @param {import('./teach-store.js').TeachCombo} combo */
 function comboSummary(combo) {
   const t = combo.topicIds.map((id) => {
     const x = state.teach?.topics.find((v) => v.id === id);
@@ -419,8 +755,8 @@ function updateComboAdd() {
   const btn = $("combo-add");
   if (!btn) return;
   const a = currentAssignment();
-  btn.disabled = !state.picked || (!a.topicIds.length && !a.categoryIds.length);
-  btn.title = btn.disabled ? "先给当前题归类，再存为组合" : "把当前题存为组合";
+  (/** @type {HTMLButtonElement} */ (btn)).disabled = !state.picked || (!a.topicIds.length && !a.categoryIds.length);
+  (/** @type {HTMLButtonElement} */ (btn)).title = (/** @type {HTMLButtonElement} */ (btn)).disabled ? "先给当前题归类，再存为组合" : "把当前题存为组合";
 }
 
 function renderComboStrip() {
@@ -463,7 +799,7 @@ function closeComboPop() {
   const hint = $("combo-hint");
   if (hint) hint.hidden = true;
   const input = $("combo-name");
-  if (input) input.value = "";
+  if (input) (/** @type {HTMLInputElement} */ (input)).value = "";
 }
 
 function openComboForm() {
@@ -483,7 +819,7 @@ function openComboForm() {
   }
   pop.hidden = false;
   if (hint) hint.hidden = true;
-  input.value = "";
+  (/** @type {HTMLInputElement} */ (input)).value = "";
   input.focus();
 }
 
@@ -496,6 +832,7 @@ function openComboForm() {
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
 let comboSaveChain = Promise.resolve();
+/** @param {import('./teach-store.js').TeachCombo[]} next @param {string} label */
 async function saveComboList(next, label) {
   if (!state.teach) return { ok: false, error: "教学清单没加载" };
   const prev = state.teach.combos ?? [];
@@ -520,13 +857,14 @@ async function saveComboList(next, label) {
   return r;
 }
 
+/** @param {Event} e */
 async function submitCombo(e) {
   e.preventDefault();
   if (!state.picked || !state.teach) return;
   const a = currentAssignment();
   const input = $("combo-name");
   const hint = $("combo-hint");
-  const res = addCombo(state.teach.combos ?? [], input.value, a.topicIds, a.categoryIds);
+  const res = addCombo(state.teach.combos ?? [], (/** @type {HTMLInputElement} */ (input)).value, a.topicIds, a.categoryIds);
   if (!res.item) {
     hint.hidden = false;
     hint.textContent = res.error ?? "保存失败";
@@ -542,10 +880,12 @@ async function submitCombo(e) {
   flash(`组合「${res.item.name}」已保存`);
 }
 
+/** @param {import('./teach-store.js').TeachCombo} combo */
 function applyCombo(combo) {
   if (!state.picked || !state.teach) return;
   const { q, p } = state.picked;
-  const live = (/** @type {'topics'|'categories'} */ k, id) => state.teach?.[k].some((x) => x.id === id && !x.retired);
+  /** @param {'topics'|'categories'} k @param {string} id */
+  const live = (k, id) => state.teach?.[k].some((x) => x.id === id && !x.retired);
   const validTopics = combo.topicIds.filter((id) => live("topics", id));
   const validCategories = combo.categoryIds.filter((id) => live("categories", id));
   const missing = combo.topicIds.length + combo.categoryIds.length - validTopics.length - validCategories.length;
@@ -558,7 +898,7 @@ function applyCombo(combo) {
     flash(`已经是「${combo.name}」`);
     return;
   }
-  const before = state.teach.bindings;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
   const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
   const next = sameAsPrevious(before, q.id, { topicIds: validTopics, categoryIds: validCategories }, anchor);
   commitTeach(next, `应用组合：${combo.name}`, before, { qid: q.id, pageIndex: p.index });
@@ -569,6 +909,7 @@ function applyCombo(combo) {
 
 /* ── 管理面板：专题 / 类别 / 组合的改名、下架（软删除）与恢复 ── */
 
+/** @param {string} text @param {'ok'|undefined} [kind] */
 function showManageHint(text, kind) {
   const hint = $("manage-hint");
   if (!hint) return;
@@ -629,6 +970,7 @@ function renderManageList() {
   if (!box || !state.teach || !state.manage) return;
   /** @type {HTMLElement[]} */
   const nodes = [];
+  /** @param {string} label @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string,retired?:true}[]} items @param {string} emptyText */
   const section = (label, kind, items, emptyText) => {
     const { active, retired } = splitRetired(items);
     nodes.push(el("p", "mg-label", `${label}（${active.length}）`));
@@ -652,9 +994,11 @@ function renderManageList() {
 }
 
 /** 这一项现在被多少题在用（跨卷；数字没回来前如实说"题数未知"）。 */
+/** @param {'topics'|'categories'|'combos'} kind @param {string} id */
 function usageLabel(kind, id) {
   if (!state.manage?.usage) return "题数未知";
-  const u = state.manage.usage[kind]?.[id];
+  const bucket = kind === "combos" ? undefined : state.manage.usage[kind];
+  const u = bucket?.[id];
   if (!u) return "还没用过";
   return `用在 ${u.live} 题上${u.stale ? `（另 ${u.stale} 题已漂移）` : ""}`;
 }
@@ -682,7 +1026,7 @@ function manageRow(kind, item, retired) {
     const ok = el("button", "mg-btn primary", "保存");
     ok.type = "submit";
     form.append(input, ok);
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", /** @param {Event} e */ (e) => {
       e.preventDefault();
       void commitManageRename(kind, item, input.value);
     });
@@ -693,7 +1037,7 @@ function manageRow(kind, item, retired) {
     }, 0);
   } else {
     main.append(el("span", "mg-name", item.name));
-    main.append(el("span", "mg-sum", kind === "combos" ? comboSummary(item) : usageLabel(kind, item.id)));
+    main.append(el("span", "mg-sum", kind === "combos" ? comboSummary(/** @type {import('./teach-store.js').TeachCombo} */ (item)) : usageLabel(kind, item.id)));
   }
   row.append(main);
   /** @type {HTMLElement[]} */
@@ -728,10 +1072,12 @@ function manageRow(kind, item, retired) {
 }
 
 /** 管理成功后把服务端返回的新清单/新归属装回内存，并重画纸面角标。 */
+/** @param {'topics'|'categories'|'combos'} kind @param {any} res */
 function applyManageResult(kind, res) {
   if (!state.teach) return;
   if (Array.isArray(res.list)) {
-    state.teach = { ...state.teach, [kind]: normalizeTeachList({ [kind]: res.list }, kind) };
+    const listKind = /** @type {'topics'|'categories'} */ (kind);
+    state.teach = { ...(state.teach ?? { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: "" }), [listKind]: normalizeTeachList({ [listKind]: res.list }, listKind) };
   }
   if (Array.isArray(res.combos)) {
     state.teach = { ...state.teach, combos: normalizeCombos({ combos: res.combos }) };
@@ -750,6 +1096,7 @@ function applyManageResult(kind, res) {
 }
 
 /** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item @param {string} name */
 async function commitManageRename(kind, item, name) {
   if (!state.teach) return;
   const clean = String(name ?? "").trim();
@@ -784,6 +1131,7 @@ async function commitManageRename(kind, item, name) {
 }
 
 /** 下架（软删除）：题上的归属一个都不动。 @param {'topics'|'categories'|'combos'} kind */
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
 async function commitManageRetire(kind, item) {
   if (!state.teach) return;
   clearManageHint();
@@ -813,6 +1161,7 @@ async function commitManageRetire(kind, item) {
 }
 
 /** 恢复已下架项。 @param {'topics'|'categories'|'combos'} kind */
+/** @param {'topics'|'categories'|'combos'} kind @param {{id:string,name:string}} item */
 async function commitManageRestore(kind, item) {
   if (!state.teach) return;
   clearManageHint();
@@ -840,14 +1189,17 @@ async function commitManageRestore(kind, item) {
 
 /* ── 组合条拖动排序：长按 380ms 进入拖动，松手写回 combos.json ── */
 let suppressComboClick = false;
+/** @type {any} */
 let comboPress = null;
+/** @type {any} */
 let comboTimer = null;
+/** @type {any} */
 let comboDrag = null;
 
 function comboOrder() {
   const strip = $("combo-strip");
   if (!strip) return [];
-  return [...strip.querySelectorAll(".combo-chip")].map((b) => b.dataset.id);
+  return [...strip.querySelectorAll(".combo-chip")].map((b) => /** @type {HTMLElement} */ (b).dataset.id ?? "");
 }
 
 function bindComboDrag() {
@@ -874,7 +1226,7 @@ function bindComboDrag() {
     if (JSON.stringify(ids) === JSON.stringify(drag.before)) return;
     const prev = state.teach?.combos ?? [];
     const byId = new Map(prev.map((c) => [c.id, c]));
-    const next = ids.map((id) => byId.get(id)).filter(Boolean);
+    const next = /** @type {import('./teach-store.js').TeachCombo[]} */ (ids.map((id) => byId.get(id)).filter((c) => !!c));
     if (next.length !== prev.length) return;
     if (JSON.stringify(next.map((c) => c.id)) === JSON.stringify(prev.map((c) => c.id))) return;
     void saveComboList(next, "组合顺序").then((r) => {
@@ -947,6 +1299,7 @@ function bindComboDrag() {
   });
 }
 
+/** @param {string} qid @param {{topicIds:string[],categoryIds:string[]}} assignment */
 function rememberClassified(qid, assignment) {
   if (assignment.topicIds.length || assignment.categoryIds.length) {
     state.lastClassified = {
@@ -961,7 +1314,9 @@ function rememberClassified(qid, assignment) {
   updateSameButton();
 }
 
+/** @type {any} */
 let undoTimer = null;
+/** @param {string} label @param {UndoRecord} action */
 function showUndo(label, action) {
   state.undo = action;
   $("pick-undo-text").textContent = label;
@@ -991,7 +1346,7 @@ function undoLast() {
     return;
   }
   if (state.lastClassified?.questionId === a.qid) state.lastClassified = null;
-  const before = state.teach.bindings;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
   const next = replaceBinding(before, a.qid, a.prevBinding);
   commitTeach(next, "已撤销", before, { qid: a.qid, pageIndex: a.pageIndex }, { undoable: false, remember: false });
   flash("已撤销");
@@ -1003,16 +1358,17 @@ function applySameAsPrevious() {
   const { q, p } = state.picked;
   const prev = state.lastClassified;
   if (prev.doc !== state.doc || prev.questionId === q.id) return;
-  const before = state.teach.bindings;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
   const anchor = anchorOf(q, p, p.blocks[q.blocks?.[0]]);
   const next = sameAsPrevious(before, q.id, prev.assignment, anchor);
   commitTeach(next, `同上题：${prev.label}`, before, { qid: q.id, pageIndex: p.index });
 }
 
 let teachSaveChain = Promise.resolve();
+/** @param {import('./teach-store.js').TeachBindings} next @param {string} label @param {import('./teach-store.js').TeachBindings} prev @param {{qid:string,pageIndex:number}} ctx @param {{undoable?:boolean,remember?:boolean}} [opts] */
 function commitTeach(next, label, prev, ctx, opts = {}) {
   const { qid, pageIndex } = ctx;
-  state.teach = { ...state.teach, bindings: next };
+  state.teach = { ...(state.teach ?? { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: "" }), bindings: next };
   updatePickTray();
   repaintPage(pageIndex);
   if (opts.undoable === false) flash(label);
@@ -1036,7 +1392,7 @@ function commitTeach(next, label, prev, ctx, opts = {}) {
       hideUndo();
       const rolledBack = state.doc === doc && state.teach?.bindings === nextRef;
       if (rolledBack) {
-        state.teach = { ...state.teach, bindings: prev };
+        state.teach = { ...(state.teach ?? { topics: [], categories: [], combos: [], bindings: emptyTeachBindings(), error: "" }), bindings: prev };
         updatePickTray();
         repaintPage(pageIndex);
       }
@@ -1051,6 +1407,7 @@ function commitTeach(next, label, prev, ctx, opts = {}) {
     });
 }
 
+/** @param {'topics'|'categories'} kind */
 function openCreate(kind) {
   if (!state.picked) {
     flash("先点一道题");
@@ -1061,8 +1418,8 @@ function openCreate(kind) {
   const input = $("pick-create-name");
   form.hidden = false;
   document.querySelector(".pick-tray")?.classList.add("creating");
-  input.value = "";
-  input.placeholder = kind === "topics" ? "新专题名" : "新类别名";
+  (/** @type {HTMLInputElement} */ (input)).value = "";
+  (/** @type {HTMLInputElement} */ (input)).placeholder = kind === "topics" ? "新专题名" : "新类别名";
   input.focus();
 }
 
@@ -1072,12 +1429,13 @@ function closeCreate() {
   if (form) form.hidden = true;
   document.querySelector(".pick-tray")?.classList.remove("creating");
   const input = $("pick-create-name");
-  if (input) input.value = "";
+  if (input) (/** @type {HTMLInputElement} */ (input)).value = "";
 }
 
+/** @param {'topics'|'categories'} kind @param {string} id */
 function revealChip(kind, id) {
   const box = $(kind === "topics" ? "pick-topics" : "pick-categories");
-  const chip = [...box.querySelectorAll(".pick-chip")].find((b) => b.dataset.id === id);
+  const chip = [...box.querySelectorAll(".pick-chip")].find((b) => /** @type {HTMLElement} */ (b).dataset.id === id);
   chip?.scrollIntoView?.({ inline: "center", block: "nearest" });
 }
 
@@ -1111,7 +1469,7 @@ async function applyCreate(kind, name) {
     clearTeachNotice();
   }
   const { q, p } = state.picked;
-  const before = state.teach.bindings;
+  const before = state.teach?.bindings ?? emptyTeachBindings();
   const cur = assignmentFor(before, q.id);
   const already = kind === "topics" ? cur.topicIds.includes(res.item.id) : cur.categoryIds.includes(res.item.id);
   closeCreate();
@@ -1130,12 +1488,13 @@ async function applyCreate(kind, name) {
   return true;
 }
 
+/** @param {Event} e */
 async function submitCreate(e) {
   e.preventDefault();
   const kind = state.creating;
   if (!kind || !state.picked || !state.teach) return;
   const input = $("pick-create-name");
-  const ok = await applyCreate(kind, input.value);
+  const ok = await applyCreate(kind, (/** @type {HTMLInputElement} */ (input)).value);
   if (!ok) input.focus();
 }
 
@@ -1160,7 +1519,8 @@ function clearPickSelection() {
   updatePickTray();
 }
 
-/** 给选中题的所有块与号牌加高亮；只加 class/outline，不改任何几何。 */
+/** 给选中题的所有块与号牌加高亮；只加 class/outline，不改任何几何。
+ * @param {PageSlot | undefined} slot */
 function paintPickSelection(slot) {
   const q = state.picked?.q;
   if (!q || !slot?.paper) return;
@@ -1174,6 +1534,7 @@ function paintPickSelection(slot) {
   }
 }
 
+/** @param {SnapQuestion} q @param {SnapPage} p */
 function pickQuestion(q, p) {
   if (!state.pickMode) return;
   closeCreate();
@@ -1186,7 +1547,13 @@ function pickQuestion(q, p) {
   updatePickTray();
 }
 
+/** @param {boolean} on */
 function setPickMode(on) {
+  if (on && isPhoneViewport()) {
+    // 挑题依赖「号牌 + 块坐标」，文本流两者都没有 ⇒ 明确拒绝并给出出路，不做静默失效
+    flash("文本流视图不支持挑题：加 ?flow=0 切回纸面再挑");
+    return;
+  }
   state.pickMode = on;
   document.body.classList.toggle("pick-mode", on);
   const btn = $("t-pick");
@@ -1208,6 +1575,7 @@ function setPickMode(on) {
 }
 
 /** 点整道题：按下到抬起移动 >10px 视为滚动，不选。 */
+/** @type {{ x: number, y: number } | null} */
 let pickDown = null;
 function bindPickPointer() {
   const book = $("book");
@@ -1220,16 +1588,17 @@ function bindPickPointer() {
     const down = pickDown;
     pickDown = null;
     if (Math.abs(e.clientX - down.x) > 10 || Math.abs(e.clientY - down.y) > 10) return;
-    const target = /** @type {HTMLElement} */ (e.target);
+    const target = /** @type {HTMLElement | null} */ (e.target);
+    if (!target) return;
     const sec = target.closest?.(".bk-page");
     if (!sec) return;
     const idx = Number(sec.id.replace("pg-", "")) - 1;
     const slot = state.pages[idx];
     if (!slot?.paper) return;
-    const chip = target.closest?.(".q-chip");
+    const chip = /** @type {HTMLElement | null} */ (target.closest?.(".q-chip"));
     if (chip?.dataset?.qid) {
       const q = slot.p.questions.find((x) => x.id === chip.dataset.qid);
-      if (q) pickQuestion(q, slot.p);
+      if (q) pickQuestion(/** @type {SnapQuestion} */ (q), slot.p);
       return;
     }
     const rect = slot.paper.canvas.getBoundingClientRect();
@@ -1237,7 +1606,7 @@ function bindPickPointer() {
     const xPt = ((e.clientX - rect.left) * slot.p.width) / rect.width;
     const yPt = ((e.clientY - rect.top) * slot.p.height) / rect.height;
     const q = pickQuestionAt(slot.p, xPt, yPt, 6);
-    if (q) pickQuestion(q, slot.p);
+    if (q) pickQuestion(/** @type {SnapQuestion} */ (q), slot.p);
   });
   book.addEventListener("pointercancel", () => {
     pickDown = null;
@@ -1246,14 +1615,20 @@ function bindPickPointer() {
 
 /** 标签面板拿的「应用」句柄：写路径只有 commitBindings / commitLibrary 两条 */
 const tagApp = {
+  /** @returns {TagState} openSheet 只在 `if (state.tags)` 之后才把本句柄交给 tagSection ⇒
+   *  「tags 为 null」在句柄使用期内不可达，这里按该不变量收窄（tag-panel.js:38 的 TagApp 要求非空） */
   get tags() {
-    return state.tags;
+    return /** @type {TagState} */ (state.tags);
   },
+  /** @param {TagState} v */
   set tags(v) {
     state.tags = v;
   },
+  /** @param {DocTags} next */
   commitBindings: (next) => saveBindings(state.doc, next),
+  /** @param {Library} next */
   commitLibrary: (next) => saveLibrary(next),
+  /** @param {QuestionRef} q @param {PageRef} p */
   onRepaint: (q, p) => repaintPage(p.index),
 };
 
@@ -1264,6 +1639,10 @@ const tagApp = {
  * 之前把图甩到文末，是因为只用了引擎的一维文本（stem / answerText）—— 那里面没有图片位置。
  * 现在改用快照的块坐标（entryCrop），图文相对位置与纸面同源。
  * 跨页条目**逐页续裁**：同一个 id 在快照里按页各有一段，段段都裁、按页序叠放。
+ */
+/**
+ * @param {SnapQuestion} q
+ * @param {SnapPage} p
  */
 async function openSheet(q, p) {
   if (state.pickMode) {
@@ -1336,7 +1715,10 @@ async function openSheet(q, p) {
   }
 }
 
-/** 当前卷是题册还是答案册（措辞与"哪一面是自己"都靠它） */
+/** 当前卷是题册还是答案册（措辞与"哪一面是自己"都靠它）
+ * @param {string} doc
+ * @returns {string} "quiz" | "answer"（取自 meta.json，类型只按字符串对待）
+ */
 function docKind(doc) {
   return DOCS.find((x) => x.id === doc)?.kind ?? "quiz";
 }
@@ -1351,6 +1733,7 @@ function docKind(doc) {
  * 只读 = 不在这里增删（增删只走托盘，避免两套写入口）。**下架项照样显示**并标注「已下架」：
  * 题上的归属确实还在（软删除语义），藏起来会让人以为归类丢了。
  */
+/** @param {SnapQuestion} q @param {SnapPage} p */
 function teachReadonlySection(q, p) {
   const box = el("section", "teach-read");
   box.append(el("h4", "", "教学归类"));
@@ -1364,6 +1747,7 @@ function teachReadonlySection(q, p) {
   }
   const a = assignmentFor(teach.bindings ?? emptyTeachBindings(), q.id);
   /** @param {'topics'|'categories'} kind */
+  /** @param {string} label @param {'topics'|'categories'} kind @param {string[]} ids */
   const row = (label, kind, ids) => {
     const line = el("div", "teach-read-row");
     line.append(el("span", "teach-read-label", label));
@@ -1396,6 +1780,7 @@ function teachReadonlySection(q, p) {
  * 顶部体检摘要：把 `meta.json` 的结论翻译成一句人话。
  * - `examined=false` ⇒ 说「未体检」而不是「通过」（没测过 ≠ 没问题）；
  * - 有 issues ⇒ 显示第一条，悬停/点击看全部。
+ * @param {string} doc
  */
 function renderHealth(doc) {
   const box = $("doc-health");
@@ -1407,6 +1792,7 @@ function renderHealth(doc) {
     box.hidden = true;
     return;
   }
+  /** @type {DocStats} */
   const s = d.stats ?? {};
   const bits = [];
   if (s.questions !== undefined) bits.push(`${s.questions} 题`);
@@ -1429,10 +1815,12 @@ function renderHealth(doc) {
   }
   box.append(el("span", "", [...bits, tail].join(" · ")));
   if (d.health?.issues?.length) {
-    box.title = d.health.issues.join("\n");
+    // 同一引用先取局部：闭包里 `d.health.issues` 会丢收窄（health 可变属性），取局部不改变任何读取时机
+    const issues = d.health.issues;
+    box.title = issues.join("\n");
     box.append(el("span", "more", "详情"));
     box.onclick = () =>
-      notice([["div", "本册体检："], ...d.health.issues.map((x) => ["div", `· ${x}`])], "warn");
+      notice([["div", "本册体检："], ...issues.map((x) => /** @type {[string, string]} */ (["div", `· ${x}`]))], "warn");
     box.style.cursor = "pointer";
   } else {
     box.title = "体检通过：题号连续、无未解释的抑制";
@@ -1442,7 +1830,15 @@ function renderHealth(doc) {
 }
 
 /** 一面：先试纸面裁切；拿不到快照或块才退回文本 + 图片条，并明说是降级（不静默换排法）。
- *  返回 null = 这次点击已作废（调用方不许再往面板里塞东西）。 */
+ *  返回 null = 这次点击已作废（调用方不许再往面板里塞东西）。
+ * @param {object} token 本次点击的令牌（state.sheetToken）
+ * @param {HTMLElement} d 面板容器
+ * @param {string} label
+ * @param {{ id: string, doc: string }} side 要裁的条目：id + 所属卷
+ * @param {number} w 面板可用宽
+ * @param {() => HTMLElement[]} fallback 降级出口（textFallback）
+ * @returns {Promise<HTMLElement | null>}
+ */
 async function sideSection(token, d, label, side, w, fallback) {
   const box = el("div", "sec");
   box.append(el("div", "lbl", label));
@@ -1494,8 +1890,15 @@ async function sideSection(token, d, label, side, w, fallback) {
   return box;
 }
 
-/** 降级出口：文本 + 按阅读顺序的图片条（位置不如纸面准，但图不丢） */
+/** 降级出口：文本 + 按阅读顺序的图片条（位置不如纸面准，但图不丢）
+ * @param {string} stem
+ * @param {OptLine[] | null | undefined} options
+ * @param {ImageRef[] | null | undefined} images
+ * @param {string} doc
+ * @returns {HTMLElement[]}
+ */
 function textFallback(stem, options, images, doc) {
+  /** @type {HTMLElement[]} */
   const out = [];
   const stemBox = el("div", "stem");
   stemBox.innerHTML = prettifyLatex(stem ?? "");
@@ -1510,27 +1913,42 @@ function textFallback(stem, options, images, doc) {
   return out;
 }
 
-/** 一条目可能跨页：段列表由 `entrySegments` 从整册快照里按 id 找齐。 */
+/** 一条目可能跨页：段列表由 `entrySegments` 从整册快照里按 id 找齐。
+ * @param {Snap | null} snap
+ * @param {string} qid
+ * @param {string} doc
+ * @param {number} w
+ * @returns {CropBox | null}
+ */
 function cropOf(snap, qid, doc, w) {
   const segs = snap ? entrySegments(snap.pages, qid) : [];
   if (!segs.length) return null;
   try {
-    return entryCrop(segs, doc, w, { candidateStyle: state.ocrStyle });
+    // `holes`/`foreignBlocks` 是 entryCrop 的**声明契约**（entry-paper.js:326-327），
+    // 但其导出签名只到 `HTMLElement | null` ⇒ 调用点按契约收窄（d.ts 遮蔽债 HANDOFF §6-29 同源问题）
+    return /** @type {CropBox} */ (entryCrop(segs, doc, w, { candidateStyle: state.ocrStyle }));
   } catch (e) {
     console.warn("按原卷裁切失败，退回文本：", String(e).slice(0, 80));
     return null;
   }
 }
 
-/** 另一册的快照按需拉取并缓存（题册 0.4 MB / 答案册 0.9 MB） */
+/** 另一册的快照按需拉取并缓存（题册 0.4 MB / 答案册 0.9 MB）
+ * @param {string} doc
+ * @returns {Promise<Snap>}
+ */
 async function snapshotOf(doc) {
-  if (state.snaps.has(doc)) return state.snaps.get(doc);
-  const snap = await fetchJson(`/data/out/${enc(doc)}/stages.json`);
+  // `has` 已判过存在 ⇒ `get` 的 `| undefined` 只是 lib 签名，cast 不产生运行时代码
+  if (state.snaps.has(doc)) return /** @type {Snap} */ (state.snaps.get(doc));
+  const snap = /** @type {Snap} */ (await fetchJson(`/data/out/${enc(doc)}/stages.json`));
   state.snaps.set(doc, snap);
   return snap;
 }
 
-/** `docId:p2:q23` → `docId`（图片要拼 `/data/out/<docId>/images/`） */
+/** `docId:p2:q23` → `docId`（图片要拼 `/data/out/<docId>/images/`）
+ * @param {string} id
+ * @returns {string}
+ */
 function docOf(id) {
   const i = String(id ?? "").lastIndexOf(":p");
   return i > 0 ? id.slice(0, i) : state.doc;
@@ -1539,6 +1957,10 @@ function docOf(id) {
 /**
  * 图片条：**只在降级路径里出现**（正常路径是 entryCrop，图按原卷位置排）。
  * 按原卷阅读顺序（bbox 先 y 后 x）排；此时手里只有一维文本，没有可回填的位置标记。
+ * @param {ImageRef[] | null | undefined} images
+ * @param {string} doc
+ * @param {string} label
+ * @returns {HTMLElement}
  */
 function figStrip(images, doc, label) {
   const box = el("div", "figs");
@@ -1564,7 +1986,9 @@ function renderBook() {
   const book = $("book");
   book.replaceChildren();
   state.pages = [];
-  const data = state.data;
+  // renderBook 只在快照就位后被调用（loadDoc 尾部 / 三个开关 / resize 的 `if (state.data)`）
+  // ⇒ 边界收窄：cast 不产生运行时代码，真为 null 时依旧在 `.pages` 上抛 TypeError
+  const data = /** @type {Snap} */ (state.data);
   data.pages.forEach((p, i) => {
     const sec = el("section", "bk-page");
     sec.id = `pg-${i + 1}`;
@@ -1598,12 +2022,18 @@ function updatePageIndicator() {
  * 那里只有 id/number/section/type/blocks/startsHere/confidence/status/reasons，
  * 没有 stem/options/images —— 曾经面板因此把题干渲染成字面量 `undefined`、选项恒 0、图片全丢。
  * 阅读版（viewer/）一直读的就是这份（viewer.js:28）。
+ * @param {string} doc
  */
 async function loadQuestions(doc) {
   state.byId = null;
   state.byIdError = "";
   try {
-    const list = await fetchJson(`/data/out/${enc(doc)}/questions.json`);
+    // 产物实际是裸数组；`list.questions ?? list` 兼容带壳返回 ⇒ 用交叉类型声明，
+    // 数组上读不到 `questions`（undefined）走 ?? 兜底，运行路径与原先逐字相同
+    const list = /** @type {BankQuestion[] & { questions?: BankQuestion[] }} */ (
+      await fetchJson(`/data/out/${enc(doc)}/questions.json`)
+    );
+    /** @type {Map<string, BankQuestion>} */
     const m = new Map();
     for (const q of list.questions ?? list) m.set(q.id, q);
     state.byId = m;
@@ -1614,8 +2044,10 @@ async function loadQuestions(doc) {
 
 async function loadBank() {
   try {
-    const list = await fetchJson("/data/out/bank/bank.json");
+    const list = /** @type {BankEntry[]} */ (await fetchJson("/data/out/bank/bank.json"));
+    /** @type {Map<string, BankEntry>} */
     const byQuizId = new Map();
+    /** @type {Map<string, BankEntry>} */
     const byAnswerId = new Map();
     for (const e of list) {
       if (e.quizId) byQuizId.set(e.quizId, e);
@@ -1634,7 +2066,7 @@ async function loadBank() {
 async function loadDocs() {
   const asked = new URLSearchParams(location.search).get("doc");
   try {
-    const j = await fetchJson("/api/docs");
+    const j = /** @type {{ docs?: DocMeta[] }} */ (await fetchJson("/api/docs"));
     DOCS = (j.docs ?? []).map((d) => ({ ...d, label: d.label || d.id }));
     if (!DOCS.length) throw new Error("服务端没发现任何文档");
   } catch (e) {
@@ -1666,13 +2098,16 @@ async function loadDocs() {
   state.doc = asked && DOCS.some((d) => d.id === asked) ? asked : DEFAULT_DOC;
 }
 
+/**
+ * @param {string} doc
+ */
 async function loadDoc(doc) {
   try {
-    state.data = await fetchJson(`/data/out/${enc(doc)}/stages.json`);
+    state.data = /** @type {Snap} */ (await fetchJson(`/data/out/${enc(doc)}/stages.json`));
     state.doc = doc;
-    $("doc-pick").value = doc;
-    $("lnk-stages").href = `/stages/?doc=${enc(doc)}&stage=6&page=1`;
-    $("lnk-viewer").href = `/viewer/?doc=${enc(doc)}`;
+    /** @type {HTMLSelectElement} */ ($("doc-pick")).value = doc;
+    /** @type {HTMLAnchorElement} */ ($("lnk-stages")).href = `/stages/?doc=${enc(doc)}&stage=6&page=1`;
+    /** @type {HTMLAnchorElement} */ ($("lnk-viewer")).href = `/viewer/?doc=${enc(doc)}`;
     $("notice").hidden = true;
     $("detail").hidden = true; // 换卷时关掉面板，避免标签区指着上一卷的题目
     state.sheet = null;
@@ -1718,7 +2153,9 @@ async function loadDoc(doc) {
  */
 
 /** 底部轻提示（2.4s 自动消失） */
-let toastTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} 定时器句柄；初值 null→undefined：两者都是 clearTimeout 的空句柄 no-op，行为不变（同 stages.js:716 的处理） */
+let toastTimer = undefined;
+/** @param {string} text */
 function flash(text) {
   const t = $("toast");
   t.textContent = text;
@@ -1731,17 +2168,21 @@ function flash(text) {
   }, 2400);
 }
 
-/** 跳转后必须看得见"跳到了哪"：短暂高亮 2s */
+/** 跳转后必须看得见"跳到了哪"：短暂高亮 2s
+ * @param {Element | null} node
+ */
 function markHit(node) {
   if (!node) return;
   node.classList.add("hit");
   setTimeout(() => node.classList.remove("hit"), 2000);
 }
 
+/** @param {number} index @returns {HTMLElement | null} */
 function pageEl(index) {
   return document.getElementById(`pg-${index + 1}`);
 }
 
+/** @param {number} index @returns {boolean} */
 function jumpToPage(index) {
   const sec = pageEl(index);
   if (!sec) return false;
@@ -1752,15 +2193,24 @@ function jumpToPage(index) {
   return true;
 }
 
-/** 本册所有该题号的题（不同节会重号 ⇒ 天然是列表） */
+/** 本册所有该题号的题（不同节会重号 ⇒ 天然是列表）
+ * @param {string} n
+ * @returns {Array<{ pageIndex: number, q: SnapQuestion }>}
+ */
 function questionsByNumber(n) {
+  /** @type {Array<{ pageIndex: number, q: SnapQuestion }>} */
   const out = [];
-  state.data.pages.forEach((p, i) => {
+  // 只在 runJump 判过 `!state.data` 之后被调用 ⇒ 边界收窄（cast 不产生运行时代码）
+  const data = /** @type {Snap} */ (state.data);
+  data.pages.forEach((p, i) => {
     for (const q of p.questions ?? []) if (String(q.number) === String(n)) out.push({ pageIndex: i, q });
   });
   return out;
 }
 
+/** 只需要 {pageIndex, q} 两点：HitQuestion 与 questionsByNumber 的裸命中都结构兼容
+ * @param {{ pageIndex: number, q: SnapQuestion }} hit @returns {boolean}
+ */
 function jumpToQuestion(hit) {
   jumpToPage(hit.pageIndex);
   const chip = document.querySelector(`.q-chip[data-qid="${CSS.escape(hit.q.id)}"]`);
@@ -1768,13 +2218,19 @@ function jumpToQuestion(hit) {
   return Boolean(chip);
 }
 
-/** 搜正文：返回 { pageIndex, blockIndex, snippet }，最多 60 条（再多也没人翻） */
+/** 搜正文：返回 { pageIndex, blockIndex, snippet }，最多 60 条（再多也没人翻）
+ * @param {string} text
+ * @returns {HitBlock[]}
+ */
 function searchBlocks(text) {
   const needle = text.trim().toLowerCase();
   if (!needle) return [];
+  /** @type {HitBlock[]} */
   const out = [];
-  for (let i = 0; i < state.data.pages.length; i++) {
-    const blocks = state.data.pages[i].blocks ?? [];
+  // 只在 runJump 判过 `!state.data` 之后被调用 ⇒ 边界收窄（cast 不产生运行时代码）
+  const data = /** @type {Snap} */ (state.data);
+  for (let i = 0; i < data.pages.length; i++) {
+    const blocks = data.pages[i].blocks ?? [];
     for (let k = 0; k < blocks.length; k++) {
       const t = blocks[k].text ?? "";
       const at = t.toLowerCase().indexOf(needle);
@@ -1794,7 +2250,10 @@ function searchBlocks(text) {
   return out;
 }
 
-/** 结果面板（题号候选与正文命中共用；点一行就跳过去） */
+/** 结果面板（题号候选与正文命中共用；点一行就跳过去）
+ * @param {(HitQuestion | HitBlock)[]} hits
+ * @param {string} title
+ */
 function showHits(hits, title) {
   const box = $("hits");
   box.replaceChildren();
@@ -1820,7 +2279,9 @@ function showHits(hits, title) {
   }
 }
 
-/** 输入框的唯一入口：页码 → 题号 → 搜索 */
+/** 输入框的唯一入口：页码 → 题号 → 搜索
+ * @param {string | null | undefined} raw
+ */
 function runJump(raw) {
   const q = String(raw ?? "").trim();
   if (!q || !state.data) return;
@@ -1871,8 +2332,10 @@ function runJump(raw) {
  * 每天用的人不会每天从第 1 页翻起。位置存 localStorage：
  * 隐私模式/禁用存储时**写不进去也不影响阅读**（try/catch 兜住，不弹错）。 */
 
+/** @param {string} doc */
 const posKey = (doc) => `final:pos:${doc}`;
-let posTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} 同 toastTimer：null→undefined 对 clearTimeout 都是空句柄 no-op，行为不变 */
+let posTimer = undefined;
 /**
  * 跳转后的短暂锁：平滑滚动途中 `updatePageIndicator` 会一路报**中间页**
  * （实测跳 p7 被记成 p5）。锁住这段时间，只认"跳到的目标页"；锁一过，
@@ -1880,6 +2343,10 @@ let posTimer = null;
  */
 let posLockUntil = 0;
 
+/**
+ * @param {number} page
+ * @param {boolean} [force]
+ */
 function savePosition(page, force = false) {
   if (!force && Date.now() < posLockUntil) return;
   clearTimeout(posTimer);
@@ -1899,7 +2366,8 @@ function restorePosition() {
   } catch {
     return;
   }
-  if (!p || p < 1 || p > state.data.pages.length) return;
+  // restorePosition 只在 loadDoc 的 renderBook 之后被调用 ⇒ 边界收窄（cast 不产生运行时代码）
+  if (!p || p < 1 || p > /** @type {Snap} */ (state.data).pages.length) return;
   const sec = pageEl(p - 1);
   if (!sec) return;
   sec.scrollIntoView({ block: "start" });
@@ -1911,7 +2379,9 @@ function restorePosition() {
 /* ── 交互 ── */
 
 function initBar() {
-  const pick = $("doc-pick");
+  // index.html 里 doc-pick 是 `<select>`、jump 是 `<input>`、t-* 是 `checkbox`：
+  // `$` 只收窄到 HTMLElement（见上方注释），这里按元素实际标签再收一层（tag-panel.js:51 同法）
+  const pick = /** @type {HTMLSelectElement} */ ($("doc-pick"));
   pick.replaceChildren();
   for (const d of DOCS) {
     const o = el("option", "", d.label);
@@ -1927,7 +2397,7 @@ function initBar() {
   pick.value = state.doc;
   pick.addEventListener("change", () => loadDoc(pick.value));
 
-  const jump = $("jump");
+  const jump = /** @type {HTMLInputElement} */ ($("jump"));
   jump.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -1936,12 +2406,21 @@ function initBar() {
   // 输入框失焦时收起结果面板（点面板里的行之前会先失焦 ⇒ 延迟收，否则点不中）
   jump.addEventListener("blur", () => setTimeout(() => ($("hits").hidden = true), 180));
 
-  $("t-audit").addEventListener("change", (e) => {
-    state.audit = e.target.checked;
+  const tAudit = /** @type {HTMLInputElement} */ ($("t-audit"));
+  tAudit.addEventListener("change", (e) => {
+    // change 的 e.target 即 checkbox 本体；为 null 时原先在 `.checked` 上抛 TypeError，cast 不改这点
+    state.audit = /** @type {HTMLInputElement} */ (e.target).checked;
     renderBook();
   });
-  $("t-ocr").addEventListener("change", (e) => {
-    state.ocrStyle = e.target.checked;
+  const tFill = /** @type {HTMLInputElement} */ ($("t-fill"));
+  tFill.checked = state.ocrFill;
+  tFill.addEventListener("change", (e) => {
+    state.ocrFill = /** @type {HTMLInputElement} */ (e.target).checked;
+    renderBook();
+  });
+  const tOcr = /** @type {HTMLInputElement} */ ($("t-ocr"));
+  tOcr.addEventListener("change", (e) => {
+    state.ocrStyle = /** @type {HTMLInputElement} */ (e.target).checked;
     renderBook();
   });
   const more = $("t-more");
@@ -1953,7 +2432,7 @@ function initBar() {
   });
   document.addEventListener("click", (e) => {
     if (menu.hidden) return;
-    if (e.target.closest?.(".fb-right")) return;
+    if (/** @type {HTMLElement | null} */ (e.target)?.closest?.(".fb-right")) return;
     menu.hidden = true;
     more.setAttribute("aria-expanded", "false");
   });
@@ -1985,9 +2464,9 @@ function initBar() {
     renderPickRows();
   });
   $("pick-search-clear").addEventListener("click", () => {
-    const input = $("pick-search-q");
+    const input = /** @type {HTMLInputElement | null} */ ($("pick-search-q"));
     state.search.q = "";
-    if (input) input.value = "";
+    if (input) (/** @type {HTMLInputElement} */ (input)).value = "";
     renderPickRows();
     input?.focus();
   });
@@ -1997,7 +2476,8 @@ function initBar() {
     // 用 composedPath 而不是 closest()：面板里的按钮点下去会同步重绘，
     // 那时 e.target 已经从 DOM 上摘下来了，closest 找不到祖先 → 会把刚打开的面板又关掉。
     const path = typeof e.composedPath === "function" ? e.composedPath() : [];
-    const has = (id) => path.some((n) => n?.id === id) || !!/** @type {HTMLElement} */ (e.target)?.closest?.(`#${id}`);
+    /** @param {string} id */
+    const has = (id) => path.some((n) => /** @type {{ id?: string }} */ (n)?.id === id) || !!/** @type {HTMLElement} */ (e.target)?.closest?.(`#${id}`);
     if (!has("manage-pop") && !has("pick-manage")) closeManage();
     const pop = $("combo-pop");
     if (!pop || pop.hidden) return;
@@ -2019,7 +2499,8 @@ function initBar() {
   bindKeyboardLift();
 }
 
-let resizeTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} 同上：空句柄对 clearTimeout 等价（stages.js:716） */
+let resizeTimer = undefined;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
@@ -2037,12 +2518,16 @@ async function main() {
   // 开关支持 URL 参数（可分享/收藏某个视图）：?audit=1 开审计标记、?ocr=0 关候选样式
   const qs = new URLSearchParams(location.search);
   state.audit = qs.get("audit") === "1";
-  state.ocrStyle = qs.get("ocr") !== "0";
+  // 默认**关**（2026-10-30 用户：成品页里成片的绿字没法看）。要看哪些行是 OCR 补的，
+  // 勾工具栏「OCR 候选样式」或加 `?ocr=1` —— 能力保留，只是不再默认糊在脸上。
+  state.ocrFill = qs.get("fill") === "1";
+  state.ocrStyle = qs.get("ocr") === "1";
   state.tagsOn = qs.get("tags") !== "0";
   await loadDocs();
   initBar();
-  $("t-audit").checked = state.audit;
-  $("t-ocr").checked = state.ocrStyle;
+  /** @type {HTMLInputElement} */ ($("t-audit")).checked = state.audit;
+  /** @type {HTMLInputElement} */ ($("t-ocr")).checked = state.ocrStyle;
+  /** @type {HTMLInputElement} */ ($("t-fill")).checked = state.ocrFill;
   const asked = qs.get("doc") || DEFAULT_DOC;
   await loadBank();
   await loadDoc(asked);
@@ -2052,7 +2537,7 @@ async function main() {
   // ?q= 打开即执行一次跳转/搜索（方便收藏"某个搜索"，也让交互可被自动化核对）
   const q = qs.get("q");
   if (q) {
-    $("jump").value = q;
+    /** @type {HTMLInputElement} */ ($("jump")).value = q;
     runJump(q);
   }
 }

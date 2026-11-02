@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "note": "可疑题号行审计（scripts/audit-suspicious-number.ts）的误报登记。每条必须写 note（原卷核对依据：页图路径或原卷文本）。登记不等于修复：真实误切要单独立项改切题判据。",
+  "entries": []
+}

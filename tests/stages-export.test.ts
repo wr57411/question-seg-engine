@@ -116,6 +116,7 @@ const result: SegmentationResult = {
     inlineFormulas: 0,
     columnsPerPage: [1, 1],
   },
+  bands: [],
   answerEntries: [{ number: "9", text: "A" }],
 };
 

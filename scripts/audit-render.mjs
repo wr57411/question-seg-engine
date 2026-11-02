@@ -68,17 +68,26 @@ import { prettifyLatex, KNOWN_COMMANDS, findCommandAmbiguities, collapseImmediat
 import { emWidthOf, fontFromLineHeight, fontForBlock, baseFontOfPage, isVerticalText, hasTwoDimensionalMath, renderedTextOf, clampByWidth } from "../stages/font-metrics.js";
 import { crossBlockMerges } from "../stages/block-dedup.js";
 
-const docId = process.argv[2] ?? "23必刷题 2相互作用";
+const ARGS = process.argv.slice(2);
+const ALLOW_MISSING = ARGS.includes("--allow-missing");
+const docArg = ARGS.find((a) => !a.startsWith("--"));
+const docId = docArg ?? "23必刷题 2相互作用";
 const SNAP = new URL(`../data/out/${docId}/stages.json`, import.meta.url);
 
 let snap;
 try {
   snap = JSON.parse(readFileSync(SNAP, "utf8"));
 } catch {
-  // 快照是运行时产物（data/ 不入库）：新克隆环境没有它，跳过而非报错，
-  // 这样本脚本可以安全接入 npm run check。
-  console.log(`渲染审计：跳过（未找到快照 ${docId}，先运行 npm run stages:export）`);
-  process.exit(0);
+  // 快照是运行时产物（data/ 不入库）。**缺快照 ≠ 通过**：
+  // 旧实现 exit 0，会让 npm run check 在「渲染审计从未运行」时显示全绿（假绿）。
+  // 现在默认 exit 2；离线/无 data 的场景必须显式加 --allow-missing，且打印「未审计」。
+  const msg = `渲染审计：未找到快照 ${docId}（先运行 npm run stages:export）`;
+  if (ALLOW_MISSING) {
+    console.log(`${msg}；--allow-missing 显式跳过（本次未审计 = 未通过）`);
+    process.exit(0);
+  }
+  console.error(`${msg} —— 渲染审计未运行，不能当通过（离线跳过请显式加 --allow-missing）`);
+  process.exit(2);
 }
 
 /** 输出端可疑模式（语法干净但语义可疑） */
@@ -271,7 +280,16 @@ const fidelityFail =
 // 每节带 fatal 标志：false = 提示级，只展示不计入退出码
 const sections = [];
 for (const [name] of OUT_PATTERNS) {
-  sections.push([name, outHits[name], true]);
+  if (name === "残留反斜杠" || name === "残留花括号") {
+    // 最终页只画 blocks；raw/discarded 是 stages 的「原料」视图，里面的上游残留
+    // 不应把最终页判红（2026-10-28：3卷/机械能 raw 花括号、4曲线 raw 反斜杠）。
+    const rendered = outHits[name].filter((h) => h.src === "blocks");
+    const others = outHits[name].filter((h) => h.src !== "blocks");
+    sections.push([`${name}（blocks）`, rendered, true]);
+    if (others.length) sections.push([`${name}（raw/discarded，提示）`, others, false]);
+  } else {
+    sections.push([name, outHits[name], true]);
+  }
 }
 sections.push(["选项粘连未分隔", stuckOptions, true]);
 sections.push(["未覆盖的 LaTeX 命令", [...unknownCmds.entries()].map(([c, n]) => ({ shown: `\\${c} ×${n}` })), true]);
@@ -558,21 +576,35 @@ for (const p of snap.pages) {
     }
   }
 }
+// **判定项与提示项在这里分家**（`DECISIONS §86`，收口 `§6-1`）：两类的可信度根本不同 ——
+//   · 非二维块：走 `clampByWidth`，构造上 `em·F ≤ bboxW`；右缘仍越过画布 ⇒ 夹子失效，
+//     是**真 bug**，阈值 0，超了就让 check 红；
+//   · `\frac/\sqrt` 块：豁免夹子，且 `renderedTextOf` 是分子分母的一维拼接 ⇒ `em·F` 只是**上界**，
+//     实测 `§11.4` DOM 0 块溢出画布、本轮审计估算亦为 0 ⇒ 保持提示项（不可信的量不设门）。
 {
-  const mathN = clipEstimate.filter((x) => x.math).length;
-  console.log("\n⚠️ 画布边界裁切估算（提示项，不计退出码）");
+  const clipMath = clipEstimate.filter((x) => x.math);
+  const clipPlain = clipEstimate.filter((x) => !x.math);
+  const plainBad = clipPlain.length > 0;
+  console.log(
+    `\n${plainBad ? "❌" : "✅"} 画布边界裁切（判定项：非二维块 右缘 > 画布宽(${AUDIT_CANVAS_W}) 的块数 = 0）`,
+  );
+  console.log(
+    `     非二维块 ${clipPlain.length} 个（判定）· \\frac/\\sqrt 块 ${clipMath.length} 个（提示，一维投影只是上界）`,
+  );
   console.log("     成因：\\frac/\\sqrt 块豁免 clampByWidth（Task 14 收窄后只这一类）→ 字号取基准、");
   console.log("     不受 bbox 宽约束 → 文字右缘可能越过画布右边界，被 .canvas{overflow:hidden} 裁掉（G1）。");
-  console.log(
-    `     估算「右缘 > 画布宽(${AUDIT_CANVAS_W})」的块：${clipEstimate.length} 个（其中含二维公式源码 ${mathN} 个）`,
-  );
-  console.log("     ⚠️ 对 \\frac/\\sqrt 块，renderedTextOf 是分子分母的拼接（二维排版的一维投影）→ 仍是上界；");
-  console.log("        真实是否裁切以视觉审板/DOM 为准，本清单只用于把风险显性化。");
+  console.log("     非二维块走夹子后仍越界 = 夹子失效（真 bug，判红）；二维块清单仅供人看。");
   for (const x of [...clipEstimate].sort((a, b) => b.over - a.over).slice(0, 10)) {
     console.log(`        p${x.p} blocks[${x.i}] 右缘超出 ${x.over.toFixed(1)}px math=${x.math} ${JSON.stringify(x.shown)}`);
   }
   if (clipEstimate.length > 10) console.log(`        …另有 ${clipEstimate.length - 10} 条`);
-  hints += clipEstimate.length; // 提示项：计入提示总数（不影响退出码）
+  if (plainBad) {
+    console.log(
+      `        ❌ ${clipPlain.length} 个非二维块越过画布右缘：clampByWidth 应保证 em·F ≤ bboxW，出现即判据失效`,
+    );
+    bad++;
+  }
+  hints += clipMath.length; // 提示项：计入提示总数（不影响退出码）
 }
 
 // ── 10. 墨迹覆盖率（Task 16；判定项：**内容级条数**的回归；提示项：区域清单）──────

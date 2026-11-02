@@ -61,7 +61,9 @@ export const DUP_MIN_COMMON = 3;
 /** 合并时的最小重叠长度（1 字符重叠太弱，如两块都以「的」相接）。 */
 export const MERGE_MIN_OVERLAP = 2;
 
+/** @param {any} b */
 const isImage = (b) => b?.kind === "image";
+/** @param {any} b */
 const textOf = (b) => (typeof b?.text === "string" ? b.text : "");
 
 /**
@@ -69,11 +71,15 @@ const textOf = (b) => (typeof b?.text === "string" ? b.text : "");
  * `_`/`^`（上下标标记）保留 —— 比较用，不追求与渲染文本逐字一致。
  * 例：`"D. 绳a的拉力$F _ { a }$增大"` → `"D.绳a的拉力F_a增大"`。
  */
+/** @param {unknown} text */
 export function dedupPlainText(text) {
   return String(text).replace(/\\[A-Za-z]+/g, "").replace(/[$\\{}]/g, "").replace(/\s+/g, "");
 }
 
-/** 两个字符串的最长公共子串长度（朴素 DP，O(m·n)；输入是单块短文本，规模可忽略）。 */
+/**
+ * 两个字符串的最长公共子串长度（朴素 DP，O(m·n)；输入是单块短文本，规模可忽略）。
+ * @param {string} a @param {string} b
+ */
 export function longestCommonSubstring(a, b) {
   if (!a || !b) return 0;
   let prev = new Array(b.length + 1).fill(0);
@@ -115,6 +121,7 @@ export function isCrossBlockDuplicate(a, b) {
 }
 
 /** 在 a 中找 `b` 的最长前缀的最后一次出现（拼接点）。返回 `{ i, k }` 或 null。 */
+/** @param {string} a @param {string} b */
 function joinAtPrefix(a, b) {
   const max = Math.min(a.length, b.length);
   for (let k = max; k >= MERGE_MIN_OVERLAP; k--) {
@@ -137,7 +144,9 @@ export function mergeTexts(a, b) {
   if (b.includes(a)) return { text: b, overlap: a.length, dir: "contains" };
   const ab = joinAtPrefix(a, b); // A 的尾部 ⊗ B 的头部 → a.slice(0,i) + b
   const ba = joinAtPrefix(b, a); // 反向
+  /** @type {(x: string, y: string, j: {i:number,k:number}) => {text:string, overlap:number, dir:"ab"|"ba"}} */
   const build = (x, y, j) => ({ text: x.slice(0, j.i) + y, overlap: j.k, dir: x === a ? "ab" : "ba" });
+  /** @type {{text:string, overlap:number, dir:"contains"|"ab"|"ba"}[]} */
   const cands = [];
   if (ab) cands.push(build(a, b, ab));
   if (ba) cands.push(build(b, a, ba));
@@ -149,6 +158,7 @@ export function mergeTexts(a, b) {
 }
 
 /** 两块 bbox 的并集 [min x0, min y0, max x1, max y1]。 */
+/** @param {number[]} ba @param {number[]} bb */
 export function unionBbox(ba, bb) {
   return [
     Math.min(ba[0], bb[0]),
@@ -210,7 +220,8 @@ export function crossBlockMerges(blocks) {
 export function mergePlan(blocks) {
   const drop = new Set();
   const keep = new Map();
-  for (const m of crossBlockMerges(blocks)) {
+  // `blocks` 声明可空（调用方传入 undefined 表示无块）—— 显式兜空，不让 `?` 变成运行时崩溃
+  for (const m of crossBlockMerges(blocks ?? [])) {
     if (!m.merged) continue; // 命中但无法合并 → 两块都原样渲染，不丢弃、不保留
     drop.add(m.dropI);
     keep.set(m.keepI, { text: m.text, bbox: m.bbox });

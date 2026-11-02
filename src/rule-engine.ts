@@ -10,11 +10,16 @@
  */
 import { layoutPage } from "./layout.js";
 import {
+  bandOrdinal,
+  hasTextbookSource,
+  isBandSubheading,
   isPageFurniture,
+  isPageNoiseLine,
   looksLikeAnswerEntry,
   matchAnswerEntry,
   matchBoxListItem,
   matchFirstLine,
+  matchGluedQuestionNumber,
   nextKey,
   splitConjoinedOptions,
   startsWithQuestionNumber,
@@ -22,6 +27,8 @@ import {
   stripQuestionPrefix,
 } from "./patterns.js";
 import type {
+  Band,
+  BBox,
   ImageRef,
   IndexedBlock,
   Option,
@@ -62,6 +69,8 @@ interface Draft {
   /** 选项键前向断裂（期待 A/B 却先出现 C/D）：组不完整，多半是上游漏检 */
   optGap: boolean;
   images: ImageRef[];
+  /** 本题目区域内出现的表格（`kind:"table"` 块归属而来，DECISIONS §76） */
+  tables: { html: string; bbox: BBox; pageIndex: number }[];
   blockIndexes: number[];
   pageIndex: number;
   firstLineOfQuestion: string;
@@ -98,6 +107,7 @@ export function segmentWithRules(doc: ParsedDocument): SegmentationResult {
   }
   mergeAnswers(ctx);
   flagDuplicateNumbers(ctx);
+  flagSectionContinuity(ctx, questions);
   return ctx.result(questions);
 }
 
@@ -122,6 +132,8 @@ class Ctx {
     formulaBlocks: 0,
     /** 行内公式对数（$...$ 出现对数，同样纳入抽检分母） */
     inlineFormulas: 0,
+    /** 按「题号黏正文」规则切出的题数（DECISIONS §77；0 表示本册没有这种形态） */
+    gluedQuestions: 0,
     columnsPerPage: [] as number[],
   };
 
@@ -151,6 +163,39 @@ class Ctx {
   private chapterTitle = "";
   private sectionNo = "";
   private section = "";
+  /** 教材知识萃取参考区：区内「1./2./3.」是表格/参考内容，不是题目（2026-10-29 新书实测） */
+  private extractBand = false;
+  /**
+   * 当前所处的**教辅栏目板块**标题（`教材实验 10 …` / `教材素材变式 …` / `教材知识 N …`）；
+   * 空串 = 不在板块内。用于抑制板块内的知识编号被当成题号（`DECISIONS §78`）。
+   * 遇到章/节标题或卷尾即清空。
+   */
+  private bandTitle = "";
+  /** 教辅栏目板块条目（`DECISIONS §78`）；由 `buildBands()` 在收尾时统一生成 */
+  private bands: Band[] = [];
+  /** 板块边界标记（按全局块序）：`band` 开板块、`end` 关板块 */
+  private bandMarks: { index: number; type: "band" | "end"; title?: string }[] = [];
+  /** 全局块索引 → (页, 页内下标, 文本)，供板块条目按页归组 */
+  private blockSlots = new Map<number, { page: number; within: number; text: string }>();
+  /** 每页已处理块数（算页内下标用） */
+  private pageSeen = new Map<number, number>();
+
+  /**
+   * 板块头**待开题**（`DECISIONS §79`）：`教材实验 10 …` 这类栏目，整块可能本身就是一道大题
+   * （题号印在栏目名里），也可能栏目内还有自己的 `1. 2.` 编号。
+   *
+   * 为什么延迟开题、而不是见到栏目头就开：机械能守恒 p13 的「教材实验7」下面紧跟真题
+   * `1小天同学用如图1所示的实验装置进行实验。`（`§77` 切出来的）。若栏目头先开一道「第 7 题」，
+   * 就会多出一道空题、题号序列变成 7 → 1（同组不连续，N4 报红）。
+   * ⇒ 收集到第一个**真实题号**时放弃开题；整块都没有题号时，才用栏目序号开题。
+   */
+  private pendingBand: {
+    title: string;
+    ordinal: string | null;
+    entry: IndexedBlock;
+    blockIndexes: number[];
+    texts: string[];
+  } | null = null;
   /** 章/节标题时间线（按 (页, y) 排序）—— 见 buildHeadingTimeline */
   private headings: {
     page: number;
@@ -225,6 +270,45 @@ class Ctx {
       return;
     }
 
+    // **板块归组记账**（`DECISIONS §78`）：只记录 (页, 页内下标, 文本)，不改任何切题判定。
+    // 页内下标按「本页已处理块数」递增 —— 与 `stages.json` 的 `pages[].blocks` 同序
+    // （两者都走 `layoutPage()` 的阅读顺序）。答案区块不记账：板块不会跨进答案区。
+    const withinPage = this.pageSeen.get(entry.pageIndex) ?? 0;
+    this.pageSeen.set(entry.pageIndex, withinPage + 1);
+    this.blockSlots.set(blockIndex, {
+      page: entry.pageIndex,
+      within: withinPage,
+      text: block.kind === "text" || block.kind === "table" ? block.text : "",
+    });
+    // 待开题的板块头：把它之后的块先攒起来（开题时一次性归给题目；放弃开题时块仍在快照里）
+    if (this.pendingBand) {
+      this.pendingBand.blockIndexes.push(blockIndex);
+      if (block.kind === "text") this.pendingBand.texts.push(block.text);
+    }
+
+    /**
+     * **表格块**（`DECISIONS §76`）：只归属当前题，**不参与任何题号/选项判定**。
+     * 为什么必须在这里提前 return：表格块有 `firstLine`，若落到下面的 `matchFirstLine`
+     * 就会被当正文甚至切出新题 —— 切题结果必须与改动前逐字节一致，这是本特性的硬约束。
+     * 归属不到题时**不静默**：记 ReviewNote（实验题黏连题号导致整页 0 题时会出现，
+     * 见 HANDOFF §6-26）。
+     */
+    if (block.kind === "table") {
+      const html = block.html ?? "";
+      if (!this.current) {
+        this.review(blockIndex, "悬空表格：归属不到任何题目（本页无进行中的题）", null);
+        return;
+      }
+      this.current.tables.push({ html, bbox: block.bbox, pageIndex: this.current.pageIndex });
+      this.current.blockIndexes = [...this.current.blockIndexes, blockIndex];
+      return;
+    }
+
+    // 页内噪声块：答案标记（如 `[答案 P014]`）与被拆出的孤立括号 `()`。
+    // 它们不是正文，但可能出现在页面中部（顶部家具守卫管不到），会粘进题干/选项。
+    // 只跳过**整块恰好是**这些形态的块，不做子串删除，避免误伤正文。
+    if (block.kind === "text" && isPageNoiseLine(block.text)) return;
+
     // 方框列表状态防滞留：距上次方框条目超过 BOX_LIST_MAX_IDLE 个块即失效。
     // 为什么需要：状态要跨页存活（实测该方框从 p15 底跨到 p16 顶），所以不能用页界清；
     // 上限取「实测最大间隔 5 个块」的 2.4 倍，既容得下真实间隔，又不会长期滞留。
@@ -256,7 +340,57 @@ class Ctx {
       return;
     }
 
-    const m = matchFirstLine(block.firstLine);
+    /**
+     * 期望题号（供「徽标题号」弱信号守卫用，`DECISIONS §97`）：
+     * 有当前题 ⇒ 上一题 + 1；无当前题（首题 / 刚过年节标题）⇒ null（不施加守卫）。
+     * 注意与下方「黏连通道」的期望值**不同**：那里无当前题时取 `1`（节内题号重启），
+     * 属于"主动认题"；这里取 null 属于"不拦"，两者语义不同，故不合并。
+     */
+    const expectedNext =
+      this.current && /^\d{1,2}$/.test(this.current.number)
+        ? Number(this.current.number) + 1
+        : null;
+    const m = matchFirstLine(block.firstLine, expectedNext);
+
+    /**
+     * **题号黏正文**（`DECISIONS §77`）：`2为了减少阻力…` —— 数字紧跟汉字，无分隔符。
+     * 只在「形状完全没匹配上 + 序号恰好接上一题」时才认，判据见
+     * `patterns.ts` 的 `matchGluedQuestionNumber`。
+     * 为什么要在这里补：实验题整类切不出来（含实验标记 8 页里 5 页 0 题），
+     * 而实验题的题号常常就长这样。
+     */
+    if (m.kind === "other" && !this.extractBand && !this.boxList) {
+      /**
+       * 期望题号：
+       * - 有当前题 ⇒ 上一题 + 1（序号连续，最强的信号）；
+       * - **无当前题**（刚过章/节标题，或本册首题）⇒ 只认 `1`（节内题号从 1 重启）。
+       *   少了这条，节边界上的黏连题号（`1小天同学用如图1所示…`）永远切不出来。
+       */
+      const expected = this.current
+        ? /^\d{1,2}$/.test(this.current.number)
+          ? Number(this.current.number) + 1
+          : null
+        : 1;
+      // 板块内的知识小标题不能走黏连通道（`DECISIONS §78`）：
+      // `1伏安法测电源电动势和内阻` 与真题 `1小天同学用如图1所示…` 形状同族，
+      // 靠 isBandSubheading 的「有句读即不是小标题」区分 —— 后者带句号，仍然切题。
+      const glued =
+        this.bandTitle && isBandSubheading(block.text)
+          ? null
+          : matchGluedQuestionNumber(block.firstLine, expected);
+      if (glued !== null) {
+        this.settleOptions(null);
+        // 黏连通道也是**真实题号**：板块内有它 ⇒ 放弃用栏目序号开题（机械能 p13 `1小天同学…`）
+        this.pendingBand = null;
+        // 剥掉行首题号（`2为了…` → `为了…`），其余文本原样进题干
+        const stripped = block.firstLine.trimStart().replace(/^\d{1,2}/, "");
+        const restText = block.text.trimStart().replace(/^\d{1,2}/, "");
+        this.openDraft(glued, { text: restText }, entry);
+        this.stats.gluedQuestions = (this.stats.gluedQuestions ?? 0) + 1;
+        this.review(blockIndex, `题号黏正文：按「第 ${glued} 题」切分（原行「${stripped.slice(0, 24)}…」）`, this.current);
+        return;
+      }
+    }
 
     // 方框内编号列表的锚点 `▶1. …`（方法技巧/易错警示方框）：记下起始编号，
     // 后续「序号恰好 +1」的行按方框条目处理（见 patterns.ts 的 BOX_LIST_BULLET）。
@@ -266,7 +400,24 @@ class Ctx {
 
     switch (m.kind) {
       case "answer_zone": {
-        // 参考答案区：试题流终止，之后只解析答案条目
+        // 参考答案区：试题流终止，之后只解析答案条目。
+        //
+        // 试题流终止 = 板块终止（`DECISIONS §79`）：挂着待开题的板块必须在此结算，
+        // 否则它会一路攒到 finish()，把整个答案区文本吞进假题干。
+        this.settlePendingBand();
+        // **位置守卫（2026-10-29）**：切进 answers 模式是**不可逆**的破坏性状态变化，
+        // 而「答案及解析」这类词形在**封面/扉页/页脚**上同样出现（本册页脚就是它）。
+        // 没有已收题目就切换，等于把整册正文判成答案续行 —— 实测《答案册-合订本》
+        // p0 封面标题一命中就 0 题（A/B 实测：503→0）。
+        // ⇒ 要求「已有题目」才允许切换；否则只记 review，不改状态。
+        if (this.questions.length === 0 && !this.current) {
+          this.review(
+            blockIndex,
+            `答案区标题出现在首题之前（疑似封面/扉页），不切换状态：「${block.firstLine.trim()}」`,
+            null,
+          );
+          return;
+        }
         this.settleOptions(null);
         this.current = null;
         this.boxList = null;
@@ -283,6 +434,10 @@ class Ctx {
         this.chapterTitle = m.title ?? "";
         this.sectionNo = "";
         this.section = "";
+        this.extractBand = false;
+        this.bandTitle = "";
+        this.settlePendingBand();
+        this.bandMarks.push({ index: blockIndex, type: "end" });
         return;
       }
       case "section": {
@@ -290,8 +445,30 @@ class Ctx {
         this.settleOptions(null);
         this.current = null;
         this.boxList = null;
+        // **教辅栏目板块头**（`教材实验 10 …` 等）不是节：它没有节号，
+        // 若照节处理会把 sectionNo 清成空串、把 section 覆盖成栏目名，
+        // 而节号参与「题号唯一键」⇒ 后面同号题会跨节错配（`DECISIONS §78`）。
+        if (m.band) {
+          this.settlePendingBand();
+          this.bandTitle = (m.title ?? block.text).trim();
+          this.bandMarks.push({ index: blockIndex, type: "band", title: this.bandTitle });
+          this.extractBand = /^教材知识萃取/.test(block.text.trim());
+          // 挂起：先不开题，等这个板块里出现第一个真实题号（有则放弃）或板块结束（无则开题）
+          this.pendingBand = {
+            title: this.bandTitle,
+            ordinal: bandOrdinal(this.bandTitle),
+            entry,
+            blockIndexes: [blockIndex],
+            texts: block.kind === "text" ? [block.text] : [],
+          };
+          return;
+        }
+        this.bandTitle = "";
+        this.settlePendingBand();
+        this.bandMarks.push({ index: blockIndex, type: "end" });
         this.sectionNo = m.captured || (m.indexNumeral ?? "");
         this.section = block.text.trim();
+        this.extractBand = /^教材知识萃取/.test(block.text.trim());
         return;
       }
       case "sub_question": {
@@ -306,6 +483,27 @@ class Ctx {
         return;
       }
       case "question_no": {
+        if (this.extractBand && !hasTextbookSource(block.text)) {
+          // 萃取区内**带教材出处标注**的是真题（`DECISIONS §84`）：
+          // 一刀切抑制会把真题一起丢掉（实测机械能 p7 丢 2 道），所以按标注放行。
+          this.review(blockIndex, `教材知识萃取栏内的编号条目「${m.captured}.」不是题目（参考表格内容）`, this.current);
+          return;
+        }
+        // **教辅栏目板块内的知识编号**不是题号（`DECISIONS §78`）：
+        // 原卷上 `1. 游标卡尺` / `2. 螺旋测微器` 是讲解条目（后跟【工作原理】【读数方法】），
+        // 被切成题会让题库混进假题、同组题号重号，且最后一道假题会跨页吞掉 p7/p9/p10 的正文。
+        // 判据见 `patterns.isBandSubheading`（最严 AND，宁可漏判）。
+        // 不丢内容：块照常并入当前题；无当前题时块仍在快照 blocks 里（成品页照旧按块渲染）。
+        if (this.bandTitle && isBandSubheading(block.text)) {
+          this.settleOptions(null);
+          this.appendToCurrent(block.text, blockIndex);
+          this.review(
+            blockIndex,
+            `教辅栏目「${this.bandTitle}」内的编号条目「${m.captured}.」不是题目（知识小标题，非题干）`,
+            this.current,
+          );
+          return;
+        }
         // **方框守卫**：`▶N.` 锚点之后、序号恰好 +1、且**不像答案条目**的行，
         // 是方框内的编号条目（不是题）。判据最严（AND 三条件），且**不静默**：
         // 记 ReviewNote，文本并入当前题（不丢内容）。
@@ -329,6 +527,8 @@ class Ctx {
         }
         this.boxList = null;
         this.settleOptions(null);
+        // 板块内出现了真实题号 ⇒ 该板块本来就有自己的编号，**放弃**用栏目序号开题
+        this.pendingBand = null;
         this.openDraft(m.captured, block, entry);
         return;
       }
@@ -493,6 +693,7 @@ class Ctx {
       optEvidence: false,
       optGap: false,
       images: [],
+      tables: [],
       blockIndexes: [entry.index],
       pageIndex: entry.pageIndex,
       firstLineOfQuestion: block.text.trim().slice(0, 60),
@@ -521,6 +722,7 @@ class Ctx {
 
   finish(): void {
     this.settleOptions(null);
+    this.settlePendingBand();
   }
 
   /**
@@ -536,12 +738,81 @@ class Ctx {
     }
   }
 
+  /**
+   * 板块结束：整块没有出现过真实题号 ⇒ 把栏目本身开成一道题（`DECISIONS §79`）。
+   * 题号取栏目序号（`教材实验 10` → `"10"`），并**强制新编号组** ——
+   * 它不是同册的「第 10 题」，不该排在前面真题号序列里（否则 N4「组内不连续」报红）。
+   */
+  private settlePendingBand(): void {
+    const p = this.pendingBand;
+    this.pendingBand = null;
+    if (!p || !p.ordinal) return;
+    const ordinal = p.ordinal;
+    this.sectionSeq++;
+    this.groupHasQuestions = false;
+    this.openDraft(ordinal, { text: p.title }, p.entry);
+    const cur = this.current;
+    if (!cur) return;
+    this.settleOptions(null);
+    cur.blockIndexes = [...new Set([...p.blockIndexes, ...cur.blockIndexes])];
+    // 噪声块（`答案 P049]` 之类）不进题干 —— 走的是与 process() 同一份判据
+    const extra = p.texts.filter((t) => t.trim() && t.trim() !== p.title.trim() && !isPageNoiseLine(t));
+    if (extra.length) cur.stemParts = [p.title, ...extra];
+    this.review(
+      p.entry.index,
+      `栏目「${p.title}」整块无可识别题号 ⇒ 按栏目序号开为第 ${ordinal} 题（自成一组，不占同册真题号序）`,
+      cur,
+    );
+  }
+
+  /**
+   * 由 `bandMarks` 切出板块区间并生成 `Band`（`DECISIONS §78`）。
+   *
+   * 区间 = [本板块头块, 下一个结构头块)。区间内的块**全部**归本板块 —— 包括被题目
+   * 认领的块：板块只回答「这一段属于哪个栏目」，不与题目争所有权。
+   * 跨页的板块按页拆成多条、共享 `bandKey`（快照与 viewer 都按页消费）。
+   */
+  private buildBands(): Band[] {
+    const out: Band[] = [];
+    let seq = 0;
+    for (let i = 0; i < this.bandMarks.length; i++) {
+      const m = this.bandMarks[i]!;
+      if (m.type !== "band") continue;
+      // 上界：下一个结构头；没有后继标记时用「本册块总数」收口
+      // （不能用 MAX_SAFE_INTEGER —— 那会让循环从板块头一路跑到无穷大，实测直接把进程跑死）
+      const stop = this.bandMarks[i + 1]?.index ?? this.stats.totalBlocks;
+      const bandKey = `${this.doc.docId}:band${++seq}`;
+      const byPage = new Map<number, { idx: number[]; text: string[] }>();
+      for (let g = m.index; g < stop; g++) {
+        const slot = this.blockSlots.get(g);
+        if (!slot) continue;
+        const bucket = byPage.get(slot.page) ?? { idx: [], text: [] };
+        bucket.idx.push(slot.within);
+        if (slot.text) bucket.text.push(slot.text);
+        byPage.set(slot.page, bucket);
+      }
+      for (const [page, b] of [...byPage.entries()].sort((a, z) => a[0] - z[0])) {
+        out.push({
+          id: `${bandKey}:p${page}`,
+          bandKey,
+          title: m.title ?? "",
+          pageIndex: page,
+          blockIndexes: b.idx,
+          text: b.text.join("\n"),
+          status: "needs_review",
+        });
+      }
+    }
+    return out;
+  }
+
   result(questions: Question[]): SegmentationResult {
     this.stats.questions = questions.length;
     this.stats.reviewCount = this.reviews.length;
     return {
       docId: this.doc.docId,
       questions,
+      bands: this.buildBands(),
       reviews: this.reviews,
       stats: this.stats,
       answerEntries: this.answers,
@@ -568,6 +839,7 @@ function buildQuestion(d: Draft, ctx: Ctx): Question {
     stem: d.stemParts.join("\n").trim(),
     options: d.options,
     images: d.images,
+    ...(d.tables.length ? { tables: d.tables } : {}),
     source: {
       file: ctx.doc.docId,
       pageIndex: d.pageIndex,
@@ -606,6 +878,94 @@ function mergeAnswers(ctx: Ctx): void {
         snippet: entry.text.slice(0, 40),
       });
     }
+  }
+}
+
+/**
+ * 题号断档判定结果（纯数据，供测试直接断言）。
+ */
+export interface NumberGap {
+  sectionSeq: number;
+  questionId: string;
+  /** 按「节内应从 1 递增」推得的期望题号 */
+  expected: number;
+  /** 实际题号 */
+  actual: number;
+  /** skip = 跳号（疑似漏切 N 题）；back = 回退（疑似漏切或误切） */
+  kind: "skip" | "back";
+  /** 题干前缀，便于人工按清单回查 */
+  snippet: string;
+}
+
+/**
+ * **节内题号断档判定**（纯函数：不读 Ctx、不产生副作用，测试可直接调）。
+ *
+ * 判据：同一 `sectionSeq` 内，题号必须 `1,2,3,…` 严格递增。
+ * 为什么这条成立而不与「每页重排题号」冲突：
+ * 题号回到 `1` 时 `Ctx.openDraft` 已经 `sectionSeq++`（`rule-engine.ts` 约 663 行），
+ * 所以**同一 sectionSeq 内出现非 +1 即为异常**，不需要再判"是不是小节重启"。
+ *
+ * 为什么需要它：`flagDuplicateNumbers` **按页**查重（理由是每页重排题号），
+ * 但漏题常发生在跨页处 —— 实测《电路》p4→p5 序列 `1,2,3,4,2,3`，
+ * 两道重复题分处两页 ⇒ 按页查重看不见，而漏题本身也无人发现
+ * （`tmp/docx-probe/电路-比对报告.md`，三源确证该题整题丢失）。
+ *
+ * 每组只报**第一处**断档：一处断档之后整段序列位移，逐条报会刷屏。
+ */
+export function sectionNumberGaps(questions: Question[]): NumberGap[] {
+  const groups = new Map<number, Question[]>();
+  for (const q of questions) {
+    const list = groups.get(q.sectionSeq) ?? [];
+    list.push(q);
+    groups.set(q.sectionSeq, list);
+  }
+  const out: NumberGap[] = [];
+  for (const [sectionSeq, group] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+    const ordered = [...group].sort(
+      (a, b) => (a.source.blockIndexes[0] ?? 0) - (b.source.blockIndexes[0] ?? 0),
+    );
+    // 基准 = **组内首题**，不从 1 起：夹具/片段可能从任意题号开始
+    // （实测既有 6 个端到端用例的首题不是 1，从 1 起判会直接误报 6 条）。
+    // 代价：组内**首题**被漏切时查不出（首题 2 与"从 2 开始的片段"不可区分）。
+    // 按 L2 纪律「宁可漏判也不能误判」，取此口径。
+    let prev: number | null = null;
+    for (const q of ordered) {
+      const n = Number.parseInt(q.number, 10);
+      if (!Number.isInteger(n)) continue; // 汉字大题（一、二、）等非数字题号，另行判据
+      if (prev !== null && n !== prev + 1) {
+        out.push({
+          sectionSeq,
+          questionId: q.id,
+          expected: prev + 1,
+          actual: n,
+          kind: n > prev + 1 ? "skip" : "back",
+          snippet: q.stem.slice(0, 40) || q.number,
+        });
+        break;
+      }
+      prev = n;
+    }
+  }
+  return out;
+}
+
+/**
+ * 把题号断档写成 `ReviewNote`。
+ *
+ * **只报警，不扣分、不改 status**：该信号是新增的检测层，先看清单规模再决定是否纳入置信度。
+ * 一旦扣分（−0.3 ⇒ 1.0→0.7 < 0.75）会让全库数十道题直接落 `needs_review`，
+ * 在清单未经人工校核前，那是把"漏题"换成"噪声"，属换一种静默。
+ */
+function flagSectionContinuity(ctx: Ctx, questions: Question[]): void {
+  for (const g of sectionNumberGaps(questions)) {
+    const kindText = g.kind === "skip" ? "跳号" : "回退";
+    const hint = g.kind === "skip" ? `，疑似漏切 ${g.actual - g.expected} 题` : "，疑似漏切或误切";
+    ctx.reviews.push({
+      questionId: g.questionId,
+      reason: `题号断档（${kindText}）：第 ${g.sectionSeq} 号组内期望 #${g.expected}，实际 #${g.actual}${hint}`,
+      blockIndex: -1,
+      snippet: g.snippet,
+    });
   }
 }
 

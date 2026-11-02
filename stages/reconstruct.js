@@ -1,3 +1,6 @@
+// 类型权威检查器：`tsconfig.viewer.json`（checkJs:true + DOM lib）。本文件是 DOM 代码，
+// **不要**加 `// @ts-check` —— 主 `tsconfig.json` 的 lib 没有 DOM，一旦本文件被 TS 测试 import
+// 进主程序，`HTMLElement` / `document` 会被判成未知名字（DECISIONS §95）。
 /**
  * reconstruct.js —— 「按原坐标重建纸面」的共享渲染器（展示层；DOM 构造 + 纯函数消费）
  *
@@ -17,12 +20,36 @@ import { baseFontOfPage, clampByWidth, fontForBlock, isVerticalText } from "./fo
 import { contentLabelPlacements } from "./uncovered-layout.js";
 import { mergePlan } from "./block-dedup.js";
 import { stackContents, tagStackPlacements } from "./tag-layout.js";
+import { parseTableHtml } from "./table-html.js";
+
+/**
+ * 本渲染器消费的快照形状（只声明**读过**的字段，不追求与引擎 schema 完全一致）：
+ * - `Block` / `Uncovered` / `OcrItem` 来自 `stages.json` 的页内数据；
+ * - `PageQuestion` 是页内 `questions[]`（`blocks` 是块下标，不是块对象）；
+ * - `RenderOpts` 是 `renderPaper` 的选项。
+ * @typedef {[number, number, number, number]} Rect
+ * @typedef {{ i: number, kind?: string, bbox: number[], text?: string, html?: string, img?: string, dtype?: string, ocr?: boolean, correction?: boolean }} Block
+ * @typedef {{ bbox: number[], area: number, kind?: string }} Uncovered
+ * @typedef {{ bbox: number[], win?: number[], text?: string, source?: string, accepted?: boolean, ratio?: number, crop?: string, raw?: string }} OcrItem
+ * @typedef {{ id: string, number: string, blocks: number[], startsHere?: boolean }} PageQuestion
+ * @typedef {{ width: number, height: number, blocks: Block[], questions: PageQuestion[], columns?: number, discarded?: Block[], uncovered?: Uncovered[], ocrFill?: OcrItem[] }} Page
+ * @typedef {{ text: string, short: string, name: string, color: string }} TagLike
+ * @typedef {{ key: string, q: PageQuestion, tags: TagLike[], side: "left" | "right", topPx: number }} TagEntry
+ * @typedef {{ doc?: string, paneW: number, diagnostics?: boolean, candidateStyle?: boolean, onChipClick?: ((q: PageQuestion, p: Page) => void) | null, resolveTags?: ((q: PageQuestion, p: Page) => TagLike[] | null) | null, ocrFill?: boolean, assignmentBadge?: ((q: PageQuestion, p: Page) => { topics: number, categories: number } | null) | null }} RenderOpts
+ * @typedef {import("./table-html.js").ParsedTable} ParsedTable
+ */
 
 /** 阶段 1–5 的画布像素宽（与 CSS --canvas-w 一致，用于字号换算） */
 export const CANVAS_W = 760;
 /** 纸面外侧留给题号牌的留白宽度（号牌绝不压正文，见 renderPaper） */
 export const GUTTER = 22;
 
+/**
+ * @param {string} tag
+ * @param {string} [cls]
+ * @param {string} [text]
+ * @returns {HTMLElement}
+ */
 export const el = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -34,12 +61,24 @@ export const enc = encodeURIComponent;
 
 /* ── 画布与块 ── */
 
+/**
+ * @param {Pick<Page, "width" | "height">} p
+ * @returns {HTMLDivElement}
+ */
 export function paperCanvas(p) {
-  const c = el("div", "canvas");
+  const c = /** @type {HTMLDivElement} */ (el("div", "canvas"));
   c.style.aspectRatio = `${p.width} / ${p.height}`;
   return c;
 }
 
+/**
+ * @template {HTMLElement} T
+ * @param {T} node
+ * @param {number[]} bbox
+ * @param {number} w
+ * @param {number} h
+ * @returns {T}
+ */
 export function posStyle(node, bbox, w, h) {
   const [x0, y0, x1, y1] = bbox;
   node.style.left = `${(x0 / w) * 100}%`;
@@ -49,25 +88,190 @@ export function posStyle(node, bbox, w, h) {
   return node;
 }
 
+/**
+ * **挂载后实测适配**（`DECISIONS §76`）：表格内容比框高就把字号往下收，直到装得下。
+ *
+ * 为什么不在建节点时算：`tableNode` 执行时节点还没进文档，`clientHeight` 是 0，
+ * 量不到真实高度。而纯估算（字符数 / 渲染宽度）**永远偏保守** —— 实测把表格字号压到
+ * 正文的 0.45 倍（原卷里表格字与正文接近同号），用户当场指出「这肯定不会有这么小的字」。
+ * ⇒ 初始用页面正文字号，挂载后用真实布局收缩，取到「装得下的最大值」。
+ *
+ * 只缩不放：字号已经由 `fontForBlock` 按页面口径定过，放大就不再忠实。
+ */
+/**
+ * @param {HTMLElement | null | undefined} root
+ */
+export function fitTables(root) {
+  const nodes = root?.querySelectorAll ? root.querySelectorAll(".blk-table") : [];
+  for (const rawNode of nodes) {
+    const node = /** @type {HTMLElement} */ (rawNode);
+    const table = /** @type {HTMLTableElement | null} */ (node.querySelector("table"));
+    if (!table || typeof node.clientHeight !== "number" || node.clientHeight <= 0) continue;
+    let fs = parseFloat(table.style.fontSize) || 12;
+    let guard = 0;
+    while (node.scrollHeight > node.clientHeight + 1 && fs > 6 && guard++ < 60) {
+      fs = Math.max(6, fs - 0.25);
+      table.style.fontSize = `${fs}px`;
+    }
+  }
+}
+
+/** 表格节点：按块 bbox 落位，内部按上游 HTML 的行/列画真网格（`DECISIONS §76`）。
+ *
+ * 为什么用内联样式：`stages/` 与 `final/` 各有自己的 CSS，但**共用本渲染器**。
+ * 把表格样式写成内联，能保证两处一定长得一样（红线「纸面重建只此一处实现」）。
+ *
+ * 解析不出行时返回 null ⇒ 调用方退回普通文本渲染（**不丢内容**）。
+ */
+/**
+ * 单元格文本的**渲染宽度估计**（单位 em，`DECISIONS §76`）。
+ *
+ * 为什么不能按字符数：`$P_{总}=EI=P_{出}+P_{内}$` 在源码里有 20 个字符，渲染出来只有
+ * 约 2em 宽。按字符数会把行数严重高估 ⇒ 字号被压到 6–8px（2026-10-29 用户对照原书指出
+ * 「这肯定不会有这么小的字」，实测确实只有原卷的 1/2 左右）。
+ *
+ * 口径：中文 1em、西文/数字 0.55em、其余标点 0.4em、行内公式整体约 2.2em。
+ * 仍是估计，但误差方向从「系统性高估」变成「大致相当」。
+ */
+/**
+ * @param {unknown} s
+ * @returns {number}
+ */
+export function textWidthEm(s) {
+  let em = 0;
+  for (const part of String(s ?? "").split(/(\$[^$]*\$)/)) {
+    if (!part) continue;
+    if (part.startsWith("$") && part.endsWith("$") && part.length > 1) {
+      em += 2.2;
+      continue;
+    }
+    for (const ch of part) {
+      if (/[\u4e00-\u9fa5]/.test(ch)) em += 1;
+      else if (/[A-Za-z0-9]/.test(ch)) em += 0.55;
+      else if (/\s/.test(ch)) em += 0.3;
+      else em += 0.4;
+    }
+  }
+  return em;
+}
+
+/**
+ * 按内容给每列分配宽度比例（`DECISIONS §76`）。
+ *
+ * 为什么不用等宽：`table-layout:fixed` 默认等分，但教辅表格列宽差异极大
+ * （「电源的总功率」很窄、公式列很宽）。等分会让宽列内容挤成很多行 ⇒ 纵向溢出
+ * ⇒ 只能靠缩字号解决 ⇒ 字小到看不清。按内容长度分配后，同样高度能装下更大字号。
+ *
+ * 口径：每列取「该列所有单元格的字符数 / colspan」的最大值，再归一化成百分比。
+ * 纯确定性（只看文字量），不猜语义。
+ */
+/**
+ * @param {ParsedTable["rows"]} rows
+ * @param {number} cols
+ * @returns {number[]}
+ */
+export function tableColWidths(rows, cols) {
+  if (!rows.length || cols <= 0) return [];
+  const chars = new Array(cols).fill(1);
+  for (const r of rows) {
+    let c = 0;
+    for (const cell of r.cells) {
+      const per = Math.max(1, textWidthEm(cell.text)) / cell.colspan;
+      for (let k = 0; k < cell.colspan && c + k < cols; k++) chars[c + k] = Math.max(chars[c + k], per);
+      c += cell.colspan;
+    }
+  }
+  const total = chars.reduce((a, b) => a + b, 0) || 1;
+  // 下限 8%：太窄的列会把字挤成竖排，反而更高
+  const raw = chars.map((n) => Math.max(8, (n / total) * 100));
+  const sum = raw.reduce((a, b) => a + b, 0);
+  return raw.map((n) => (n / sum) * 100);
+}
+
+/**
+ * @param {Block} b
+ * @param {Page} p
+ * @param {number} [canvasW]
+ * @param {number | null} [baseFont]
+ * @param {string} [doc]
+ * @returns {HTMLElement | null}
+ */
+export function tableNode(b, p, canvasW = CANVAS_W, baseFont = null, doc = "") {
+  if (!b.html) return null;
+  const { rows, cols } = parseTableHtml(b.html);
+  if (!rows.length) return null;
+  const node = posStyle(el("div", "blk blk-table kind-table"), b.bbox, p.width, p.height);
+  node.title = "上游表格（按 spans[].html 的 rowspan/colspan 还原网格）";
+  // 初始用**页面正文字号**（表格字与原卷正文接近同号，2026-10-29 对照原卷实测）。
+  // ⚠️ 不能用 `clampByWidth`：它是「一行文字宽度 vs 块宽」的夹子，而表格块的 `text` 是
+  // **整表压平文本**（几十上百字），会被当成超长单行 ⇒ 字号被夹到 3–7px（实测表9 只剩 3.4px）。
+  // 表格的宽度约束由 `tableColWidths` + 单元格换行负责，高度约束由 `fitTables` 实测负责。
+  const size = baseFont || fontForBlock(b, p.width, canvasW, baseFont, p.blocks) || 12;
+  const widths = tableColWidths(rows, cols);
+  const table = el("table");
+  // ⚠️ `white-space:normal` 是必须的：`.blk` 全局 `white-space:nowrap`（行级块按原坐标排一行），
+  // 表格继承它就不换行 ⇒ 单元格内容溢出、被 `.canvas{overflow:hidden}` 裁掉右半边
+  // （2026-10-29 首轮截图实测：第三列文字全部被切）。
+  table.style.cssText = `width:100%;height:100%;border-collapse:collapse;table-layout:fixed;white-space:normal;font-size:${size}px;line-height:1.15;`;
+  const colgroup = el("colgroup");
+  for (const w of widths) {
+    const col = el("col");
+    col.style.width = `${w.toFixed(2)}%`;
+    colgroup.append(col);
+  }
+  table.append(colgroup);
+  for (const r of rows) {
+    const tr = el("tr");
+    for (const cell of r.cells) {
+      const td = /** @type {HTMLTableCellElement} */ (el("td"));
+      if (cell.rowspan > 1) td.rowSpan = cell.rowspan;
+      if (cell.colspan > 1) td.colSpan = cell.colspan;
+      td.style.cssText = "border:1px solid rgba(0,0,0,.35);padding:1px 3px;vertical-align:top;white-space:normal;word-break:break-word;overflow-wrap:anywhere;";
+      td.innerHTML = prettifyLatex(cell.text);
+      // 单元格里的插图（上游 `<img src>`）：表格里的曲线图/示意图不能丢（对照原卷 2026-10-29）
+      for (const name of cell.images ?? []) {
+        const img = /** @type {HTMLImageElement} */ (el("img"));
+        img.src = `/data/out/${enc(doc)}/images/${enc(name)}`;
+        img.alt = "表格内插图";
+        img.style.cssText = "max-width:100%;max-height:100%;object-fit:contain;display:block;margin:2px 0;";
+        td.append(img);
+      }
+      tr.append(td);
+    }
+    table.append(tr);
+  }
+  node.append(table);
+  return node;
+}
+
 /** 行级块节点（各阶段与对比/成品共用；canvasW 为画布像素宽，用于字号换算）
  *  mergeCtx：本页「同页块级重复」的**并集合并**上下文（block-dedup.js，判据只此一处定义）：
  *   - `drop`：被合并掉的块（其内容已进合并文本）→ 返回 null，调用方跳过（**不丢内容**）；
  *   - `keep`：承载块 → 用**合并文本**与两块 **bbox 并集**渲染（更接近原卷该行真实范围）。
  *  返回 null 表示该块不渲染。 */
+/**
+ * @param {Block} b
+ * @param {Page} p
+ * @param {number} [canvasW]
+ * @param {number | null} [baseFont]
+ * @param {{ drop: Set<number>, keep: Map<number, { text: string, bbox: number[] }> } | null} [mergeCtx]
+ * @param {string} [doc]
+ * @returns {HTMLElement | null}
+ */
 export function blockNode(b, p, canvasW = CANVAS_W, baseFont = null, mergeCtx = null, doc = "") {
   if (mergeCtx?.drop.has(b.i)) return null;
   const m = mergeCtx?.keep.get(b.i);
   const blk = m ? { ...b, text: m.text, bbox: m.bbox } : b;
   const node = posStyle(el("div", `blk blk-line kind-${blk.kind}`), blk.bbox, p.width, p.height);
-  node.title = m ? `${blk.text} ｜（上游把本行读成两个重叠块，已合并）` : blk.text;
+  node.title = m ? `${blk.text} ｜（上游把本行读成两个重叠块，已合并）` : (blk.text ?? "");
   if (blk.kind === "image" && blk.img) {
-    const img = el("img");
+    const img = /** @type {HTMLImageElement} */ (el("img"));
     img.src = `/data/out/${enc(doc)}/images/${enc(blk.img)}`;
     img.alt = "图片块";
     node.append(img);
   } else {
     // prettifyLatex 返回 HTML 片段（\frac 竖排分式 / \sqrt 带上划线根号），必须 innerHTML
-    const html = prettifyLatex(blk.text);
+    const html = prettifyLatex(blk.text ?? "");
     const txt = el("span", "txt");
     txt.innerHTML = html;
     // 宽度安全上限（R3/R5）：行高模型对个别行（页眉页脚/计划用时/短标签）会过冲，
@@ -83,6 +287,10 @@ export function blockNode(b, p, canvasW = CANVAS_W, baseFont = null, mergeCtx = 
 
 /** 本页并集合并上下文：{ drop:Set<i>, keep:Map<i, {text,bbox}> }（block-dedup.js）。
  *  派生逻辑（含「不可合并则不丢弃」不变式）在 `mergePlan` 内，只此一处实现、有测试锁定。 */
+/**
+ * @param {Page} p
+ * @returns {{ drop: Set<number>, keep: Map<number, { text: string, bbox: number[] }> }}
+ */
 export function mergeContext(p) {
   return mergePlan(p.blocks);
 }
@@ -90,8 +298,40 @@ export function mergeContext(p) {
 /** 追加本页行级块节点（跳过被合并掉的块；返回与 p.blocks 对齐的节点数组，null = 未渲染）。
  *  `candidateStyle=false` ⇒ OCR 补入行**按普通正文样式**渲染（成品页的默认外观），
  *  但 title 仍写明来源（G1 的信息不丢，只是不抢视觉）。 */
+/**
+ * @param {HTMLElement} c
+ * @param {Page} p
+ * @param {number} canvasW
+ * @param {number | null} baseFont
+ * @param {{ drop: Set<number>, keep: Map<number, { text: string, bbox: number[] }> } | null} mergeCtx
+ * @param {string} [doc]
+ * @param {boolean} [candidateStyle]
+ * @returns {(HTMLElement | null)[]}
+ */
 export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", candidateStyle = true) {
-  const nodes = p.blocks.map((b) => blockNode(b, p, canvasW, baseFont, mergeCtx, doc));
+  // ── 表格（DECISIONS §76）──
+  // 表格块自带 bbox（就是表格整块框）。被这个框**完整覆盖**的其它行块，其文本已由网格呈现
+  // ⇒ 不再重复画（否则网格上叠一层压平文字，正是用户看到的「几行乱字」）。
+  // 判据是**几何包含**（确定性），不是"猜哪些块属于表格"。
+  const tableBlocks = p.blocks.filter((b) => b.kind === "table" && b.html);
+  /** @type {Set<number>} */
+  const coveredByTable = new Set();
+  for (const t of tableBlocks) {
+    const [rx0, ry0, rx1, ry1] = t.bbox;
+    for (const b of p.blocks) {
+      if (b === t) continue;
+      const [x0, y0, x1, y1] = b.bbox;
+      if (x0 >= rx0 - 1 && y0 >= ry0 - 1 && x1 <= rx1 + 1 && y1 <= ry1 + 1) coveredByTable.add(b.i);
+    }
+  }
+  const nodes = p.blocks.map((b) => {
+    if (coveredByTable.has(b.i)) return null;
+    if (b.kind === "table" && b.html) {
+      const tn = tableNode(b, p, canvasW, baseFont, doc);
+      if (tn) return tn;
+    }
+    return blockNode(b, p, canvasW, baseFont, mergeCtx, doc);
+  });
   // `ocr: true` 的块是**从 OCR 候选补进来的题号行**（上游整行漏识别，见 export-stages 的
   // injectOcrQuestionLines）⇒ 默认用青绿候选样式渲染，绝不与引擎原文混淆（G1）。
   nodes.forEach((n, i) => {
@@ -118,6 +358,7 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
 
 /* ── 三类「额外内容/标记」 ── */
 
+/** @type {Record<string, string>} */
 const DISCARDED_LABEL = { header: "页眉", footer: "页脚", page_number: "页码", aside_text: "侧栏" };
 
 /**
@@ -139,22 +380,68 @@ const DISCARDED_LABEL = { header: "页眉", footer: "页脚", page_number: "页�
  * 单条 OCR 候选 → 节点。**纸面与面板裁切共用这一个实现**（否则两处样式/口径会漂）。
  * 候选一律用青绿虚线 + 角标呈现，绝不与引擎原文混淆（红线 G1）。
  */
+/**
+ * @param {OcrItem} it
+ * @param {Page} p
+ * @param {number} canvasW
+ * @param {number} baseFont
+ * @param {boolean} [candidateStyle]
+ * @returns {HTMLElement}
+ */
 export function ocrFillNode(it, p, canvasW, baseFont, candidateStyle = true) {
   const isPage = it.source === "page";
-  const node = posStyle(el("div", candidateStyle ? "blk blk-ocr" : "blk blk-line"), it.win ?? it.bbox, p.width, p.height);
+  const box = it.win ?? it.bbox;
+  const node = posStyle(
+    el("div", candidateStyle ? "blk blk-ocr blk-ocr-window" : "blk blk-line"),
+    box,
+    p.width,
+    p.height,
+  );
   node.title =
     `OCR 候选补全（非引擎文本，请核对）\n来源：${isPage ? "整页 OCR" : "区域裁图"}\n` +
     `宽度比 ${it.ratio}（≈1 为合理；${isPage ? "整页来源按**洞自身**宽度算" : "裁图来源按窗口宽算"}）\n` +
     `证据：${it.crop}\nOCR 原始输出：${it.raw}`;
+  /**
+   * 2026-10-28：绿框画在候选**证据 bbox** 上，不再画在 `win` 上。
+   *
+   * `win` 是为了把整行 OCR 文本排进去而扩出来的窗口，常与相邻公式块有几 pt 重叠
+   * （答案册 p13 实测：`二 定律有1` 的 win x24.6–74.7 vs 公式 x69–179，重叠 5.7pt；
+   * `a，根据运动学规律有` 重叠 5.2pt）。绿框画在 win 上 ⇒ 边框压到公式。
+   * 证据 bbox 是「原卷上真正缺墨的洞」，与原生块天然不相交；文字仍按 win 排版，
+   * 证据框只负责标记。宁可框比文字小，也不让标记压正文（G1/G9）。
+   */
+  if (candidateStyle) {
+    const ev = el("div", "ocr-evidence");
+    const [x0, y0, x1, y1] = it.bbox;
+    const [wx0, wy0, wx1, wy1] = box;
+    const w = wx1 - wx0;
+    const h = wy1 - wy0;
+    ev.style.left = `${((x0 - wx0) / w) * 100}%`;
+    ev.style.top = `${((y0 - wy0) / h) * 100}%`;
+    ev.style.width = `${((x1 - x0) / w) * 100}%`;
+    ev.style.height = `${((y1 - y0) / h) * 100}%`;
+    ev.append(el("span", "tag", isPage ? "OCR·整页" : "OCR·裁图"));
+    node.append(ev);
+  }
   const txt = el("span", "txt");
-  txt.textContent = it.text;
-  txt.style.fontSize = `${baseFont}px`;
+  txt.textContent = it.text ?? "";
+  /**
+   * 字号必须**按候选自身框宽夹紧**（与 `blockNode` 同源，`clampByWidth`）。
+   * 定死 baseFont 会让长候选横向溢出，而 `posStyle` 连**高度**也定死了 ⇒
+   * 溢出的字直接压到下一行正文上（2026-10-28 实测：答案册 p13 的
+   * 「【解析】设 A、B…」一行宽 246pt，13.6px 时需 ~408px，横向溢出后压住公式行）。
+   * 候选是「行」级证据，一行必须落在一行的高度里 —— 宁可字略小，也不能压正文。
+   */
+  txt.style.fontSize = `${clampByWidth(baseFont, { bbox: box, text: it.text ?? "" }, p.width, canvasW)}px`;
   node.append(txt);
-  if (candidateStyle) node.append(el("span", "tag", isPage ? "OCR·整页" : "OCR·裁图"));
   return node;
 }
 
 /** 候选行的落点矩形（窗口优先，整页来源没有窗口时用块框）。 */
+/**
+ * @param {OcrItem} it
+ * @returns {number[]}
+ */
 export function ocrRect(it) {
   return it.win ?? it.bbox;
 }
@@ -162,14 +449,27 @@ export function ocrRect(it) {
 /**
  * @param region 只画与该矩形相交的候选（面板裁一条题目时用）；null = 全画
  */
+/**
+ * @param {HTMLElement} c
+ * @param {Page} p
+ * @param {number} [canvasW]
+ * @param {boolean} [candidateStyle]
+ * @param {number[] | null} [region] 只画与该矩形相交的候选（面板裁一条题目时用）；null = 全画
+ */
 export function ocrFillInto(c, p, canvasW = CANVAS_W, candidateStyle = true, region = null) {
   const items = (p.ocrFill ?? []).filter((x) => x.accepted && (!region || rectHits(ocrRect(x), region)));
   if (!items.length) return;
-  const baseFont = baseFontOfPage(p.blocks, p.width, canvasW);
+  // 12px 是本渲染器的兜底字号（与 tableNode 一致）；baseFontOfPage 全页无文本块时才为 null
+  const baseFont = baseFontOfPage(p.blocks, p.width, canvasW) ?? 12;
   for (const it of items) c.append(ocrFillNode(it, p, canvasW, baseFont, candidateStyle));
 }
 
 /** 两个矩形是否相交（PDF 点 [x0,y0,x1,y1]）。 */
+/**
+ * @param {number[] | null | undefined} a
+ * @param {number[] | null | undefined} b
+ * @returns {boolean}
+ */
 export function rectHits(a, b) {
   return !!a && !!b && a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
 }
@@ -198,17 +498,23 @@ export function rectHits(a, b) {
  * 实测两册 45 个洞（42 个 <200px），几乎全是图注那一类小孤立标记
  * （例 答案册 p4 甲/乙/丙 三个图注位各一个洞）。
  *
- * @param {any} p 整页快照
- * @returns {Array<{bbox:number[], area:number}>}
+ * @param {Page} p 整页快照
+ * @returns {Uncovered[]}
  */
 export function unfilledContentHoles(p) {
   const all = p.uncovered ?? [];
   if (!all.length) return [];
   const filled = (p.ocrFill ?? []).filter((x) => x.accepted).map((x) => x.bbox);
+  /** @param {number[]} r @returns {boolean} */
   const isFilled = (r) => filled.some((f) => r[0] < f[2] && r[2] > f[0] && r[1] < f[3] && r[3] > f[1]);
   return all.filter((r) => r.kind !== "furniture" && !isFilled(r.bbox));
 }
 
+/**
+ * @param {HTMLElement} c
+ * @param {Page} p
+ * @param {number} [canvasW]
+ */
 export function uncoveredInto(c, p, canvasW = CANVAS_W) {
   const all = p.uncovered ?? [];
   if (!all.length) return;
@@ -235,9 +541,11 @@ export function uncoveredInto(c, p, canvasW = CANVAS_W) {
   // （它保证每个标签都不与任何解析块 bbox 相交、且在页内；放不下/必压正文的组不产出）。
   // ⚠️ 避让集合必须**含 OCR 候选块** —— 候选不在 p.blocks 里，不带上它标签就会压住刚补出来的候选文本
   //（2026-10-10 用户当场指出：「标记盖住正文」的规矩对候选同样成立）。
-  const avoidForLabels = p.blocks.concat(
-    (p.ocrFill ?? []).filter((x) => x.accepted).map((x) => ({ bbox: x.win ?? x.bbox })),
-  );
+  /** @type {{ bbox: number[] }[]} */
+  const avoidForLabels = [
+    ...p.blocks,
+    ...(p.ocrFill ?? []).filter((x) => x.accepted).map((x) => ({ bbox: x.win ?? x.bbox })),
+  ];
   for (const { rect, count } of contentLabelPlacements(content, avoidForLabels, p.width, p.height, canvasW)) {
     const tag = el("span", "uncovered-tag", count > 1 ? `解析遗漏 ×${count}` : "解析遗漏");
     tag.style.left = `${(rect[0] / p.width) * 100}%`;
@@ -249,14 +557,20 @@ export function uncoveredInto(c, p, canvasW = CANVAS_W) {
 /** 丢弃块（页眉/页脚/页码/侧栏）：虚线灰块呈现——原卷上有、解析器判为家具的内容。
  * canvasW 为**该视图**的画布像素宽：阶段 1–5 传 CANVAS_W(760)、对比/成品传真实栏宽；
  * 曾硬编码 CANVAS_W → 对比栏内丢弃块字号偏大 760/460 = 1.65×（R2）。 */
+/**
+ * @param {HTMLElement} c
+ * @param {Page} p
+ * @param {number} [canvasW]
+ */
 export function renderDiscardedInto(c, p, canvasW = CANVAS_W) {
   const baseFont = baseFontOfPage(p.blocks, p.width, canvasW);
   // 邻块池含本页行级块与丢弃块：丢弃块之间也可能互相挤压（Task 14 结构判据）
   const pool = [...(p.blocks ?? []), ...(p.discarded ?? [])];
   for (const b of p.discarded ?? []) {
     const node = posStyle(el("div", "blk blk-discarded"), b.bbox, p.width, p.height);
-    const shown = prettifyLatex(b.text);
-    node.title = `[已被解析器丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}] ${b.text}`;
+    const shown = prettifyLatex(b.text ?? "");
+    const dtype = b.dtype ?? "";
+    node.title = `[已被解析器丢弃·${DISCARDED_LABEL[dtype] ?? b.dtype}] ${b.text}`;
     if (shown) {
       const txt = el("span", "txt");
       txt.innerHTML = shown;
@@ -266,11 +580,15 @@ export function renderDiscardedInto(c, p, canvasW = CANVAS_W) {
       // 竖排块（R4）：同 blockNode——字号按 bboxW 定，方向也要竖排
       if (isVerticalText(b.bbox, b.text ?? "")) node.classList.add("blk-vertical");
     }
-    node.append(el("span", "tag", `丢弃·${DISCARDED_LABEL[b.dtype] ?? b.dtype}`));
+    node.append(el("span", "tag", `丢弃·${DISCARDED_LABEL[dtype] ?? b.dtype}`));
     c.append(node);
   }
 }
 
+/**
+ * @param {[string, string][]} items
+ * @returns {HTMLElement}
+ */
 export function legend(items) {
   const l = el("div", "legend");
   for (const [color, label] of items) {
@@ -305,15 +623,34 @@ export function legend(items) {
  *                             列互相遮挡并误触），所以标签的增删一律走题号牌 → 面板，不在纸面上做。
  *                             落位与三级降级（full/count/chip）由 `tag-layout.js` 算，见该文件口径注释。
  */
+/**
+ * @param {Page} p
+ * @param {Partial<RenderOpts>} [opts]
+ * @returns {{ wrap: HTMLElement, canvas: HTMLDivElement, innerW: number }}
+ */
 export function renderPaper(p, opts = {}) {
   const {
     doc = "",
-    paneW,
+    paneW = 0,
     diagnostics = false,
     candidateStyle = true,
     onChipClick = null,
     resolveTags = null,
     assignmentBadge = null,
+    /**
+     * **是否把 OCR 补行画到纸面上**（`DECISIONS §91`）：默认 **false**。
+     *
+     * 补行是「引擎没识别到、由 OCR 补出来的候选行」。它有两种来源：
+     * - `crop`：按行裁图，位置天然对得上；
+     * - `page`：**整页 OCR，没有位置信息** —— 算法要靠「锚点 + 宽度比例」把文本硬配回洞，
+     *   实测会错配（电路 p1 把表格单元格的文字配到页眉的洞上 ⇒ 页面上出现
+     *   `欧姆定律（纯电阻电路` / `dot` / `_2+` 一堆错位碎字，2026-10-30 用户截图）。
+     *
+     * 补行是**核查**用的证据（"这里原来漏了什么"），不是阅读内容。默认不画：
+     * 需要时 `?fill=1` 或工具栏开关，`OCR 整页识别全文` 折叠区也一直可看。
+     * 数据一个字没删（G1），只是不再默认糊在页面上。
+     */
+    ocrFill = false,
   } = opts;
 
   // 题号牌挂在「题目所在那一栏」的外侧：
@@ -321,6 +658,7 @@ export function renderPaper(p, opts = {}) {
   //（2026-10-12 用户当场指出「识别错了」——实测第 17 页第 3/4/5/6 题首块 x≈276 属右栏，号牌却全挂在左侧）。
   const firsts = p.questions.map((q) => q.blocks.map((i) => p.blocks[i]).find(Boolean) ?? null);
   const mid = p.width / 2;
+  /** @param {Block | null} b @returns {boolean} */
   const isRightCol = (b) => (p.columns ?? 1) >= 2 && !!b && (b.bbox[0] + b.bbox[2]) / 2 >= mid;
   const needsRight = p.questions.some((q, k) => q.startsHere !== false && isRightCol(firsts[k]));
 
@@ -347,6 +685,7 @@ export function renderPaper(p, opts = {}) {
   // ── 标签层：先在 px 域算好落位，再挂号牌（chip 级降级要挂在号牌上）──────────
   // 画布高由 `aspect-ratio` 决定，等式与 CSS 同源：canvasH = innerW × p.height / p.width。
   const canvasH = (innerW * p.height) / p.width;
+  /** @type {TagEntry[]} */
   const tagEntries = [];
   if (resolveTags) {
     p.questions.forEach((q, k) => {
@@ -367,6 +706,7 @@ export function renderPaper(p, opts = {}) {
     tagEntries.map((e) => ({ key: e.key, side: e.side, topPx: e.topPx, tagCount: e.tags.length })),
     canvasH,
   );
+  /** @param {string} id @returns {number} */
   const badgeOf = (id) => {
     const pl = tagPlaced.get(id);
     return pl && pl.level === "chip" ? pl.tagCount : 0;
@@ -421,9 +761,13 @@ export function renderPaper(p, opts = {}) {
     wrap.append(stack);
   }
 
-  ocrFillInto(c, p, innerW, candidateStyle); // 先画候选
+  if (ocrFill) ocrFillInto(c, p, innerW, candidateStyle); // 候选补行：默认不画（见 opts.ocrFill）
   if (diagnostics) uncoveredInto(c, p, innerW); // 再画遗漏标记（盖得住候选，符合原顺序）
   // 注意：**不要再次 append(c)** —— c 已经在 wrap 里；重复 append 会把它移出容器，
   // 号牌就又回到被 `.canvas{overflow:hidden}` 裁掉的状态。
+  // 表格字号适配必须在**挂载后**做：节点进文档才有 clientHeight。
+  // 用 rAF 排到下一帧，两个调用方（final / stages）都不用改一行（纸面重建只此一处）。
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => fitTables(wrap));
+
   return { wrap, canvas: c, innerW };
 }

@@ -1,3 +1,6 @@
+// 类型权威检查器：`tsconfig.viewer.json`（checkJs:true + DOM lib）。本文件是 DOM 代码，
+// **不要**加 `// @ts-check` —— 主 `tsconfig.json` 的 lib 没有 DOM，一旦本文件被 TS 测试 import
+// 进主程序，`HTMLElement` / `document` 会被判成未知名字（DECISIONS §95）。
 // ============================================================
 // viewer/viewer.js — 展示层逻辑（纯浏览器，无引擎 src/ import）
 // 解耦红线：本文件不得 import ../src/ 任何内容。数据来源见 CONTRACT.md。
@@ -5,38 +8,111 @@
 
 import { resolveDoc, loadWithFallback } from "./doc-utils.js";
 
+/**
+ * 快照里一道题的**本文件视图**（字段口径见 `viewer/docs/CONTRACT.md`；这里只声明读过的）。
+ * @typedef {Object} QOption
+ * @property {string} key
+ * @property {string} text
+ *
+ * @typedef {Object} Question
+ * @property {string} id
+ * @property {string} [number]
+ * @property {string} [stem]
+ * @property {string} [type]
+ * @property {string} status
+ * @property {string} [section]
+ * @property {string} [answer]
+ * @property {QOption[]} [options]
+ * @property {Array<{ path: string }>} [images]
+ * @property {number} [confidence]
+ * @property {string} [review_note]
+ * @property {string} [error]
+ *
+ * @typedef {Object} Band 教辅栏目板块条目（`DECISIONS §78`，`bands.json`）
+ * @property {string | number} id
+ * @property {string} title
+ * @property {number} pageIndex
+ * @property {number[]} [blockIndexes]
+ * @property {string} [text]
+ *
+ * @typedef {{ renderMathInElement?: (el: Element, opts?: Record<string, unknown>) => void }} KatexWindow
+ *   KaTeX auto-render 是 `<script>` 直接挂到 window 的第三方全局（无类型包），
+ *   这里只声明本文件用到的那一个方法，不用 `any` 蒙过去。
+ */
+
 /** URL ?doc= 参数（含"缺失/非法回退默认"容错），由 doc-utils 解析 */
 const DOC = resolveDoc(location.search);
 // BASE 依赖实际生效 doc（回退后），故用函数延迟计算，并在 main() 中按 effectiveDoc 赋值
+/** @param {string} doc */
 const baseFor = (doc) => `../data/out/${encodeURIComponent(doc)}`;
 let BASE = baseFor(DOC);
 
+/** @type {{ answersVisible: boolean, filter: string, questions: Question[], bands: Band[], reviewMode: boolean }} */
 const state = {
   answersVisible: false,
   filter: "all",
   questions: [],
+  /** 教辅栏目板块条目（`bands.json`，可选增强：缺文件时为空数组，不影响主列表） */
+  bands: [],
   reviewMode: false, // true 时显示质检队列视图（showReview），false 显示主列表（showOverview）
 };
 
-const $ = (sel, root = document) => root.querySelector(sel);
+/**
+ * 可选查询：拿不到就返回 null（调用方自己判空）。
+ * @param {string} sel
+ * @param {ParentNode} [root]
+ * @returns {HTMLElement | null}
+ */
+const $ = (sel, root = document) => /** @type {HTMLElement | null} */ (root.querySelector(sel));
+
+/**
+ * 必存在查询：页面缺这个元素就是**事故**，直接抛错并说清缺哪个
+ * （旧写法在 null 上取属性同样抛 TypeError，只是信息不可读 —— 红线 G1「不静默失败」）。
+ * @param {string} sel
+ * @param {ParentNode} [root]
+ * @returns {HTMLElement}
+ */
+const need = (sel, root = document) => {
+  const found = root.querySelector(sel);
+  if (!found) throw new Error(`页面缺少元素：${sel}`);
+  return /** @type {HTMLElement} */ (found); // 本文件的选择器全部指向 HTML 元素（id/class 选择）
+};
+
+/**
+ * @param {string} id
+ * @param {string} [cls]
+ * @returns {string}
+ */
 const icon = (id, cls = "icon") =>
   `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
 
 /* ---------------- 数据加载（doc 容错：失败时回退默认一次，并给出明确提示） ---------------- */
+/** @returns {Promise<{ questions: unknown, effectiveDoc: string }>} */
 async function load() {
-  return loadWithFallback(
+  const res = await loadWithFallback(
     async (doc) => fetch(`../data/out/${encodeURIComponent(doc)}/questions.json`),
     DOC,
   );
+  // 栏目板块（`DECISIONS §78`）是**可选增强**：老产物没有 bands.json，
+  // 缺文件/坏 JSON 都不该让题目列表打不开 ⇒ 静默降级为空数组。
+  try {
+    const r = await fetch(`../data/out/${encodeURIComponent(res.effectiveDoc)}/bands.json`);
+    state.bands = r.ok ? await r.json() : [];
+  } catch {
+    state.bands = [];
+  }
+  return res;
 }
 
 /* ---------------- 契约适配 ---------------- */
 // 图片路径：拼接 images/ 前缀
+/** @param {Question} q @returns {string[]} */
 function imageSrc(q) {
   return (q.images || []).map((i) => `${BASE}/images/${encodeURIComponent(i.path)}`);
 }
 
 // 适配①：answer 形如 "B\n解析：由…" → 拆成 { value, solution? }
+/** @param {Question} q @returns {{ value: string, solution?: string }} */
 function splitAnswer(q) {
   if (!q.answer) return { value: "—" };
   const idx = q.answer.indexOf("解析：");
@@ -48,7 +124,7 @@ function splitAnswer(q) {
 
 /* ---------------- 渲染：目录栏 ---------------- */
 function renderToc() {
-  const nav = $("#toc-nav");
+  const nav = need("#toc-nav");
   nav.innerHTML = "";
   const sections = groupBySection(state.questions);
   for (const [name, qs] of sections) {
@@ -79,22 +155,29 @@ function renderToc() {
   }
 }
 
+/**
+ * @param {Question[]} qs
+ * @returns {Map<string, Question[]>}
+ */
 function groupBySection(qs) {
+  /** @type {Map<string, Question[]>} */
   const m = new Map();
   for (const q of qs) {
     const key = q.section || "";
-    if (!m.has(key)) m.set(key, []);
-    m.get(key).push(q);
+    const bucket = m.get(key);
+    if (bucket) bucket.push(q);
+    else m.set(key, [q]);
   }
   return m;
 }
 
 /* ---------------- 渲染：卡片 ---------------- */
+/** @param {Question} q @param {number} i @returns {HTMLElement} */
 function renderCard(q, i) {
   const card = document.createElement("article");
   card.className = `card${q.status === "needs_review" ? " needs_review" : ""}`;
   card.id = anchorId(q);
-  card.style.setProperty("--i", i);
+  card.style.setProperty("--i", String(i));
 
   const opts = q.options || [];
   const isChoice = q.type === "choice" || opts.length >= 2;
@@ -173,10 +256,10 @@ function renderCard(q, i) {
   `;
 
   // 单题答案开关
-  const btn = $("[data-answer-toggle]", card);
+  const btn = need("[data-answer-toggle]", card);
   btn.addEventListener("click", () => {
     const shown = card.classList.toggle("show-answer");
-    $("span", btn).textContent = shown ? "Hide Answer" : "Show Answer";
+    need("span", btn).textContent = shown ? "Hide Answer" : "Show Answer";
   });
 
   return card;
@@ -187,24 +270,47 @@ function updateStats() {
   const total = state.questions.length;
   const ok = state.questions.filter((q) => q.status === "ok").length;
   const review = total - ok;
-  $("#stat-total").textContent = total;
-  $("#stat-ok").textContent = ok;
-  $("#stat-review").textContent = review;
+  need("#stat-total").textContent = String(total);
+  need("#stat-ok").textContent = String(ok);
+  need("#stat-review").textContent = String(review);
   // Review 按钮计数同步（Review (N)，N = needs_review 数）
   const label = $("#review-btn-label");
   if (label) label.textContent = `Review (${review})`;
-  const btn = $("#review-btn");
+  const btn = need("#review-btn");
   if (btn) {
     btn.classList.toggle("is-empty", review === 0);
     btn.setAttribute("aria-pressed", String(state.reviewMode));
   }
 }
 
+/* ---------------- 渲染：栏目板块卡（DECISIONS §78） ---------------- */
+/**
+ * 板块条目不冒充题目：标题栏显示「板块」而不是题号，也不进 Total/ok/review 计数。
+ * 目的只有一个 —— 让「教材实验 10 长度的测量」这类栏目里的内容在按题浏览时也能找到，
+ * 而不是像以前那样要么被切成假题、要么彻底消失。
+ */
+/** @param {Band} b @returns {HTMLElement} */
+function renderBandCard(b) {
+  const card = document.createElement("article");
+  card.className = "card band-card";
+  card.id = `band-${String(b.id).replace(/[^\w:-]/g, "_")}`;
+  const preview = (b.text || "").slice(0, 360);
+  card.innerHTML = `
+    <header class="card-head">
+      <span class="q-id">板块</span>
+      <span class="q-section">${escapeHtml(b.title)}</span>
+      <span class="q-type">p${b.pageIndex + 1}</span>
+    </header>
+    <p class="band-note">本页栏目内容（${(b.blockIndexes || []).length} 块）不是独立题目，按栏目归属展示。</p>
+    ${preview ? `<p class="stem band-text">${escapeHtml(preview)}${(b.text || "").length > preview.length ? "…" : ""}</p>` : ""}`;
+  return card;
+}
+
 function applyFilter() {
-  const flow = $("#paper");
+  const flow = need("#paper");
   const vis = state.questions.filter((q) => state.filter === "all" || q.type === state.filter);
   flow.querySelectorAll(".card").forEach((c) => c.remove());
-  $("#placeholder").hidden = true;
+  need("#placeholder").hidden = true;
   if (!vis.length) {
     flow.querySelector("#empty")?.remove();
     const empty = document.createElement("div");
@@ -219,8 +325,32 @@ function applyFilter() {
     flow.appendChild(empty);
     return;
   }
-  // 骨架屏保留至首屏渲染完成即可
-  vis.forEach((q, i) => flow.appendChild(renderCard(q, i)));
+  // 板块卡按页插在题目流里。同页的板块**排在该页题目之后**：
+  // questions.json 里没有「题目在本页的块位置」，硬把板块放在页首会把它前面的题推到后面
+  // （实测 p1 三张板块卡把第 1 题挤到了第三张卡下面）。宁可顺序粗一点，也不能打乱题目顺序。
+  const bands = [...(state.bands || [])].sort((a, b) => a.pageIndex - b.pageIndex);
+  /** @type {Set<string | number>} */
+  const placed = new Set();
+  /** @param {number} page */
+  const placeBandsBefore = (page) => {
+    for (const b of bands) {
+      if (!placed.has(b.id) && b.pageIndex < page) {
+        flow.appendChild(renderBandCard(b));
+        placed.add(b.id);
+      }
+    }
+  };
+  vis.forEach((q, i) => {
+    const pm = /:p(\d+):/.exec(q.id || "");
+    placeBandsBefore(pm ? Number(pm[1]) : -1);
+    flow.appendChild(renderCard(q, i));
+  });
+  for (const b of bands) {
+    if (!placed.has(b.id)) {
+      flow.appendChild(renderBandCard(b));
+      placed.add(b.id);
+    }
+  }
   renderToc();
   // 重建卡片是全新的 DOM：按 state 统一回填答案可见性，并重新渲染 KaTeX 公式
   applyAnswerVisibility();
@@ -229,16 +359,18 @@ function applyFilter() {
 
 /* ---------------- 答案可见性（全局 + 单题共用，保证 rebuild 后与 state 一致） ---------------- */
 function applyAnswerVisibility() {
-  document.querySelectorAll(".card").forEach((c) => c.classList.toggle("show-answer", state.answersVisible));
-  const btn = $("#toggle-answers");
-  $("span", btn).textContent = state.answersVisible ? "Hide All Answers" : "Toggle All Answers";
+  document.querySelectorAll(".card").forEach((c) => /** @type {HTMLElement} */ (c).classList.toggle("show-answer", state.answersVisible));
+  const btn = need("#toggle-answers");
+  need("span", btn).textContent = state.answersVisible ? "Hide All Answers" : "Toggle All Answers";
 }
 
+/** @param {string} f */
 function setFilter(f) {
   state.filter = f;
-  document.querySelectorAll(".filter").forEach((b) =>
-    b.classList.toggle("is-active", b.dataset.filter === f)
-  );
+  document.querySelectorAll(".filter").forEach((b) => {
+    const el = /** @type {HTMLElement} */ (b);
+    el.classList.toggle("is-active", el.dataset.filter === f);
+  });
   applyFilter();
 }
 
@@ -247,11 +379,11 @@ function setFilter(f) {
 function showReview() {
   state.reviewMode = true;
   renderReviewQueue();
-  $("#paper").hidden = true;
-  const rb = $("#review");
+  need("#paper").hidden = true;
+  const rb = need("#review");
   rb.hidden = false;
   document.body.classList.add("review-mode");
-  const btn = $("#review-btn");
+  const btn = need("#review-btn");
   btn.classList.add("is-active");
   btn.setAttribute("aria-pressed", "true");
 }
@@ -259,19 +391,20 @@ function showReview() {
 // 返回总览视图（恢复卡片流 + 筛选 + 目录）
 function showOverview() {
   state.reviewMode = false;
-  const rb = $("#review");
+  const rb = need("#review");
   rb.hidden = true;
-  $("#paper").hidden = false;
+  need("#paper").hidden = false;
   document.body.classList.remove("review-mode");
-  const btn = $("#review-btn");
+  const btn = need("#review-btn");
   btn.classList.remove("is-active");
   btn.setAttribute("aria-pressed", "false");
 }
 
 // 渲染质检队列：列出所有 needs_review 题，每项可点击进入单题
 function renderReviewQueue() {
-  const rb = $("#review");
+  const rb = need("#review");
   rb.innerHTML = "";
+  /** @type {Question[]} */
   const reviewQs = state.questions.filter((q) => q.status === "needs_review");
 
   const head = document.createElement("div");
@@ -319,7 +452,7 @@ function renderReviewQueue() {
       </div>
       <p class="review-stem">${escapeHtml(q.stem)}</p>`;
     // 进入单题：滚动到对应题卡并回到总览（高亮目标卡）
-    item.querySelector("[data-go]").addEventListener("click", (e) => {
+    need("[data-go]", item).addEventListener("click", (e) => {
       e.stopPropagation();
       goToQuestion(q);
     });
@@ -329,6 +462,7 @@ function renderReviewQueue() {
 }
 
 // 质检队列项 → 回到总览并滚动到目标题卡（含单题高亮）
+/** @param {Question} q */
 function goToQuestion(q) {
   showOverview();
   const target = document.getElementById(anchorId(q));
@@ -340,6 +474,7 @@ function goToQuestion(q) {
 }
 
 // 根据数据泛化错误摘要（用于质检队列的红色错误标签）
+/** @param {Question} q @returns {string} */
 function reviewError(q) {
   const msg = q.review_note || q.error || "";
   if (msg) return String(msg);
@@ -349,6 +484,7 @@ function reviewError(q) {
 }
 
 /* ---------------- 全局答案开关 ---------------- */
+/** @param {boolean} v */
 function setAnswersVisible(v) {
   state.answersVisible = v;
   applyAnswerVisibility();
@@ -356,9 +492,10 @@ function setAnswersVisible(v) {
 
 /* ---------------- KaTeX 渲染（离线降级原文） ---------------- */
 function renderMath() {
-  if (typeof window.renderMathInElement === "function") {
+  const katex = /** @type {KatexWindow} */ (window);
+  if (typeof katex.renderMathInElement === "function") {
     try {
-      window.renderMathInElement(document.body, {
+      katex.renderMathInElement(document.body, {
         delimiters: [
           { left: "$$", right: "$$", display: true },
           { left: "$", right: "$", display: false },
@@ -373,28 +510,31 @@ function renderMath() {
 
 /* ---------------- 移动端目录 ---------------- */
 function initMobileToc() {
-  $("#mobile-menu").addEventListener("click", () => {
-    const open = $("#toc").classList.toggle("open");
+  need("#mobile-menu").addEventListener("click", () => {
+    const open = need("#toc").classList.toggle("open");
     document.body.classList.toggle("toc-open", open);
   });
 }
 function closeTocOnResize() {
   window.addEventListener("resize", () => {
     if (window.innerWidth > 900) {
-      $("#toc").classList.remove("open");
+      need("#toc").classList.remove("open");
       document.body.classList.remove("toc-open");
     }
   });
 }
 
 /* ---------------- 工具 ---------------- */
+/** @param {Question} q @returns {string} */
 function anchorId(q) {
-  return `q-${(q.id || q.number).replace(/[^\w\u4e00-\u9fa5:-]/g, "_")}`;
+  // id 必有（契约）；万一缺失也只退化成 `q-`，不再抛 TypeError
+  return `q-${(q.id || q.number || "").replace(/[^\w\u4e00-\u9fa5:-]/g, "_")}`;
 }
 
 // 展示标签：避免"题号重复"歧义（真实数据多卷题目 number 都为 6）。
 // 若 number 在全量题目里唯一 → 用 "Q-6"；重复 → 用 id 里的页码段（如 p7:q43 → "p7-6"）
 // 或直接回退 id，确保每张卡/队列项展示可区分。
+/** @param {Question} q @returns {string} */
 function displayLabel(q) {
   const n = q.number;
   const label = `Q-${n || q.id}`;
@@ -406,6 +546,7 @@ function displayLabel(q) {
   if (m) return `Q-${n} (p${m[1]})`;
   return `Q-${q.id}`;
 }
+/** @param {unknown} s @returns {string} */
 function escapeHtml(s) {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -418,22 +559,23 @@ function escapeHtml(s) {
 /* ---------------- 启动 ---------------- */
 async function main() {
   // 标题先用初始 DOC 占位；成功加载后再用实际生效 doc（可能回退默认）覆盖
-  $("#masthead-doc").textContent = DOC;
-  $("#toc-doc").textContent = DOC;
+  need("#masthead-doc").textContent = DOC;
+  need("#toc-doc").textContent = DOC;
 
   // 全局答案开关
-  $("#toggle-answers").addEventListener("click", () => setAnswersVisible(!state.answersVisible));
+  need("#toggle-answers").addEventListener("click", () => setAnswersVisible(!state.answersVisible));
 
   // 质检队列 Review 入口（P3）：点击切换 质检队列视图 <-> 总览
-  $("#review-btn").addEventListener("click", () => {
+  need("#review-btn").addEventListener("click", () => {
     if (state.reviewMode) showOverview();
     else showReview();
   });
 
   // 题型筛选
-  $("#filters").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-filter]");
-    if (btn) setFilter(btn.dataset.filter);
+  need("#filters").addEventListener("click", (e) => {
+    const target = /** @type {Element | null} */ (e.target);
+    const btn = /** @type {HTMLElement | null} */ (target?.closest("[data-filter]"));
+    if (btn?.dataset.filter) setFilter(btn.dataset.filter);
   });
 
   initMobileToc();
@@ -441,19 +583,19 @@ async function main() {
 
   try {
     const { questions, effectiveDoc } = await load();
-    state.questions = questions;
+    state.questions = /** @type {Question[]} */ (questions);
     // 用实际生效 doc（可能已回退默认）驱动标题与图片路径 BASE，而非初始 DOC
     BASE = baseFor(effectiveDoc);
-    $("#masthead-doc").textContent = effectiveDoc;
-    $("#toc-doc").textContent = effectiveDoc;
+    need("#masthead-doc").textContent = effectiveDoc;
+    need("#toc-doc").textContent = effectiveDoc;
   } catch (err) {
-    $("#placeholder").hidden = true;
-    const flow = $("#paper");
+    need("#placeholder").hidden = true;
+    const flow = need("#paper");
     const empty = document.createElement("div");
     empty.id = "empty";
     empty.className = "empty-state";
     empty.innerHTML = `<div class="stamp-circle">${icon("i-alert")}</div>
-      <h2>数据加载失败</h2><p>${escapeHtml(err.message)}</p>`;
+      <h2>数据加载失败</h2><p>${escapeHtml(/** @type {Error} */ (err).message)}</p>`;
     flow.appendChild(empty);
     return;
   }

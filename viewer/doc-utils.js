@@ -28,6 +28,7 @@ export function resolveDoc(search) {
  *   注：effectiveDoc 用于 masthead/toc 标题与图片路径 BASE，回退时其值为 DEFAULT_DOC。
  */
 export function loadWithFallback(fetcher, doc) {
+  /** @param {string} d */
   const attempt = async (d) => {
     const res = await fetcher(d);
     if (!res || !res.ok) {

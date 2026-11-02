@@ -72,6 +72,7 @@ function run(q: Question): SegmentationResult {
       inlineFormulas: 0,
       columnsPerPage: [1],
     },
+    bands: [],
     answerEntries: [],
   };
   validateResult(doc, result);

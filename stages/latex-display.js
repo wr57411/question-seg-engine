@@ -17,6 +17,7 @@
  * （测试用例全部取自真实样张噪声公式）。
  */
 
+/** @type {Record<string,string>} */
 const GREEK = {
   alpha: "α", beta: "β", gamma: "γ", delta: "δ", Delta: "Δ",
   epsilon: "ε", zeta: "ζ", eta: "η", theta: "θ", Theta: "Θ",
@@ -25,12 +26,13 @@ const GREEK = {
   Sigma: "Σ", tau: "τ", phi: "φ", Phi: "Φ", varphi: "φ",
   chi: "χ", psi: "ψ", omega: "ω", Omega: "Ω",
   Gamma: "Γ", vartheta: "ϑ", varepsilon: "ε", varsigma: "ς", varkappa: "ϰ", varrho: "ϱ",
-  Xi: "Ξ", Upsilon: "Υ",
+  Xi: "Ξ", Upsilon: "Υ", upsilon: "υ",
   varGamma: "Γ", varDelta: "Δ", varTheta: "Θ", varLambda: "Λ",
   varXi: "Ξ", varPi: "Π", varSigma: "Σ", varUpsilon: "Υ",
   varPhi: "Φ", varPsi: "Ψ", varOmega: "Ω",
 };
 
+/** @type {Record<string,string>} */
 const SYMBOL = {
   cdot: "·", times: "×", div: "÷", pm: "±", mp: "∓",
   leq: "≤", le: "≤", geq: "≥", ge: "≥", neq: "≠", ne: "≠",
@@ -45,6 +47,11 @@ const SYMBOL = {
   oplus: "⊕", ominus: "⊖", otimes: "⊗", top: "⊤", bot: "⊥",
   sin: "sin", cos: "cos", tan: "tan", cot: "cot", log: "log", ln: "ln",
   max: "max", min: "min", circ: "°", square: "□", triangle: "△",
+  ell: "ℓ", mid: "|", AA: "Å", lrcorner: "⌟", surd: "√", arcsin: "arcsin",
+  land: "∧", exists: "∃", emptyset: "∅", not: "¬",
+  sharp: "♯", flat: "♭", natural: "♮", ddagger: "‡", ngeq: "≱", gtrless: "≷",
+  vert: "|", boxtimes: "⊠", pounds: "£", rfloor: "⌋", backslash: "∖",
+  jmath: "ȷ", arctan: "arctan",
 };
 
 /** 命令后紧跟的花括号参数按内容展开、本身不显示（字体包装/上划线等） */
@@ -53,6 +60,8 @@ const UNWRAP = new Set([
   "overline", "bar", "underline", "vec", "hat", "widetilde", "widehat",
   "overrightarrow", "overleftarrow", "operatorname", "textrm", "textbf",
   "textit", "mathsf", "texttt", "mbox", "textnormal",
+  "mathscr", "mathfrak", "mathtt", "bf", "sf", "cal", "tiny", "scriptscriptstyle", "boxed",
+  "smash", "tilde", "dot", "ddot",
 ]);
 
 /** 无参数、直接丢弃的命令（纯排版指令，非内容） */
@@ -60,6 +69,7 @@ const DROP_CMD = new Set([
   "displaystyle", "textstyle", "scriptstyle", "limits", "nolimits",
   "quad", "qquad", "thinspace", "enspace", "mathstrut", "strut",
   "left", "right", "big", "Big", "bigg", "Bigg",
+  "mathbin", "nonumber", "notag",
 ]);
 
 /** 参数非内容、需连参数一并丢弃的命令（否则 "red" 之类会裸奔） */
@@ -68,6 +78,12 @@ const DROP_WITH_ARG = new Set([
   "phantom", "hphantom", "vphantom",
 ]);
 
+/** 需要专门分支的命令（环境/黑板粗体）：不在 UNWRAP 里按普通单参数处理。 */
+const CUSTOM = new Set(["begin", "end", "mathbb", "underset", "overset", "stackrel"]);
+/** 黑板粗体常用数集；其余字母退化为普通字母（只影响显示，不改数据）。 */
+/** @type {Record<string,string>} */
+const MATHBB = { R: "ℝ", N: "ℕ", Z: "ℤ", Q: "ℚ", C: "ℂ", P: "ℙ" };
+
 /**
  * 渲染器已知命令集。两个用途：
  * ① parseCommand 用它做「最长已知前缀」回退（MinerU 常把 "\theta B" 写成 "\thetaB"）；
@@ -75,7 +91,7 @@ const DROP_WITH_ARG = new Set([
  *    因为它们已被丢弃、不留痕迹，所以必须在输入端查。
  */
 export const KNOWN_COMMANDS = new Set([
-  ...Object.keys(GREEK), ...Object.keys(SYMBOL), ...UNWRAP, ...DROP_CMD, ...DROP_WITH_ARG,
+  ...Object.keys(GREEK), ...Object.keys(SYMBOL), ...UNWRAP, ...DROP_CMD, ...DROP_WITH_ARG, ...CUSTOM,
   "frac", "dfrac", "tfrac", "sqrt",
 ]);
 
@@ -87,12 +103,15 @@ export const KNOWN_COMMANDS = new Set([
 export const STRUCTURAL_COMMANDS = new Set([...DROP_CMD, ...DROP_WITH_ARG]);
 
 /** HTML 转义：输出片段由调用方 innerHTML 挂载，字面文本必须转义。 */
+/** @param {string} s */
 const escapeHtml = (s) =>
   s.replace(/[&<>]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"));
 
+/** @param {string} ch */
 const isSpace = (ch) => ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
 
 /** 跳过空白，返回新下标 */
+/** @param {string} s @param {number} i */
 function skipSpaces(s, i) {
   while (i < s.length && isSpace(s[i])) i++;
   return i;
@@ -100,6 +119,7 @@ function skipSpaces(s, i) {
 
 /** 解析一个花括号组（含嵌套），s[start] 必须是 "{"；返回 { content, end } 或 null。
  * 括号失衡时把余下全部当组内容（展示兜底：宁输出内容，不漏出源码）。 */
+/** @param {string} s @param {number} start */
 function parseGroup(s, start) {
   if (s[start] !== "{") return null;
   let depth = 0;
@@ -115,6 +135,7 @@ function parseGroup(s, start) {
 }
 
 /** 解析命令/上下标的一个参数：{组}、单个命令、或单字符 */
+/** @param {string} s @param {number} i @returns {{text:string, end:number}|null} */
 function parseArg(s, i) {
   i = skipSpaces(s, i);
   const ch = s[i];
@@ -128,6 +149,7 @@ function parseArg(s, i) {
 }
 
 /** 从 s[i]（应为 "\\"）解析一个完整命令（名字 + 可选参数），返回原始切片与终点 */
+/** @param {string} s @param {number} i */
 function parseCommand(s, i) {
   const start = i;
   i++;
@@ -162,6 +184,7 @@ function parseCommand(s, i) {
  * - 空白在公式内无语义，**一律跳过**（在 HTML 阶段折叠会破坏标签属性里的空格）
  * - 字面字符逐个 escapeHtml
  */
+/** @param {string} s */
 function desugar(s) {
   let out = "";
   let i = 0;
@@ -195,6 +218,36 @@ function desugar(s) {
       if (name === "sqrt") {
         const a = parseArg(s, cmd.end);
         if (a) { out += `<span class="sqrt">√<span class="rad">${desugar(a.text)}</span></span>`; i = a.end; continue; }
+      }
+      if (name === "begin" || name === "end") {
+        // 环境：吃掉 \begin{env} / \end{env}；array/tabular 再吃掉列格式 {cc}
+        const env = parseArg(s, cmd.end);
+        let j = env ? env.end : cmd.end;
+        if (name === "begin" && env) {
+          const envName = env.text.trim();
+          if (envName === "array" || envName === "tabular") {
+            const spec = parseArg(s, j);
+            if (spec) j = spec.end;
+          }
+        }
+        i = j;
+        continue;
+      }
+      if (name === "mathbb") {
+        const a = parseArg(s, cmd.end);
+        if (a) {
+          const key = a.text.trim();
+          out += MATHBB[key] ?? desugar(a.text);
+          i = a.end;
+          continue;
+        }
+      }
+      if (name === "underset" || name === "overset" || name === "stackrel") {
+        // 两参数装饰：渲染基座（第二个参数）；上方/下方的小字只作可读性退化，不丢基座。
+        const a = parseArg(s, cmd.end);
+        const b = a ? parseArg(s, a.end) : null;
+        if (a && b) { out += desugar(b.text); i = b.end; continue; }
+        if (a) { out += desugar(a.text); i = a.end; continue; }
       }
       if (UNWRAP.has(name)) {
         const a = parseArg(s, cmd.end);
@@ -262,6 +315,7 @@ const LOOKS_LATEX = /\\[A-Za-z]+|[A-Za-z0-9]\s*[_^]/;
  * 空格，"方向 D." → "方向D."），若在渲染前做，那些被吃掉的空格会让相邻选项又粘在一起
  * （2026-10-08 实测 p3 raw[10] 回归）。放在最后则天然避开该问题。
  */
+/** @param {string} text */
 export function separateOptionMarks(text) {
   const marks = text.match(/[A-D][.．]/g);
   if (!marks || marks.length < 2) return text;
@@ -314,6 +368,7 @@ export function spaceEmptyParens(text) {
  * @returns {string} 折叠掉一份即时重复前缀后的文本；无命中则原样返回
  */
 const MIN_REPEAT = 6;
+/** @param {string} text */
 export function collapseImmediateRepeat(text) {
   if (typeof text !== "string") return text;
   const maxK = Math.floor(text.length / 2);
@@ -340,6 +395,7 @@ export function collapseImmediateRepeat(text) {
  * "B. F sin θcos θ" 带空格）。2026-10-08 曾加过「收紧数学符号间空格」，
  * 回原卷核对后发现与原卷不符，已回滚——**没有回原卷核对过的"美化"不要做**。
  */
+/** @param {string} text */
 export function prettifyLatex(text) {
   if (!text) return text;
   text = collapseImmediateRepeat(text);
@@ -378,6 +434,7 @@ export function prettifyLatex(text) {
  * 猜错则产生"无人察觉的错误内容"）。纯排版指令（\left 等）豁免——
  * 它们不产生可见内容，切错也看不出来。
  */
+/** @param {string} text */
 export function findCommandAmbiguities(text) {
   const found = [];
   for (const m of text.matchAll(/\\([A-Za-z]+)/g)) {

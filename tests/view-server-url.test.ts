@@ -37,3 +37,30 @@ test("view-server 启动日志打印带完整 doc 参数的可点击 URL", () =>
   assert.match(out, /23%E5%BF%85%E5%88%B7%E9%A2%98/); // encodeURIComponent("23必刷题") 前缀
   assert.match(out, /%202%E7%9B%B8%E4%BA%92%E4%BD%9C%E7%94%A8/); // " 2相互作用"
 });
+
+test("TAGS_WRITE=0：POST /api/tags 返回 403（只读预览）", async () => {
+  const { spawn } = await import("node:child_process");
+  const port = 4200 + Math.floor(Math.random() * 600);
+  const child = spawn("node", ["--import", "tsx", "scripts/view-server.ts"], {
+    cwd: ROOT,
+    env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", TAGS_WRITE: "0" },
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  try {
+    for (let i = 0; i < 60; i++) {
+      try {
+        const r = await fetch(`http://127.0.0.1:${port}/api/docs`);
+        if (r.ok) break;
+      } catch {
+        /* not ready */
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const res = await fetch(`http://127.0.0.1:${port}/api/tags?doc=x`, { method: "POST", body: "{}" });
+    assert.equal(res.status, 403);
+    const body = (await res.json()) as { error?: string };
+    assert.match(body.error ?? "", /TAGS_WRITE=0|只读/);
+  } finally {
+    child.kill("SIGKILL");
+  }
+});
