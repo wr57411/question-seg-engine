@@ -1,0 +1,387 @@
+[
+  {
+    "book": "23必刷题 1 直线运动",
+    "page": 0,
+    "exp_nums": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "got_nums": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "matched": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "missing": [],
+    "extra": [],
+    "coverage": "5/5",
+    "seq": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "inversions": 0,
+    "expected_formula_spans": 3,
+    "minicpm_inline_math": 4,
+    "expected_tables": 0,
+    "minicpm_tables": 0,
+    "expected_charts": 0,
+    "minicpm_charts": 0,
+    "minicpm_chart_tables": 0,
+    "expected_images": 6,
+    "minicpm_skipped_images": 6,
+    "failed_blocks": 0,
+    "content_chars": 1274,
+    "raw_text_chars": 1054,
+    "elapsed": 1.49
+  },
+  {
+    "book": "23必刷题 1 直线运动",
+    "page": 10,
+    "exp_nums": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "got_nums": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "matched": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "missing": [],
+    "extra": [],
+    "coverage": "6/6",
+    "seq": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "inversions": 0,
+    "expected_formula_spans": 23,
+    "minicpm_inline_math": 41,
+    "expected_tables": 0,
+    "minicpm_tables": 0,
+    "expected_charts": 0,
+    "minicpm_charts": 0,
+    "minicpm_chart_tables": 0,
+    "expected_images": 8,
+    "minicpm_skipped_images": 9,
+    "failed_blocks": 0,
+    "content_chars": 1711,
+    "raw_text_chars": 1435,
+    "elapsed": 1.51
+  },
+  {
+    "book": "23必刷题 4 曲线运动",
+    "page": 8,
+    "exp_nums": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "got_nums": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "matched": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "missing": [],
+    "extra": [],
+    "coverage": "6/6",
+    "seq": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "inversions": 0,
+    "expected_formula_spans": 34,
+    "minicpm_inline_math": 33,
+    "expected_tables": 0,
+    "minicpm_tables": 0,
+    "expected_charts": 0,
+    "minicpm_charts": 0,
+    "minicpm_chart_tables": 0,
+    "expected_images": 5,
+    "minicpm_skipped_images": 6,
+    "failed_blocks": 0,
+    "content_chars": 1793,
+    "raw_text_chars": 2208,
+    "elapsed": 1.78
+  },
+  {
+    "book": "物理_教材基础练机械能守恒定律",
+    "page": 1,
+    "exp_nums": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "got_nums": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "matched": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "missing": [],
+    "extra": [],
+    "coverage": "4/4",
+    "seq": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "inversions": 0,
+    "expected_formula_spans": 26,
+    "minicpm_inline_math": 34,
+    "expected_tables": 1,
+    "minicpm_tables": 1,
+    "expected_charts": 0,
+    "minicpm_charts": 0,
+    "minicpm_chart_tables": 0,
+    "expected_images": 4,
+    "minicpm_skipped_images": 9,
+    "failed_blocks": 0,
+    "content_chars": 2275,
+    "raw_text_chars": 1456,
+    "elapsed": 2.19
+  },
+  {
+    "book": "物理_教材基础练机械能守恒定律",
+    "page": 3,
+    "exp_nums": [
+      "1",
+      "2",
+      "3"
+    ],
+    "got_nums": [
+      "1",
+      "2",
+      "3"
+    ],
+    "matched": [
+      "1",
+      "2",
+      "3"
+    ],
+    "missing": [],
+    "extra": [],
+    "coverage": "3/3",
+    "seq": [
+      "1",
+      "2",
+      "3"
+    ],
+    "inversions": 0,
+    "expected_formula_spans": 22,
+    "minicpm_inline_math": 34,
+    "expected_tables": 1,
+    "minicpm_tables": 1,
+    "expected_charts": 0,
+    "minicpm_charts": 0,
+    "minicpm_chart_tables": 0,
+    "expected_images": 3,
+    "minicpm_skipped_images": 8,
+    "failed_blocks": 0,
+    "content_chars": 2097,
+    "raw_text_chars": 1313,
+    "elapsed": 1.81
+  },
+  {
+    "book": "物理_教材基础练 电路",
+    "page": 4,
+    "exp_nums": [
+      "1",
+      "2",
+      "3"
+    ],
+    "got_nums": [
+      "1",
+      "2",
+      "3"
+    ],
+    "matched": [
+      "1",
+      "2",
+      "3"
+    ],
+    "missing": [],
+    "extra": [],
+    "coverage": "3/3",
+    "seq": [
+      "1",
+      "2",
+      "3"
+    ],
+    "inversions": 0,
+    "expected_formula_spans": 0,
+    "minicpm_inline_math": 27,
+    "expected_tables": 0,
+    "minicpm_tables": 2,
+    "expected_charts": 0,
+    "minicpm_charts": 1,
+    "minicpm_chart_tables": 1,
+    "expected_images": 4,
+    "minicpm_skipped_images": 4,
+    "failed_blocks": 0,
+    "content_chars": 2168,
+    "raw_text_chars": 1341,
+    "elapsed": 0
+  },
+  {
+    "book": "教材基础练 磁场",
+    "page": 0,
+    "exp_nums": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "got_nums": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "matched": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "missing": [],
+    "extra": [],
+    "coverage": "4/4",
+    "seq": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "inversions": 0,
+    "expected_formula_spans": 0,
+    "minicpm_inline_math": 5,
+    "expected_tables": 6,
+    "minicpm_tables": 1,
+    "expected_charts": 0,
+    "minicpm_charts": 0,
+    "minicpm_chart_tables": 0,
+    "expected_images": 4,
+    "minicpm_skipped_images": 5,
+    "failed_blocks": 0,
+    "content_chars": 1698,
+    "raw_text_chars": 1348,
+    "elapsed": 1.58
+  },
+  {
+    "book": "答案册-合订本",
+    "page": 1,
+    "exp_nums": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "got_nums": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "matched": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "missing": [],
+    "extra": [],
+    "coverage": "5/5",
+    "seq": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "inversions": 0,
+    "expected_formula_spans": 24,
+    "minicpm_inline_math": 22,
+    "expected_tables": 0,
+    "minicpm_tables": 0,
+    "expected_charts": 0,
+    "minicpm_charts": 0,
+    "minicpm_chart_tables": 0,
+    "expected_images": 2,
+    "minicpm_skipped_images": 3,
+    "failed_blocks": 0,
+    "content_chars": 2546,
+    "raw_text_chars": 2945,
+    "elapsed": 1.53
+  }
+]

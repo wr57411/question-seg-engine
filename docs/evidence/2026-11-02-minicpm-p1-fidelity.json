@@ -1,0 +1,319 @@
+[
+  {
+    "book": "23必刷题 1 直线运动",
+    "page": 0,
+    "questions": 5,
+    "recall_mean": 0.905,
+    "recall_median": 0.914,
+    "recall_min": 0.846,
+    "below_0.5": 0,
+    "table_blocks": 0,
+    "chart_blocks": 0,
+    "chart_as_table": 0,
+    "per_question": [
+      {
+        "number": "1",
+        "recall": 0.846,
+        "baseline_chars": 97
+      },
+      {
+        "number": "2",
+        "recall": 0.914,
+        "baseline_chars": 194
+      },
+      {
+        "number": "3",
+        "recall": 0.924,
+        "baseline_chars": 168
+      },
+      {
+        "number": "4",
+        "recall": 0.909,
+        "baseline_chars": 124
+      },
+      {
+        "number": "5",
+        "recall": 0.934,
+        "baseline_chars": 201
+      }
+    ]
+  },
+  {
+    "book": "23必刷题 1 直线运动",
+    "page": 10,
+    "questions": 6,
+    "recall_mean": 0.89,
+    "recall_median": 0.897,
+    "recall_min": 0.82,
+    "below_0.5": 0,
+    "table_blocks": 0,
+    "chart_blocks": 0,
+    "chart_as_table": 0,
+    "per_question": [
+      {
+        "number": "1",
+        "recall": 0.92,
+        "baseline_chars": 142
+      },
+      {
+        "number": "2",
+        "recall": 0.928,
+        "baseline_chars": 147
+      },
+      {
+        "number": "3",
+        "recall": 0.856,
+        "baseline_chars": 167
+      },
+      {
+        "number": "4",
+        "recall": 0.874,
+        "baseline_chars": 152
+      },
+      {
+        "number": "5",
+        "recall": 0.82,
+        "baseline_chars": 168
+      },
+      {
+        "number": "6",
+        "recall": 0.943,
+        "baseline_chars": 110
+      }
+    ]
+  },
+  {
+    "book": "23必刷题 4 曲线运动",
+    "page": 8,
+    "questions": 6,
+    "recall_mean": 0.818,
+    "recall_median": 0.859,
+    "recall_min": 0.555,
+    "below_0.5": 0,
+    "table_blocks": 0,
+    "chart_blocks": 0,
+    "chart_as_table": 0,
+    "per_question": [
+      {
+        "number": "1",
+        "recall": 0.858,
+        "baseline_chars": 150
+      },
+      {
+        "number": "2",
+        "recall": 0.858,
+        "baseline_chars": 182
+      },
+      {
+        "number": "3",
+        "recall": 0.86,
+        "baseline_chars": 174
+      },
+      {
+        "number": "4",
+        "recall": 0.879,
+        "baseline_chars": 150
+      },
+      {
+        "number": "5",
+        "recall": 0.9,
+        "baseline_chars": 228
+      },
+      {
+        "number": "6",
+        "recall": 0.555,
+        "baseline_chars": 219
+      }
+    ]
+  },
+  {
+    "book": "物理_教材基础练机械能守恒定律",
+    "page": 1,
+    "questions": 4,
+    "recall_mean": 0.848,
+    "recall_median": 0.831,
+    "recall_min": 0.821,
+    "below_0.5": 0,
+    "table_blocks": 1,
+    "chart_blocks": 0,
+    "chart_as_table": 0,
+    "per_question": [
+      {
+        "number": "1",
+        "recall": 0.828,
+        "baseline_chars": 196
+      },
+      {
+        "number": "2",
+        "recall": 0.91,
+        "baseline_chars": 174
+      },
+      {
+        "number": "3",
+        "recall": 0.833,
+        "baseline_chars": 232
+      },
+      {
+        "number": "4",
+        "recall": 0.821,
+        "baseline_chars": 171
+      }
+    ]
+  },
+  {
+    "book": "物理_教材基础练机械能守恒定律",
+    "page": 3,
+    "questions": 3,
+    "recall_mean": 0.873,
+    "recall_median": 0.855,
+    "recall_min": 0.845,
+    "below_0.5": 0,
+    "table_blocks": 1,
+    "chart_blocks": 0,
+    "chart_as_table": 0,
+    "per_question": [
+      {
+        "number": "1",
+        "recall": 0.845,
+        "baseline_chars": 185
+      },
+      {
+        "number": "2",
+        "recall": 0.919,
+        "baseline_chars": 231
+      },
+      {
+        "number": "3",
+        "recall": 0.855,
+        "baseline_chars": 171
+      }
+    ]
+  },
+  {
+    "book": "物理_教材基础练 电路",
+    "page": 4,
+    "questions": 3,
+    "recall_mean": 0.894,
+    "recall_median": 0.907,
+    "recall_min": 0.851,
+    "below_0.5": 0,
+    "table_blocks": 1,
+    "chart_blocks": 1,
+    "chart_as_table": 1,
+    "per_question": [
+      {
+        "number": "1",
+        "recall": 0.907,
+        "baseline_chars": 124
+      },
+      {
+        "number": "2",
+        "recall": 0.924,
+        "baseline_chars": 176
+      },
+      {
+        "number": "3",
+        "recall": 0.851,
+        "baseline_chars": 163
+      }
+    ]
+  },
+  {
+    "book": "教材基础练 磁场",
+    "page": 0,
+    "questions": 4,
+    "recall_mean": 0.906,
+    "recall_median": 0.903,
+    "recall_min": 0.876,
+    "below_0.5": 0,
+    "table_blocks": 1,
+    "chart_blocks": 0,
+    "chart_as_table": 0,
+    "per_question": [
+      {
+        "number": "1",
+        "recall": 0.876,
+        "baseline_chars": 164
+      },
+      {
+        "number": "2",
+        "recall": 0.916,
+        "baseline_chars": 184
+      },
+      {
+        "number": "3",
+        "recall": 0.942,
+        "baseline_chars": 237
+      },
+      {
+        "number": "4",
+        "recall": 0.889,
+        "baseline_chars": 167
+      }
+    ]
+  },
+  {
+    "book": "答案册-合订本",
+    "page": 1,
+    "questions": 10,
+    "recall_mean": 0.954,
+    "recall_median": 0.966,
+    "recall_min": 0.838,
+    "below_0.5": 0,
+    "table_blocks": 0,
+    "chart_blocks": 0,
+    "chart_as_table": 0,
+    "per_question": [
+      {
+        "number": "1",
+        "recall": 1.0,
+        "baseline_chars": 47
+      },
+      {
+        "number": "2",
+        "recall": 0.978,
+        "baseline_chars": 190
+      },
+      {
+        "number": "3",
+        "recall": 1.0,
+        "baseline_chars": 142
+      },
+      {
+        "number": "4",
+        "recall": 0.92,
+        "baseline_chars": 83
+      },
+      {
+        "number": "5",
+        "recall": 0.935,
+        "baseline_chars": 339
+      },
+      {
+        "number": "1",
+        "recall": 1.0,
+        "baseline_chars": 134
+      },
+      {
+        "number": "2",
+        "recall": 0.838,
+        "baseline_chars": 193
+      },
+      {
+        "number": "3",
+        "recall": 0.913,
+        "baseline_chars": 170
+      },
+      {
+        "number": "4",
+        "recall": 1.0,
+        "baseline_chars": 166
+      },
+      {
+        "number": "5",
+        "recall": 0.953,
+        "baseline_chars": 161
+      }
+    ]
+  }
+]
