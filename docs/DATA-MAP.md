@@ -30,6 +30,8 @@
 | `data/out/<册>/questions.json` | 切题结果 | `daily` / `segmentFromLayout` | **D** | 与引擎 mtime 比：`npm run preflight` |
 | `data/out/<册>/stages.json` | 展示快照 | `npm run stages:export` | D | 同上 |
 | `data/out/<册>/meta.json` | 体检摘要 | `daily` | D | **看 `build.engine`（`src/` 子树指纹）**：不等于当前 `git rev-parse HEAD:src` 即为过期。`importedAt` 是首次导入时间，**不是**产出时间 |
+| `data/out/<册>/ocr-page-fill.json` | 整页 OCR 的候选/全文（切题前由 `injectOcrFullTextLines` 注入） | `scripts/ocr-page-fill.ts` | D | 与 `questions.json` 同次导出；**只有被 `--pages` 跑过的页**（答案册目前仅 3 页），删掉即回退 OCR 注入 |
+| `data/out/<册>/ocr-page/` | 整页 OCR 缓存（每页 PNG + 识别全文 `pNN.txt`） | `scripts/ocr-page-fill.ts` | E（缓存，可删） | 重跑会重建；**不是**切题输入 |
 | `data/out/<册>-OXR/` | 第二解析源（OXR）产物 | `--parser oxr` | D | 与 MinerU 侧同样处理 |
 | `data/out/bank/` `tags/` `topics/` `teach/` | 题库/标签/专题/教学层 | 各自的 `npm run bank` 等 | D | 依赖上游产物，上游过期它也就过期 |
 | `data/smoke/` | 首次 API 冒烟原始响应 | `scripts/api-smoke.ts` | D（但**字段事实以它为准**） | 一次性的，不再变 |
