@@ -118,8 +118,15 @@ export function judge(
   const bc = cjk(bodyNorm.slice(0, 12));
   if (bc.length < MIN_CJK) return null; // 正文汉字太少，无法判断（宁漏不误）
   const covLayout = coverage(bc, layoutGrams);
-  const covPool = poolGrams ? coverage(bc, poolGrams) : 1;
+  // 无产物题池（该册没有 questions.json）时**不做**「已在产物里」的短路判断：
+  // 那会永远返回 null（等于对缺产物的册子完全不报警）。
+  const covPool = poolGrams ? coverage(bc, poolGrams) : 0;
+  // **产物里已经有这道题 ⇒ 不是缺陷**，无论 layout 覆盖率多低。
+  // 实测《机械能守恒》p6#1：用 `corrections` 清单补回题号后，产物里已有该题（题池 1.00），
+  // 但 layout 仍只有残段（0.40）—— 不先看产物就会把「已修好的」一直报成缺陷。
+  if (poolGrams && covPool >= POOL_HAS) return null;
   if (covLayout < LAYOUT_HAS) return { verdict: "X1", covLayout, covPool };
-  if (covPool < POOL_HAS) return { verdict: "X2", covLayout, covPool };
-  return null;
+  // 没有产物题池 ⇒ 无从判断「有没有成题」，只判 X1，不猜 X2。
+  if (!poolGrams) return null;
+  return { verdict: "X2", covLayout, covPool };
 }

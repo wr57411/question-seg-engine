@@ -267,6 +267,8 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
       const blocks: ParsedBlock[] = [];
       /** 跨页段泄漏行（见 dropCrossPageLeaks 的归类说明），按页收集后统一迁回 */
       const leaks: ParsedBlock[] = [];
+      /** 本页丢弃的纯符号噪声行数（见 isSymbolNoiseLine），汇总到文档级计数 */
+      let noiseDropped = 0;
       const pageWidth = asNumber(size?.[0]) ?? 1654;
       const pageHeight = asNumber(size?.[1]) ?? 2339;
       /**
@@ -357,7 +359,18 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
             parts.push(isInlineEquation ? `$${content.trim()}$` : content);
           }
           if (parts.length === 0) continue;
-          const text = parts.join("");
+          const joined = parts.join("");
+          // **纯符号噪声行**（`DECISIONS §100`）：插图里的「× × ×」网格被上游当成文字行，
+          // 《教材基础练 磁场》p2 一页 154 行。留着会同时造成两处坏结果：
+          // ① 把 x0 直方图左簇灌到 168 行，`detectColumns` 的相对阈值失效 ⇒ 整页判单栏、
+          //    阅读顺序退化成全页 y 排序（该页 4 道题题干两栏交错）；
+          // ② 题干被几百个 `×` 灌满（实测该页 #1 的 stem 达 5,306 字）。
+          // 丢弃的是无词汇信息的符号串，计数上抛到 `ParsedDocument.droppedNoiseLines` 保证可见。
+          if (isSymbolNoiseLine(joined)) {
+            noiseDropped++;
+            continue;
+          }
+          const text = normalizeCircledQuestionNo(joined);
           const block: ParsedBlock = {
             kind: "text",
             bbox: toBBox(line.bbox),
@@ -393,11 +406,17 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
         height: pageHeight,
         blocks: tabled,
         leaks,
-      } satisfies PageInfo & { leaks: ParsedBlock[] };
+        noiseDropped,
+      } satisfies PageInfo & { leaks: ParsedBlock[]; noiseDropped: number };
     })
     .sort((a, b) => a.index - b.index);
-  const withLeaks = pages as (PageInfo & { leaks: ParsedBlock[] })[];
-  return { docId, pages: dropCrossPageLeaks(withLeaks) };
+  const withLeaks = pages as (PageInfo & { leaks: ParsedBlock[]; noiseDropped: number })[];
+  const droppedNoiseLines = withLeaks.reduce((a, p) => a + (p.noiseDropped ?? 0), 0);
+  return {
+    docId,
+    pages: dropCrossPageLeaks(withLeaks),
+    ...(droppedNoiseLines > 0 ? { droppedNoiseLines } : {}),
+  };
 }
 
 /**
@@ -728,6 +747,54 @@ function dropCrossPageLeaks(pages: (PageInfo & { leaks: ParsedBlock[] })[]): Pag
  * 从 layout 的块结构里取纯文本（`lines[].spans[].content`）。
  * 用于 `discarded_blocks` —— 那里同样只有行/span 结构，没有现成的 text 字段。
  */
+/**
+ * 纯符号噪声行：插图里的「× × ×」网格被上游当成文字行（`DECISIONS §100`）。
+ *
+ * 判据（全部 AND，宁漏不误）：
+ * 1. 去空白后长度 ≥ 6；
+ * 2. 只由 `× ✕ ✖ ☓ ＊ * · • - — _ = ~ ～` 与空白组成；
+ * 3. 其中 `×` 类字符（含 ✕✖☓）≥ 4 个 —— 排除 `——` `====` 这类分隔线，
+ *    避免把版式装饰当噪声删掉。
+ *
+ * 实测全 15 册只有《教材基础练 磁场》p2 命中 154 行（该页有一张「磁场垂直纸面向里」的
+ * × 网格插图，被 MinerU 逐行识别成文本），其余 14 册 0 行。
+ */
+function isSymbolNoiseLine(text: string): boolean {
+  const t = text.replace(/\s/g, "");
+  if (t.length < 6) return false;
+  if (!/^[×✕✖☓＊*·•\-—_=~～]+$/.test(t)) return false;
+  return (t.match(/[×✕✖☓]/g) ?? []).length >= 4;
+}
+
+/**
+ * 行首「带圈数字」→ 阿拉伯数字（2026-11-02 实测，`DECISIONS §100`）
+ *
+ * 上游偶尔把**题号**输出成 `①`–`⑳`（U+2460–U+2473）：实测《运动和力》p4、
+ * 《机械能守恒》p1 / p4 / p6 / p15 的原卷是 `3[多选][人教版必修一 P96…]`，
+ * `layout.json` 里却是 `③[多选][人教版必修一 P96…]`，而项目自己的整页 OCR
+ * (`ocr-page/pNN.txt`) 是正常的 `3[`。判据只认 ASCII 数字 ⇒ **这 5 题整题不入库**
+ * (`§99` 审计 X2 命中，逐条核过)。
+ *
+ * 只在**强信号**下还原：圈号后紧跟 `[`／`【`／`「`、四位年份，或该行 60 字内出现
+ * 教材版本词 / `…变式]` 出处标注。全 15 册实测：圈号开头的行共 31 条，满足强信号的
+ * **恰好这 5 条**，其余都是正文里的 `①②③` 列举（还原它们会把列举变成题号）。
+ */
+function normalizeCircledQuestionNo(line: string): string {
+  const m = /^([\u2460-\u2473])\s*/.exec(line);
+  if (!m) return line;
+  const rest = line.slice(m[0].length);
+  const strong =
+    /^[\[［【「]/.test(rest) ||
+    /^(?:19|20)\d{2}/.test(rest) ||
+    /(人教版|粤教版|鲁科版|教科版|沪科版|苏教版)/.test(line.slice(0, 60)) ||
+    line.slice(0, 60).includes("变式]");
+  if (!strong) return line;
+  const n = m[1]!.codePointAt(0)! - 0x2460 + 1;
+  // 后面若直接接数字（`③ 2024…`），必须补一个空格，否则会拼成 `32024`
+  const sep = /^\d/.test(rest) ? " " : "";
+  return String(n) + sep + rest;
+}
+
 function layoutBlockText(pb: Record<string, unknown>): string {
   const out: string[] = [];
   for (const lineRaw of asArray(pb.lines as unknown)) {

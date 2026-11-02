@@ -1,0 +1,23 @@
+{
+ "docId": "教材基础练 磁场",
+ "generatedAt": "2026-11-02T09:05:50",
+ "basis": "题号行交叉核对（DECISIONS §99）",
+ "counts": {
+  "replace": 0,
+  "replaceText": 1,
+  "insert": 0,
+  "bodyHole": 0,
+  "total": 1
+ },
+ "items": [
+  {
+   "page": 9,
+   "kind": "replace_text",
+   "blockText": "图所示是磁流体发电机的工作原理示意图。发",
+   "to": "4[多选][人教版选修二P12第4题设问变式]易错如图所示是磁流体发电机的工作原理示意图。发",
+   "from": "缺题号与出处标注前缀（「4[多选][…]易错如」）",
+   "verified": false,
+   "evidence": "整页 OCR p09.txt 该行为「4[多选][人教版选修二P12第4题设问变式]易错如图所示是磁流体发电机…」；layout 该行只剩「图所示是…」，行首 20 余字丢失。未回原卷页图核对。"
+  }
+ ]
+}

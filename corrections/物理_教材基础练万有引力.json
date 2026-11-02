@@ -1,0 +1,23 @@
+{
+ "docId": "物理_教材基础练万有引力",
+ "generatedAt": "2026-11-02T09:05:50",
+ "basis": "题号行交叉核对（DECISIONS §99）",
+ "counts": {
+  "replace": 0,
+  "replaceText": 1,
+  "insert": 0,
+  "bodyHole": 0,
+  "total": 1
+ },
+ "items": [
+  {
+   "page": 4,
+   "kind": "replace_text",
+   "blockText": "[人教版必修二 P59 问题拓展变式] 如图所示, ",
+   "to": "1 [人教版必修二 P59 问题拓展变式] 如图所示, ",
+   "from": "缺行首题号 1",
+   "verified": false,
+   "evidence": "整页 OCR p04.txt 该行为「1 [人教版必修二 P59 问题拓展变式] 如图所示,…」；layout 缺「1」。未回原卷页图核对。"
+  }
+ ]
+}

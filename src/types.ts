@@ -81,6 +81,12 @@ export interface PageInfo {
 export interface ParsedDocument {
   docId: string;
   pages: PageInfo[];
+  /**
+   * 被丢弃的**纯符号噪声行**计数（如把插图里的「× × ×」网格认成文字行）。
+   * 丢弃的是无词汇信息的符号串，但**必须可见**（红线「不静默」）——
+   * 由 `index.ts` 的摘要与 `daily` 体检打印；`layout.json` 原件不动，可复核。
+   */
+  droppedNoiseLines?: number;
 }
 
 /** 带文档内原始序号与页码的块，供决策层回溯 source.blockIndexes / ReviewNote */

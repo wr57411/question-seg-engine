@@ -1,0 +1,32 @@
+{
+ "docId": "物理_教材基础练 曲线运动",
+ "generatedAt": "2026-11-02T09:05:50",
+ "basis": "题号行交叉核对（DECISIONS §99）",
+ "counts": {
+  "replace": 0,
+  "replaceText": 2,
+  "insert": 0,
+  "bodyHole": 0,
+  "total": 2
+ },
+ "items": [
+  {
+   "page": 8,
+   "kind": "replace_text",
+   "blockText": "2023 全国甲卷 [人教版必修二 P30 第 3 题考法变",
+   "to": "1 2023 全国甲卷 [人教版必修二 P30 第 3 题考法变",
+   "from": "缺行首题号 1",
+   "verified": false,
+   "evidence": "整页 OCR p08.txt 该行为「1 2023 全国甲卷 [人教版必修二 P30 第 3 题考法变式]…」；layout 同位置只有一个 span 且无「1」⇒ 上游丢单个题号字符。未回原卷页图核对。"
+  },
+  {
+   "page": 16,
+   "kind": "replace_text",
+   "blockText": "2024 江西卷 [多选] [人教版必修二 P21 第 6 题",
+   "to": "2 2024 江西卷 [多选] [人教版必修二 P21 第 6 题",
+   "from": "缺行首题号 2",
+   "verified": false,
+   "evidence": "整页 OCR p16.txt 该行为「2 2024 江西卷 [多选] [人教版必修二 P21 第6题情境变式]…」；layout 缺「2」。未回原卷页图核对。"
+  }
+ ]
+}
