@@ -434,6 +434,20 @@ for (const p of snap.pages) {
     }
     for (const seg of segList) {
       if (li >= holeLines.length) break;
+      // **逐段 before/列守卫**（2026-11-02）：一个 OCR span 可能跨多行
+      // （实测答案册 p151 = `"综合\n1. B 必刷知识·感应电流的产生"`），而 `before` 锚点块
+      // 只有一个位置。后续段若已落到锚点下方，就不能再吃更靠下的洞 —— 否则会把下一题的
+      // 题号行补到上一题的位置（p151 的 `#1` 因此被塞进 `#3` 的洞，`#2` 留在上一组）。
+      // 逐段重判；一旦越界就**放弃该 span 的剩余段**（交给 fullText 路径按下一行重新定位）。
+      const nextHole = holeLines[li]!;
+      if (fb) {
+        const fby = (fb.bbox[1] + fb.bbox[3]) / 2;
+        const holeY =
+          nextHole.reduce((a, k) => a + (holes[k]!.bbox[1] + holes[k]!.bbox[3]) / 2, 0) / nextHole.length;
+        if (fby < holeY - fontPt) break;
+        const firstHole = nextHole[0]!;
+        if ((fb.bbox[0] < mid) !== (holes[firstHole]!.bbox[0] < mid)) break;
+      }
       const hn = hardNorm(seg);
       const L = hn.chars.length;
       if (!L) continue;
