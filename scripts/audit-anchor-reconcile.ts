@@ -158,10 +158,11 @@ function main(): void {
     const qPath = join(ROOT, doc, "questions.json");
     if (!existsSync(qPath)) continue;
     const raw = JSON.parse(readFileSync(qPath, "utf8")) as
-      | { questions?: { source?: { pageIndex?: number } }[] }
-      | { source?: { pageIndex?: number } }[];
+      | { questions?: { source?: { pageIndex?: number }; stem?: string }[] }
+      | { source?: { pageIndex?: number }; stem?: string }[];
     const qs = (Array.isArray(raw) ? raw : raw.questions ?? []) as {
       source?: { pageIndex?: number };
+      stem?: string;
     }[];
     const { pageOf, pages } = layoutAnchors(doc);
     const ks = [...wordAnchor.keys()].filter((n) => pageOf.has(n)).sort((a, b) => a - b);
@@ -181,7 +182,11 @@ function main(): void {
       const pTo = idx + 1 < ks.length ? pageOf.get(ks[idx + 1]!)! : pages + 1;
       const engineCount = qs.filter((x) => {
         const p = (x.source?.pageIndex ?? -1) + 1;
-        return p >= pFrom && p < pTo;
+        if (p < pFrom || p >= pTo) return false;
+        // **实验区不计入本对账**（`DECISIONS §103`）：Word 侧只有「教材实验 N」一行标题、
+        // 没有任何题号行，而引擎按小问切成 N 道 ⇒ 两侧口径天然不同，计入只会产生假异常。
+        // 实验区的完整性由 `§99` 的 X2（正文在输入里却不成题）单独覆盖。
+        return !/^\s*教材实验\s*\d+/.test(x.stem ?? "");
       }).length;
       rows.push({
         doc,
