@@ -16,25 +16,34 @@
  * - **X2 切分丢题**：正文在 layout 里，却没成为任何一道题（含被并进相邻题）。
  *
  * 反向（layout 有、OCR 无）不报：OCR 自身也会漏，报了只会是噪声。
- * 命中 ⇒ 打印清单；默认 **exit 0**（先观察量级，不卡门）；`--strict` ⇒ exit 1。
+ *
+ * **入闸方式（`§99` v2 补充）**：命中是**已知缺陷**，不是在办事项 —— 让 `check` 每次都红，
+ * 等于逼人忽略它。所以用**登记表**（`scripts/numbering-cross-baseline.json`）：
+ * - 已登记 ⇒ 只打印，不算失败；
+ * - **未登记的新命中 ⇒ exit 1**（这才是回归）；
+ * - 已登记但本次不再命中 ⇒ 打印「已消失，请从登记表移除」，不算失败（修好了是好事）。
  *
  * 用法：
- *   npm run audit:numbering:cross
- *   npm run audit:numbering:cross -- --strict
- *   npm run audit:numbering:cross -- --root tmp/fixture    # 自检
+ *   npm run audit:numbering:cross                    # 闸门模式（新命中才红）
+ *   npm run audit:numbering:cross -- --report        # 只看清单，永远 exit 0
+ *   npm run audit:numbering:cross -- --update-baseline   # 重写登记表
+ *   npm run audit:numbering:cross -- --root tmp/fixture  # 自检（不比对登记表）
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   Q_LINE,
+  baselineKeys,
   bodyFromLines,
   cjk,
   gramSet,
   judge,
+  type BaselineEntry,
   type Verdict,
 } from "./lib/numbering-cross.js";
 
 const DEFAULT_ROOT = join("data", "out");
+const BASELINE_PATH = join("scripts", "numbering-cross-baseline.json");
 /** 同书的另一种解析副本 + 非文档目录：不重复报。 */
 const SKIP_EXACT = new Set(["bank", "tags", "_tablecheck"]);
 const SKIP_SUFFIX = /-(?:OXR|MinerU)$/;
@@ -47,16 +56,28 @@ interface Hit {
   verdict: Verdict;
   covLayout: number;
   covPool: number;
+  /** 正文汉字前 8 字，登记表的稳定键 */
+  body: string;
 }
 
-function parseArgs(argv: string[]): { root: string; strict: boolean } {
+function parseArgs(argv: string[]): {
+  root: string;
+  report: boolean;
+  updateBaseline: boolean;
+  /** 显式指定的登记表路径（自检/测试用）；未指定时按 root 推断 */
+  baseline: string | null;
+} {
   let root = DEFAULT_ROOT;
-  let strict = false;
+  let report = false;
+  let updateBaseline = false;
+  let baseline: string | null = null;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--root" && argv[i + 1]) root = argv[++i]!;
-    if (argv[i] === "--strict") strict = true;
+    if (argv[i] === "--baseline" && argv[i + 1]) baseline = argv[++i]!;
+    if (argv[i] === "--report") report = true;
+    if (argv[i] === "--update-baseline") updateBaseline = true;
   }
-  return { root, strict };
+  return { root, report, updateBaseline, baseline };
 }
 
 function readJson<T>(path: string): T | null {
@@ -87,7 +108,7 @@ function layoutSpans(lay: LayoutFile): string[] {
 }
 
 function main(): void {
-  const { root, strict } = parseArgs(process.argv.slice(2));
+  const { root, report, updateBaseline, baseline: baselineArg } = parseArgs(process.argv.slice(2));
   if (!existsSync(root)) {
     console.error(`目录不存在：${root}`);
     process.exit(1);
@@ -125,6 +146,7 @@ function main(): void {
         if (!q) continue;
         const j = judge(bodyFromLines(lines, li), layoutGrams, poolGrams);
         if (!j) continue;
+        const body = cjk(bodyFromLines(lines, li).slice(0, 12)).slice(0, 8);
         hits.push({
           doc: name,
           page: pageIdx + 1,
@@ -133,6 +155,7 @@ function main(): void {
           verdict: j.verdict,
           covLayout: j.covLayout,
           covPool: j.covPool,
+          body,
         });
         reported = true;
       }
@@ -162,7 +185,84 @@ function main(): void {
     "说明：覆盖率为「汉字 4 字滑窗命中比例」，不用精确子串（公式/字母写法必然不同）。\n" +
       "处置：回原卷页图核对（红线：检测不改写），确认后再决定是否补切。",
   );
-  if (strict && hits.length > 0) process.exit(1);
+
+  // ── 登记表比对 ──
+  // 生产根目录用默认登记表；换了 `--root`（夹具）却**没**给 `--baseline` 时，不比对，
+  // 避免拿生产登记表去量夹具。显式给了 `--baseline` 就一律用它。
+  const baselinePath = baselineArg ?? (root === DEFAULT_ROOT ? BASELINE_PATH : null);
+  if (!baselinePath) return;
+
+  if (updateBaseline) {
+    const entries: BaselineEntry[] = hits.map((h) => ({
+      doc: h.doc,
+      check: h.verdict,
+      at: `p${h.page} #${h.number}`,
+      body: h.body,
+      detail: h.ocrLine,
+    }));
+    writeFileSync(baselinePath, `${JSON.stringify(entries, null, 1)}\n`, "utf8");
+    console.log(`\n已写入登记表 ${baselinePath}：${entries.length} 条`);
+    return;
+  }
+
+  const baseline = readJson<BaselineEntry[]>(baselinePath) ?? [];
+  const known = new Set<string>();
+  for (const e of baseline) {
+    for (const k of baselineKeys({
+      doc: e.doc,
+      verdict: e.check,
+      page: Number(/^p(\d+)/.exec(e.at ?? "")?.[1] ?? NaN) || null,
+      number: /#(\S+)$/.exec(e.at ?? "")?.[1] ?? null,
+      body: e.body ?? "",
+    })) {
+      known.add(k);
+    }
+  }
+  const isKnown = (h: Hit) =>
+    baselineKeys({ doc: h.doc, verdict: h.verdict, page: h.page, number: h.number, body: h.body }).some(
+      (k) => known.has(k),
+    );
+
+  const fresh = hits.filter((h) => !isKnown(h));
+  const seen = new Set<string>();
+  for (const h of hits) {
+    for (const k of baselineKeys({
+      doc: h.doc,
+      verdict: h.verdict,
+      page: h.page,
+      number: h.number,
+      body: h.body,
+    })) {
+      seen.add(k);
+    }
+  }
+  const stale = baseline.filter(
+    (e) =>
+      !baselineKeys({
+        doc: e.doc,
+        verdict: e.check,
+        page: Number(/^p(\d+)/.exec(e.at ?? "")?.[1] ?? NaN) || null,
+        number: /#(\S+)$/.exec(e.at ?? "")?.[1] ?? null,
+        body: e.body ?? "",
+      }).some((k) => seen.has(k)),
+  );
+
+  console.log(
+    `登记表：已知 ${baseline.length} 条；本次命中 ${hits.length} 条 ⇒ 已登记 ${hits.length - fresh.length} / **新增 ${fresh.length}**`,
+  );
+  if (fresh.length) {
+    console.log("\n⚠️ **未登记的新命中（回归）**：");
+    for (const h of fresh) console.log(`  ${h.doc} · p${h.page} · #${h.number} · ${h.verdict} | ${h.ocrLine}`);
+    console.log("\n若是真缺陷：修它；若是判据误报：修判据，别把它塞进登记表。");
+  }
+  if (stale.length) {
+    console.log(`\nℹ️ 已登记但本次未命中 ${stale.length} 条（修好了？请删掉对应条目）：`);
+    for (const e of stale.slice(0, 10)) console.log(`  ${e.doc} · ${e.at} · ${e.check} · ${e.body}`);
+    if (stale.length > 10) console.log(`  … 其余 ${stale.length - 10} 条`);
+  }
+
+  if (report) return;
+  if (fresh.length > 0) process.exit(1);
 }
 
 main();

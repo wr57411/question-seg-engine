@@ -74,6 +74,35 @@ export interface Judgement {
   covPool: number;
 }
 
+/** 登记表条目（`scripts/numbering-cross-baseline.json`）。 */
+export interface BaselineEntry {
+  doc: string;
+  check: Verdict;
+  /** 可读定位：`p5 #1` */
+  at: string;
+  /** 正文汉字前 8 字 —— 比页码/题号稳定（重新切题后页码会变） */
+  body: string;
+  /** 一行说明，给人看的 */
+  detail?: string;
+  /** 原卷核对证据（`pages/page-05.png` 这类）；有则审计校验文件存在 */
+  verified?: string;
+  note?: string;
+}
+
+/** 登记表匹配键：先按「册 + 判据 + 页码题号」，再退回「册 + 判据 + 正文前 8 字」。 */
+export function baselineKeys(e: {
+  doc: string;
+  verdict: Verdict;
+  page: number | null;
+  number: string | null;
+  body: string;
+}): string[] {
+  const keys: string[] = [];
+  if (e.page !== null) keys.push(`${e.doc}|${e.verdict}|p${e.page} #${e.number}`);
+  keys.push(`${e.doc}|${e.verdict}|${e.body}`);
+  return keys;
+}
+
 /**
  * 判定：
  * - **X1 上游丢字**：layout 覆盖率 < `LAYOUT_HAS` ⇒ 该题正文在**输入**里就没有。

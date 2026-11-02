@@ -17,7 +17,7 @@
     "test": "node --import tsx --test \"tests/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "typecheck:viewer": "tsc -p tsconfig.viewer.json",
-    "check": "npm run typecheck && npm run typecheck:viewer && npm test && npm run audit:render:baseline && npm run audit:numbering && npm run audit:suspicious && npm run bank:all",
+    "check": "npm run typecheck && npm run typecheck:viewer && npm test && npm run audit:render:baseline && npm run audit:numbering && npm run audit:numbering:cross && npm run audit:suspicious && npm run bank:all",
     "stages:ocr-fill": "tsx scripts/ocr-fill.ts",
     "stages:ocr-page": "tsx scripts/ocr-page-fill.ts",
     "audit:numbering": "tsx scripts/audit-numbering.ts",
@@ -40,7 +40,9 @@
     "fuse:eval": "tsx scripts/fuse-eval.ts",
     "fuse:doc": "tsx scripts/fuse-doc.ts",
     "audit:ab": "tsx scripts/ab-questions.ts",
-    "audit:numbering:cross": "tsx scripts/audit-numbering-cross.ts"
+    "audit:numbering:cross": "tsx scripts/audit-numbering-cross.ts",
+    "audit:numbering:cross:report": "tsx scripts/audit-numbering-cross.ts --report",
+    "audit:numbering:cross:update": "tsx scripts/audit-numbering-cross.ts --update-baseline"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
