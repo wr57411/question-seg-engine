@@ -748,8 +748,9 @@ class Ctx {
 
   /**
    * 板块结束：整块没有出现过真实题号 ⇒ 把栏目本身开成一道题（`DECISIONS §79`）。
-   * 题号取栏目序号（`教材实验 10` → `"10"`），并**强制新编号组** ——
-   * 它不是同册的「第 10 题」，不该排在前面真题号序列里（否则 N4「组内不连续」报红）。
+   * 题号取「实验 + 栏目序号」（`教材实验 10` → `"实验10"`，`B-20` 2026-11-02 定案），
+   * 并**强制新编号组** —— 它不是同册的「第 10 题」，不该排在前面真题号序列里，
+   * 也不该看起来像真题号（否则 N4「组内不连续」报红、读者也会误认）。
    */
   private settlePendingBand(): void {
     const p = this.pendingBand;
@@ -760,9 +761,10 @@ class Ctx {
     // 同背景的小问属于同一道题 —— 整块仍按一道题开，不按小问拆。
 
     const ordinal = p.ordinal;
+    const experimentNumber = `实验${ordinal}`;
     this.sectionSeq++;
     this.groupHasQuestions = false;
-    this.openDraft(ordinal, { text: p.title }, p.entry);
+    this.openDraft(experimentNumber, { text: p.title }, p.entry);
     const cur = this.current;
     if (!cur) return;
     this.settleOptions(null);
@@ -772,7 +774,7 @@ class Ctx {
     if (extra.length) cur.stemParts = [p.title, ...extra];
     this.review(
       p.entry.index,
-      `栏目「${p.title}」整块无可识别题号 ⇒ 按栏目序号开为第 ${ordinal} 题（自成一组，不占同册真题号序）`,
+      `栏目「${p.title}」整块无可识别题号 ⇒ 按栏目序号开为「${experimentNumber}」（自成一组，不占同册真题号序）`,
       cur,
     );
   }

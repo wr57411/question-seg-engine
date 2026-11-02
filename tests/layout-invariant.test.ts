@@ -60,7 +60,7 @@ function makeNode(tagName: string): Stub {
   createTextNode: (t: string) => Object.assign(makeNode("#text"), { textContent: t }),
 };
 
-const { GUTTER, renderPaper, ocrFillNode } = await import("../stages/reconstruct.js");
+const { GUTTER, EXP_GUTTER, renderPaper, ocrFillNode } = await import("../stages/reconstruct.js");
 
 /* ── 夹具：一页两题双栏（够触发号牌分栏与标签列，不依赖 git 忽略的 data/） ── */
 
@@ -140,6 +140,24 @@ test("③ 留白与画布宽度钉死成字面量（给标签腾地方=把页面
   assert.equal(off.innerW, 716);
   assert.equal(on.innerW, 716, "标签层不得改变内容区宽度");
   assert.equal(on.canvas.style.width, "716px");
+});
+
+test("④ 实验编号页：留白加宽到 EXP_GUTTER，普通页仍是 22（B-20）", () => {
+  // 实验编号 `实验10` 比纯数字宽，22px 留白放不下；只对该页加宽，普通页几何不变。
+  const EXP_PAGE = {
+    ...PAGE,
+    questions: PAGE.questions.map((q, i) => ({ ...q, number: `实验${10 + i}` })),
+  };
+  const { innerW, wrap } = renderPaper(EXP_PAGE, { paneW: 760 } as never);
+  // fixture 两题分属左右栏 ⇒ 两侧留白都加宽
+  assert.equal(innerW, 760 - EXP_GUTTER * 2);
+  assert.equal(GUTTER, 22);
+  // 号牌必须原样写「实验10」，并带 exp 类（CSS 缩字号），不能被拆成「实验」「10」
+  const geo = paperGeometry(wrap);
+  assert.ok(
+    geo.some((g) => g.startsWith("q-chip plain exp|") && g.endsWith("实验10")),
+    `实验编号号牌缺失：\n${geo.join("\n")}`,
+  );
 });
 
 test("②b 教学角标只挂进号牌，不改纸面几何；N·M 文案正确", () => {

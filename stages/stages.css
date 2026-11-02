@@ -494,6 +494,10 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   border-radius: 2px;
   box-shadow: none;
 }
+/* 实验编号（`实验10`）比纯数字宽：略缩字号，配合 EXP_GUTTER 36px 留白（B-20） */
+.q-chip.plain.exp {
+  font-size: 9px;
+}
 
 /* ── 解析遗漏标记（Task 16；修复轮 1 分级）──────────────────────
    未覆盖墨迹：原卷页图上是墨迹、却不在本页任何解析块内的区域。

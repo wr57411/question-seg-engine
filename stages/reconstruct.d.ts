@@ -28,6 +28,7 @@ export interface PaperOptions {
 
 export const CANVAS_W: number;
 export const GUTTER: number;
+export const EXP_GUTTER: number;
 
 export function el(tag: string, cls: string, text?: string): any;
 export function enc(s: string): string;

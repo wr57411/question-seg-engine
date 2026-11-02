@@ -89,8 +89,14 @@ interface Q {
 
 const isDigits = (s: string) => /^\d{1,3}$/.test(s);
 const isSubQuestionForm = (s: string) => /^[（(]\s*\d{1,2}\s*[)）]$/.test(s);
+/**
+ * 实验区题号：`实验10`（`B-20` 2026-11-02 定案）。
+ * 它不是同册真题号，单独一类：N1 放行、N4 不计入「源题号标记 ↔ 切出题数」的常规比较。
+ */
+const isExperimentNumber = (s: string) => /^实验\d{1,2}$/.test(s);
 /** 题号合法值域：1..99（`0` 不是题号；三位数超出教辅任何真实编号习惯） */
 const inDomain = (s: string) => isDigits(s) && Number(s) >= 1 && Number(s) <= 99;
+const experimentInDomain = (s: string) => isExperimentNumber(s) && Number(s.slice(2)) >= 1 && Number(s.slice(2)) <= 99;
 
 /** 收集一份文档的全部违规 */
 function auditDoc(doc: string): { violations: Violation[]; stats: string[]; suppressionNotes: string[] } {
@@ -111,8 +117,8 @@ function auditDoc(doc: string): { violations: Violation[]; stats: string[]; supp
   for (const q of questions) {
     if (isSubQuestionForm(q.number)) {
       v.push({ doc, check: "N1", at: q.number, detail: "小问形态被当成题号" });
-    } else if (!isDigits(q.number)) {
-      v.push({ doc, check: "N1", at: JSON.stringify(q.number), detail: "题号不是纯阿拉伯数字" });
+    } else if (!isDigits(q.number) && !isExperimentNumber(q.number)) {
+      v.push({ doc, check: "N1", at: JSON.stringify(q.number), detail: "题号不是纯阿拉伯数字或实验编号" });
     }
   }
 
@@ -124,6 +130,13 @@ function auditDoc(doc: string): { violations: Violation[]; stats: string[]; supp
         check: "N6",
         at: `p${(q.source?.pageIndex ?? -1) + 1} #${q.number}`,
         detail: `题号 ${q.number} 不在合法值域 [1,99]（0 不是题号）`,
+      });
+    } else if (isExperimentNumber(q.number) && !experimentInDomain(q.number)) {
+      v.push({
+        doc,
+        check: "N6",
+        at: `p${(q.source?.pageIndex ?? -1) + 1} #${q.number}`,
+        detail: `实验编号 ${q.number} 不在合法值域 [1,99]`,
       });
     }
   }
@@ -204,7 +217,10 @@ function auditDoc(doc: string): { violations: Violation[]; stats: string[]; supp
       const m = matchFirstLine((b.text ?? "").split("\n")[0] ?? "");
       return m.kind === "question_no";
     }).length;
-    const qOn = questions.filter((q) => q.source?.pageIndex === page.index).length;
+    // 实验区题由栏目头开题、没有题号标记，两侧都不计（B-20）
+    const qOn = questions.filter(
+      (q) => q.source?.pageIndex === page.index && !isExperimentNumber(q.number),
+    ).length;
     markers += onPage;
     if (onPage === qOn) continue;
     const recorded = suppressedByPage.get(page.index) ?? 0;
@@ -235,11 +251,13 @@ function auditDoc(doc: string): { violations: Violation[]; stats: string[]; supp
     }
     gOff = hi;
   }
+  const regular = questions.filter((q) => !isExperimentNumber(q.number)).length;
+  const experiment = questions.length - regular;
   stats.push(
-    `${doc}: ${questions.length} 题 / ${groups.size} 组；源题号标记 ${markers} 个` +
-      (markers === questions.length
-        ? "（覆盖 100% ✓）"
-        : `（差 ${markers - questions.length}：${explained} 条为已记录抑制 ${explainedPages.join(",")}）`),
+    `${doc}: ${questions.length} 题（其中实验区 ${experiment} 题） / ${groups.size} 组；源题号标记 ${markers} 个` +
+      (markers === regular
+        ? "（常规题覆盖 100% ✓）"
+        : `（差 ${markers - regular}：${explained} 条为已记录抑制 ${explainedPages.join(",")}）`),
   );
   return { violations: v, stats, suppressionNotes };
 }

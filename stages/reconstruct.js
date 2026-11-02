@@ -45,6 +45,12 @@ export const CANVAS_W = 760;
 export const GUTTER = 22;
 
 /**
+ * 实验编号（`实验10`）比纯数字宽，22px 留白放不下（2026-11-02 `B-20` 定案）。
+ * 只对含实验编号的页面加宽，普通页几何仍是 22px（`tests/layout-invariant.test.ts` 锁死）。
+ */
+export const EXP_GUTTER = GUTTER + 14;
+
+/**
  * @param {string} tag
  * @param {string} [cls]
  * @param {string} [text]
@@ -666,7 +672,9 @@ export function renderPaper(p, opts = {}) {
   // 原做法是「页内落位，放不下就不挂」—— 但答案册这种密页（86 块/双栏/小字）
   // 页边距根本放不下号牌，于是**整页几乎一个号牌都不显示**，用户看到的就是「题号没识别出来」。
   // 现在把内容区收窄、号牌挂在留白里 ⇒ 永远放得下，且**绝不压正文**。
-  const innerW = Math.max(120, paneW - GUTTER - (needsRight ? GUTTER : 0));
+  // 实验编号（`实验10`）更宽：只对该页加宽留白，普通页保持 22px（B-20）
+  const gutter = p.questions.some((q) => /^实验\d+/.test(q.number)) ? EXP_GUTTER : GUTTER;
+  const innerW = Math.max(120, paneW - gutter - (needsRight ? gutter : 0));
   const c = paperCanvas(p);
   c.style.width = `${innerW}px`;
   if (diagnostics) renderDiscardedInto(c, p, innerW); // 对比栏宽口径：丢弃块也必须用 innerW（R2）
@@ -678,8 +686,8 @@ export function renderPaper(p, opts = {}) {
   // ⇒ 套一层与画布等宽等高的定位容器，号牌挂在容器上。
   const wrap = el("div", "paper-wrap");
   wrap.style.position = "relative";
-  wrap.style.marginLeft = `${GUTTER}px`;
-  if (needsRight) wrap.style.marginRight = `${GUTTER}px`;
+  wrap.style.marginLeft = `${gutter}px`;
+  if (needsRight) wrap.style.marginRight = `${gutter}px`;
   wrap.append(c);
 
   // ── 标签层：先在 px 域算好落位，再挂号牌（chip 级降级要挂在号牌上）──────────
@@ -719,10 +727,12 @@ export function renderPaper(p, opts = {}) {
     // 挂了会让用户看到「不属于这页的题号」（实测第 17 页顶部挂 `第8题`，而该页题号是 9/2/3/4/5/6）。
     if (q.startsHere === false) return;
     // **只写数字**（用户要求：写「第N题」太占版面，把页面挤小了）——完整信息放 title。
-    const chip = el("span", "q-chip plain", q.number);
+    // 实验编号（`实验10`）是完整标签，不再加「第…题」前缀（B-20）。
+    const isExperiment = /^实验\d+/.test(q.number);
+    const chip = el("span", `q-chip plain${isExperiment ? " exp" : ""}`, q.number);
     // 号牌必须能追溯到题目 id：跳转/高亮/测试都靠它（`textContent` 只有题号，多节同号会认错）
     chip.dataset.qid = q.id;
-    chip.title = `第${q.number}题${onChipClick ? (resolveTags ? "（点击看详情 / 增删标签）" : "（点击看详情）") : ""}`;
+    chip.title = `${isExperiment ? q.number : `第${q.number}题`}${onChipClick ? (resolveTags ? "（点击看详情 / 增删标签）" : "（点击看详情）") : ""}`;
     // 按题目所在栏决定挂哪一侧：右栏题挂右留白，其余挂左留白
     if (isRightCol(f)) chip.style.left = "calc(100% + 4px)";
     else chip.style.right = "calc(100% + 4px)";
