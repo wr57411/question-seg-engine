@@ -36,6 +36,11 @@
 
 详见 [`docs/specs/2026-11-02-confidence-gated-validation-proposal.md`](2026-11-02-confidence-gated-validation-proposal.md) §9。
 
+**2026-11-02 晚补充（用户定案）**：**完整金标恢复为 B01 主路线**；「抽样金标 / 不必整本」
+降为置信曲线与成本兜底的可选项。首本 **《物理_教材基础练 电路》**：全量工作表已生成
+`gold/worksheets/物理_教材基础练 电路-full.md`（31 题，11 已标、余 20），整本标完后
+`complete:true`，`check:accuracy` 才能第一次算 precision/recall。
+
 
 - 一句话：**先让准确率可测，再让吞吐可跑**；没有金标准的「准确率很高」不算指标。
 

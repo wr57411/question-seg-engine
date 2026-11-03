@@ -3,8 +3,11 @@
 // 用法：
 //   npm run gold:worksheet -- --all
 //   npm run gold:worksheet -- "23必刷题 3 运动和力的关系"
+//   npm run gold:worksheet -- "物理_教材基础练 电路" --full   # 全量（整本金标）
 //
-// 每本抽 5 题（首/25%/50%/75%/末），列出页图路径、系统草稿（仅参考）、金标 JSON 模板。
+// 默认每本抽 5 题（首/25%/50%/75%/末）；`--full` 生成整本全量工作表，文件名为
+// `<docId>-full.md`，已有金标（`gold/<doc>.json`）的题会标注「已有金标，沿用」。
+// 列出页图路径、系统草稿（仅参考）、金标 JSON 模板。
 // 标注规则：必须回原卷页图转写；不能从 questions.json 复制；整本标完才把 complete 改 true。
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -23,6 +26,7 @@ interface RegistryBook {
 const REG = JSON.parse(readFileSync("gold/registry.json", "utf8")) as { books: RegistryBook[] };
 const args = process.argv.slice(2);
 const all = args.includes("--all");
+const full = args.includes("--full");
 const docArg = args.find((a) => !a.startsWith("--"));
 const books = all ? REG.books : REG.books.filter((b) => b.docId === docArg);
 if (books.length === 0) {
@@ -43,25 +47,46 @@ mkdirSync(join("gold", "worksheets"), { recursive: true });
 for (const b of books) {
   const qs = JSON.parse(readFileSync(join("data", "out", b.docId, "questions.json"), "utf8")) as Question[];
   const n = qs.length;
-  const idxs = [...new Set([0, Math.floor(n * 0.25), Math.floor(n * 0.5), Math.floor(n * 0.75), n - 1])].filter(
-    (i) => i >= 0 && i < n,
-  );
+  const idxs = full
+    ? [...Array(n).keys()]
+    : [...new Set([0, Math.floor(n * 0.25), Math.floor(n * 0.5), Math.floor(n * 0.75), n - 1])].filter(
+        (i) => i >= 0 && i < n,
+      );
+  /** 已有金标：按 (page|number) 复用，避免整本工作表把已转写的题又留空 */
+  const existingGold = new Map<string, { stem: string; options: { key: string; text: string }[] }>();
+  if (b.gold && existsSync(b.gold)) {
+    try {
+      const g = JSON.parse(readFileSync(b.gold, "utf8")) as {
+        questions?: { page: number; number: string; stem?: string; options?: { key: string; text: string }[] }[];
+      };
+      for (const gq of g.questions ?? []) {
+        existingGold.set(`${gq.page}|${gq.number}`, {
+          stem: gq.stem ?? "",
+          options: gq.options ?? [],
+        });
+      }
+    } catch {
+      // 金标文件坏了不阻断工作表生成；下方会把对应题按待转写处理
+    }
+  }
+  const goldPath = b.gold ?? `gold/${b.docId}.json`;
   const lines: string[] = [
     `# ${b.docId} 标注工作表`,
     "",
     `- 类别：${b.class}（A=原书扫描 / B=手机截图 / C=答案册）`,
-    `- 页数 / 题数：${b.pages} / ${b.questions}`,
+    `- 页数 / 题数：${b.pages} / ${qs.length}`,
     `- 原卷：\`${b.sourcePdf}\``,
     `- 规则：**只用原卷页图转写**；下面的“系统草稿”只作定位参考，不能直接当金标。`,
-    `- 整本标完后，把 \`gold/${b.docId}.json\` 的 \`complete\` 改成 \`true\`，才算整本金标准。`,
+    `- 整本标完后，把 \`${goldPath}\` 的 \`complete\` 改成 \`true\`，才算整本金标准。`,
     "",
   ];
   idxs.forEach((qi, k) => {
     const q = qs[qi]!;
     const page = q.source.pageIndex;
     const img = pageImage(b.docId, page);
+    const gold = existingGold.get(`${page}|${q.number}`);
     lines.push(
-      `## 样本 ${k + 1} · p${page + 1} #${q.number}`,
+      `## ${full ? `${k + 1}/${idxs.length}` : `样本 ${k + 1}`} · p${page + 1} #${q.number}`,
       "",
       img ? `![页图](${img})` : `（页图缺失；请用原卷 PDF：\`data/out/${b.docId}/origin.pdf\`）`,
       "",
@@ -71,23 +96,35 @@ for (const b of books) {
       ...q.options.map((o) => `${o.key}. ${o.text}`),
       "```",
       "",
-      "### 金标填写（转写后替换下面的值）",
-      "```json",
-      JSON.stringify(
-        {
-          page,
-          number: q.number,
-          stem: "← 用页图转写",
-          options: q.options.map((o) => ({ key: o.key, text: "← 用页图转写" })),
-        },
-        null,
-        2,
-      ),
-      "```",
-      "",
     );
+    if (gold) {
+      lines.push(
+        "### 已有金标（沿用；仍建议抽看页图）",
+        "```json",
+        JSON.stringify({ page, number: q.number, stem: gold.stem, options: gold.options }, null, 2),
+        "```",
+        "",
+      );
+    } else {
+      lines.push(
+        "### 金标填写（转写后替换下面的值）",
+        "```json",
+        JSON.stringify(
+          {
+            page,
+            number: q.number,
+            stem: "← 用页图转写",
+            options: q.options.map((o) => ({ key: o.key, text: "← 用页图转写" })),
+          },
+          null,
+          2,
+        ),
+        "```",
+        "",
+      );
+    }
   });
-  const out = join("gold", "worksheets", `${b.docId}.md`);
+  const out = join("gold", "worksheets", `${b.docId}${full ? "-full" : ""}.md`);
   writeFileSync(out, lines.join("\n"));
-  console.log(`${b.docId} → ${out}（${idxs.length} 题样本）`);
+  console.log(`${b.docId} → ${out}（${idxs.length} 题${full ? "全量" : "样本"}）`);
 }
