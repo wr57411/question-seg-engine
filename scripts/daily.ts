@@ -44,6 +44,7 @@ import { homedir } from "node:os";
 import { basename, extname, join, resolve } from "node:path";
 import { convertOxrResponse } from "./oxr-convert.js";
 import { parsePdfWithOxr } from "./oxr-client.js";
+import { verifyToken } from "./paddle-client.js";
 
 type Flags = Record<string, string | true>;
 
@@ -491,33 +492,49 @@ async function main(): Promise<void> {
   const ocrArtifact = existsSync(join(outDir, "ocr-page-fill.json"));
   let ocr: Meta["source"]["ocr"] = ocrArtifact ? "page" : "skipped";
   let ocrError: string | null = null;
+  const hasPdf = existsSync(join(outDir, "origin.pdf")) || existsSync(join(outDir, `${docId}_origin.pdf`));
+  // **凭据存在 ≠ 凭据可用**（2026-11-03 实测）：`mcp.json` 里那个 token 已过期、打接口返回 401，
+  // 而旧版这里只判「有没有配 token」就放行去跑 OCR ⇒ 整步静默空转，题数照旧、没人知道为什么。
+  // 现在加一次零成本握手 `GET {JOB_URL}/1`（实测：401/403=失效，404 + code 11001=可用，不提交作业、不花额度）。
+  // 口径：「没配凭据」= 跳过并说明（不算失败）；「配了但失效」= **失败**，写进 meta.ocrError 并让体检报警。
   if (flags["no-ocr"] === true) {
     console.log(
       ocrArtifact
         ? "\n[3/4] 跳过 OCR 调用（--no-ocr）；复用已有 ocr-page-fill.json"
         : "\n[3/4] 跳过 OCR 补行（--no-ocr）",
     );
+  } else if (!hasPdf) {
+    console.log("\n[3/4] 跳过 OCR 补行：没有原卷 PDF（OCR 要按页渲染原卷）");
   } else if (!hasOcrToken()) {
     console.log(
       "\n[3/4] 跳过 OCR 补行：没有 PaddleOCR 凭据\n" +
         "      （env PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN，或 ~/.workbuddy-ai/mcp.json 的 PaddleOCR-VL-1.6）\n" +
         "      ⇒ 上游整行漏读的内容不会被补回；成品页仍可用，缺的行会在审计视图里标出来。",
     );
-  } else if (!existsSync(join(outDir, "origin.pdf")) && !existsSync(join(outDir, `${docId}_origin.pdf`))) {
-    console.log("\n[3/4] 跳过 OCR 补行：没有原卷 PDF（OCR 要按页渲染原卷）");
   } else {
-    console.log("\n[3/4] 整页 OCR 补行（上游漏读的行）…");
-    try {
-      run("ocr-page-fill.ts", [docId]);
-      ocr = "page";
-    } catch (e) {
-      // 不静默：OCR 失败是「少补了一些行」，不是「这份卷坏了」；但必须写进 meta/体检。
+    const cred = await verifyToken();
+    if (!cred.ok) {
       ocr = "failed";
-      ocrError = String((e as Error)?.message ?? e).slice(0, 200);
+      ocrError = `PaddleOCR 凭据不可用 [${cred.state}]：${cred.detail}`.slice(0, 200);
       console.log(
-        `      ⚠️ OCR 补行失败：${ocrError}\n` +
-          "         快照仍是完整可用的，只是少补了漏读行；稍后可单独重试：npm run stages:ocr-page -- \"" + docId + '"',
+        `      ⚠️ 配了凭据但握手失败，OCR 这一步**没有跑**：${ocrError}\n` +
+          "         这不是「这份卷坏了」，是「漏读的行不会被补回」——换一枚有效 token 后重跑：\n" +
+          '         npm run stages:ocr-page -- "' + docId + '"',
       );
+    } else {
+      console.log("\n[3/4] 整页 OCR 补行（上游漏读的行）…");
+      try {
+        run("ocr-page-fill.ts", [docId]);
+        ocr = "page";
+      } catch (e) {
+        // 不静默：OCR 失败是「少补了一些行」，不是「这份卷坏了」；但必须写进 meta/体检。
+        ocr = "failed";
+        ocrError = String((e as Error)?.message ?? e).slice(0, 200);
+        console.log(
+          `      ⚠️ OCR 补行失败：${ocrError}\n` +
+            "         快照仍是完整可用的，只是少补了漏读行；稍后可单独重试：npm run stages:ocr-page -- \"" + docId + '"',
+        );
+      }
     }
   }
 
