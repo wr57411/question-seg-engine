@@ -332,7 +332,8 @@ async function main(): Promise<void> {
     "- 本表只测**能不能落位**，不测**字对不对**（字一律来自 VL；VL 的准确率见 `DECISIONS §108`）。",
     "",
   );
-  writeFileSync(join(ROOT, "docs", "evidence", "2026-11-03-line-align-probe.md"), L.join("\n"), "utf8");
+  const reportPath = join(ROOT, "docs", "evidence", `2026-11-03-line-align-${vlDoc}.md`);
+  writeFileSync(reportPath, L.join("\n"), "utf8");
 
   console.log(
     `\n${vlDoc}\n  行框 ${totals.lines}：锚点 ${totals.anchor}（${pct(totals.anchor, totals.lines)}）、` +
@@ -340,7 +341,7 @@ async function main(): Promise<void> {
       `交人工 ${totals.needsHuman}（${pct(totals.needsHuman, totals.lines)}）、` +
       `剩框 ${totals.leftoverFrame}、剩字 ${totals.leftoverText}\n` +
       `  文字消费 ${totals.consumed}/${totals.chars}（${pct(totals.consumed, totals.chars)}）；行框归块 ${cover.assigned}/${cover.lines}、无归属 ${cover.orphan}、跨块 ${cover.ambiguous}\n` +
-      `  报告 → docs/evidence/2026-11-03-line-align-probe.md`);
+      `  报告 → ${reportPath}`);
   for (const [k, v] of [...byLabel.entries()].sort((a, b) => b[1].lines - a[1].lines).slice(0, 5)) {
     console.log(`    ${k || "(空)"}: 行 ${v.lines} 锚点+排除 ${pct(v.anchor + v.eliminated, v.lines)} 消费 ${pct(v.consumed, v.chars)}`);
   }
