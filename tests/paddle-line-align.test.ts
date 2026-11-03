@@ -3,7 +3,7 @@
 // 修掉之后 86.3%（text 块 94.1%）。这两条退化回去会让小样数字立刻掉一半。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { alignBlock, matchChars } from "../scripts/paddle-line-align.js";
+import { alignBlock, matchChars, stripMarkup } from "../scripts/paddle-line-align.js";
 
 test("matchChars：剥标点后，全角逗号与半角逗号不再造成 MISS", () => {
   assert.deepEqual(matchChars("如图所示，电源"), matchChars("如图所示,电源"));
@@ -51,4 +51,17 @@ test("alignBlock：V3 漏行 ⇒ 剩字报警（不把邻行文字塞进去）",
   ]);
   assert.equal(result.anchor, 2);
   assert.ok(result.chars > result.consumed, "必须留下未消费的字");
+});
+
+test("stripMarkup：表格块的 HTML 标签不算「要消费的字」", () => {
+  const html = '<table><tr><td rowspan="2">欧姆定律</td><td>1/R</td></tr></table>';
+  assert.equal(stripMarkup(html).replace(/\s+/g, ""), "欧姆定律1/R");
+  assert.ok(matchChars(html).join("").includes("欧姆定律"));
+  assert.ok(!matchChars(html).join("").includes("table"), "标签名不得进入匹配字符");
+  assert.ok(!matchChars(html).join("").includes("rowspan"), "属性名不得进入匹配字符");
+});
+
+test("stripMarkup：HTML 标签与图片占位符不进分母（表格块的真实教训）", () => {
+  assert.deepEqual(matchChars('<table><tr><td rowspan="2">甲</td></tr></table>'), matchChars("甲"));
+  assert.deepEqual(matchChars("![](images/x.jpg) 乙"), matchChars("乙"));
 });

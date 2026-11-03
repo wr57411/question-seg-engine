@@ -55,12 +55,24 @@ const inside = (p: [number, number], b: Box, pad = PAD): boolean =>
   p[0] >= b[0] - pad && p[0] <= b[2] + pad && p[1] >= b[1] - pad && p[1] <= b[3] + pad;
 
 /**
+ * 去掉**标记本身**，只留标记里的字（2026-11-03 实测：表格块的 block_content 是 HTML，
+ * `<table><tr><td rowspan="2">` 会被当成"没消费掉的字"，白拉低消费率、还会造成假报警）。
+ * 处理：HTML 标签、图片占位符、LaTeX 环境壳（`\begin{...}` / `\end{...}`）。
+ */
+export function stripMarkup(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\\(?:begin|end)\{[^}]*\}/g, " ");
+}
+
+/**
  * 匹配前的字符归一化：在 `hardChars` 之上再去掉**标点与符号**。
  * 实测原因（2026-11-03）：VL 出半角 `,`、V3 出全角 `，`，一字之差整行 MISS。
  * 位置对齐只需要"实义字"一致，标点不参与。
  */
 export function matchChars(s: string): string[] {
-  return hardChars(s).filter((c) => !/[，。、；：？！“”‘’（）《》〈〉「」【】,.;:?!"'()\[\]<>=+*/~—…·\-]/.test(c));
+  return hardChars(stripMarkup(s)).filter((c) => !/[，。、；：？！“”‘’（）《》〈〉「」【】,.;:?!"'()\[\]<>=+*/~—…·\-]/.test(c));
 }
 
 /** 在 `hay` 里从 `from` 起找 `needle`（都已是硬字符数组）。 */
