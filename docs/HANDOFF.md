@@ -23,6 +23,18 @@
   测试 357 例 / 配对 420 条 / 渲染基线 7 卷）；`feat/pick-classify` @ `6cc6185`（测试 355 例）。
   oxr 线交接包：[`docs/dev/bgx/reports/2026-10-30-2204-REPORT-会话交接给下一位Agent.md`](dev/bgx/reports/2026-10-30-2204-REPORT-会话交接给下一位Agent.md)
 
+## 0.0 MiniCPM-OCR/Jev 评估（2026-11-02 晚，已收口）
+
+- **结论（决策 A）**：MiniCPM 仅作为**结构 + 表格文本**交叉源（题号/顺序/表块/表文本）；
+  **公式不宣称**；P2-2 adapter 不写，未改生产线。
+- 关键数：30 页题号 **147/147**、0 额外、tess-only 0；Word 3 表文本 93.0%/90.9%；
+  公式 OMML 碎片化，50 条无法可靠配对（表内 39 段 exact 9/39、覆盖 23/39）；
+  P0 整题级失败（54 条 AUC 0.582/best 68.5%），row 级真实错误 best 94.3%。
+- 报告 `docs/evidence/2026-11-02-minicpm-round3.md`；计划
+  `docs/plans/2026-11-02-minicpm-ocr-round3-workflow.md`；台账 `docs/BACKLOG.md` B-24/B-25。
+
+---
+
 ## 0. 本轮（2026-11-02 · MinerU 生态评估 + 产物新鲜度基建）的交接要点
 
 **一句话**：主线结论没变（**B01 金标准仍是唯一卡点**），但本轮**清掉了一个假病灶**、**补上了上下文基建**。
