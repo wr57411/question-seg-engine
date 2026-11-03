@@ -1,0 +1,592 @@
+{
+  "tables": [
+    {
+      "table": 111,
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 1,
+      "word_formulas": 14,
+      "mini_formulas": 8,
+      "pairs": [
+        {
+          "word": "{W}_{F},",
+          "mini": "W_{F}",
+          "fuzzy": 0.8,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "{W}_{F}-",
+          "mini": "W_{F}",
+          "fuzzy": 0.8,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "mgL\\left(1-cos\\theta\\right)=0,",
+          "mini": "W_{F} - mgL(1 - \\cos \\theta) = 0",
+          "fuzzy": 0.895,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "{W}_{F}=mgL\\left(1-cos\\theta\\right)",
+          "mini": "W_{F} = mgL(1 - \\cos \\theta)",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        },
+        {
+          "word": "{W}_{f}={F}_{f}\\Delta{x}_{1}+{F}_{f}",
+          "mini": "W_{F} = mgL(1 - \\cos \\theta)",
+          "fuzzy": 0.364,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "△{x}_{2}+{F}_{f}△{x}_{3}⋯⋯=",
+          "mini": "x_{2}",
+          "fuzzy": 0.286,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "{F}_{f}\\left(△{x}_{1}+△{x}_{2}+△{x}_{3}⋯⋯\\right)=",
+          "mini": "W = \\frac{kx_{1} + kx_{2}}{2} \\cdot (x_{2} - x_{1})",
+          "fuzzy": 0.372,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "{F}_{f}2\\piR",
+          "mini": "W_{F}",
+          "fuzzy": 0.25,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "W=F⋅(\\frac{h}{sin\\alpha}-",
+          "mini": "W = F \\cdot (\\frac{h}{\\sin \\alpha} - \\frac{h}{\\sin \\beta})",
+          "fuzzy": 0.667,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "\\frac{h}{sin\\beta})",
+          "mini": "W = F \\cdot (\\frac{h}{\\sin \\alpha} - \\frac{h}{\\sin \\beta})",
+          "fuzzy": 0.542,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "x₁",
+          "mini": "x_{1}",
+          "fuzzy": 0.5,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "x₂",
+          "mini": "x_{1}",
+          "fuzzy": 0.5,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "W=",
+          "mini": "W_{F}",
+          "fuzzy": 0.5,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "\\frac{kx₁+kx₂}{2}⋅\\left(x₂-x₁\\right)",
+          "mini": "W = \\frac{kx_{1} + kx_{2}}{2} \\cdot (x_{2} - x_{1})",
+          "fuzzy": 0.667,
+          "exact": false,
+          "covered": false
+        }
+      ]
+    },
+    {
+      "table": 112,
+      "book": "物理_教材基础练机械能守恒定律",
+      "page": 3,
+      "word_formulas": 8,
+      "mini_formulas": 8,
+      "pairs": [
+        {
+          "word": "v\\uparrow\\RightarrowF=\\frac{P}{v}\\downarrow\\Rightarrowa=\\frac{F-Fₚ}{m}\\downarrow",
+          "mini": "v \\uparrow \\Rightarrow F = \\frac{P}{v} \\downarrow \\Rightarrow a = \\frac{F - F_{阻}}{m} \\downarrow",
+          "fuzzy": 0.985,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "a=\\frac{F-{F}_{{P}_{1}}}{m}\\RightarrowF",
+          "mini": "a = \\frac{F - F_{阻}}{m} \\Rightarrow F",
+          "fuzzy": 0.933,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "\\RightarrowP=Fv\\uparrow\\Rightarrow{P}_{额}=F{v}_{1}",
+          "mini": "\\Rightarrow P = Fv \\uparrow \\Rightarrow P_{额} = Fv_{1}",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        },
+        {
+          "word": "t₀=\\frac{v₁}{a}",
+          "mini": "t_{0} = \\frac{v_{1}}{a}",
+          "fuzzy": 0.8,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "F={F}_{P}\\Rightarrowa=0\\Rightarrow{F}_{m}=\\frac{P}{{v}_{m}}",
+          "mini": "F = F_{阻} \\Rightarrow a = 0 \\Rightarrow F_{阻} = \\frac{P}{v_{m}}",
+          "fuzzy": 0.946,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "v\\uparrow\\RightarrowF=}v\\downarrow\\Rightarrowa=",
+          "mini": "v \\uparrow \\Rightarrow F = \\frac{P}{v} \\downarrow \\Rightarrow a = \\frac{F - F_{阻}}{m} \\downarrow",
+          "fuzzy": 0.785,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "vₘ",
+          "mini": "v_{m}",
+          "fuzzy": 0.5,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": ",v{'}_{m}=\\frac{{P}_{额}}{{F}_{阻}}",
+          "mini": "v_{m}^{\\prime} = \\frac{P_{额}}{F_{阻}}",
+          "fuzzy": 0.759,
+          "exact": false,
+          "covered": false
+        }
+      ]
+    },
+    {
+      "table": 138,
+      "book": "物理_教材基础练 电路",
+      "page": 4,
+      "word_formulas": 16,
+      "mini_formulas": 17,
+      "pairs": [
+        {
+          "word": "{P}_{总}=EI={P}_{出}+{P}_{内}",
+          "mini": "P_{\\text{总}} = EI = P_{\\text{出}} + P_{\\text{内}}",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        },
+        {
+          "word": "{P}_{出}=UI=EI-{I}^{2}r={P}_{总}-{P}_{肉}",
+          "mini": "P_{\\text{出}} = UI = EI - I^{2}r = P_{\\text{总}} - P_{\\text{内}}",
+          "fuzzy": 0.944,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "E=I\\left(R+r\\right)、",
+          "mini": "E = I (R + r)",
+          "fuzzy": 0.941,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "{P}_{总}={I}^{2}\\left(R+r\\right)=\\frac{{E}^{2}}{R+r}",
+          "mini": "P_{\\text{总}} = I^{2}(R + r) = \\frac{E^{2}}{R + r}",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        },
+        {
+          "word": "{P}_{出}={I}^{2}R=\\frac{{E}^{2}R}{{\\left(R+r\\right)}^{2}}",
+          "mini": "P_{\\text{出}} = I^{2}R = \\frac{E^{2}R}{(R + r)^{2}}",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        },
+        {
+          "word": "{P}_{内}={I}^{2}r={U}_{内}I={P}_{总}-{P}_{±}",
+          "mini": "P_{\\text{内}} = I^{2}r = U_{\\text{内}} I = P_{\\text{总}} - P_{\\text{出}}",
+          "fuzzy": 0.938,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "η=\\frac{{P}_{±}}{{P}_{总}}\\times100",
+          "mini": "\\eta = \\frac{R}{R + r} \\times 100\\%",
+          "fuzzy": 0.667,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "η=\\frac{R}{R+r}\\times100",
+          "mini": "\\eta = \\frac{R}{R + r} \\times 100\\%",
+          "fuzzy": 0.872,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "{P}_{出}",
+          "mini": "P_{\\text{出}}",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        },
+        {
+          "word": "{P}_{出}={I}^{2}R=\\frac{{E}^{2}}{\\frac{{\\left(R-r\\right)}^{2}}{R}+4r}",
+          "mini": "P_{\\text{出}} = I^{2}R = \\frac{E^{2}}{\\frac{(R - r)^{2}}{R} + 4r}",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        },
+        {
+          "word": "R=r",
+          "mini": "R = r",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        },
+        {
+          "word": "Pₘₐₓ=\\frac{E²}{4r}",
+          "mini": "P_{\\text{max}} = \\frac{E^{2}}{4r}",
+          "fuzzy": 0.692,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "P₁<Pₘₐₓ",
+          "mini": "P_{\\text{出}} &lt; P_{\\text{max}}",
+          "fuzzy": 0.235,
+          "exact": false,
+          "covered": false
+        },
+        {
+          "word": "R₁",
+          "mini": "R",
+          "fuzzy": 0.667,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "R₂,",
+          "mini": "R",
+          "fuzzy": 0.5,
+          "exact": false,
+          "covered": true
+        },
+        {
+          "word": "R₁R₂=r²",
+          "mini": "R = r",
+          "fuzzy": 0.6,
+          "exact": false,
+          "covered": false
+        }
+      ]
+    },
+    {
+      "table": 145,
+      "book": "教材基础练 磁场",
+      "page": 0,
+      "word_formulas": 1,
+      "mini_formulas": 1,
+      "pairs": [
+        {
+          "word": "B=\\frac{F}{IL}",
+          "mini": "B = \\frac{F}{IL}",
+          "fuzzy": 1.0,
+          "exact": true,
+          "covered": true
+        }
+      ]
+    }
+  ],
+  "sample": [
+    {
+      "word": "{W}_{F},",
+      "mini": "W_{F}",
+      "fuzzy": 0.8,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "{W}_{F}-",
+      "mini": "W_{F}",
+      "fuzzy": 0.8,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "mgL\\left(1-cos\\theta\\right)=0,",
+      "mini": "W_{F} - mgL(1 - \\cos \\theta) = 0",
+      "fuzzy": 0.895,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "{W}_{F}=mgL\\left(1-cos\\theta\\right)",
+      "mini": "W_{F} = mgL(1 - \\cos \\theta)",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    },
+    {
+      "word": "{W}_{f}={F}_{f}\\Delta{x}_{1}+{F}_{f}",
+      "mini": "W_{F} = mgL(1 - \\cos \\theta)",
+      "fuzzy": 0.364,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "△{x}_{2}+{F}_{f}△{x}_{3}⋯⋯=",
+      "mini": "x_{2}",
+      "fuzzy": 0.286,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "{F}_{f}\\left(△{x}_{1}+△{x}_{2}+△{x}_{3}⋯⋯\\right)=",
+      "mini": "W = \\frac{kx_{1} + kx_{2}}{2} \\cdot (x_{2} - x_{1})",
+      "fuzzy": 0.372,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "{F}_{f}2\\piR",
+      "mini": "W_{F}",
+      "fuzzy": 0.25,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "W=F⋅(\\frac{h}{sin\\alpha}-",
+      "mini": "W = F \\cdot (\\frac{h}{\\sin \\alpha} - \\frac{h}{\\sin \\beta})",
+      "fuzzy": 0.667,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "\\frac{h}{sin\\beta})",
+      "mini": "W = F \\cdot (\\frac{h}{\\sin \\alpha} - \\frac{h}{\\sin \\beta})",
+      "fuzzy": 0.542,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "x₁",
+      "mini": "x_{1}",
+      "fuzzy": 0.5,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "x₂",
+      "mini": "x_{1}",
+      "fuzzy": 0.5,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "W=",
+      "mini": "W_{F}",
+      "fuzzy": 0.5,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "\\frac{kx₁+kx₂}{2}⋅\\left(x₂-x₁\\right)",
+      "mini": "W = \\frac{kx_{1} + kx_{2}}{2} \\cdot (x_{2} - x_{1})",
+      "fuzzy": 0.667,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "v\\uparrow\\RightarrowF=\\frac{P}{v}\\downarrow\\Rightarrowa=\\frac{F-Fₚ}{m}\\downarrow",
+      "mini": "v \\uparrow \\Rightarrow F = \\frac{P}{v} \\downarrow \\Rightarrow a = \\frac{F - F_{阻}}{m} \\downarrow",
+      "fuzzy": 0.985,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "a=\\frac{F-{F}_{{P}_{1}}}{m}\\RightarrowF",
+      "mini": "a = \\frac{F - F_{阻}}{m} \\Rightarrow F",
+      "fuzzy": 0.933,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "\\RightarrowP=Fv\\uparrow\\Rightarrow{P}_{额}=F{v}_{1}",
+      "mini": "\\Rightarrow P = Fv \\uparrow \\Rightarrow P_{额} = Fv_{1}",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    },
+    {
+      "word": "t₀=\\frac{v₁}{a}",
+      "mini": "t_{0} = \\frac{v_{1}}{a}",
+      "fuzzy": 0.8,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "F={F}_{P}\\Rightarrowa=0\\Rightarrow{F}_{m}=\\frac{P}{{v}_{m}}",
+      "mini": "F = F_{阻} \\Rightarrow a = 0 \\Rightarrow F_{阻} = \\frac{P}{v_{m}}",
+      "fuzzy": 0.946,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "v\\uparrow\\RightarrowF=}v\\downarrow\\Rightarrowa=",
+      "mini": "v \\uparrow \\Rightarrow F = \\frac{P}{v} \\downarrow \\Rightarrow a = \\frac{F - F_{阻}}{m} \\downarrow",
+      "fuzzy": 0.785,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "vₘ",
+      "mini": "v_{m}",
+      "fuzzy": 0.5,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": ",v{'}_{m}=\\frac{{P}_{额}}{{F}_{阻}}",
+      "mini": "v_{m}^{\\prime} = \\frac{P_{额}}{F_{阻}}",
+      "fuzzy": 0.759,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "{P}_{总}=EI={P}_{出}+{P}_{内}",
+      "mini": "P_{\\text{总}} = EI = P_{\\text{出}} + P_{\\text{内}}",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    },
+    {
+      "word": "{P}_{出}=UI=EI-{I}^{2}r={P}_{总}-{P}_{肉}",
+      "mini": "P_{\\text{出}} = UI = EI - I^{2}r = P_{\\text{总}} - P_{\\text{内}}",
+      "fuzzy": 0.944,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "E=I\\left(R+r\\right)、",
+      "mini": "E = I (R + r)",
+      "fuzzy": 0.941,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "{P}_{总}={I}^{2}\\left(R+r\\right)=\\frac{{E}^{2}}{R+r}",
+      "mini": "P_{\\text{总}} = I^{2}(R + r) = \\frac{E^{2}}{R + r}",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    },
+    {
+      "word": "{P}_{出}={I}^{2}R=\\frac{{E}^{2}R}{{\\left(R+r\\right)}^{2}}",
+      "mini": "P_{\\text{出}} = I^{2}R = \\frac{E^{2}R}{(R + r)^{2}}",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    },
+    {
+      "word": "{P}_{内}={I}^{2}r={U}_{内}I={P}_{总}-{P}_{±}",
+      "mini": "P_{\\text{内}} = I^{2}r = U_{\\text{内}} I = P_{\\text{总}} - P_{\\text{出}}",
+      "fuzzy": 0.938,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "η=\\frac{{P}_{±}}{{P}_{总}}\\times100",
+      "mini": "\\eta = \\frac{R}{R + r} \\times 100\\%",
+      "fuzzy": 0.667,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "η=\\frac{R}{R+r}\\times100",
+      "mini": "\\eta = \\frac{R}{R + r} \\times 100\\%",
+      "fuzzy": 0.872,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "{P}_{出}",
+      "mini": "P_{\\text{出}}",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    },
+    {
+      "word": "{P}_{出}={I}^{2}R=\\frac{{E}^{2}}{\\frac{{\\left(R-r\\right)}^{2}}{R}+4r}",
+      "mini": "P_{\\text{出}} = I^{2}R = \\frac{E^{2}}{\\frac{(R - r)^{2}}{R} + 4r}",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    },
+    {
+      "word": "R=r",
+      "mini": "R = r",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    },
+    {
+      "word": "Pₘₐₓ=\\frac{E²}{4r}",
+      "mini": "P_{\\text{max}} = \\frac{E^{2}}{4r}",
+      "fuzzy": 0.692,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "P₁<Pₘₐₓ",
+      "mini": "P_{\\text{出}} &lt; P_{\\text{max}}",
+      "fuzzy": 0.235,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "R₁",
+      "mini": "R",
+      "fuzzy": 0.667,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "R₂,",
+      "mini": "R",
+      "fuzzy": 0.5,
+      "exact": false,
+      "covered": true
+    },
+    {
+      "word": "R₁R₂=r²",
+      "mini": "R = r",
+      "fuzzy": 0.6,
+      "exact": false,
+      "covered": false
+    },
+    {
+      "word": "B=\\frac{F}{IL}",
+      "mini": "B = \\frac{F}{IL}",
+      "fuzzy": 1.0,
+      "exact": true,
+      "covered": true
+    }
+  ],
+  "all_n": 39,
+  "sample_exact": 9,
+  "sample_f7": 22,
+  "sample_covered": 23
+}

@@ -213,8 +213,10 @@ python3 docs/evidence/2026-11-02-minicpm-round3-scripts/analyze.py
 - **结构项通过**：题号覆盖 147/147、0 额外、0 tess-only、0 未解释逆序；
 - **表格文本项通过**：Word 独立参照 3 张表，文本单元召回 **93.0%**、精确 **90.9%**；
 - **表格公式单元格未认证**：Word 表内公式是 OMML/图片，未转 LaTeX；
-- **公式项未通过/不可认证**：抽样 50 条 fuzzy≥0.7 58%、覆盖 66%，低于 85%；
-  MinerU 参照切分/乱码，缺独立公式金标准；
+- **公式项未通过/不可认证**：B 尝试了 Word OMML，但 Word 公式是碎片化 OMML、
+  无页码锚点，无法可靠拼成 50 条逐条公式；表内公式 39 段 exact 9/39、覆盖 23/39；
+  全局 50 对 exact 4/50、fuzzy≥0.7 41/50 但存在明显错配（如 `E=LΔI/Δt` 对 `v=Δx/Δt`）。
+  **仍缺独立公式金标准**，不能认证 85%；
 - **chart 必须黑名单**：5/5 全被写成 `<table>`；
 - **P2-2 不写**：公式项未过，适配器前置条件未满足。
 
@@ -223,7 +225,7 @@ python3 docs/evidence/2026-11-02-minicpm-round3-scripts/analyze.py
 | 选项 | 做法 | 影响 |
 |---|---|---|
 | **A（推荐）** | 接受 MiniCPM 只做**结构 + 表格文本交叉**（题号/顺序/表块/表文本），不宣称公式准确；停止接入 | 保留已验证收益，不接生产线 |
-| **B** | 把 Word 表内 OMML 转 LaTeX / 补公式 OCR，完成 50 条公式金标准；重跑 P1-G | 能真正判定公式，但要再加一轮 |
+| **B2** | 另立公式 OCR 专项：PaddleOCR-VL/独立公式 OCR，或 OMML 分段+页码锚定，再完成 50 条逐条对照 | 能真正判定公式，但已超出本轮；需单独立项 |
 | **C** | 不管门，直接写 P2 只读 adapter | 不推荐；会把未验收的公式接进来 |
 
 **补测 B 证据**：
@@ -233,6 +235,18 @@ python3 docs/evidence/2026-11-02-minicpm-round3-scripts/analyze.py
 | [`2026-11-02-minicpm-round3-p1-word-tables.json`](2026-11-02-minicpm-round3-p1-word-tables.json) | Word 3 张表的逐单元对照 |
 | [`2026-11-02-minicpm-round3-p1-gold-word.json`](2026-11-02-minicpm-round3-p1-gold-word.json) | Word 表文本 + 公式覆盖汇总 |
 | [`2026-11-02-minicpm-round3-scripts/p1-gold-word.py`](2026-11-02-minicpm-round3-scripts/p1-gold-word.py) | Word 解析/表格/公式覆盖脚本 |
+
+### 6.5 B 补测：Word OMML 公式尝试
+
+- 从 `物理_教材基础练.docx` 提取 **2274 个 OMML 公式**（1124 个唯一串），写了最小 OMML→LaTeX
+  转换器（分式/上下标/根号/括号/求和等）；
+- **表内公式**：表 111/112/138/145，Word 公式片段 39 段；与同表 MiniCPM 公式最佳匹配：
+  exact 9/39（23%）、fuzzy≥0.7 22/39（56%）、片段覆盖 23/39（59%）；
+- **全局 50 对**：Word 池按内容匹配 MinerU/MiniCPM，exact 4/50、fuzzy≥0.7 41/50；
+  但存在明显错配（`E=LΔI/Δt` 对 `v=Δx/Δt`），**不能当准确率**；
+- **根因**：Word OMML 是碎片化公式（一个公式拆成多个 run/单元格），没有页码锚点；
+  当前没有独立公式 OCR（PaddleOCR-VL 本会话不可用），无法可靠拼成 50 条逐条公式；
+- 结论：B 的“公式金标准”未完成；**公式项仍不可认证**，不据此判 MiniCPM 错。
 
 ---
 
