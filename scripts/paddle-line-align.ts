@@ -209,6 +209,67 @@ export function alignBlock(blockText: string, lines: { text: string }[]): {
   return { result: res, examples };
 }
 
+
+/**
+ * 每行最终「拿走哪段文字」（锚点行取命中片段；排除法行取缺口片段）。
+ * 供产线用：洞与行框对齐后，洞里的字就取它所在那一行的这段。
+ */
+export interface LineText {
+  lineIdx: number;
+  /** `anchor` 文字对得上；`eliminated` 由排除法得到；`blocked` 守卫/歧义，不给文字 */
+  kind: "anchor" | "eliminated" | "blocked";
+  text: string;
+}
+
+export function alignBlockLines(blockText: string, lines: { text: string }[]): LineText[] {
+  const hay = matchChars(blockText);
+  const used: { start: number; end: number }[] = [];
+  const overlaps = (a: number, b: number) => used.some((u) => a < u.end && b > u.start);
+  const anchors = new Map<number, { start: number; end: number }>();
+  let cursor = 0;
+  lines.forEach((l, idx) => {
+    const needle = matchChars(l.text);
+    if (needle.length === 0) return;
+    let at = -1;
+    for (let i = cursor; i + needle.length <= hay.length; i++) {
+      if (hay.slice(i, i + needle.length).join("") === needle.join("") && !overlaps(i, i + needle.length)) { at = i; break; }
+    }
+    if (at < 0) {
+      for (let i = 0; i + needle.length <= hay.length; i++) {
+        if (hay.slice(i, i + needle.length).join("") === needle.join("") && !overlaps(i, i + needle.length)) { at = i; break; }
+      }
+    }
+    if (at >= 0) {
+      used.push({ start: at, end: at + needle.length });
+      anchors.set(idx, { start: at, end: at + needle.length });
+      cursor = Math.max(cursor, at + needle.length);
+    }
+  });
+
+  const anchoredLens = [...anchors.keys()].map((i) => matchChars(lines[i]!.text).length).filter((n) => n > 0);
+  const avg = anchoredLens.length ? anchoredLens.reduce((a, b) => a + b, 0) / anchoredLens.length : 0;
+
+  const out: LineText[] = lines.map((l, i) => ({ lineIdx: i, kind: "blocked" as const, text: l.text }));
+  for (const [idx, a] of anchors) out[idx] = { lineIdx: idx, kind: "anchor", text: blockText.slice(0, 0) || "" };
+  // 锚点行：按字符区间从原文取（原文与 hard 序列下标不同，这里只回填 hard 片段，供比对用）
+  for (const [idx, a] of anchors) out[idx] = { lineIdx: idx, kind: "anchor", text: hay.slice(a.start, a.end).join("") };
+
+  // 缺口：未被占用的 hard 区间，按行序分配给未锚定的行
+  let prevEnd = 0;
+  let i = 0;
+  while (i < lines.length) {
+    if (anchors.has(i)) { prevEnd = anchors.get(i)!.end; i++; continue; }
+    const run: number[] = [];
+    const gs = prevEnd;
+    while (i < lines.length && !anchors.has(i)) { run.push(i); i++; }
+    const ge = i < lines.length ? anchors.get(i)!.start : hay.length;
+    const gapLen = Math.max(0, ge - gs);
+    const fits = run.length === 1 && gapLen > 0 && avg > 0 && gapLen <= avg * CAPACITY_RATIO;
+    if (fits) out[run[0]!] = { lineIdx: run[0]!, kind: "eliminated", text: hay.slice(gs, ge).join("") };
+  }
+  return out;
+}
+
 function loadPages(doc: string): PaddlePage[] {
   const dir = join(ROOT, "data", "out", doc, "ocr-jobs");
   if (!existsSync(dir)) throw new Error(`没有 ${dir}`);
