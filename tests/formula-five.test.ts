@@ -17,6 +17,7 @@ import {
   classify,
   dice,
   hasNestedFrac,
+  summarize,
   spans,
   type FormulaItem,
 } from "../scripts/formula-five-audit.js";
@@ -131,4 +132,32 @@ test("anchorRows: 一方包含另一方算粒度差，不算分歧", () => {
   const r = anchorRows(items)[0]!;
   assert.equal(r.granularity, true);
   assert.equal(r.outliers.length, 0, "粒度差不该产出离群家");
+});
+
+/* ── 5. 可核验性分档（决定错误率能不能算） ─────────────────────────── */
+
+test("via 分档：块包含锚点记 block，只有页级文本记 page（page 不进错误率分母）", () => {
+  const items: FormulaItem[] = [
+    { src: "v3", page: 2, latex: "I_{\\text{保}}=0.25\\ A", norm: [0.8, 0.43, 0.92, 0.46], boxKind: "exact", score: null, inTable: false },
+    // 这条块的框**包含**锚点 ⇒ 位置可核验到块一级
+    { src: "vl", page: 2, latex: "I_{\\text{保}}=0.25\\ \\text{A}", norm: [0.5, 0.38, 0.95, 0.52], boxKind: "block", score: null, inTable: false },
+    // 这条没有任何框 ⇒ 只能页级猜，标 page
+    { src: "minicpm", page: 2, latex: "I_{保} = 0.25 \\, A", norm: null, boxKind: "none", score: null, inTable: false },
+  ];
+  const r = anchorRows(items)[0]!;
+  assert.equal(r.cells.vl?.via, "block", "块框包含锚点 ⇒ 应记 block");
+  assert.equal(r.cells.minicpm?.via, "page", "无框的页级匹配 ⇒ 必须记 page，不能冒充可核验");
+  assert.equal(r.cells.v3?.via, "hard");
+});
+
+test("summarize：page 档单独计数，不混进可核验数", () => {
+  const items: FormulaItem[] = [
+    { src: "v3", page: 0, latex: "R=\\rho\\frac{l}{S}", norm: [0.1, 0.2, 0.4, 0.24], boxKind: "exact", score: null, inTable: false },
+    { src: "vl", page: 0, latex: "R = \\rho \\frac{l}{S}", norm: null, boxKind: "none", score: null, inTable: false },
+  ];
+  const st = summarize(anchorRows(items))[0]!;
+  assert.equal(st.per.v3!.hardN, 1);
+  assert.equal(st.per.v3!.pageOnly, 0, "V3 有逐条框 ⇒ 不该落到 page 档");
+  assert.equal(st.per.vl!.pageOnly, 1, "VL 只有页级匹配 ⇒ 记 page");
+  assert.equal(st.per.vl!.hardN, 0);
 });

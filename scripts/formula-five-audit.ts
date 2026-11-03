@@ -329,8 +329,9 @@ export interface Cell {
   latex: string;
   canon: string;
   score: number | null;
-  /** hard = 逐条框命中；pool = 页级文本归队（位置不可核验）；none = 该家这格没有。 */
-  via: "hard" | "pool";
+  /** 可核验性三档：`hard`=该家自己有逐条框（MinerU/V3）；`block`=串来自**包含锚点的那个块**
+   *  （位置可核验到块一级）；`page`=整页文本里挑最像的（**位置不可核验，不计入错误率分母**）。 */
+  via: "hard" | "block" | "page";
 }
 
 export interface Variant { canon: string; latex: string; srcs: Source[] }
@@ -419,7 +420,11 @@ export function anchorRows(all: FormulaItem[], iouMin = 0.25, diceMin = 0.5): Ro
     for (const s of POOL_SOURCES) {
       if (cells[s]) continue;
       const cand = pool.get(`${s}:${c.page}`) ?? [];
-      let best: FormulaItem | null = null; let bestD = 0;
+      const cx = (c.norm[0] + c.norm[2]) / 2; const cy = (c.norm[1] + c.norm[3]) / 2;
+      // 块包含锚点 ⇒ 位置可核验到块一级；否则只能算页级猜（via=page）
+      const contains = (it: FormulaItem): boolean =>
+        !!it.norm && it.norm[0] <= cx && cx <= it.norm[2] && it.norm[1] <= cy && cy <= it.norm[3];
+      let best: FormulaItem | null = null; let bestD = 0; let bestBlock = false;
       for (const it of cand) {
         const cn = canonLatex(it.latex);
         if (!cn) continue;
@@ -430,10 +435,12 @@ export function anchorRows(all: FormulaItem[], iouMin = 0.25, diceMin = 0.5): Ro
           return contained ? 1 : dice(cn, sd);
         };
         const d = Math.max(...seeds.map(match));
-        if (d > bestD) { bestD = d; best = it; }
+        // 同分时"块包含锚点"优先（先按包含关系再按相似度换掉当前最优）
+        const itBlock = contains(it);
+        if (d > bestD || (d === bestD && itBlock && !bestBlock)) { bestD = Math.max(d, bestD); best = it; bestBlock = itBlock; }
       }
       if (best && bestD >= diceMin) {
-        cells[s] = { latex: best.latex, canon: canonLatex(best.latex), score: null, via: "pool" };
+        cells[s] = { latex: best.latex, canon: canonLatex(best.latex), score: null, via: bestBlock ? "block" : "page" };
       }
     }
     // 变体归堆。**只有逐条框（hard）的家能定多数派**：页级归队可能把邻格公式挂进来
@@ -462,7 +469,7 @@ export function anchorRows(all: FormulaItem[], iouMin = 0.25, diceMin = 0.5): Ro
     let merged = camps.length > 1 ? false : hardSrc.length > 1;
     for (const src of SOURCES) {
       const cell = cells[src];
-      if (!cell || cell.via !== "pool") continue;
+      if (!cell || cell.via === "hard") continue;
       const before = camps.length;
       if (!join(cell, src)) {
         // 0.9：再低就会把「嵌套分式 vs 读扁」这种真结构差并成一堆（实测 dice=0.80）
@@ -491,7 +498,15 @@ export function anchorRows(all: FormulaItem[], iouMin = 0.25, diceMin = 0.5): Ro
 
 export interface ClassStat {
   cls: string; total: number;
-  per: Record<Source, { hit: number; garbled: number; minority: number; scoreSum: number; scoreN: number }>;
+  per: Record<Source, {
+    hit: number; garbled: number; minority: number; scoreSum: number; scoreN: number;
+    /** 该家自己给得出逐条公式框的格数 —— **唯一能做位置级判据的一档**。 */
+    hardN: number;
+    /** 串来自包含锚点的块（位置只能核到块一级）。 */
+    blockN: number;
+    /** 只有页级匹配的格数 —— **不进错误率分母**（匹配器会偏向挑到对的那个）。 */
+    pageOnly: number;
+  }>;
 }
 
 export function summarize(rows: Row[]): ClassStat[] {
@@ -500,16 +515,17 @@ export function summarize(rows: Row[]): ClassStat[] {
     const set = cls === "ALL" ? rows : rows.filter((r) => r.tags.includes(cls));
     const per = {} as ClassStat["per"];
     for (const s of SOURCES) {
-      let hit = 0; let garbled = 0; let minority = 0; let scoreSum = 0; let scoreN = 0;
+      let hit = 0; let garbled = 0; let minority = 0; let scoreSum = 0; let scoreN = 0; let hardN = 0; let blockN = 0; let pageOnly = 0;
       for (const r of set) {
         const c = r.cells[s];
         if (!c) continue;
         hit += 1;
+        if (c.via === "page") pageOnly += 1; else if (c.via === "hard") hardN += 1; else blockN += 1;
         if (GARBLED.test(c.latex)) garbled += 1;
         if (c.score !== null) { scoreSum += c.score; scoreN += 1; }
         if (r.outliers.includes(s)) minority += 1;
       }
-      per[s] = { hit, garbled, minority, scoreSum, scoreN };
+      per[s] = { hit, garbled, minority, scoreSum, scoreN, hardN, blockN, pageOnly };
     }
     return { cls, total: set.length, per };
   });
@@ -549,6 +565,16 @@ export function report(doc: string, rows: Row[], stats: ClassStat[], missing: st
     });
     L.push(`| ${st.cls} | ${st.total} | ${cells.join(" | ")} |`);
   }
+  L.push("", `## 1b. 可核验性（**决定错误率能不能算**）`, "");
+  L.push(`| 源 | 命中 | ①逐条框 hard | ②块包含锚点 block | ③只有页级 page（**不进分母**） |`, `|---|---:|---:|---:|---:|`);
+  for (const s of SOURCES) {
+    const st = stats[0]!.per[s]!;
+    L.push(`| ${SRC_CN[s]} | ${st.hit} | ${st.hardN} | ${st.blockN} | ${st.pageOnly} |`);
+  }
+  L.push("", "> **① 才是真分母**：只有 MinerU 与 StructureV3 自带逐条公式框。",
+    "> ② 只能核到「这个式子确实出现在包含该位置的那个块里」，块内第几条判不了。",
+    "> ③ 是「整页里挑最像的串」，**匹配器天然偏向挑到对的那个** ⇒ 用它算错误率会系统性偏松，",
+    "> 所以 VL / MiniCPM / OXR 的公式错误率**不能由本工具给**，只能由页图人工判定给（证据文档 §3）。", "");
   L.push("", `## 2. 分歧计数`, "");
   L.push(`- 位置锚槽位 **${rows.length}**；出现 ≥2 种写法（待核）：**${conflicts.length}** 条；`);
   L.push(`  其中 **两个逐条框家互斥（⚡）**：${rows.filter((r) => r.hardConflict).length} 条 —— 位置可比，优先看这些。`);
@@ -571,7 +597,7 @@ export function report(doc: string, rows: Row[], stats: ClassStat[], missing: st
       const c = r.cells[s];
       if (!c) return "·";
       const mark = r.outliers.includes(s) ? "⚠" : "";
-      return `${mark}${clip(c.latex, 26)}${c.via === "pool" ? "" : ""}`;
+      return `${mark}${clip(c.latex, 26)}${c.via === "page" ? "〔位置不可核验〕" : ""}`;
     });
     L.push(`| ${r.id} | p${r.page + 1} | ${box} | ${r.tags.join(",") || "—"} | ${r.variants.length}派${r.hardConflict ? " ⚡" : ""} | ${r.outliers.map((o) => SRC_CN[o]).join(",")} | ${per.join(" | ")} |`);
   }
