@@ -25,6 +25,7 @@
     "ocr:job": "tsx scripts/paddle-client.ts run",
     "audit:paddle": "tsx scripts/paddle-structure-audit.ts",
     "audit:pos": "tsx scripts/paddle-pos-diff.ts",
+    "audit:formula": "tsx scripts/formula-five-audit.ts",
     "audit:numbering": "tsx scripts/audit-numbering.ts",
     "audit:suspicious": "tsx scripts/audit-suspicious-number.ts",
     "bank": "tsx scripts/build-bank.ts",
