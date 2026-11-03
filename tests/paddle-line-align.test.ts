@@ -65,3 +65,34 @@ test("stripMarkup：HTML 标签与图片占位符不进分母（表格块的真�
   assert.deepEqual(matchChars('<table><tr><td rowspan="2">甲</td></tr></table>'), matchChars("甲"));
   assert.deepEqual(matchChars("![](images/x.jpg) 乙"), matchChars("乙"));
 });
+
+test("容量守卫：缺口字数超过邻行平均 1.5× ⇒ 不填（标待核）", () => {
+  // 两条锚定行各 8 字（均 8），中间一行对不上、且缺口有 16 字 ⇒ 16 > 8×1.5
+  const hay = "甲".repeat(8) + "程".repeat(16) + "乙".repeat(8);
+  const { result } = alignBlock(hay, [
+    { text: "甲".repeat(8) },
+    { text: "对不上的公式行" },
+    { text: "乙".repeat(8) },
+  ]);
+  assert.equal(result.anchor, 2);
+  assert.equal(result.eliminated, 0);
+  assert.equal(result.guardBlocked, 1);
+});
+
+test("容量守卫：缺口字数在邻行 1.5× 以内 ⇒ 照常排除法定行", () => {
+  const hay = "甲".repeat(8) + "程".repeat(8) + "乙".repeat(8);
+  const { result } = alignBlock(hay, [
+    { text: "甲".repeat(8) },
+    { text: "对不上" },
+    { text: "乙".repeat(8) },
+  ]);
+  assert.equal(result.anchor, 2);
+  assert.equal(result.eliminated, 1);
+  assert.equal(result.guardBlocked, 0);
+});
+
+test("容量守卫：一块里一个锚都没有 ⇒ 无从校准，不填", () => {
+  const { result } = alignBlock("完全对不上的整段文字内容甲", [{ text: "另一段完全不同的字" }]);
+  assert.equal(result.eliminated, 0);
+  assert.equal(result.guardBlocked, 1);
+});

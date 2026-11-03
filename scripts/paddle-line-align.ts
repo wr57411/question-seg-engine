@@ -25,7 +25,16 @@ const ROOT = join(import.meta.dirname, "..");
 /** 块框外扩：V3 行框常比 VL 块框略宽/略高（同为版面检测，边界口径不同）。 */
 const PAD = 0.002;
 
-export type Verdict = "anchor" | "eliminated" | "needs_human" | "leftover_text" | "leftover_frame";
+export type Verdict = "anchor" | "eliminated" | "guard_blocked" | "needs_human" | "leftover_text" | "leftover_frame";
+
+/**
+ * 排除法的**容量守卫**（2026-11-03 用户定：阈值 1.5 倍）。
+ * 为什么不用"字号 × 字数"：字号是整页中位行高、字宽又不齐（汉字≈1 宽、数字≈半宽、
+ * LaTeX 记号纸面上根本不存在）⇒ 绝对量估不准。改用**同块已锚定行的平均每行字数**当尺子，
+ * 数据自校准；缺口超过它的 1.5 倍就判"这一行放不下"，标待核不填。
+ * 方向是"不确定就拦"：拦错只多一条待核、页面上看得见；漏拦是静默塞错、看不见。
+ */
+export const CAPACITY_RATIO = 1.5;
 
 export interface BlockResult {
   page: number;
@@ -35,6 +44,8 @@ export interface BlockResult {
   /** 锚点里有多少是「乱序匹配」的（行序 ≠ 文本序，说明块内跨栏或续段） */
   outOfOrder?: number;
   eliminated: number;
+  /** 排除法被容量守卫拦下的行数（并进「交人工」统计） */
+  guardBlocked: number;
   needsHuman: number;
   leftoverText: number;
   leftoverFrame: number;
@@ -124,9 +135,14 @@ export function alignBlock(blockText: string, lines: { text: string }[]): {
     }
   });
 
+  // 容量尺子：同块已锚定行的平均硬字符数（只算真锚上的行）
+  const anchoredLens = [...anchors.keys()].map((i) => matchChars(lines[i]!.text).length).filter((n) => n > 0);
+  const avgChars = anchoredLens.length ? anchoredLens.reduce((a, b) => a + b, 0) / anchoredLens.length : 0;
+
   const res = {
     lines: lines.length,
     anchor: anchors.size,
+    guardBlocked: 0,
     outOfOrder: [...anchors.values()].filter((a) => a.outOfOrder).length,
     eliminated: 0,
     needsHuman: 0,
@@ -153,8 +169,18 @@ export function alignBlock(blockText: string, lines: { text: string }[]): {
     const next = i < lines.length ? anchors.get(i)! : null;
     const gapLen = Math.max(0, (next ? next.start : hay.length) - gapStart);
     if (run.length === 1 && gapLen > 0) {
-      res.eliminated++;
-      examples.push({ kind: "eliminated", detail: `1 行 / ${gapLen} 字 ⇒ 排除法定行` });
+      // 容量守卫：这条线放得下这段字吗？（拿同块已锚定行的平均字数当尺子）
+      const fits = avgChars > 0 && gapLen <= avgChars * CAPACITY_RATIO;
+      if (fits) {
+        res.eliminated++;
+        examples.push({ kind: "eliminated", detail: `1 行 / ${gapLen} 字（邻行均 ${avgChars.toFixed(1)}）⇒ 排除法定行` });
+      } else {
+        res.guardBlocked++;
+        examples.push({
+          kind: "guard_blocked",
+          detail: `1 行 / ${gapLen} 字（邻行均 ${avgChars ? avgChars.toFixed(1) : "无可比"}）⇒ 超过 ${CAPACITY_RATIO} 倍，不填`,
+        });
+      }
     } else if (run.length >= 2 && gapLen > 0) {
       res.needsHuman++;
       examples.push({ kind: "needs_human", detail: `${run.length} 行 / ${gapLen} 字 ⇒ 有歧义` });
@@ -194,6 +220,7 @@ function loadPages(doc: string): PaddlePage[] {
 const KIND_ZH: Record<Verdict, string> = {
   anchor: "锚点",
   eliminated: "排除法定行",
+  guard_blocked: "容量守卫拦下",
   needs_human: "交人工",
   leftover_text: "剩字报警",
   leftover_frame: "剩框报警",
@@ -218,10 +245,10 @@ async function main(): Promise<void> {
 
   const blocks: BlockResult[] = [];
   const examples: Example[] = [];
-  const totals = { anchor: 0, eliminated: 0, needsHuman: 0, leftoverText: 0, leftoverFrame: 0, chars: 0, consumed: 0, blocks: 0, lines: 0 };
+  const totals = { anchor: 0, eliminated: 0, guardBlocked: 0, needsHuman: 0, leftoverText: 0, leftoverFrame: 0, chars: 0, consumed: 0, blocks: 0, lines: 0 };
 
   let cover = { lines: 0, assigned: 0, ambiguous: 0, orphan: 0 };
-  const byLabel = new Map<string, { blocks: number; lines: number; anchor: number; eliminated: number; needsHuman: number; chars: number; consumed: number }>();
+  const byLabel = new Map<string, { blocks: number; lines: number; anchor: number; eliminated: number; guardBlocked?: number; needsHuman: number; chars: number; consumed: number }>();
   for (let p = 0; p < n; p++) {
     const vlPage = vl[p]!;
     const v3Page = v3[p]!;
@@ -261,6 +288,7 @@ async function main(): Promise<void> {
       totals.lines += result.lines;
       totals.anchor += result.anchor;
       totals.eliminated += result.eliminated;
+      totals.guardBlocked += result.guardBlocked;
       totals.needsHuman += result.needsHuman;
       totals.leftoverText += result.leftoverText;
       totals.leftoverFrame += result.leftoverFrame;
@@ -268,6 +296,7 @@ async function main(): Promise<void> {
       totals.consumed += result.consumed;
       const L0 = byLabel.get(b.label) ?? { blocks: 0, lines: 0, anchor: 0, eliminated: 0, needsHuman: 0, chars: 0, consumed: 0 };
       L0.blocks++; L0.lines += result.lines; L0.anchor += result.anchor; L0.eliminated += result.eliminated;
+      L0.guardBlocked = (L0.guardBlocked ?? 0) + result.guardBlocked;
       L0.needsHuman += result.needsHuman; L0.chars += result.chars; L0.consumed += result.consumed;
       byLabel.set(b.label, L0);
       for (const e of ex) {
@@ -309,7 +338,8 @@ async function main(): Promise<void> {
     `| V3 行框（落在 VL 块内） | ${totals.lines} | 100% |`,
     `| 靠文字锚点定行 | ${totals.anchor} | ${pct(totals.anchor, totals.lines)} |`,
     `| 靠排除法定行 | ${totals.eliminated} | ${pct(totals.eliminated, totals.lines)} |`,
-    `| **交人工（区间有歧义）** | **${totals.needsHuman}** | ${pct(totals.needsHuman, totals.lines)} |`,
+    `| 排除法被容量守卫拦下（≥${CAPACITY_RATIO}× 邻行字数） | ${totals.guardBlocked} | ${pct(totals.guardBlocked, totals.lines)} |`,
+    `| **交人工（歧义 + 守卫拦截）** | **${totals.needsHuman + totals.guardBlocked}** | ${pct(totals.needsHuman + totals.guardBlocked, totals.lines)} |`,
     `| 剩框报警（有框没字） | ${totals.leftoverFrame} | ${pct(totals.leftoverFrame, totals.lines)} |`,
     `| 剩字报警（有字没框） | ${totals.leftoverText} | — |`,
     `| 文字消费率 | ${totals.consumed} / ${totals.chars} | ${pct(totals.consumed, totals.chars)} |`,
@@ -350,7 +380,7 @@ async function main(): Promise<void> {
   console.log(
     `\n${vlDoc}\n  行框 ${totals.lines}：锚点 ${totals.anchor}（${pct(totals.anchor, totals.lines)}）、` +
       `排除 ${totals.eliminated}（${pct(totals.eliminated, totals.lines)}）、` +
-      `交人工 ${totals.needsHuman}（${pct(totals.needsHuman, totals.lines)}）、` +
+      `交人工 ${totals.needsHuman}（${pct(totals.needsHuman, totals.lines)}）、守卫拦下 ${totals.guardBlocked}（${pct(totals.guardBlocked, totals.lines)}）、` +
       `剩框 ${totals.leftoverFrame}、剩字 ${totals.leftoverText}\n` +
       `  文字消费 ${totals.consumed}/${totals.chars}（${pct(totals.consumed, totals.chars)}）；行框归块 ${cover.assigned}/${cover.lines}、无归属 ${cover.orphan}、跨块 ${cover.ambiguous}\n` +
       `  报告 → ${reportPath}`);
