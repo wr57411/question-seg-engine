@@ -13,12 +13,21 @@ import argparse, base64, io, json, os
 
 p = argparse.ArgumentParser()
 p.add_argument("--doc", required=True)
+p.add_argument("--sample", type=int, default=0, help="抽 N 条（按页分散）；0=全部重叠例")
 a = p.parse_args()
 doc = a.doc
 from PIL import Image, ImageDraw
 
 d = json.load(open(f"data/out/{doc}/ocr-fill-jobs.json", encoding="utf-8"))
 rows = [r for r in d["rows"] if r.get("oldText") is not None]
+if a.sample:
+    # 过滤后的候选里按页分散抽 N 条（不与旧路径重叠也要，问题改成"新对/新错/不该补"）
+    allrows = sorted(d["rows"], key=lambda r: (r["page"], r["bbox"][0]))
+    if a.sample < len(allrows):
+        step = len(allrows) / a.sample
+        rows = [allrows[min(len(allrows)-1, int(i*step))] for i in range(a.sample)]
+    else:
+        rows = allrows
 cases = []
 for i, r in enumerate(rows):
     img_path = f"data/out/{doc}/pages/page-{r['page']:02d}.png"
@@ -41,7 +50,7 @@ for i, r in enumerate(rows):
     s = min(2.0, 760/crop.size[0])
     crop = crop.resize((int(crop.size[0]*s), int(crop.size[1]*s)), Image.LANCZOS)
     buf = io.BytesIO(); crop.save(buf, format="JPEG", quality=72)
-    cases.append({"id": i, "page": r["page"], "kind": r["kind"], "new": r["text"], "old": r["oldText"],
+    cases.append({"id": i, "page": r["page"], "kind": r["kind"], "new": r["text"], "old": r.get("oldText"),
                   "w": round(x1-x0), "h": round(y1-y0), "img": base64.b64encode(buf.getvalue()).decode()})
 
 TPL = open(os.path.join(os.path.dirname(__file__), "review-fill.template.html"), encoding="utf-8").read()

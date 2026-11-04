@@ -170,6 +170,9 @@ function main(): void {
     const perLine = new Map<string, { text: string; kind: string; box: Box }>();
     for (const b of vp.blocks) {
       if (!b.norm || !b.content) continue;
+      // 表格/图表/插图块**不走行对齐**（2026-11-03 实测：过滤薄片后剩下的候选 77/78 都在 table 块里，
+      // 全是单元格数字；它们该走单元格通道或干脆不补）
+      if (["table", "chart", "image", "figure_title", "footer_image"].includes(b.label)) continue;
       const cand = tp.lines
         .filter((l) => l.norm && l.text && overlap(l.norm!, b.norm!) / area(l.norm!) >= 0.5)
         .sort((a, c) => a.norm![1] - c.norm![1] || a.norm![0] - c.norm![0]);
