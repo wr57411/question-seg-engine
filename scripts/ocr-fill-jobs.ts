@@ -13,12 +13,20 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PaddlePage } from "./paddle-client.js";
-import { alignBlockLines, hardNormWithMap, matchChars } from "./paddle-line-align.js";
+import { alignBlockLines, hardNormWithMap, matchChars, stripMarkup } from "./paddle-line-align.js";
 
 const ROOT = join(import.meta.dirname, "..");
 type Box = [number, number, number, number];
 
 const center = (b: Box): [number, number] => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2];
+
+/**
+ * 洞高下限（归一化页高，2026-11-03 按人工判定标定）：
+ * 人工判的 13 例里，「不该补」的 6 例洞高 2–3px（1000px 宽页图），
+ * 「新对」的 5 例全是 8–12px ⇒ 薄片=装饰/残墨，高的才是真缺字。
+ * 取 0.003 页高（1000px 宽页 ≈ 4.3px）作为下限，宁可少补。
+ */
+export const MIN_HOLE_H_NORM = 0.003;
 const overlap = (a: Box, b: Box) => {
   const w = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
   const h = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
@@ -50,7 +58,11 @@ export interface Cand {
  * ⇒ 正确的规则不是"1:1"（那会把碎片行的字丢掉），而是：
  * **洞只认一行；一行的字按它名下各洞的宽度切开分给碎片**（floor + 余数给宽者）。
  */
-/** 切点能不能落在这里：前一个字符是标点/空白，或下一个字符是标点——都算自然边界。 */
+/**
+ * ⚠️ 默认**关闭**（2026-11-03 用户纠正）：切点由洞的几何决定，不由标点决定。
+ * 上游漏读的就是那一段，它可能正好把一个词劈开 —— 那就该劈开。
+ * 按标点吸附会把字挪到**别的洞**里，等于篡改几何。保留此函数仅供人工核对时参考。
+ */
 export function isSafeCut(chars: string[], k: number): boolean {
   if (k <= 0 || k >= chars.length) return true;
   const prev = chars[k - 1]!;
@@ -72,7 +84,7 @@ export function snapCut(chars: string[], k: number, window = 2): number {
 export function splitTextAmongHoles(
   text: string,
   holes: { holeKey: string; width: number }[],
-  opts: { snap?: boolean } = {},
+  opts: { snap?: boolean } = { snap: false },
 ): { holeKey: string; text: string }[] {
   if (holes.length === 0) return [];
   if (holes.length === 1) return [{ holeKey: holes[0]!.holeKey, text }];
@@ -88,7 +100,7 @@ export function splitTextAmongHoles(
     left--;
   }
   // 切点先按宽度定，再吸附到自然边界（总字数不变，只在相邻两洞之间挪）
-  if (opts.snap !== false) {
+  if (opts.snap === true) {
     let cursor = 0;
     for (let i = 0; i < base.length - 1; i++) {
       cursor += base[i]!;
@@ -100,6 +112,11 @@ export function splitTextAmongHoles(
       base[i + 1]! -= delta;
       cursor = snapped;
     }
+  }
+  // 字不够分（洞比字多，或某洞分到 0 字）⇒ 不产空片：整行归最宽的洞，其余不填
+  if (holes.length > chars.length || base.some((n) => n === 0)) {
+    const widest = holes.reduce((a, h, i) => (holes[a]!.width >= h.width ? a : i), 0);
+    return [{ holeKey: holes[widest]!.holeKey, text }];
   }
   const out: { holeKey: string; text: string }[] = [];
   let at = 0;
@@ -159,11 +176,12 @@ function main(): void {
       if (cand.length === 0) continue;
       const texts = alignBlockLines(b.content, cand);
       const { map } = hardNormWithMap(b.content);
+      const stripped = stripMarkup(b.content); // 下标是相对"剥标记后"的串算的，必须切同一个串
       cand.forEach((l, i) => {
         const owned = texts[i]!;
         if (owned.kind === "blocked" || !owned.span) return;
         const [a0, a1] = owned.span;
-        const original = b.content.slice(map[a0] ?? 0, (map[a1 - 1] ?? 0) + 1);
+        const original = stripped.slice(map[a0] ?? 0, (map[a1 - 1] ?? 0) + 1);
         perLine.set(l.norm!.map((n) => n.toFixed(4)).join(","), { text: original, kind: owned.kind, box: l.norm! });
       });
     }
@@ -177,6 +195,7 @@ function main(): void {
       const h = bb[3]! - bb[1]!;
       if (w <= 0 || h <= 0 || w / h < 1.5) continue;
       const hole: Box = [bb[0]! / dims.w, bb[1]! / dims.h, bb[2]! / dims.w, bb[3]! / dims.h];
+      if (hole[3] - hole[1] < MIN_HOLE_H_NORM) continue; // 薄片（装饰/残墨）不补
       const holeKey = `${p}:${hole.map((n) => n.toFixed(4)).join(",")}`;
       holeBox.set(holeKey, hole);
       for (const [lineKey, v] of perLine) {
@@ -208,8 +227,16 @@ function main(): void {
       for (const c of cs) if (!uniqHoles.has(c.holeKey) || c.cov > uniqHoles.get(c.holeKey)!.cov) uniqHoles.set(c.holeKey, c);
       const list = [...uniqHoles.values()].sort((a, b) => (holeBox.get(a.holeKey)![0] ?? 0) - (holeBox.get(b.holeKey)![0] ?? 0));
       const text = cs[0]!.text;
-      const parts = splitTextAmongHoles(text, list.map((c) => ({ holeKey: c.holeKey, width: holeBox.get(c.holeKey)![2] - holeBox.get(c.holeKey)![0] })));
-      list.forEach((c, i) => assigned.push({ ...c, text: parts[i]!.text, kind: c.kind }));
+      const parts = splitTextAmongHoles(
+        text,
+        list.map((c) => ({ holeKey: c.holeKey, width: holeBox.get(c.holeKey)![2] - holeBox.get(c.holeKey)![0] })),
+      );
+      // 字不够分时 split 只返回最宽的那个洞 ⇒ 按 holeKey 取，拿不到的洞不产候选（不产空片）
+      const byHole = new Map(parts.map((p2) => [p2.holeKey, p2.text]));
+      for (const c of list) {
+        const t = byHole.get(c.holeKey);
+        if (t && t.trim()) assigned.push({ ...c, text: t, kind: c.kind });
+      }
     }
     for (const c of assigned) {
       const hole = holeBox.get(c.holeKey)!;
