@@ -195,3 +195,14 @@ V3 在表格里读的格子文本与 VL 的 HTML 文本在**切分与顺序**上
 
 **仍然不做的**：不用"墨迹宽度"替 bbox 宽度（要重渲染，先记下作为后续可选项）；
 不把切点吸附到"语义"层（那需要模型，与零模型原则冲突）。
+
+## 14. 人工判定页（2026-11-03 用户要求：判定要方便输入）
+
+`scripts/review-fill-page.py` + `scripts/review-fill.template.html` ⇒ 生成
+`data/out/<doc>/review-fill.html`（单文件、离线可开）。
+
+- 每例：页图裁块（红框=洞）+ 新路径文本 + 现状产线文本。
+- 判定：键盘 1 新对 / 2 旧对 / 3 都错 / 4 都对 / 0 跳过，自动进下一例；判定存 localStorage。
+- 收尾：一键"复制结果"或"下载 JSON"（含 summary 与逐条 verdict），回传即可。
+- 复跑：`/Users/john/.local/share/uv/tools/paddleocr-mcp/bin/python scripts/review-fill-page.py --doc "<docId>"`
+  （依赖 Pillow；本机在 paddle 的 uv 环境里已有）
