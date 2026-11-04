@@ -27,16 +27,22 @@ for i, r in enumerate(rows):
     im = Image.open(img_path).convert("RGB")
     W, H = im.size
     x0, y0, x1, y1 = [r["bbox"][0]*W, r["bbox"][1]*H, r["bbox"][2]*W, r["bbox"][3]*H]
-    cx0, cy0 = max(0, int(x0-60)), max(0, int(y0-46))
-    cx1, cy1 = min(W, int(x1+60)), min(H, int(y1+46))
-    crop = im.crop((cx0, cy0, cx1, cy1))
+    # 上下文留足：横向 ±110、纵向 ±70（洞常是 2–7px 薄片，只画框看不出来）
+    cx0, cy0 = max(0, int(x0-110)), max(0, int(y0-70))
+    cx1, cy1 = min(W, int(x1+110)), min(H, int(y1+70))
+    crop = im.crop((cx0, cy0, cx1, cy1)).convert("RGBA")
+    overlay = Image.new("RGBA", crop.size, (0,0,0,0))
+    od = ImageDraw.Draw(overlay)
+    box = [x0-cx0-2, y0-cy0-2, x1-cx0+2, y1-cy0+2]   # 外扩 2px，避免被字覆盖
+    od.rectangle(box, fill=(220,40,40,70), outline=(200,20,20,255), width=2)
+    crop = Image.alpha_composite(crop, overlay).convert("RGB")
     dr = ImageDraw.Draw(crop)
-    dr.rectangle([x0-cx0, y0-cy0, x1-cx0, y1-cy0], outline=(220,40,40), width=3)
+    dr.rectangle(box, outline=(200,20,20), width=2)
     s = min(2.0, 760/crop.size[0])
     crop = crop.resize((int(crop.size[0]*s), int(crop.size[1]*s)), Image.LANCZOS)
     buf = io.BytesIO(); crop.save(buf, format="JPEG", quality=72)
-    cases.append({"id": i, "page": r["page"], "kind": r["kind"], "new": r["text"],
-                  "old": r["oldText"], "img": base64.b64encode(buf.getvalue()).decode()})
+    cases.append({"id": i, "page": r["page"], "kind": r["kind"], "new": r["text"], "old": r["oldText"],
+                  "w": round(x1-x0), "h": round(y1-y0), "img": base64.b64encode(buf.getvalue()).decode()})
 
 TPL = open(os.path.join(os.path.dirname(__file__), "review-fill.template.html"), encoding="utf-8").read()
 out = f"data/out/{doc}/review-fill.html"

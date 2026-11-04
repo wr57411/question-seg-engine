@@ -29,12 +29,13 @@ pre{white-space:pre-wrap;word-break:break-all;font-size:12px;background:#0f172a;
     <button onclick="vote('old')">② 旧对</button>
     <button onclick="vote('both_wrong')">③ 都错</button>
     <button onclick="vote('both_ok')">④ 都对</button>
+    <button onclick="vote('no_fill')" style="grid-column:span 4;background:#fff8f7;border-color:#e3b4ae;color:#b42318">⑤ 这个洞根本不该补（薄片/不是缺字）</button>
   </div>
   <div class="btns" style="grid-template-columns:repeat(2,1fr);margin-top:8px">
     <button class="g" onclick="vote('skip')">跳过 (0)</button>
     <button class="g" onclick="finish()">导出结果</button>
   </div>
-  <div class="note">键盘：1 新对 · 2 旧对 · 3 都错 · 4 都对 · 0 跳过 · ← 上一条。判定存在本机，刷新不丢。</div>
+  <div class="note">键盘：1 新对 · 2 旧对 · 3 都错 · 4 都对 · 5 不该补 · 0 跳过 · ← 上一条。判定存在本机，刷新不丢。</div>
   <div id="out"></div>
 </div>
 <script>
@@ -50,10 +51,11 @@ function render(){
     '<img src="data:image/jpeg;base64,' + c.img + '">' +
     '<div class="txt"><span class="k kn">新路径</span><span class="mono">' + esc(c.new) + '</span></div>' +
     '<div class="txt"><span class="k ko">现状产线</span><span class="mono">' + esc(c.old) + '</span></div>' +
+    '<div class="note">洞尺寸约 ' + c.w + '×' + c.h + ' px（页面像素）；红带=洞，四周多留了上下文便于定位</div>' +
     (votes[c.id] ? '<div class="done">已判：' + zh(votes[c.id]) + '（再点一次可改）</div>' : '');
 }
 function esc(s){return (s||"").replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}
-function zh(v){return {new:"新对",old:"旧对",both_wrong:"都错",both_ok:"都对",skip:"跳过"}[v]||v}
+function zh(v){return {new:"新对",old:"旧对",both_wrong:"都错",both_ok:"都对",no_fill:"不该补",skip:"跳过"}[v]||v}
 function vote(v){
   votes[CASES[i].id] = v;
   localStorage.setItem(KEY, JSON.stringify(votes));
@@ -80,6 +82,7 @@ document.addEventListener("keydown", e => {
   else if (e.key === "2") vote("old");
   else if (e.key === "3") vote("both_wrong");
   else if (e.key === "4") vote("both_ok");
+  else if (e.key === "5") vote("no_fill");
   else if (e.key === "0") vote("skip");
   else if (e.key === "ArrowLeft" && i>0) { i--; render(); }
 });
