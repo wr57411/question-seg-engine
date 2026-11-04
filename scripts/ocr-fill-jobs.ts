@@ -13,7 +13,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PaddlePage } from "./paddle-client.js";
-import { alignBlockLines, matchChars } from "./paddle-line-align.js";
+import { alignBlockLines, hardNormWithMap, matchChars } from "./paddle-line-align.js";
 
 const ROOT = join(import.meta.dirname, "..");
 type Box = [number, number, number, number];
@@ -50,9 +50,29 @@ export interface Cand {
  * ⇒ 正确的规则不是"1:1"（那会把碎片行的字丢掉），而是：
  * **洞只认一行；一行的字按它名下各洞的宽度切开分给碎片**（floor + 余数给宽者）。
  */
+/** 切点能不能落在这里：前一个字符是标点/空白，或下一个字符是标点——都算自然边界。 */
+export function isSafeCut(chars: string[], k: number): boolean {
+  if (k <= 0 || k >= chars.length) return true;
+  const prev = chars[k - 1]!;
+  const next = chars[k]!;
+  const punct = /[，。、；：？！“”‘’（）《》〈〉「」【】,.;:?!\s]/;
+  return punct.test(prev) || punct.test(next);
+}
+
+/** 把切点吸到 ±window 内最近的自然边界（2026-11-03 用户提：切点不该落在词中间）。 */
+export function snapCut(chars: string[], k: number, window = 2): number {
+  if (isSafeCut(chars, k)) return k;
+  for (let d = 1; d <= window; d++) {
+    if (isSafeCut(chars, k - d)) return k - d;
+    if (isSafeCut(chars, k + d)) return k + d;
+  }
+  return k;
+}
+
 export function splitTextAmongHoles(
   text: string,
   holes: { holeKey: string; width: number }[],
+  opts: { snap?: boolean } = {},
 ): { holeKey: string; text: string }[] {
   if (holes.length === 0) return [];
   if (holes.length === 1) return [{ holeKey: holes[0]!.holeKey, text }];
@@ -66,6 +86,20 @@ export function splitTextAmongHoles(
     if (left <= 0) break;
     base[o.i]!++;
     left--;
+  }
+  // 切点先按宽度定，再吸附到自然边界（总字数不变，只在相邻两洞之间挪）
+  if (opts.snap !== false) {
+    let cursor = 0;
+    for (let i = 0; i < base.length - 1; i++) {
+      cursor += base[i]!;
+      const snapped = snapCut(chars, cursor);
+      const delta = snapped - cursor;
+      if (delta === 0) continue;
+      if (base[i + 1]! - delta <= 0) continue; // 不让下一个洞变空
+      base[i]! += delta;
+      base[i + 1]! -= delta;
+      cursor = snapped;
+    }
   }
   const out: { holeKey: string; text: string }[] = [];
   let at = 0;
@@ -124,10 +158,13 @@ function main(): void {
         .sort((a, c) => a.norm![1] - c.norm![1] || a.norm![0] - c.norm![0]);
       if (cand.length === 0) continue;
       const texts = alignBlockLines(b.content, cand);
+      const { map } = hardNormWithMap(b.content);
       cand.forEach((l, i) => {
         const owned = texts[i]!;
-        if (owned.kind === "blocked") return;
-        perLine.set(l.norm!.map((n) => n.toFixed(4)).join(","), { text: owned.text, kind: owned.kind, box: l.norm! });
+        if (owned.kind === "blocked" || !owned.span) return;
+        const [a0, a1] = owned.span;
+        const original = b.content.slice(map[a0] ?? 0, (map[a1 - 1] ?? 0) + 1);
+        perLine.set(l.norm!.map((n) => n.toFixed(4)).join(","), { text: original, kind: owned.kind, box: l.norm! });
       });
     }
 

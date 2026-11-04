@@ -50,3 +50,14 @@ test("splitTextAmongHoles：单个洞拿走整行；空行不产候选", async (
   assert.deepEqual(splitTextAmongHoles("甲乙", [{ holeKey: "h1", width: 5 }]), [{ holeKey: "h1", text: "甲乙" }]);
   assert.deepEqual(splitTextAmongHoles("甲乙", []), []);
 });
+
+test("splitTextAmongHoles：切点吸附到标点边界（不把词切两半）", async () => {
+  const { splitTextAmongHoles } = await import("../scripts/ocr-fill-jobs.js");
+  // 9 字（逗号在第 5 位），宽度 2:1 ⇒ 原始切点在 6（"戊"与"己"之间，词中间）
+  const text = "甲乙丙丁，戊己庚辛";
+  const snapped = splitTextAmongHoles(text, [{ holeKey: "h1", width: 2 }, { holeKey: "h2", width: 1 }]);
+  assert.equal(snapped.map((p) => p.text).join(""), text); // 不重不漏
+  assert.equal(snapped[0]!.text, "甲乙丙丁，"); // 吸到逗号之后（切点 5）
+  const raw = splitTextAmongHoles(text, [{ holeKey: "h1", width: 2 }, { holeKey: "h2", width: 1 }], { snap: false });
+  assert.equal(raw[0]!.text, "甲乙丙丁，戊"); // 不吸附就切在词中间
+});

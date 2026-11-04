@@ -82,6 +82,22 @@ export function stripMarkup(s: string): string {
  * 实测原因（2026-11-03）：VL 出半角 `,`、V3 出全角 `，`，一字之差整行 MISS。
  * 位置对齐只需要"实义字"一致，标点不参与。
  */
+/** 与 `hardChars` 同口径的**去标点**版本，同时记录每个字符在原串中的下标（回填原文用）。 */
+export function hardNormWithMap(s: string): { chars: string[]; map: number[] } {
+  const out: string[] = [];
+  const map: number[] = [];
+  const stripped = stripMarkup(s);
+  for (let i = 0; i < stripped.length; i++) {
+    const ch = stripped[i]!;
+    if (/\s/.test(ch)) continue;
+    if (ch === "$" || ch === "\\" || ch === "{" || ch === "}") continue;
+    if (/[，。、；：？！“”‘’（）《》〈〉「」【】,.;:?!"'()\[\]<>=+*/~—…·\-]/.test(ch)) continue;
+    out.push(ch);
+    map.push(i);
+  }
+  return { chars: out, map };
+}
+
 export function matchChars(s: string): string[] {
   return hardChars(stripMarkup(s)).filter((c) => !/[，。、；：？！“”‘’（）《》〈〉「」【】,.;:?!"'()\[\]<>=+*/~—…·\-]/.test(c));
 }
@@ -218,7 +234,10 @@ export interface LineText {
   lineIdx: number;
   /** `anchor` 文字对得上；`eliminated` 由排除法得到；`blocked` 守卫/歧义，不给文字 */
   kind: "anchor" | "eliminated" | "blocked";
+  /** 该行拿走的文字（硬字符）；原文请用 `span` 回填 */
   text: string;
+  /** `[start, end)`：在硬字符序列里的区间；blocked 时为 null */
+  span: [number, number] | null;
 }
 
 export function alignBlockLines(blockText: string, lines: { text: string }[]): LineText[] {
@@ -249,10 +268,9 @@ export function alignBlockLines(blockText: string, lines: { text: string }[]): L
   const anchoredLens = [...anchors.keys()].map((i) => matchChars(lines[i]!.text).length).filter((n) => n > 0);
   const avg = anchoredLens.length ? anchoredLens.reduce((a, b) => a + b, 0) / anchoredLens.length : 0;
 
-  const out: LineText[] = lines.map((l, i) => ({ lineIdx: i, kind: "blocked" as const, text: l.text }));
-  for (const [idx, a] of anchors) out[idx] = { lineIdx: idx, kind: "anchor", text: blockText.slice(0, 0) || "" };
-  // 锚点行：按字符区间从原文取（原文与 hard 序列下标不同，这里只回填 hard 片段，供比对用）
-  for (const [idx, a] of anchors) out[idx] = { lineIdx: idx, kind: "anchor", text: hay.slice(a.start, a.end).join("") };
+  const out: LineText[] = lines.map((l, i) => ({ lineIdx: i, kind: "blocked" as const, text: l.text, span: null }));
+  for (const [idx, a] of anchors)
+    out[idx] = { lineIdx: idx, kind: "anchor", text: hay.slice(a.start, a.end).join(""), span: [a.start, a.end] };
 
   // 缺口：未被占用的 hard 区间，按行序分配给未锚定的行
   let prevEnd = 0;
@@ -265,7 +283,7 @@ export function alignBlockLines(blockText: string, lines: { text: string }[]): L
     const ge = i < lines.length ? anchors.get(i)!.start : hay.length;
     const gapLen = Math.max(0, ge - gs);
     const fits = run.length === 1 && gapLen > 0 && avg > 0 && gapLen <= avg * CAPACITY_RATIO;
-    if (fits) out[run[0]!] = { lineIdx: run[0]!, kind: "eliminated", text: hay.slice(gs, ge).join("") };
+    if (fits) out[run[0]!] = { lineIdx: run[0]!, kind: "eliminated", text: hay.slice(gs, ge).join(""), span: [gs, ge] };
   }
   return out;
 }
