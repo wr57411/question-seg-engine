@@ -35,6 +35,48 @@ function loadPages(doc: string): PaddlePage[] {
 
 interface Hole { page: number; bbox: Box; text?: string; accepted?: boolean }
 
+export interface Cand {
+  holeKey: string;
+  lineKey: string;
+  cov: number;
+  text: string;
+  kind: string;
+}
+
+/**
+ * 洞 ↔ 行 的真实结构（2026-11-03 实测《电路》273 洞）：
+ * **每个洞最多只对应 1 行**（217 个洞命中 1 行、56 个没命中、0 个跨行），
+ * 但**一行常被 2–8 个洞碎片共用**（117 行里 47 行如此）。
+ * ⇒ 正确的规则不是"1:1"（那会把碎片行的字丢掉），而是：
+ * **洞只认一行；一行的字按它名下各洞的宽度切开分给碎片**（floor + 余数给宽者）。
+ */
+export function splitTextAmongHoles(
+  text: string,
+  holes: { holeKey: string; width: number }[],
+): { holeKey: string; text: string }[] {
+  if (holes.length === 0) return [];
+  if (holes.length === 1) return [{ holeKey: holes[0]!.holeKey, text }];
+  const chars = Array.from(text);
+  const totalW = holes.reduce((a, h) => a + Math.max(1e-9, h.width), 0);
+  const raw = holes.map((h) => (chars.length * Math.max(1e-9, h.width)) / totalW);
+  const base = raw.map((n) => Math.floor(n));
+  let left = chars.length - base.reduce((a, b) => a + b, 0);
+  const order = raw.map((n, i) => ({ i, frac: n - Math.floor(n) })).sort((a, b) => b.frac - a.frac);
+  for (const o of order) {
+    if (left <= 0) break;
+    base[o.i]!++;
+    left--;
+  }
+  const out: { holeKey: string; text: string }[] = [];
+  let at = 0;
+  holes.forEach((h, i) => {
+    const n = base[i]!;
+    out.push({ holeKey: h.holeKey, text: chars.slice(at, at + n).join("") });
+    at += n;
+  });
+  return out;
+}
+
 function main(): void {
   const argv = process.argv.slice(2);
   const flag = (k: string): string | null => {
@@ -64,7 +106,11 @@ function main(): void {
   }
 
   const rows: { page: number; bbox: Box; text: string; kind: string; oldText?: string; same?: boolean }[] = [];
+  let pageCands: { holeKey: string; lineKey: string; cov: number; text: string; kind: string }[] = [];
+  let conflictTotal = 0; // 跨行歧义（一个洞命中多行）的洞数
+  const holeBox = new Map<string, Box>();
   for (let p = 0; p < Math.min(vl.length, v3.length); p++) {
+    pageCands = [];
     const vp = vl[p]!;
     const tp = v3[p]!;
     const stage = stages.pages[p];
@@ -94,16 +140,50 @@ function main(): void {
       const h = bb[3]! - bb[1]!;
       if (w <= 0 || h <= 0 || w / h < 1.5) continue;
       const hole: Box = [bb[0]! / dims.w, bb[1]! / dims.h, bb[2]! / dims.w, bb[3]! / dims.h];
-      // 覆盖洞面积最多的那一行
-      let best: { text: string; kind: string; cov: number } | null = null;
-      for (const v of perLine.values()) {
+      const holeKey = `${p}:${hole.map((n) => n.toFixed(4)).join(",")}`;
+      holeBox.set(holeKey, hole);
+      for (const [lineKey, v] of perLine) {
         const cov = overlap(hole, v.box) / Math.max(1e-9, area(hole));
-        if (cov >= 0.5 && (!best || cov > best.cov)) best = { text: v.text, kind: v.kind, cov };
+        if (cov >= 0.5) pageCands.push({ holeKey, lineKey: `${p}:${lineKey}`, cov, text: v.text, kind: v.kind });
       }
-      if (!best) continue;
-      const oldHit = (oldByPage.get(p) ?? []).find((o) => overlap(hole, [o.bbox[0]! / dims.w, o.bbox[1]! / dims.h, o.bbox[2]! / dims.w, o.bbox[3]! / dims.h]) / Math.max(1e-9, area(hole)) >= 0.5);
-      const same = oldHit ? matchChars(oldHit.text).join("") === best.text : undefined;
-      rows.push({ page: p + 1, bbox: hole, text: best.text, kind: best.kind, oldText: oldHit?.text, same });
+    }
+
+    // 跨行歧义统计：一个洞同时命中 ≥2 行（理论上不该有，实测 0）
+    const linesPerHole = new Map<string, Set<string>>();
+    for (const c of pageCands) {
+      const set = linesPerHole.get(c.holeKey) ?? new Set<string>();
+      set.add(c.lineKey);
+      linesPerHole.set(c.holeKey, set);
+    }
+    for (const set of linesPerHole.values()) if (set.size >= 2) conflictTotal++;
+
+    // 按行归洞：一行可以拥有多个洞碎片；每个洞只认一行（跨行则记歧义，不填）
+    const byLine = new Map<string, Cand[]>();
+    for (const c of pageCands) {
+      const arr = byLine.get(c.lineKey) ?? [];
+      arr.push(c);
+      byLine.set(c.lineKey, arr);
+    }
+    const assigned: (Cand & { text: string })[] = [];
+    for (const [lineKey, cs] of byLine) {
+      void lineKey;
+      const uniqHoles = new Map<string, Cand>();
+      for (const c of cs) if (!uniqHoles.has(c.holeKey) || c.cov > uniqHoles.get(c.holeKey)!.cov) uniqHoles.set(c.holeKey, c);
+      const list = [...uniqHoles.values()].sort((a, b) => (holeBox.get(a.holeKey)![0] ?? 0) - (holeBox.get(b.holeKey)![0] ?? 0));
+      const text = cs[0]!.text;
+      const parts = splitTextAmongHoles(text, list.map((c) => ({ holeKey: c.holeKey, width: holeBox.get(c.holeKey)![2] - holeBox.get(c.holeKey)![0] })));
+      list.forEach((c, i) => assigned.push({ ...c, text: parts[i]!.text, kind: c.kind }));
+    }
+    for (const c of assigned) {
+      const hole = holeBox.get(c.holeKey)!;
+      const oldHit = (oldByPage.get(p) ?? []).find(
+        (o) =>
+          overlap(hole, [o.bbox[0]! / dims.w, o.bbox[1]! / dims.h, o.bbox[2]! / dims.w, o.bbox[3]! / dims.h]) /
+            Math.max(1e-9, area(hole)) >=
+          0.5,
+      );
+      const same = oldHit ? matchChars(oldHit.text).join("") === c.text : undefined;
+      rows.push({ page: p + 1, bbox: hole, text: c.text, kind: c.kind, oldText: oldHit?.text, same });
     }
   }
 
@@ -115,6 +195,7 @@ function main(): void {
     generatedAt: new Date().toISOString(),
     note: "只读对照：新路径（VL 字 + V3 行框）给每个洞算的字 vs 现状产线同一洞给过的字。不写产线文件。",
     holesWithCandidate: rows.length,
+    conflicts: conflictTotal,
     alsoFilledByOld: withOld.length,
     sameAsOld: same,
     onlyNew: rows.length - withOld.length,
@@ -123,7 +204,8 @@ function main(): void {
   writeFileSync(join(outDir, "ocr-fill-jobs.json"), JSON.stringify(out, null, 1), "utf8");
   console.log(
     `\n${doc}\n  新路径能给候选的洞：${rows.length}\n  现状产线也填过的：${withOld.length}（其中字一致 ${same}，${((same / Math.max(1, withOld.length)) * 100).toFixed(1)}%）\n` +
-      `  只有新路径能填（现状没补）：${rows.length - withOld.length}\n  明细 → data/out/${doc}/ocr-fill-jobs.json`,
+      `  只有新路径能填（现状没补）：${rows.length - withOld.length}\n` +
+      `  跨行歧义（一个洞命中多行）：${conflictTotal}\n  明细 → data/out/${doc}/ocr-fill-jobs.json`,
   );
 }
 

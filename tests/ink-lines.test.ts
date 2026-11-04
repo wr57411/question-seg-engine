@@ -31,3 +31,22 @@ test("splitInkLines：空白区域切出 0 行（不产生幽灵行）", () => {
   const img = makeImg(200, 200, []);
   assert.equal(splitInkLines(img, 200, 200, [0, 0, 200, 200]).length, 0);
 });
+
+test("splitTextAmongHoles：一行被 3 个洞碎片共用时，按洞宽切字、不重不漏", async () => {
+  const { splitTextAmongHoles } = await import("../scripts/ocr-fill-jobs.js");
+  const parts = splitTextAmongHoles("一二三四五六", [
+    { holeKey: "h1", width: 3 },
+    { holeKey: "h2", width: 1 },
+    { holeKey: "h3", width: 2 },
+  ]);
+  assert.equal(parts.map((p) => p.text).join(""), "一二三四五六");
+  assert.equal(parts.length, 3);
+  assert.equal(parts[0]!.text.length, 3);
+  assert.equal(parts[1]!.text.length, 1);
+});
+
+test("splitTextAmongHoles：单个洞拿走整行；空行不产候选", async () => {
+  const { splitTextAmongHoles } = await import("../scripts/ocr-fill-jobs.js");
+  assert.deepEqual(splitTextAmongHoles("甲乙", [{ holeKey: "h1", width: 5 }]), [{ holeKey: "h1", text: "甲乙" }]);
+  assert.deepEqual(splitTextAmongHoles("甲乙", []), []);
+});
