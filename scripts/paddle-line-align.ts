@@ -19,6 +19,9 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PaddlePage } from "./paddle-client.js";
 import { hardChars } from "./paddle-pos-diff.js";
+// B-33：剥标签必须用白名单（不等式 `$ r<R $` 曾被任意 `<...>` 通配整段吃掉）。
+// 白名单单一权威源在 ocr-lib.ts，两处共用防漂移。
+import { HTML_TAG_RE } from "./ocr-lib.js";
 
 type Box = [number, number, number, number];
 const ROOT = join(import.meta.dirname, "..");
@@ -72,7 +75,7 @@ const inside = (p: [number, number], b: Box, pad = PAD): boolean =>
  */
 export function stripMarkup(s: string): string {
   return s
-    .replace(/<[^>]*>/g, " ")
+    .replace(HTML_TAG_RE, " ")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
     .replace(/\\(?:begin|end)\{[^}]*\}/g, " ");
 }

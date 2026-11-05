@@ -37,12 +37,35 @@ export function readToken(): string {
   process.exit(2);
 }
 
+/**
+ * OCR/文档解析输出里实际会出现的 HTML 标签名白名单（B-33，2026-11-04）。
+ * 剥标签**只认这份清单**——不许用任意 `<...>` 通配：
+ * 理科试卷的 `$ r<R $` 含 `<`，通配会把「不等式 → 下一个 `>`」之间的正文整段吃掉
+ * （实测：真实 MCP 输出上 240 字符 / 16 处中文被误删；证据 `docs/BACKLOG.md` B-33、
+ * `docs/evidence/2026-11-04-识别链路与OCR工具盘点.md` §8.1）。
+ * 白名单外的疑似标签**宁可残留**（可见、可审计），不误删（不可见 = 丢内容）。
+ */
+export const KNOWN_HTML_TAGS = [
+  "div", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption",
+  "p", "span", "br", "img", "hr", "ul", "ol", "li", "dl", "dt", "dd",
+  "h1", "h2", "h3", "h4", "h5", "h6", "html", "body", "head", "meta",
+  "style", "script", "math", "svg", "figure", "figcaption",
+  "a", "font", "center", "b", "strong", "em", "i", "u", "s", "sub", "sup",
+  "pre", "code", "blockquote", "section", "header", "footer", "article",
+] as const;
+
+/** 已知标签的开/闭/自闭合标签正则（忽略大小写，属性任意）。 */
+export const HTML_TAG_RE = new RegExp(
+  `</?(?:${KNOWN_HTML_TAGS.join("|")})\\b[^>]*>`,
+  "gi",
+);
+
 /** 清洗 OCR 输出：去掉 markdown/HTML/图片占位符与多余空白（**不改字**）。 */
 export function cleanOcr(s: string): string {
   return s
-    .replace(/<div[\s\S]*?<\/div>/gi, " ")
+    .replace(/<div\b[\s\S]*?<\/div>/gi, " ")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/<[^>]+>/g, " ")
+    .replace(HTML_TAG_RE, " ")
     .replace(/^[#>*\s]+/gm, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -51,9 +74,9 @@ export function cleanOcr(s: string): string {
 /** 同 {@link cleanOcr}，但**保留换行** —— 整页路径要按 OCR 的换行切段。 */
 export function cleanOcrLines(s: string): string {
   return s
-    .replace(/<div[\s\S]*?<\/div>/gi, "\n")
+    .replace(/<div\b[\s\S]*?<\/div>/gi, "\n")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "\n")
-    .replace(/<[^>]+>/g, "\n")
+    .replace(HTML_TAG_RE, "\n")
     .replace(/^[#>*\s]+/gm, "")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{2,}/g, "\n")
