@@ -17,6 +17,14 @@
  * 判据与 MCP 路径同阈值（A/B 可比）：text 非空 + `$` 成对 + ratio ∈ [0.45,1.9] + 洞期望字数 ≥1.6
  * + 裁图路径交叉核对；`rec_score` 只记录不过滤（检测不改写）。
  *
+ * 批次 2（`--formula`，默认关）：公式碎片 V3 不放行级文本（进 `formula_res_list`）⇒ 公式洞行级无框可配
+ * （实测 p150 三洞全空即此）。开启后对**无行命中**的洞用公式框（norm→pt）做同款几何匹配
+ * （盖住洞 ≥0.6 + 列一致），候选 text=LaTeX **原样**（不清洗公式串），只两道门：
+ * 匹配几何 + 洞大小（expected ≥1.6）；宽度比 / `$` 成对对 LaTeX 原串意义有限 ⇒ 只如实记录不拒。
+ * 公式候选带 `kind:"formula"`、score 恒 null（作业解析层未取 formula score）；是否让 LaTeX 直进
+ * OcrFillItem.text 是产品决策，未定 ⇒ 开关默认关。缓存 v2 同时存行与公式（v1 旧行缓存对
+ * --formula 视为未命中，服务端按字节去重 ⇒ 重跑不重算不计费）。
+ *
  * 用法：`node --import tsx scripts/ocr-page-fill-jobs.ts <docId> [--pages 74,91] [--force]`
  *   ⚠️ `--pages` 页号与产物 JSON 的 `page` 字段同口径（**0 基 p.index**；MCP 版 CLI 是 1 基，
  *   勿混 —— B-30 第一轮就是页序口径错位把整轮读数作废的）。
@@ -32,6 +40,9 @@ import { join } from "node:path";
 import { emWidthOf } from "../stages/font-metrics.js";
 import { medianLineHeightPt } from "./ocr-lib.js";
 import { overlapArea, parseDocParsingJsonl, runJob, type Box, type PaddleLine } from "./paddle-client.js";
+
+/** 公式区域（`formula_res_list[]` 归一化形态，见 `PaddlePage.formulas`；解析层未取 formula score）。 */
+type PaddleFormula = { latex: string; bbox: Box | null; norm: Box | null };
 
 const MODEL = "PP-StructureV3" as const;
 /** SPEC 参数面基线（盘点 §4.2 分档表）：补行只需文本；图表 HTML / 改写 / 公式编号都是噪声，显式关。 */
@@ -60,8 +71,10 @@ export interface OcrFillItem {
   accepted: boolean;
   source: "page";
   engine: "jobs";
-  /** 匹配行的最小 rec_score；只记录不过滤。 */
+  /** 匹配行的最小 rec_score；只记录不过滤。公式候选恒为 null（解析层未取 formula score）。 */
   score: number | null;
+  /** 批次 2：公式候选标记（行级候选不设此字段）。 */
+  kind?: "formula";
   reason?: string;
   /** lineMultiHole：该洞曾与别的洞争同一行、行归了重叠更大者（可核对记录，不猜）。 */
   conflict?: string;
@@ -167,6 +180,70 @@ export function judgeHole(holeW: number, fontPt: number, text: string, cropText:
   return { expected, ratio, balanced, agree, ok, reason };
 }
 
+export interface FormulaMatchResult {
+  /** 每个洞名下的公式（遍历序即 y0 序 ⇒ 拼接顺序正确）。 */
+  holeFormulas: { latex: string; box: Box }[][];
+  /** 公式与多个洞争抢时的冲突记录（同 lineMultiHole 语义，不猜）。 */
+  conflicts: (string | null)[];
+}
+
+/**
+ * 公式框→洞匹配（批次 2，`--formula`）：与行匹配同款几何（**盖住洞** ≥0.6 + 列一致），
+ * 但**无硬字符门槛**（LaTeX 记号会被 hardChars 剥没）、无 hardNorm 类清洗 —— LaTeX 原样保留。
+ * 公式按 y0 排序遍历；一行多洞同款语义：只归覆盖率最大者，其余记冲突。
+ */
+export function matchFormulasToHoles(
+  formulas: PaddleFormula[],
+  holes: Box[],
+  pageW: number,
+  pageH: number,
+): FormulaMatchResult {
+  const holeFormulas: { latex: string; box: Box }[][] = holes.map(() => []);
+  const conflicts: (string | null)[] = holes.map(() => null);
+  const mid = pageW / 2;
+  const rows = formulas
+    .filter((f): f is PaddleFormula & { norm: Box } => !!f.norm && !!f.latex.trim())
+    .map((f) => ({ latex: f.latex.trim(), box: [f.norm[0] * pageW, f.norm[1] * pageH, f.norm[2] * pageW, f.norm[3] * pageH] as Box }))
+    .sort((a, b) => a.box[1] - b.box[1]);
+  for (const f of rows) {
+    const cands: { i: number; cov: number }[] = [];
+    holes.forEach((hb, i) => {
+      if ((f.box[0] < mid) !== (hb[0] < mid)) return; // 列一致
+      const ha = Math.max(0, (hb[2] - hb[0]) * (hb[3] - hb[1]));
+      if (!(ha > 0)) return;
+      const cov = overlapArea(f.box, hb) / ha;
+      if (cov >= LINE_HOLE_OVERLAP_MIN) cands.push({ i, cov });
+    });
+    if (!cands.length) continue;
+    cands.sort((a, b) => b.cov - a.cov);
+    holeFormulas[cands[0]!.i]!.push(f);
+    if (cands.length > 1) {
+      const note =
+        `lineMultiHole：公式「${f.latex.slice(0, 18)}」同时压中 ${cands.length} 个洞，` +
+        `归覆盖率最大者 #${cands[0]!.i}，其余 {${cands.slice(1).map((c) => c.i).join(",")}} 不猜`;
+      for (const c of cands.slice(1)) conflicts[c.i] ??= note;
+    }
+  }
+  return { holeFormulas, conflicts };
+}
+
+export interface FormulaJudgement {
+  expected: number;
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * 公式候选判据（批次 2）：**只两道门** —— 匹配几何（matchFormulasToHoles 已过）+ 洞大小。
+ * 宽度比 / `$` 成对对 LaTeX 原串意义有限（rec_formula 是完整公式、emWidthOf 对二维排版不成立）
+ * ⇒ 不据此拒，只在候选的 ratio/文本里如实记录（检测不改写）。
+ */
+export function judgeFormulaHole(holeW: number, fontPt: number): FormulaJudgement {
+  const expected = fontPt > 0 ? holeW / fontPt : 0;
+  const ok = expected >= MIN_EXPECT_CHARS;
+  return { expected, ok, reason: ok ? undefined : `洞太小（期望 ${expected.toFixed(1)} 字 < ${MIN_EXPECT_CHARS}）` };
+}
+
 /** 字符 bigram Dice 一致度（与 `ocr-page-fill.ts` 同式）。 */
 function dice(a: string, b: string): number {
   const grams = (t: string) => {
@@ -208,6 +285,7 @@ async function main(): Promise<void> {
   const PAGES: Set<number> | null =
     pagesArgIdx >= 0 ? new Set(process.argv[pagesArgIdx + 1]!.split(",").map((x) => Number(x.trim()))) : null;
   const FORCE = process.argv.includes("--force");
+  const FORMULA = process.argv.includes("--formula"); // 批次 2：公式洞补全（默认关，产品决策未定）
   const OUT_DIR = join("data", "out", DOC);
   const PDF = join(OUT_DIR, "origin.pdf");
   const CACHE_DIR = join(OUT_DIR, "ocr-jobs-cache");
@@ -265,13 +343,29 @@ async function main(): Promise<void> {
       renameSync(join(CACHE_DIR, produced), pngPath);
     }
 
-    /* ② 行级 OCR：本地行缓存（--force 绕过）；服务端按 (PNG 字节+options) 去重 ⇒ 同字节重跑不重算不计费 */
+    /* ② 行级 OCR：本地缓存 v2 = {v:2, lines, formulas}（--force 绕过）；
+       服务端按 (PNG 字节+options) 去重 ⇒ 同字节重跑不重算不计费（v1 旧行缓存对 --formula 视为未命中） */
     let lines: PaddleLine[] = [];
+    let formulas: PaddleFormula[] = [];
     const cachePath = join(CACHE_DIR, `${stem}.json`);
+    let cacheHit = false;
     if (!FORCE && existsSync(cachePath)) {
-      lines = JSON.parse(readFileSync(cachePath, "utf8")) as PaddleLine[];
-      console.log(`p${pno} 命中缓存（${lines.length} 行）`);
-    } else {
+      try {
+        const raw = JSON.parse(readFileSync(cachePath, "utf8")) as unknown;
+        const isV2 = !Array.isArray(raw) && (raw as { v?: unknown })?.v === 2;
+        if (!FORMULA || isV2) {
+          lines = (Array.isArray(raw) ? raw : (raw as { lines: PaddleLine[] }).lines) as PaddleLine[];
+          formulas = (!Array.isArray(raw) && Array.isArray((raw as { formulas?: PaddleFormula[] }).formulas)
+            ? (raw as { formulas: PaddleFormula[] }).formulas
+            : []) as PaddleFormula[];
+          cacheHit = true;
+          console.log(`p${pno} 命中缓存（${lines.length} 行${FORMULA ? ` / ${formulas.length} 公式` : ""}）`);
+        }
+      } catch {
+        /* 坏缓存当没有 */
+      }
+    }
+    if (!cacheHit) {
       const t0 = Date.now();
       const outcome = await runJob({
         model: MODEL,
@@ -279,20 +373,23 @@ async function main(): Promise<void> {
         options: JOB_OPTIONS,
         onProgress: (m) => console.log(`p${pno} ${m}`),
       });
-      lines = parseDocParsingJsonl(outcome.jsonl)[0]?.lines ?? [];
-      writeFileSync(cachePath, JSON.stringify(lines), "utf8");
+      const page0 = parseDocParsingJsonl(outcome.jsonl)[0];
+      lines = page0?.lines ?? [];
+      formulas = page0?.formulas ?? [];
+      writeFileSync(cachePath, JSON.stringify({ v: 2, lines, formulas }), "utf8");
       console.log(
-        `p${pno} ${MODEL} ${(outcome.wallMs / 1000).toFixed(1)}s jobId=${outcome.jobId} sha=${outcome.inputSha256.slice(0, 12)} → ${lines.length} 行`,
+        `p${pno} ${MODEL} ${(outcome.wallMs / 1000).toFixed(1)}s jobId=${outcome.jobId} sha=${outcome.inputSha256.slice(0, 12)} → ${lines.length} 行 / ${formulas.length} 公式`,
       );
-      if (!lines.length) console.log(`p${pno} ⚠️ 行级结果为空`);
+      if (!lines.length && !formulas.length) console.log(`p${pno} ⚠️ 行级与公式结果均为空`);
     }
 
-    /* ③ 行框 → pt 域 → 洞匹配（L2 最严 AND） */
+    /* ③ 行框/公式框 → pt 域 → 洞匹配（L2 最严 AND）；公式只在 --formula 且无行命中时补位 */
     const fontPt = medianLineHeightPt(p.blocks);
     const { orderedLines, holeLines, conflicts } = matchLinesToHoles(lines, holes, p.width, p.height);
-    const fullText = orderedLines.map((l) => l.text).join("\n");
+    const fm = FORMULA ? matchFormulasToHoles(formulas, holes, p.width, p.height) : null;
+    const fullText = orderedLines.map((l) => l.text).join("\n"); // fullText 只记行文，公式不混入
 
-    /* ④ 判据 + 落条（OcrFillItem 同构 + engine/score） */
+    /* ④ 判据 + 落条（OcrFillItem 同构 + engine/score/kind） */
     const items: OcrFillItem[] = [];
     let acc = 0;
     holes.forEach((bb, i) => {
@@ -303,32 +400,54 @@ async function main(): Promise<void> {
         bb[3] + PAD_Y,
       ];
       const ls = holeLines[i]!;
-      const text = ls.map((l) => l.text.trim()).filter(Boolean).join(" ");
-      const raw = ls.map((l) => l.text).join("\n");
-      const cropText = cropByBbox.get(bb.map((v) => Math.round(v)).join(",")) ?? "";
-      const j = judgeHole(bb[2] - bb[0], fontPt, text, cropText);
-      const scores = ls.map((l) => l.score).filter((s): s is number => typeof s === "number");
-      const score = scores.length ? Math.min(...scores) : null;
-      if (j.ok) acc++;
-      const reason = j.ok ? undefined : !text && conflicts[i] ? conflicts[i]! : j.reason;
+      const fms = fm?.holeFormulas[i] ?? [];
+      const conflict = conflicts[i] ?? fm?.conflicts[i] ?? null;
       const item: OcrFillItem = {
-        bbox: bb,
-        win,
-        text,
-        raw,
-        crop: pngPath,
-        ratio: +j.ratio.toFixed(2),
-        accepted: j.ok,
-        source: "page",
-        engine: "jobs",
-        score,
+        bbox: bb, win, text: "", raw: "", crop: pngPath, ratio: 0, accepted: false,
+        source: "page", engine: "jobs", score: null,
       };
+      let reason: string | undefined;
+      let label = "";
+      if (ls.length) {
+        const text = ls.map((l) => l.text.trim()).filter(Boolean).join(" ");
+        const j = judgeHole(bb[2] - bb[0], fontPt, text, cropByBbox.get(bb.map((v) => Math.round(v)).join(",")) ?? "");
+        const scores = ls.map((l) => l.score).filter((s): s is number => typeof s === "number");
+        item.text = text;
+        item.raw = ls.map((l) => l.text).join("\n");
+        item.ratio = +j.ratio.toFixed(2);
+        item.accepted = j.ok;
+        item.score = scores.length ? Math.min(...scores) : null;
+        reason = j.ok ? undefined : !text && conflicts[i] ? conflicts[i]! : j.reason;
+        if (j.ok) acc++;
+        label = `期望${j.expected.toFixed(1)}字 比=${j.ratio.toFixed(2)} score=${item.score === null ? "-" : item.score.toFixed(2)} `;
+        console.log(
+          `  p${pno} 洞 ${JSON.stringify(bb.map((v) => Math.round(v)))} ${label}${j.ok ? "✓" : "✗"} ${JSON.stringify(text.slice(0, 44))}${j.ok ? "" : ` ← ${reason}`}`,
+        );
+      } else if (fms.length) {
+        // 公式候选（批次 2）：text=LaTeX 原样**不清洗**；只两道门（匹配几何已过 + 洞大小），ratio 只记录不拒
+        const text = fms.map((f) => f.latex).join(" ");
+        const jf = judgeFormulaHole(bb[2] - bb[0], fontPt);
+        const denom = emWidthOf(text) * fontPt; // LaTeX 原串的 em 度量只作记录（对二维排版不成立），不据判
+        item.text = text;
+        item.raw = fms.map((f) => f.latex).join("\n");
+        item.kind = "formula";
+        item.ratio = +(denom > 0 ? (bb[2] - bb[0]) / denom : 0).toFixed(2);
+        item.accepted = jf.ok;
+        reason = jf.reason;
+        if (jf.ok) acc++;
+        console.log(
+          `  p${pno} 洞 ${JSON.stringify(bb.map((v) => Math.round(v)))} 期望${jf.expected.toFixed(1)}字 公式 ${jf.ok ? "✓" : "✗"} ${JSON.stringify(text.slice(0, 44))}${jf.ok ? "" : ` ← ${reason}`}`,
+        );
+      } else {
+        const j = judgeHole(bb[2] - bb[0], fontPt, "", "");
+        reason = conflicts[i] ?? j.reason;
+        console.log(
+          `  p${pno} 洞 ${JSON.stringify(bb.map((v) => Math.round(v)))} 期望${j.expected.toFixed(1)}字 比=0.00 score=- ✗ "" ← ${reason}`,
+        );
+      }
       if (reason) item.reason = reason;
-      if (conflicts[i]) item.conflict = conflicts[i]!;
+      if (conflict) item.conflict = conflict;
       items.push(item);
-      console.log(
-        `  p${pno} 洞 ${JSON.stringify(bb.map((v) => Math.round(v)))} 期望${j.expected.toFixed(1)}字 比=${j.ratio.toFixed(2)} score=${score === null ? "-" : score.toFixed(2)} ${j.ok ? "✓" : "✗"} ${JSON.stringify(text.slice(0, 44))}${j.ok ? "" : ` ← ${reason}`}`,
-      );
     });
     outPages.push({ page: pno, fullText, items });
     totalAccepted += acc;
@@ -342,6 +461,7 @@ async function main(): Promise<void> {
         docId: DOC,
         generatedAt: new Date().toISOString(),
         source: "pp-structurev3-jobs",
+        formula: FORMULA, // 批次 2 公式候选开关状态（产物溯源）
         note: "整页 OCR 候选补全（直连作业接口，行框落位）：仅供人工核对，不静默替换引擎文本（G1）。",
         total: totalHoles,
         accepted: totalAccepted,

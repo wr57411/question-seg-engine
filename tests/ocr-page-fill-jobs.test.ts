@@ -6,7 +6,14 @@
 // 方案 §11.2 教训：洞↔行不 1:1 会把同一行的字填进好几个洞 ⇒ 一行多洞只取覆盖率最大者、其余记冲突不猜。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hardChars, holesOf, judgeHole, matchLinesToHoles } from "../scripts/ocr-page-fill-jobs.js";
+import {
+  hardChars,
+  holesOf,
+  judgeFormulaHole,
+  judgeHole,
+  matchFormulasToHoles,
+  matchLinesToHoles,
+} from "../scripts/ocr-page-fill-jobs.js";
 import type { Box, PaddleLine } from "../scripts/paddle-client.js";
 
 /** 测试页：W=100 / H=200（pt 域），页宽中线 mid=50。 */
@@ -88,6 +95,33 @@ test("matchLinesToHoles：一行多洞取覆盖率最大者，其余洞记 lineM
   assert.equal(holeLines[1]!.length, 0, "c2 不猜");
   assert.match(conflicts[1]!, /lineMultiHole/);
   assert.equal(conflicts[0], null);
+});
+
+test("matchFormulasToHoles：公式框盖住洞 ≥0.6 归洞、无硬字符门槛、跨列不归、LaTeX 原样保留", () => {
+  const f = (latex: string, x0: number, y0: number, x1: number, y1: number) => ({
+    latex,
+    bbox: null,
+    norm: [x0 / W, y0 / H, x1 / W, y1 / H] as Box,
+  });
+  const hole = box(10, 100, 80, 110);
+  const { holeFormulas, conflicts } = matchFormulasToHoles(
+    [f("\\frac { 1 } { 2 }", 10, 100, 80, 108), f("跨列公式", 55, 100, 95, 108)],
+    [hole],
+    W,
+    H,
+  );
+  assert.deepEqual(holeFormulas[0]!.map((x) => x.latex), ["\\frac { 1 } { 2 }"], "跨列公式不归；LaTeX 不清洗");
+  assert.equal(conflicts[0], null);
+  const { holeFormulas: hf2 } = matchFormulasToHoles([f("x", 10, 100, 80, 108)], [box(10, 100, 45, 110), box(45, 100, 80, 110)], W, H);
+  assert.equal(hf2[0]!.length, 1, "一行盖住两洞：归覆盖率相同者中的先到者（稳定序）");
+  assert.equal(hf2[1]!.length, 0);
+});
+
+test("judgeFormulaHole：只两道门（几何已在匹配层过 + 洞大小），宽度比/$成对不参与拒绝", () => {
+  assert.equal(judgeFormulaHole(120, 9).ok, true, "期望 13.3 字");
+  const j = judgeFormulaHole(12, 9); // expected = 1.33 < 1.6
+  assert.equal(j.ok, false);
+  assert.match(j.reason!, /洞太小/);
 });
 
 test("judgeHole：合格候选接受（含 $ 成对形态）", () => {
