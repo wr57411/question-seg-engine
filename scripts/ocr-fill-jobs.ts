@@ -34,10 +34,10 @@ const overlap = (a: Box, b: Box) => {
 };
 const area = (b: Box) => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
 
-function loadPages(doc: string): PaddlePage[] {
+function loadPages(doc: string, model: "PaddleOCR-VL-1.6" | "PP-StructureV3"): PaddlePage[] {
   const dir = join(ROOT, "data", "out", doc, "ocr-jobs");
-  const f = readdirSync(dir).find((n) => n.endsWith(".pages.json"));
-  if (!f) throw new Error(`${dir} 没有 *.pages.json`);
+  const f = readdirSync(dir).find((n) => n.startsWith(`${model}-`) && n.endsWith(".pages.json"));
+  if (!f) throw new Error(`${dir} 没有 ${model} 的 *.pages.json`);
   return JSON.parse(readFileSync(join(dir, f), "utf8")) as PaddlePage[];
 }
 
@@ -144,8 +144,8 @@ function main(): void {
   const stages = JSON.parse(readFileSync(join(outDir, "stages.json"), "utf8")) as {
     pages: { index?: number; width: number; height: number; uncovered?: { bbox?: number[]; kind?: string }[] }[];
   };
-  const vl = loadPages(doc);
-  const v3 = loadPages(v3Doc);
+  const vl = loadPages(doc, "PaddleOCR-VL-1.6");
+  const v3 = loadPages(v3Doc, "PP-StructureV3");
   const old = existsSync(join(outDir, "ocr-page-fill.json"))
     ? (JSON.parse(readFileSync(join(outDir, "ocr-page-fill.json"), "utf8")) as { pages?: { page: number; items?: { bbox: number[]; text?: string; accepted?: boolean }[] }[] })
     : { pages: [] as { page: number; items?: { bbox: number[]; text?: string; accepted?: boolean }[] }[] };
