@@ -55,7 +55,11 @@ test("splitTextAmongHoles：切点吸附到标点边界（不把词切两半）"
   const { splitTextAmongHoles } = await import("../scripts/ocr-fill-jobs.js");
   // 9 字（逗号在第 5 位），宽度 2:1 ⇒ 原始切点在 6（"戊"与"己"之间，词中间）
   const text = "甲乙丙丁，戊己庚辛";
-  const snapped = splitTextAmongHoles(text, [{ holeKey: "h1", width: 2 }, { holeKey: "h2", width: 1 }]);
+  // ⚠️ 历史注记（2026-11-05）：`9926ac3` 引入 snap 时默认 `opts = {}`（不吸附），
+  // `ae8199a` 收口时显式改默认为 `{ snap: false }` —— 默认不吸附是收口语义。
+  // 因此两个断言都**显式传参**，锁「吸附开/关」两种行为本身，不锁默认值；
+  // 默认值语义（生产是否吸附）归支线定案，改默认值时这两个断言都应保持成立。
+  const snapped = splitTextAmongHoles(text, [{ holeKey: "h1", width: 2 }, { holeKey: "h2", width: 1 }], { snap: true });
   assert.equal(snapped.map((p) => p.text).join(""), text); // 不重不漏
   assert.equal(snapped[0]!.text, "甲乙丙丁，"); // 吸到逗号之后（切点 5）
   const raw = splitTextAmongHoles(text, [{ holeKey: "h1", width: 2 }, { holeKey: "h2", width: 1 }], { snap: false });
