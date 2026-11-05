@@ -93,3 +93,21 @@ npm run check:accuracy          # 同 --gate
 | 物理_教材基础练机械能守恒定律 | 3 | MinerU-only | 100/100/100 |
 
 - 结论：**融合不是每本都更好**，必须按书用金标选源；6 本均只是 3–11 题部分金标，不能当整本准确率。
+
+## 结构金标（`kind:"structure"`，2026-11-05 新增）
+
+`gold/<docId>.structure.json` 是**只标 `(page, number)` 的题目清单**，用来算切题层的 recall / precision，与全文金标分开：
+
+| | 全文金标（`kind` 缺省 / `"full"`） | 结构金标（`kind:"structure"`） |
+|---|---|---|
+| `questions[]` | `stem` / `options` / `answer` / `imageCount` 全文 | 只有 `page` / `number` / `stem:""` + 独立证据 |
+| `complete:true` 的含义 | 整本全文转写完 | **题目清单完整**（不是全文完整） |
+| 产出指标 | recall / precision / 严格文本 / 选项 / 答案 / 图片 | **只有 recall / precision** |
+| `check:accuracy --gate` | 参与门槛 | **不参与**（不许拿清单冒充内容验收通过） |
+| `autoPass` | 可按阈值判 | **恒 false** |
+
+- 生成：`npx tsx scripts/gold-structure.ts`（只读交叉，不写 `data/out/`）。
+- 独立证据：整页 OCR 题号行；无证据的题标 `needsReview`，回原卷页图核实后写 `pageImageChecked`。
+- ⚠ **已知边界**：清单骨架来自 `gold/worksheets/*-full.md`，其 `(page,number)` 与 `data/out/<doc>/questions.json` 同源 ⇒ `recall/precision` 只作**评分器联调**，**不能读成系统准确率**；完全独立分母（逐页回原卷数题号）另立子目标。
+- ⚠ 「两题并一题」仍可能让 precision 虚高：清单未标起止边界。
+- 现存一份：`gold/物理_教材基础练 电路.structure.json`（31 题；OCR 证据 28 + 页图核实 3）。证据见 `docs/evidence/2026-11-05-电路独立题号交叉.md` 与 `docs/evidence/2026-11-05-电路独立题号页图/`。

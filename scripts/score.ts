@@ -32,10 +32,16 @@ export interface GoldQuestion {
   answer?: string;
   /** 该题应有的图片数；缺省 = 不评图片召回 */
   imageCount?: number;
+  /** 结构金标专用：独立来源（整页 OCR 题号行）的证据 */
+  ocrEvidence?: { file: string; line: string };
+  /** 结构金标专用：没有独立证据，须回原卷页图复核 */
+  needsReview?: boolean;
 }
 
 export interface GoldDoc {
   docId: string;
+  /** "full"（缺省）= 全文金标；"structure" = 只标 (page,number) 的题目清单，只算切题 P/R */
+  kind?: "full" | "structure";
   /** true = 整本标注（可算 precision）；false = 试点/部分标注（只算 recall） */
   complete: boolean;
   source?: string;
@@ -45,6 +51,7 @@ export interface GoldDoc {
 
 export interface ScoreResult {
   docId: string;
+  goldKind: "full" | "structure";
   goldComplete: boolean;
   goldQuestions: number;
   systemQuestions: number;
@@ -232,6 +239,9 @@ function byPageNumber(system: Question[]): Map<string, Question[]> {
  * 这样「题存在但内容略偏」和「题根本没切出来」能分开看。
  */
 export function scoreQuestions(docId: string, gold: GoldDoc, system: Question[]): ScoreResult {
+  // 结构金标只有 (page, number)，没有全文 ⇒ 文本/选项/答案/图片类指标一律不计算，
+  // 也不许拿它冒充「内容自动通过」（红线：不静默失败、不冒充通过）。
+  const isStructure = gold.kind === "structure";
   const byKey = byPageNumber(system);
   const used = new Set<Question>();
   const matchedPairs: { g: GoldQuestion; s: Question; sim: number }[] = [];
@@ -252,12 +262,16 @@ export function scoreQuestions(docId: string, gold: GoldDoc, system: Question[])
   const matched = matchedPairs.length;
   const recall = gold.questions.length ? matched / gold.questions.length : 0;
   const precision = gold.complete ? (system.length ? matched / system.length : 0) : null;
-  const strictTextMatch = matched
-    ? matchedPairs.filter((p) => p.sim >= 0.95).length / matched
-    : null;
-  const strictTextMismatches = matchedPairs
-    .filter((p) => p.sim < 0.95)
-    .map((p) => ({ page: p.g.page, number: p.g.number, similarity: Number(p.sim.toFixed(4)) }));
+  const strictTextMatch = isStructure
+    ? null
+    : matched
+      ? matchedPairs.filter((p) => p.sim >= 0.95).length / matched
+      : null;
+  const strictTextMismatches = isStructure
+    ? []
+    : matchedPairs
+        .filter((p) => p.sim < 0.95)
+        .map((p) => ({ page: p.g.page, number: p.g.number, similarity: Number(p.sim.toFixed(4)) }));
 
   let goldOpts = 0;
   let hitOpts = 0;
@@ -292,17 +306,28 @@ export function scoreQuestions(docId: string, gold: GoldDoc, system: Question[])
   const needsReviewRate = system.length
     ? system.filter((q) => q.status === "needs_review").length / system.length
     : 0;
-  // 部分金标准不能判「自动通过」：没有 precision/误切分母，只有完整金标准才有资格。
+  // 部分金标/结构金标都不能判「内容自动通过」：前者没 precision 分母，后者根本没全文。
   const autoPass =
-    gold.complete && needsReviewRate <= REVIEW_THRESHOLD && recall >= 0.99 && (precision ?? 0) >= 0.99;
+    !isStructure && gold.complete && needsReviewRate <= REVIEW_THRESHOLD && recall >= 0.99 && (precision ?? 0) >= 0.99;
 
   const notes: string[] = [];
-  if (!gold.complete) notes.push("partial gold：只算 recall 与匹配题上的选项/答案指标，precision 不计算");
+  if (isStructure) {
+    const missing = gold.questions.filter((q) => q.needsReview).length;
+    notes.push("结构金标：只算切题 recall/precision；文本・公式・图保真率不适用（未转写全文）");
+    notes.push(`独立 OCR 题号证据 ${gold.questions.length - missing}/${gold.questions.length}；${missing} 题 needs_review，须回原卷页图复核`);
+    notes.push(
+      "⚠ 结构金标的 (page,number) 骨架与系统产物同源 ⇒ P/R 只作评分器联调，不能读作系统准确率；" +
+        "完全独立分母（逐页回原卷数题号）另立子目标",
+    );
+  } else if (!gold.complete) {
+    notes.push("partial gold：只算 recall 与匹配题上的选项/答案指标，precision 不计算");
+  }
   notes.push("边界准确率未测：金标准暂未标注起始/结束块");
   notes.push("静默失败由 audit-numbering/ReviewNote 门判定，不在本脚本内");
 
   return {
     docId,
+    goldKind: isStructure ? "structure" : "full",
     goldComplete: gold.complete,
     goldQuestions: gold.questions.length,
     systemQuestions: system.length,
@@ -311,10 +336,10 @@ export function scoreQuestions(docId: string, gold: GoldDoc, system: Question[])
     precision,
     strictTextMatch,
     strictTextMismatches,
-    optionCompleteness: goldOpts ? hitOpts / goldOpts : null,
-    optionCer: cerN ? cerSum / cerN : null,
-    answerPairing: goldAnswers ? hitAnswers / goldAnswers : null,
-    imageRecall: goldImages ? hitImages / goldImages : null,
+    optionCompleteness: isStructure || !goldOpts ? null : hitOpts / goldOpts,
+    optionCer: isStructure || !cerN ? null : cerSum / cerN,
+    answerPairing: isStructure || !goldAnswers ? null : hitAnswers / goldAnswers,
+    imageRecall: isStructure || !goldImages ? null : hitImages / goldImages,
     needsReviewRate,
     autoPass,
     unmatchedGold,
@@ -429,7 +454,7 @@ function main(): void {
     "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ...results.map(
       (r) =>
-        `| ${r.docId}${r.goldComplete ? "" : "（部分）"} | ${r.goldQuestions} | ${r.systemQuestions} | ${r.matched} | ${pct(r.recall)} | ${pct(r.precision)} | ${pct(r.strictTextMatch)} | ${pct(r.optionCompleteness)} | ${pct(r.optionCer)} | ${pct(r.answerPairing)} | ${pct(r.imageRecall)} | ${pct(r.needsReviewRate)} | ${r.autoPass ? "是" : "否"} |`,
+        `| ${r.docId}${r.goldKind === "structure" ? "（结构）" : r.goldComplete ? "" : "（部分）"} | ${r.goldQuestions} | ${r.systemQuestions} | ${r.matched} | ${pct(r.recall)} | ${pct(r.precision)} | ${pct(r.strictTextMatch)} | ${pct(r.optionCompleteness)} | ${pct(r.optionCer)} | ${pct(r.answerPairing)} | ${pct(r.imageRecall)} | ${pct(r.needsReviewRate)} | ${r.autoPass ? "是" : "否"} |`,
     ),
     "",
     ...results.flatMap((r) => [
@@ -460,13 +485,13 @@ function main(): void {
   console.log(`\n报告：data/score/report.md`);
 
   if (gate) {
-    if (results.every((r) => !r.goldComplete)) {
-      console.error("check:accuracy：没有完整金标准，无法判定（partial 试点不算）");
+    // 结构金标只覆盖切题，不能拿它判「整题内容自动通过」⇒ 门槛只认完整全文金标。
+    const eligible = results.filter((r) => r.goldKind === "full" && r.goldComplete);
+    if (eligible.length === 0) {
+      console.error("check:accuracy：没有完整全文金标准，无法判定（partial 试点与结构金标都不算）");
       process.exit(2);
     }
-    const failures = results
-      .filter((r) => r.goldComplete)
-      .flatMap((r) => gateFailures(r).map((f) => `${r.docId}: ${f}`));
+    const failures = eligible.flatMap((r) => gateFailures(r).map((f) => `${r.docId}: ${f}`));
     if (failures.length) {
       console.error(`\n准确率门未过（Phase 1 阈值）：\n- ${failures.join("\n- ")}`);
       process.exit(1);
