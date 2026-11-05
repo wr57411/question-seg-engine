@@ -386,6 +386,28 @@ layout.json / content_list.json
 
 ## 2. 当前状态（事实，非计划）
 
+### 2026-11-03 状态（OCR 传输层 / 公式五方 / 补字线收口）
+
+- 分支 `feature/oxr`，今日 **20 个提交**；`npm run check` **546/546 绿**（实跑）。
+- **`DECISIONS §107` OCR 校验线换传输层**：MCP 结构性丢弃 `prunedResult`（实测 `output_mode:"detailed"` 也不含 bbox），
+  改直连 AI Studio 异步作业接口并留存原始 JSONL（整本 13 页：V3 71s、VL 219s；逐页 MCP 单页 45.8s）。
+  坐标一律按 `prunedResult.width/height` 归一化（图片域 vs PDF 渲染域 4186×5988）。
+  `daily` 凭据门由「存在性」改「可用性」：零成本握手 `GET {JOB_URL}/1`（401=失效、404+`11001`=可用）。
+  StructureV3 同时登记为**独立结构计数器**（`npm run audit:paddle`，只报警、不进 check）：
+  13 本 **table 39/39 册级全等**、chart 10/13，Paddle 独占 行框 24,326 / 单元格框 562 / 公式条目 4,391。
+- **`DECISIONS §108` 公式五方对照**（页图核 30 行）：真错 MinerU 22/29、StructureV3 8/27、
+  **PaddleOCR-VL 0/23**、MiniCPM 0/21、OXR 0/22（OXR 3 行不包 LaTeX）。
+  `§106`「三台机器源在公式上集体失明」**收窄为「MinerU 汉字下标整类失明」**（全册 410 条公式 0 条含汉字）；
+  B-25 仍 `DROPPED`，理由换成「可判样本太小 + 缺位置级交叉」。
+- **补字线收口：`B-32` 转 `DROPPED`**。《电路》273 个 content 洞 →（洞高 ≥0.3% 页高）78 →
+  （排除 table/chart/image 块）**1** →（人工判定）**0**；根因是本册"洞"多为 2–7px 的装饰/残墨薄片
+  （行高中位 41px），不是漏读的行。答案册抽 20 页：10 洞 / **2 条候选**（均为 text 块的题号+栏目行，
+  如 `5.C 必刷方法·正交分解法`）⇒ 目标极稀（≈每 10 页 1 条），留档不排期。
+- **今日新增工具**（与补字解耦、可复用）：`scripts/paddle-client.ts`（作业接口 + 凭据握手 + 归一化）、
+  `paddle-line-align.ts`（VL 字 + V3 行框：锚点→排除→容量守卫 1.5×）、`ink-lines.ts`（洞内墨迹投影切行，零模型）、
+  `ocr-fill-jobs.ts`（新旧只读对照）、`review-fill-page.py`（人工判定单页，键盘判定 + 导出 JSON）。
+- **P0 卡点未变**：金标准 **39 / 1,086 题**、电路 11/31、`complete:true` 的本数 **0** ⇒ precision/recall 仍算不出来。
+
 ### 已跑通的两份真实文档（均双栏）
 
 | 文档 | 规模 | 切题结果 | 位置 |
@@ -691,6 +713,11 @@ layout.json / content_list.json
 | 已有解析结果、只重导 | `npm run daily -- <layout.json> --id <docId> --no-ocr` |
 | 只刷新体检摘要（不动产物） | `npm run daily -- <layout.json> --id <docId> --meta-only` |
 | 质量门（改任何代码后必跑） | `npm run check`（含 `audit:numbering` + `audit:suspicious`） |
+| **OCR 凭据是否可用（零成本握手）** | `npm run ocr:verify` |
+| 整本提交 OCR 作业（留 `prunedResult`） | `npm run ocr:job -- --doc "<docId>" --model PP-StructureV3`（或 `PaddleOCR-VL-1.6`） |
+| 结构计数 vs MinerU（只报警） | `npm run audit:paddle`（≤40 页/本，超限跳过并登记） |
+| 位置审计（只报警） | `npm run audit:pos` |
+| 公式五方对照（只读） | `npm run audit:formula` |
 | **可疑题号行审计（只报警）** | `npm run audit:suspicious` —— S1 行首 `N.$数字` / S2 题干以 `$数字` 开头；命中 exit 1，不改数据 |
 | 批量导入（MVP） | `npm run batch -- --inbox inbox`（`--no-ocr`/`--limit`/`--retry`/`--parser`；同哈希跳过，失败隔离） |
 | 批量日报 | `npm run batch:report` |
@@ -730,6 +757,11 @@ layout.json / content_list.json
 | `docs/specs/2026-10-28-batch-book-ingestion-spec.md` | 批量扫书目标、可量化指标、待办清单（B01–B14） | 草案；待拍板 Q1–Q5 |
 | `docs/PRD-viewer.md` | viewer 的产品需求（设计输入稿） | 状态为「待设计验证」，实现以 viewer/ 实际为准 |
 | `docs/real-api-notes.md` | MinerU API 字段事实 | 字段争议以它为准 |
+| **`docs/plans/2026-11-03-vl-text-v3-lines.md`** | 补字线（VL 出字 + V3 出行框）的方案、18 条实测、**收口结论** | 结论 `B-32 DROPPED`；工具与判据保留可复用 |
+| `docs/evidence/2026-11-03-paddle-two-routes-probe.md` | 两条产线的字段/时延实测（MCP 丢坐标的证据） | `§107` 的事实来源 |
+| `docs/evidence/2026-11-03-paddle-structure-audit.md` | StructureV3 vs MinerU 结构计数（13 本） | `table 39/39` 全等，只报警 |
+| `docs/evidence/2026-11-03-paddle-pos-diff.md` | 摊字符 vs VL 块位置（v1 作废、v2 读数） | 只报警；结论不可外推 |
+| `docs/evidence/2026-11-03-formula-five-way.md` | 五方公式对照 30 行页图判定 | `§108` 的事实来源 |
 | `docs/第二章答案-结构化提取.md` | 答案册首跑报告 | 含首尾边界与 46 处待校对的如实说明 |
 | `docs/design/stages-review.md` | stages 审板全记录（11+ 轮，按轮组织） | 找「某处显示问题何时修、怎么修的」看这里 |
 | `docs/design/viewer-review.md` | viewer 早期审板记录 | 历史 |
@@ -784,7 +816,7 @@ layout.json / content_list.json
 | 6-2 | `sectionSeq` 开组规则失真（结论已撤销，残余未验证） | 部分撤销 |
 | 6-3 | 答案册 5 条基线（源文档限制） | 未修 |
 | 6-4 | bank 配对 68/83 | 已解决（83/83） |
-| 6-5 | 上游漏识别（补行链路覆盖不全） | 部分 |
+| 6-5 | 上游漏识别（补行链路覆盖不全） | **已收口（2026-11-03，`B-32` DROPPED）**：本册 273 个洞过滤后只剩 1 个候选、人工判 0；答案册 20 页仅 2 条 ⇒ 目标极稀，工具留档不排期 |
 | 6-6 | 细节残留（`1.$5`、逗号宽度等） | 未修（**检测已加**：`audit:suspicious`，只报警；自动修仍未做） |
 | 6-7 | 成品页自动化覆盖薄 + 大卷性能未验证 | 未修 |
 | 6-8 | 单卷过拟合（光学卷暴露 3 个版式缺口） | 部分 |
