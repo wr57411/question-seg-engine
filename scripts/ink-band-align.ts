@@ -236,10 +236,14 @@ export function alignLinesToBands(
       l.norm![3] * pageH,
     ]);
     // 局部吸附锚带（扩带口径的精华，实测 11/14 的来源）：行框锚点 inkLineAround 吸附到的
-    // 墨迹带，与其同视觉行（y 重叠 >40%）的候选带在 DP 打分里 +0.5 —— 两口径融合
+    // 墨迹带，与其同视觉行（y 重叠 >40%）的候选带在 DP 打分里 +0.5 —— 两口径融合。
+    // ⚠️ 锚带高 >22pt（跨行拖偏带，p91 标签行实测 36pt）不可信——吸附本身被密集区粘连拖偏时
+    // bonus 会把 DP 一起带偏——此时不给 bonus，让重叠主分与单调上下文自己决定。
     const anchorIdx = boxes.map((box) => {
       const ab = inkLineAround(img, pageW, pageH, box);
       if (!ab) return -1;
+      const abH = ab.bbox[3] - ab.bbox[1];
+      if (abH > 22) return -1; // 拖偏带不可信
       let best = -1;
       let bestOv = 0;
       bands.forEach((b, bi) => {

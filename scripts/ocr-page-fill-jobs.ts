@@ -67,6 +67,26 @@ const LINE_HOLE_OVERLAP_MIN = 0.6;
 export const LINE_HOLE_CENTER_DY_MAX = 8;
 /** 裁图↔整页交叉核对的一致度下限（同 `ocr-page-fill.ts`）。 */
 const DICE_MIN = 0.34;
+/** 重复防护阈值（§110 第四轮）：候选 4-gram 被页面 MinerU 文本包含率的上限——
+ *  超过 = 「把已有字重复配进洞」，不是上游漏识别（p91 h0 实测错配即此形态）。 */
+export const DUP_RATIO_MAX = 0.85;
+
+/** 候选文本被页面已有文本包含的比率（char 4-gram，剥空白与 LaTeX 记号）。纯函数，可单测。 */
+export function dupRatio(candidate: string, pageText: string): number {
+  const grams = (t: string): Set<string> => {
+    const c = t.replace(/[\s$\\{}]/g, "");
+    if (c.length < 4) return new Set(c ? [c] : []);
+    const g = new Set<string>();
+    for (let i = 0; i + 4 <= c.length; i++) g.add(c.slice(i, i + 4));
+    return g;
+  };
+  const A = grams(candidate);
+  if (!A.size) return 0;
+  const B = grams(pageText);
+  let hit = 0;
+  for (const g of A) if (B.has(g)) hit++;
+  return hit / A.size;
+}
 
 export interface OcrFillItem {
   bbox: Box;
@@ -182,27 +202,40 @@ export interface Judgement {
 
 /**
  * 判据（与 MCP 路径同阈值，SPEC §4）：text 非空 + `$` 成对 + ratio∈[0.45,1.9]（洞宽/(em×字号)）
- * + 洞期望字数（洞宽/字号）≥1.6 + 裁图交叉核对（两独立路径明显矛盾 ⇒ 宁可不补）。
+ * + 洞期望字数（洞宽/字号）≥1.6 + 裁图交叉核对（两独立路径明显矛盾 ⇒ 宁可不补）
+ * + **重复防护**（§110 第四轮，2026-11-07）：候选与该页 MinerU 已有块文本高度重合
+ *   ⇒ 它不是「上游漏识别」而是「把已有字重复配进洞」，拒（p91 h0 实测错配即此形态）。
  */
-export function judgeHole(holeW: number, fontPt: number, text: string, cropText: string): Judgement {
+export function judgeHole(holeW: number, fontPt: number, text: string, cropText: string, pageText?: string): Judgement {
   const expected = fontPt > 0 ? holeW / fontPt : 0;
   const emW = emWidthOf(text);
   const ratio = emW > 0 && fontPt > 0 ? holeW / (emW * fontPt) : 0;
   const balanced = (text.match(/\$/g) ?? []).length % 2 === 0;
   const agree = !cropText || dice(cropText, text) >= DICE_MIN;
+  // 重复防护：候选的 4-gram 有多少已被页面 MinerU 文本包含（hardNorm 口径，剥 LaTeX 记号）
+  const dup = pageText ? dupRatio(text, pageText) : 0;
+  const notDup = !pageText || dup < DUP_RATIO_MAX;
   const ok =
-    text.length > 0 && expected >= MIN_EXPECT_CHARS && balanced && agree && ratio >= RATIO_MIN && ratio <= RATIO_MAX;
+    text.length > 0 &&
+    expected >= MIN_EXPECT_CHARS &&
+    balanced &&
+    agree &&
+    notDup &&
+    ratio >= RATIO_MIN &&
+    ratio <= RATIO_MAX;
   const reason = ok
     ? undefined
     : !text
       ? "无行压中此洞"
-      : expected < MIN_EXPECT_CHARS
-        ? `洞太小（期望 ${expected.toFixed(1)} 字 < ${MIN_EXPECT_CHARS}）`
-        : !balanced
-          ? "公式被切断（$ 不成对）"
-          : !agree
-            ? `与裁图结果不一致（裁图=${JSON.stringify(cropText.slice(0, 20))}）`
-            : `宽度比 ${ratio.toFixed(2)} 越界`;
+      : !notDup
+        ? `与页面已有文本重复（重合 ${dup.toFixed(2)} ≥ ${DUP_RATIO_MAX}）`
+        : expected < MIN_EXPECT_CHARS
+          ? `洞太小（期望 ${expected.toFixed(1)} 字 < ${MIN_EXPECT_CHARS}）`
+          : !balanced
+            ? "公式被切断（$ 不成对）"
+            : !agree
+              ? `与裁图结果不一致（裁图=${JSON.stringify(cropText.slice(0, 20))}）`
+              : `宽度比 ${ratio.toFixed(2)} 越界`;
   return { expected, ratio, balanced, agree, ok, reason };
 }
 
@@ -416,10 +449,15 @@ async function main(): Promise<void> {
        `--experimental-align`：DP 全局单调配带 + 几何换源（ink-band-align.ts，实验路径，
        2026-11-07 目标的另一口径——配带率 93.9% 但端到端 7/14 未超本口径 11/14，默认关）。 */
     const fontPt = medianLineHeightPt(p.blocks);
+    // 重复防护参照（§110 第四轮）：该页 MinerU 原生块文本（排除 OCR 注入块——它们本身就是补行候选的来源）
+    const pageMinerUText = (p.blocks ?? [])
+      .filter((b: any) => b.text && !b.ocr)
+      .map((b: any) => String(b.text))
+      .join("\n");
     const gray = renderGrayPage(PDF, pno + 1);
-    let orderedLines: PaddleLine[];
-    let holeLines: PaddleLine[][];
-    let conflicts: (string | null)[];
+    let orderedLines: PaddleLine[] = [];
+    let holeLines: PaddleLine[][] = holes.map(() => []);
+    let conflicts: (string | null)[] = holes.map(() => null);
     if (EXPERIMENTAL_ALIGN) {
       const aligned = alignLinesToBands(lines, gray, p.width, p.height);
       const ast = aligned.stats;
@@ -440,20 +478,39 @@ async function main(): Promise<void> {
         }
         return (band.bbox[1] + band.bbox[3]) / 2;
       };
-      // 生产口径：纯吸附（2026-11-06 用户拍板 + 2026-11-07 loop 验证最优：diag 11/14、accepted 6）。
-      // 精准融合（§110 下一步）：gate 框 = 整行墨迹带 x（mergeSameRowX）**仅用于准入判定**，
-      // 排序分（dy/cov）仍用原 V3 框 —— 混合形态（x 整体替换）的抢洞副作用因此消除。
+      // 生产口径（§110 第四轮 · 双跑逐洞取近）：吸附口径（resolver+gate）与 DP 配带口径各跑一遍，
+      // 每洞取「归属行与洞 dy 更小」者。两源逐洞互有胜负（p91 h0/p150 h2 DP 对、p74 h1 吸附对），
+      // dy 小者 = 该口径下行与洞纵向更贴合；dy 同口径各自计算、跨口径可比（都是行↔洞纵向错位）。
       const xAligned = alignLinesToBands(lines, gray, p.width, p.height, { replaceY: false });
       const gateMap = new Map<PaddleLine, Box>();
       lines.forEach((l, i) => {
         const an = xAligned.lines[i]?.norm;
         if (an) gateMap.set(l, [an[0] * p.width, an[1] * p.height, an[2] * p.width, an[3] * p.height]);
       });
-      const r1 = matchLinesToHoles(lines, holes, p.width, p.height, resolveCenter, (l) => gateMap.get(l) ?? null);
-      orderedLines = r1.orderedLines;
-      holeLines = r1.holeLines;
-      conflicts = r1.conflicts;
+      const rA = matchLinesToHoles(lines, holes, p.width, p.height, resolveCenter, (l) => gateMap.get(l) ?? null);
+      const alignedFull = alignLinesToBands(lines, gray, p.width, p.height);
+      const rD = matchLinesToHoles(alignedFull.lines, holes, p.width, p.height);
+      const holeCYA = holes.map((h) => resolveCenter(h) ?? (h[1] + h[3]) / 2);
+      const firstDy = (owned: PaddleLine[] | undefined, hcy: number, useInk: boolean): number => {
+        const first = owned?.[0];
+        if (!first?.norm) return Infinity;
+        const lb: Box = [first.norm[0] * p.width, first.norm[1] * p.height, first.norm[2] * p.width, first.norm[3] * p.height];
+        const cy = useInk ? (resolveCenter(lb) ?? (lb[1] + lb[3]) / 2) : (lb[1] + lb[3]) / 2;
+        return Math.abs(cy - hcy);
+      };
+      let dpWins = 0;
+      for (let i = 0; i < holes.length; i++) {
+        const hA = holes[i]!;
+        const dyA = firstDy(rA.holeLines[i], holeCYA[i]!, true);
+        const dyD = firstDy(rD.holeLines[i], (hA[1] + hA[3]) / 2, false);
+        const pickD = dyD < dyA;
+        if (pickD && rD.holeLines[i]!.length) dpWins++;
+        holeLines[i] = pickD && rD.holeLines[i]!.length ? rD.holeLines[i]! : rA.holeLines[i]!;
+        conflicts[i] = (pickD ? rD.conflicts[i] : null) ?? rA.conflicts[i] ?? rD.conflicts[i] ?? null;
+      }
+      orderedLines = rA.orderedLines; // fullText 行序取吸附跑（稳定）
       if (inkMiss) console.log(`p${pno} ⚠️ 墨迹带中心量测失败 ${inkMiss} 次（锚点处无墨，回退行框/几何中心）`);
+      if (dpWins) console.log(`  p${pno} 双跑仲裁：${dpWins} 洞取 DP 配带归属`);
     }
     const fm = FORMULA ? matchFormulasToHoles(formulas, holes, p.width, p.height) : null;
     const fullText = orderedLines.map((l) => l.text).join("\n"); // fullText 只记行文，公式不混入

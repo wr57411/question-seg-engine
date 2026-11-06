@@ -183,7 +183,7 @@ function main(): void {
     );
     const holes = holesOf(page);
     const gray = renderGrayPage(join(dir, "origin.pdf"), pageNo + 1);
-    // 生产口径（与 ocr-page-fill-jobs 同源）：纯吸附 resolver + 精准融合 gate（§110）
+    // 生产口径（与 ocr-page-fill-jobs 同源）：双跑逐洞取近（吸附+gate vs DP 配带）+ 精准融合 gate（§110）
     const resolveCenter = (anchor: Box): number | null => {
       const band = inkLineAround(gray, page.width, page.height, anchor);
       return band ? (band.bbox[1] + band.bbox[3]) / 2 : null;
@@ -194,9 +194,24 @@ function main(): void {
       const an = xAligned.lines[i]?.norm;
       if (an) gateMap.set(l, [an[0] * page.width, an[1] * page.height, an[2] * page.width, an[3] * page.height]);
     });
-    const { holeLines } = matchLinesToHoles(lines, holes, page.width, page.height, resolveCenter, (l) =>
-      gateMap.get(l) ?? null,
-    );
+    const rA = matchLinesToHoles(lines, holes, page.width, page.height, resolveCenter, (l) => gateMap.get(l) ?? null);
+    const alignedFull = alignLinesToBands(lines, gray, page.width, page.height);
+    const rD = matchLinesToHoles(alignedFull.lines, holes, page.width, page.height);
+    const holeCYA = holes.map((h) => resolveCenter(h) ?? (h[1] + h[3]) / 2);
+    const firstDy = (owned: PaddleLine[] | undefined, hcy: number, useInk: boolean): number => {
+      const first = owned?.[0];
+      if (!first?.norm) return Infinity;
+      const lb: Box = [first.norm[0] * page.width, first.norm[1] * page.height, first.norm[2] * page.width, first.norm[3] * page.height];
+      const cy = useInk ? (resolveCenter(lb) ?? (lb[1] + lb[3]) / 2) : (lb[1] + lb[3]) / 2;
+      return Math.abs(cy - hcy);
+    };
+    const holeLines: PaddleLine[][] = holes.map(() => []);
+    for (let i = 0; i < holes.length; i++) {
+      const hA = holes[i]!;
+      const dyA = firstDy(rA.holeLines[i], holeCYA[i]!, true);
+      const dyD = firstDy(rD.holeLines[i], (hA[1] + hA[3]) / 2, false);
+      holeLines[i] = dyD < dyA && rD.holeLines[i]!.length ? rD.holeLines[i]! : rA.holeLines[i]!;
+    }
     const centerY = (anchor: Box): number => resolveCenter(anchor) ?? (anchor[1] + anchor[3]) / 2;
 
     holes.forEach((bbox, i) => {
