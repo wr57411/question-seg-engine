@@ -26,6 +26,7 @@ import {
   matchLinesToHoles,
 } from "./ocr-page-fill-jobs.js";
 import { overlapArea, type Box, type PaddleLine } from "./paddle-client.js";
+import { inkLineAround, renderGrayPage } from "./audit-hole-geometry.js";
 
 const ROOT = process.cwd();
 
@@ -95,16 +96,17 @@ function nearest(
   hole: Box,
   pageW: number,
   pageH: number,
+  resolveCenter?: (anchor: Box) => number | null,
 ): { same: Cand | null; cross: Cand | null } {
   const mid = pageW / 2;
-  const hcy = (hole[1] + hole[3]) / 2;
+  const hcy = resolveCenter?.(hole) ?? (hole[1] + hole[3]) / 2;
   const holeLeft = hole[0] < mid;
   let same: Cand | null = null;
   let cross: Cand | null = null;
   for (const l of lines) {
     if (!l.norm || !l.text.trim()) continue;
     const lb: Box = [l.norm[0] * pageW, l.norm[1] * pageH, l.norm[2] * pageW, l.norm[3] * pageH];
-    const dy = Math.abs((lb[1] + lb[3]) / 2 - hcy);
+    const dy = Math.abs((resolveCenter?.(lb) ?? (lb[1] + lb[3]) / 2) - hcy);
     const cand: Cand = {
       text: l.text.trim().slice(0, 18),
       dy,
@@ -140,6 +142,10 @@ function explain(d: Omit<HoleDiag, "reason">): string {
 function main(): void {
   const argv = process.argv.slice(2);
   const doc = arg(argv, "--doc", "答案册-合订本");
+  if (doc.includes("..") || doc.includes("/") || doc.includes("\\")) {
+    console.error(`--doc 只接受目录名（不含路径分隔符）：${doc}`);
+    process.exit(1);
+  }
   const dir = join(ROOT, "data/out", doc);
   const cacheDir = join(dir, "ocr-jobs-cache");
   const stagesPath = join(dir, "stages.json");
@@ -175,7 +181,13 @@ function main(): void {
       (l) => !!l.norm && !!l.text.trim(),
     );
     const holes = holesOf(page);
-    const { holeLines } = matchLinesToHoles(lines, holes, page.width, page.height);
+    const gray = renderGrayPage(join(dir, "origin.pdf"), pageNo + 1);
+    const resolveCenter = (anchor: Box): number | null => {
+      const band = inkLineAround(gray, page.width, page.height, anchor);
+      return band ? (band.bbox[1] + band.bbox[3]) / 2 : null;
+    };
+    const { holeLines } = matchLinesToHoles(lines, holes, page.width, page.height, resolveCenter);
+    const centerY = (anchor: Box): number => resolveCenter(anchor) ?? (anchor[1] + anchor[3]) / 2;
 
     holes.forEach((bbox, i) => {
       const owned = holeLines[i] ?? [];
@@ -184,12 +196,17 @@ function main(): void {
         ? {
             text: first.text.trim().slice(0, 18),
             dy: Math.abs(
-              ((first.norm![1] + first.norm![3]) / 2) * page.height - (bbox[1] + bbox[3]) / 2,
+              centerY([
+                first.norm![0] * page.width,
+                first.norm![1] * page.height,
+                first.norm![2] * page.width,
+                first.norm![3] * page.height,
+              ]) - centerY(bbox),
             ),
             extra: owned.length - 1,
           }
         : null;
-      const { same, cross } = nearest(lines, bbox, page.width, page.height);
+      const { same, cross } = nearest(lines, bbox, page.width, page.height, resolveCenter);
       const base = { page: pageNo, hole: i, bbox, owner, sameCol: same, crossCol: cross };
       rows.push({ ...base, reason: explain(base) });
     });

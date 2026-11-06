@@ -41,6 +41,7 @@ import { join } from "node:path";
 import { emWidthOf } from "../stages/font-metrics.js";
 import { medianLineHeightPt } from "./ocr-lib.js";
 import { overlapArea, parseDocParsingJsonl, runJob, type Box, type PaddleLine } from "./paddle-client.js";
+import { inkLineAround, renderGrayPage } from "./audit-hole-geometry.js";
 
 /** 公式区域（`formula_res_list[]` 归一化形态，见 `PaddlePage.formulas`；解析层未取 formula score）。 */
 type PaddleFormula = { latex: string; bbox: Box | null; norm: Box | null };
@@ -116,19 +117,30 @@ export interface MatchResult {
  * 排序两级：先「中心距离」再「重叠/洞面积」——高框跨两行时重叠两边都像，中心距离才分得开；
  * 同排多个窄洞中心相同时，再用覆盖率区分。
  * lineMultiHole 冲突记录是**常态防线**：只取最优者，其余不猜。
+ *
+ * **对齐基准（2026-11-06 用户拍板「墨迹中心线对齐」）**：注入 `resolveCenter` 时，洞与行的
+ * 纵向对齐都用**墨迹带中心**（原卷灰度、`inkLineAround` 锚点扩到白缝量出）——V3 行框的系统
+ * 偏移（p91 −6 / p150 +5 / p159 +3pt，audit 实测）不再进入判据，行框降级为「同栏 + 有交集」粗判；
+ * 不注入时回退行框/几何中心（旧行为，供无墨测试环境）。
  */
-export function matchLinesToHoles(lines: PaddleLine[], holes: Box[], pageW: number, pageH: number): MatchResult {
+export function matchLinesToHoles(
+  lines: PaddleLine[],
+  holes: Box[],
+  pageW: number,
+  pageH: number,
+  resolveCenter?: (anchor: Box) => number | null,
+): MatchResult {
   const holeLines: PaddleLine[][] = holes.map(() => []);
   const conflicts: (string | null)[] = holes.map(() => null);
   const mid = pageW / 2;
-  const holeCY = holes.map((h) => (h[1] + h[3]) / 2);
+  const holeCY = holes.map((h) => resolveCenter?.(h) ?? (h[1] + h[3]) / 2);
   const orderedLines = lines
     .filter((l): l is PaddleLine & { norm: Box } => !!l.norm && !!l.text.trim())
     .sort((a, b) => a.norm[1] - b.norm[1]);
   for (const l of orderedLines) {
     if (hardChars(l.text) < 2) continue; // 单字行无法核对，不参与落位
     const lb: Box = [l.norm[0] * pageW, l.norm[1] * pageH, l.norm[2] * pageW, l.norm[3] * pageH];
-    const lc = (lb[1] + lb[3]) / 2;
+    const lc = resolveCenter?.(lb) ?? (lb[1] + lb[3]) / 2;
     const cands: { i: number; dy: number; cov: number }[] = [];
     holes.forEach((hb, i) => {
       if ((lb[0] < mid) !== (hb[0] < mid)) return; // 列一致：行与洞的 x0 同侧
@@ -391,9 +403,21 @@ async function main(): Promise<void> {
       if (!lines.length && !formulas.length) console.log(`p${pno} ⚠️ 行级与公式结果均为空`);
     }
 
-    /* ③ 行框/公式框 → pt 域 → 洞匹配（L2 最严 AND）；公式只在 --formula 且无行命中时补位 */
+    /* ③ 行框/公式框 → pt 域 → 洞匹配（L2 最严 AND）。
+       对齐基准 = 墨迹带中心（2026-11-06 用户拍板）：原卷灰度 + inkLineAround，
+       量不出时回退行框/几何中心并**显式计数**（不静默）。行框只判同栏 + 有交集。 */
     const fontPt = medianLineHeightPt(p.blocks);
-    const { orderedLines, holeLines, conflicts } = matchLinesToHoles(lines, holes, p.width, p.height);
+    const gray = renderGrayPage(PDF, pno + 1);
+    let inkMiss = 0;
+    const resolveCenter = (anchor: Box): number | null => {
+      const band = inkLineAround(gray, p.width, p.height, anchor);
+      if (!band) {
+        inkMiss++;
+        return null;
+      }
+      return (band.bbox[1] + band.bbox[3]) / 2;
+    };
+    const { orderedLines, holeLines, conflicts } = matchLinesToHoles(lines, holes, p.width, p.height, resolveCenter);
     const fm = FORMULA ? matchFormulasToHoles(formulas, holes, p.width, p.height) : null;
     const fullText = orderedLines.map((l) => l.text).join("\n"); // fullText 只记行文，公式不混入
 
@@ -459,6 +483,7 @@ async function main(): Promise<void> {
     });
     outPages.push({ page: pno, fullText, items });
     totalAccepted += acc;
+    if (inkMiss) console.log(`p${pno} ⚠️ 墨迹带中心量测失败 ${inkMiss} 次（锚点处无墨，回退行框/几何中心）`);
   }
 
   outPages.sort((a, b) => a.page - b.page);

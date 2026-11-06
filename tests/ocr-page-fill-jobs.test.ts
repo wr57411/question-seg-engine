@@ -160,3 +160,24 @@ test("judgeHole：空文本拒", () => {
   assert.equal(j.ok, false);
   assert.match(j.reason!, /无行压中此洞/);
 });
+
+test("matchLinesToHoles：注入 resolveCenter（墨迹带中心）后，行框系统偏移不再卡 dy（2026-11-06 用户拍板）", () => {
+  // 模拟 p91 实测形态：洞 y 718–729.5（中心 723.75），V3 行框比墨迹偏下 6pt ⇒
+  // 行框中心 734.5，行框中心 dy=10.75 > 8 旧判据拒；墨迹带 y 724–733（中心 728.5），
+  // 洞与行锚点量出的是**同一条墨迹带** ⇒ 墨迹中心 dy=0，命中。
+  const hole = box(22, 718, 262, 729.5);
+  const l = line("1. C 必刷知识·电容器", 31, 726, 262, 745.7); // V3 字体盒：与洞有交集，中心 735.85 ⇒ 行框中心 dy=12.1（diag 实测）
+  const resolveCenter = (): number => 728.5; // 洞锚点与行锚点量到同一条墨迹带
+  const withInk = matchLinesToHoles([l], [hole], W, H, resolveCenter);
+  assert.equal(withInk.holeLines[0]!.length, 1, "墨迹中心 dy=0 ≤ 8 ⇒ 命中");
+  const withoutInk = matchLinesToHoles([l], [hole], W, H);
+  assert.equal(withoutInk.holeLines[0]!.length, 0, "无 resolver 时旧行为：行框中心 dy=10.75 > 8 ⇒ 不命中");
+});
+
+test("matchLinesToHoles：resolveCenter 返回 null 时回退几何/行框中心（不抛错，行为同旧）", () => {
+  const hole = box(10, 100, 80, 110); // 中心 105
+  const l = line("上无而二四", 10, 103, 80, 112); // 行框中心 107.5，dy=2.5
+  const resolveCenter = (): number | null => null; // 该锚点处无墨（如纯白区域）
+  const { holeLines } = matchLinesToHoles([l], [hole], W, H, resolveCenter);
+  assert.equal(holeLines[0]!.length, 1, "回退几何中心后 dy=2.5 ≤ 8 ⇒ 命中");
+});

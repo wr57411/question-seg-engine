@@ -24,6 +24,7 @@
     "ocr:verify": "tsx scripts/paddle-client.ts verify",
     "ocr:job": "tsx scripts/paddle-client.ts run",
     "diag:match": "tsx scripts/diag-match.ts",
+    "ocr:jobs": "tsx scripts/ocr-page-fill-jobs.ts",
     "audit:paddle": "tsx scripts/paddle-structure-audit.ts",
     "audit:pos": "tsx scripts/paddle-pos-diff.ts",
     "audit:formula": "tsx scripts/formula-five-audit.ts",
