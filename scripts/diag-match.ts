@@ -27,6 +27,7 @@ import {
 } from "./ocr-page-fill-jobs.js";
 import { overlapArea, type Box, type PaddleLine } from "./paddle-client.js";
 import { inkLineAround, renderGrayPage } from "./audit-hole-geometry.js";
+import { alignLinesToBands } from "./ink-band-align.js";
 
 const ROOT = process.cwd();
 
@@ -182,6 +183,7 @@ function main(): void {
     );
     const holes = holesOf(page);
     const gray = renderGrayPage(join(dir, "origin.pdf"), pageNo + 1);
+    // 生产口径（与 ocr-page-fill-jobs 同源）：纯吸附 resolver；x 混合形态已回退（§110）
     const resolveCenter = (anchor: Box): number | null => {
       const band = inkLineAround(gray, page.width, page.height, anchor);
       return band ? (band.bbox[1] + band.bbox[3]) / 2 : null;

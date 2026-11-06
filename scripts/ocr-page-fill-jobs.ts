@@ -42,6 +42,7 @@ import { emWidthOf } from "../stages/font-metrics.js";
 import { medianLineHeightPt } from "./ocr-lib.js";
 import { overlapArea, parseDocParsingJsonl, runJob, type Box, type PaddleLine } from "./paddle-client.js";
 import { inkLineAround, renderGrayPage } from "./audit-hole-geometry.js";
+import { alignLinesToBands } from "./ink-band-align.js";
 
 /** 公式区域（`formula_res_list[]` 归一化形态，见 `PaddlePage.formulas`；解析层未取 formula score）。 */
 type PaddleFormula = { latex: string; bbox: Box | null; norm: Box | null };
@@ -306,6 +307,7 @@ async function main(): Promise<void> {
     pagesArgIdx >= 0 ? new Set(process.argv[pagesArgIdx + 1]!.split(",").map((x) => Number(x.trim()))) : null;
   const FORCE = process.argv.includes("--force");
   const FORMULA = process.argv.includes("--formula"); // 批次 2：公式洞补全（默认关，产品决策未定）
+  const EXPERIMENTAL_ALIGN = process.argv.includes("--experimental-align"); // 2026-11-07 实验路径（默认关）
   const OUT_DIR = join("data", "out", DOC);
   const PDF = join(OUT_DIR, "origin.pdf");
   const CACHE_DIR = join(OUT_DIR, "ocr-jobs-cache");
@@ -404,20 +406,43 @@ async function main(): Promise<void> {
     }
 
     /* ③ 行框/公式框 → pt 域 → 洞匹配（L2 最严 AND）。
-       对齐基准 = 墨迹带中心（2026-11-06 用户拍板）：原卷灰度 + inkLineAround，
-       量不出时回退行框/几何中心并**显式计数**（不静默）。行框只判同栏 + 有交集。 */
+       对齐基准 = 墨迹带中心（2026-11-06 用户拍板）：原卷灰度 + inkLineAround（局部吸附），
+       量不出时回退行框/几何中心并**显式计数**（不静默）。行框只判同栏 + 有交集。
+       `--experimental-align`：DP 全局单调配带 + 几何换源（ink-band-align.ts，实验路径，
+       2026-11-07 目标的另一口径——配带率 93.9% 但端到端 7/14 未超本口径 11/14，默认关）。 */
     const fontPt = medianLineHeightPt(p.blocks);
     const gray = renderGrayPage(PDF, pno + 1);
-    let inkMiss = 0;
-    const resolveCenter = (anchor: Box): number | null => {
-      const band = inkLineAround(gray, p.width, p.height, anchor);
-      if (!band) {
-        inkMiss++;
-        return null;
-      }
-      return (band.bbox[1] + band.bbox[3]) / 2;
-    };
-    const { orderedLines, holeLines, conflicts } = matchLinesToHoles(lines, holes, p.width, p.height, resolveCenter);
+    let orderedLines: PaddleLine[];
+    let holeLines: PaddleLine[][];
+    let conflicts: (string | null)[];
+    if (EXPERIMENTAL_ALIGN) {
+      const aligned = alignLinesToBands(lines, gray, p.width, p.height);
+      const ast = aligned.stats;
+      console.log(
+        `  p${pno} [实验]几何换源：配带 ${ast.paired}/${ast.total}（无带 ${ast.noBand} · 过载带 ${ast.bandOverload}）`,
+      );
+      const r2 = matchLinesToHoles(aligned.lines, holes, p.width, p.height);
+      orderedLines = r2.orderedLines;
+      holeLines = r2.holeLines;
+      conflicts = r2.conflicts;
+    } else {
+      let inkMiss = 0;
+      const resolveCenter = (anchor: Box): number | null => {
+        const band = inkLineAround(gray, p.width, p.height, anchor);
+        if (!band) {
+          inkMiss++;
+          return null;
+        }
+        return (band.bbox[1] + band.bbox[3]) / 2;
+      };
+      // 生产口径：纯吸附（2026-11-06 用户拍板 + 2026-11-07 loop 验证最优：diag 11/14、accepted 6）。
+      // x 换墨迹带真值的混合形态实测无净收益（组成互换+抢洞），已回退——实验数据见 DECISIONS §110。
+      const r1 = matchLinesToHoles(lines, holes, p.width, p.height, resolveCenter);
+      orderedLines = r1.orderedLines;
+      holeLines = r1.holeLines;
+      conflicts = r1.conflicts;
+      if (inkMiss) console.log(`p${pno} ⚠️ 墨迹带中心量测失败 ${inkMiss} 次（锚点处无墨，回退行框/几何中心）`);
+    }
     const fm = FORMULA ? matchFormulasToHoles(formulas, holes, p.width, p.height) : null;
     const fullText = orderedLines.map((l) => l.text).join("\n"); // fullText 只记行文，公式不混入
 
@@ -483,7 +508,6 @@ async function main(): Promise<void> {
     });
     outPages.push({ page: pno, fullText, items });
     totalAccepted += acc;
-    if (inkMiss) console.log(`p${pno} ⚠️ 墨迹带中心量测失败 ${inkMiss} 次（锚点处无墨，回退行框/几何中心）`);
   }
 
   outPages.sort((a, b) => a.page - b.page);
