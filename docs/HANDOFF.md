@@ -29,19 +29,19 @@
 
 **一句话**：B-28 批次 3 用**原卷墨迹**当独立裁判把「假洞」这个前提查清了（膨胀块成立、但只解释部分洞），接线决策收口为**维持不接线**；随后把「诊断」做成项目命令（`npm run diag:match`）并给「改引擎必跑 check」装了硬闸门（Stop hook），切断「用临时脚本重写判据 → 错误归因」的路径。
 
-**⚠️ 接手第一件事：本轮的改动全部还在工作区，未提交**
+**⚠️ 接手第一件事：确认提交与远端状态**
 
-| 项 | 实况（2026-11-06 08:08 实测） |
+| 项 | 实况（2026-11-06 08:10 提交后实测） |
 |---|---|
-| 分支 / HEAD | `main` @ `ea0ea86`（未动） |
-| 与远端 | **领先 `origin/main` 75 个提交，未 push**（`git rev-list --left-right --count` = `0 75`） |
-| 工作区 | **7 个已跟踪文件修改 + 7 个新增未跟踪**（清单见下） |
-| 质量门 | `npm run check` **585/585** 全绿，凭证 `209f2c663cb98e37`（`tmp/.check-stamp`） |
-| 建议 | **先提交再切分支/做别的**：批次 3 的全部证据（报告 + 裁图 + 审计脚本 + 测试）都是未跟踪文件，`git checkout` / `reset` 会直接丢掉。commit 已获项目级授权；**push 仍需用户发话** |
+| 分支 / HEAD | `main` @ `0cf5ed6`（本轮 B-28 批次 3 + B-35 **已提交**，22 文件 / +1518 −32） |
+| 与远端 | **领先 `origin/main` 76 个提交，未 push**（`git rev-list --left-right --count` = `0 76`）；**push 需用户发话** |
+| 工作区 | 干净（`git status --short` 为空） |
+| 质量门 | `npm run check` **585/585** 全绿；凭证 `tmp/.check-stamp`（由 check 自动写，**别手改**） |
+| 其它工作树 | `feature/oxr` @ `e1bcef2`、`merge-int` @ `123622b`（detached），均未合并 |
 
-未跟踪的关键文件（丢了就要重跑）：`docs/evidence/2026-11-05-洞几何核查.md`、`docs/evidence/hole-geom-2026-11-05/*.png`（7 张原卷裁图）、`scripts/audit-hole-geometry.ts`、`tests/audit-hole-geometry.test.ts`、`scripts/diag-match.ts`、`scripts/check-stamp.mjs`。
+**本轮产出的关键文件**（要复核批次 3 结论就从这几处入手）：`docs/evidence/2026-11-05-洞几何核查.md`（验收契约 + 返工记录）、`docs/evidence/hole-geom-2026-11-05/*.png`（7 张原卷裁图）、`scripts/audit-hole-geometry.ts`、`scripts/diag-match.ts`、`tests/audit-hole-geometry.test.ts`。
 
-**本轮完成**（批次 1 提交见 §0.3 旧段；批次 3 与 B-35 **尚未提交**）
+**本轮完成**（批次 1 提交见 §0.3 旧段；批次 3 与 B-35 见 `0cf5ed6`）
 
 | 做了什么 | 证据 |
 |---|---|

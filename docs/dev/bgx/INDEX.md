@@ -1,10 +1,21 @@
 # BGX 开发治理资料索引
 
-- 更新时间：2026-11-02T15:40:00+08:00
+- 更新时间：2026-11-06T08:15:00+08:00
 - 技能版本：bgx 2.2.0
 - 项目：question-seg-engine（主入口仍是 [`docs/HANDOFF.md`](../../HANDOFF.md)，本索引只是 bgx 产物的从属导航）
 
-## 本次交接（2026-11-02）—— 检测层收口 + 并入 main
+## 本次交接（2026-11-06）—— B-28 批次 3 收口 + B-35 诊断命令化
+
+- 状态：**已完成并提交**（`0cf5ed6`，22 文件 / +1518 −32；`npm run check` **585/585** 绿）。
+- **交接正文在项目主入口**：[`docs/HANDOFF.md` §0.3](../../HANDOFF.md) —— 接手第一件事（提交/远端/工作区实况）、
+  本轮完成表、「两件事不要混」（修 bbox 膨胀 ≠ 解决配对 8/14）、未闭合四项、推进顺序。
+- 本轮**不另立 bgx REPORT**：按 `tasks/lessons.md` **L9**，交接正文只落 HANDOFF，本目录不复写。
+- 关键证据：`docs/evidence/2026-11-05-洞几何核查.md`（验收契约 + 返工记录）、
+  `docs/evidence/hole-geom-2026-11-05/*.png`（7 张原卷裁图）、`scripts/audit-hole-geometry.ts`、
+  `scripts/diag-match.ts`（`npm run diag:match`）、`scripts/check-stamp.mjs`（Stop hook 凭证）。
+- ⚠️ **未 push**：`main` 领先 `origin/main` 76 个提交；push 需用户发话。
+
+## 上一次交接（2026-11-02）—— 检测层收口 + 并入 main
 
 - 状态：**已完成**（两把尺子入闸、漏题 17 → 0、main 已并入并推送）。
 - **交接正文在项目主入口**：[`docs/HANDOFF.md` §0.2](../../HANDOFF.md)（一句话结论 / 完成项 /
