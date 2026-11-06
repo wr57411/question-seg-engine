@@ -46,6 +46,12 @@ npm install && npm run check   # 必须全绿；不绿先修门，勿带病开�
 npm run preflight              # 产物新鲜度自检：data/out 里哪些快照已过期
 ```
 
+> **2026-11-06 起这条由 Hook 强制**：改了 `scripts/` 或 `src/` 之后若没跑过全绿 `check`，
+> 收尾会被 Stop hook 拦住（`exit 2`）。凭证是 `tmp/.check-stamp`，由 `check` 末尾的
+> `scripts/check-stamp.mjs` 在全绿时写入 —— 所以**不要手改或删除这个文件**来绕过，
+> 那只是把「有没有验证」这个问题藏起来。查配对为什么失败请用 `npm run diag:match`，
+> 不要自己写临时脚本重算几何判据（见 `docs/BACKLOG.md` B-35）。
+
 > **`data/` 下的一切都是快照，不是事实**（`tasks/lessons.md` **L7**）。
 > 要说「代码现在的行为」必须用 `src/` 重跑；引用产物数字必须写明来源。
 > 数据血缘见 **[docs/DATA-MAP.md](docs/DATA-MAP.md)**，开工套路见技能 `qseg-context`。

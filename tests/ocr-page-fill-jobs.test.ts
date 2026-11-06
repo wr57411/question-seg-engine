@@ -48,8 +48,8 @@ test("holesOf：只收 content 且宽/高 ≥1.5（家具、竖条、薄片排�
   assert.deepEqual(holesOf(page), [box(10, 100, 45, 110)]);
 });
 
-test("matchLinesToHoles：行框盖住洞 ≥0.6 归洞；一洞多行按 y 序拼接；输入乱序也按 y0 遍历", () => {
-  // 洞是横向碎片（宽/高 7，与真实洞同形态）；两行框都盖住洞 ≥0.6（V3 行框带 padding，相邻行会都压住短洞）
+test("matchLinesToHoles：中心距 ≤8pt 归洞；一洞多行按 y 序拼接；输入乱序也按 y0 遍历", () => {
+  // 洞是横向碎片（宽/高 7，与真实洞同形态）；两行框中心都在半行距内（V3 行框带 padding，相邻行会都压住短洞）
   const hole = box(10, 100, 80, 110); // 面积 700
   const upper = line("上无 $ \\frac{1}{2} $", 10, 100, 80, 108); // 盖住 560/700 = 0.80
   const lower = line("下无而二四", 10, 103, 80, 112); // 盖住 490/700 = 0.70
@@ -63,9 +63,9 @@ test("matchLinesToHoles：行框盖住洞 ≥0.6 归洞；一洞多行按 y 序�
   assert.deepEqual(orderedLines.map((l) => l.text), [upper.text, lower.text], "orderedLines 按 y0 序（fullText 用）");
 });
 
-test("matchLinesToHoles：重叠/洞面积 <0.6 不归（薄线压洞边）", () => {
-  const hole = box(10, 100, 45, 110); // 面积 350
-  const l = line("上无而二四", 30, 98, 45, 150); // 交集 150 ⇒ /洞面积 = 0.43
+test("matchLinesToHoles：中心距 >8pt 不归（薄线压洞边）", () => {
+  const hole = box(10, 100, 45, 110); // 中心 y=105
+  const l = line("上无而二四", 30, 98, 45, 150); // 中心 y=124 ⇒ dy=19pt > 8
   const { holeLines } = matchLinesToHoles([l], [hole], W, H);
   assert.equal(holeLines[0]!.length, 0);
 });
@@ -85,7 +85,7 @@ test("matchLinesToHoles：单硬字符行不落位（无法核对），但仍进
   assert.equal(orderedLines.length, 1);
 });
 
-test("matchLinesToHoles：一行多洞取覆盖率最大者，其余洞记 lineMultiHole 冲突（不猜）", () => {
+test("matchLinesToHoles：同排多洞中心相同时取覆盖率最大者，其余记 lineMultiHole 冲突（不猜）", () => {
   // 现实形态（分母=洞面积后可双命中）：同一行盖住同排两个不相交的窄洞
   const c1 = box(10, 100, 35, 110); // 面积 250
   const c2 = box(45, 100, 80, 110); // 面积 350

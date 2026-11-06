@@ -7,7 +7,8 @@
  * - 本文件：整页图 → PP-StructureV3 作业接口回**行级框**（rec_polys/rec_texts/rec_scores）→
  *   行框 `norm`(0..1) × stages 页宽高落回 pt 域（pdftoppm PNG 与 stages 页面同宽高比），
  *   与洞（stages pt 域）直接做几何匹配（L2 最严 AND，SPEC §4）：
- *   `重叠面积/洞面积 ≥ 0.6`（行框**盖住**洞）**且** 列一致（行与洞的 x0 同侧）**且** 行 ≥2 硬字符。
+ *   列一致（x0 同侧）**且** 有交集 **且** 中心距 ≤ 8pt（同一行）**且** 行 ≥2 硬字符；
+ *   排序先「中心距」再「重叠/洞面积」（2026-11-05 改：高框跨两行时重叠两边都像，中心距才分得开）。
  *   ⚠️ 分母与 SPEC §4 的「/行框面积」**不同**（用户 2026-11-05 批准改洞面积）：实测（答案册 4 页 14 洞）
  *   V3 行框是**整行视觉行**、MinerU 洞是行内**未覆盖碎片**，行框比洞高 1.4–1.7 倍 ⇒
  *   「/行框面积」对真配对的上限只有 0.33–0.59，0.6 阈值字面跑出 0 候选；「/洞面积」下真配对 0.67–0.99。
@@ -56,8 +57,12 @@ const PAD_Y = 3;
 const RATIO_MIN = 0.45;
 const RATIO_MAX = 1.9;
 const MIN_EXPECT_CHARS = 1.6;
-/** 行→洞：重叠面积/**洞**面积 下限（行框盖住洞的比例；阈值 0.6 同 SPEC，分母经实测修订见文件头）。 */
+/** 行→洞：重叠面积/**洞**面积 下限（公式配对仍用；行配对已改两级判据，见下）。 */
 const LINE_HOLE_OVERLAP_MIN = 0.6;
+/** 行框中心 ↔ 洞中心的纵向距离上限（pt）。本卷行距 ~19pt，取半行距 8pt：
+ *  V3 行框是字体盒（高 ≈1.7 倍墨迹），跨两行时「重叠面积」两边都像（p159 实测 31 vs 29），
+ *  只有中心距离分得开（3.5 vs 17.5）。2026-11-05 由「单一重叠门槛」改为「中心距离 + 重叠」两级。 */
+export const LINE_HOLE_CENTER_DY_MAX = 8;
 /** 裁图↔整页交叉核对的一致度下限（同 `ocr-page-fill.ts`）。 */
 const DICE_MIN = 0.34;
 
@@ -107,38 +112,41 @@ export interface MatchResult {
 }
 
 /**
- * 行→洞匹配（L2 最严 AND）。行按 y0 排序遍历；重叠/**洞**面积 ≥ 0.6（行框盖住洞）且列一致且 ≥2 硬字符。
- * 「重叠最大」按**覆盖率**（重叠/该洞面积）排序——行归「它盖得最完整」的洞，与门控同一把尺。
- * 注：分母换成洞面积后，一行同时压中多个洞不再罕见（相邻两洞都被同一行盖满是正常现象），
- * lineMultiHole 冲突记录因此是**常态防线**而非纯防御 —— 只取覆盖率最大者，其余不猜。
+ * 行→洞匹配（L2 最严 AND）。行按 y0 排序遍历；列一致 + 有交集 + **中心距 ≤ 8pt**（同一行）+ ≥2 硬字符。
+ * 排序两级：先「中心距离」再「重叠/洞面积」——高框跨两行时重叠两边都像，中心距离才分得开；
+ * 同排多个窄洞中心相同时，再用覆盖率区分。
+ * lineMultiHole 冲突记录是**常态防线**：只取最优者，其余不猜。
  */
 export function matchLinesToHoles(lines: PaddleLine[], holes: Box[], pageW: number, pageH: number): MatchResult {
   const holeLines: PaddleLine[][] = holes.map(() => []);
   const conflicts: (string | null)[] = holes.map(() => null);
   const mid = pageW / 2;
+  const holeCY = holes.map((h) => (h[1] + h[3]) / 2);
   const orderedLines = lines
     .filter((l): l is PaddleLine & { norm: Box } => !!l.norm && !!l.text.trim())
     .sort((a, b) => a.norm[1] - b.norm[1]);
   for (const l of orderedLines) {
     if (hardChars(l.text) < 2) continue; // 单字行无法核对，不参与落位
     const lb: Box = [l.norm[0] * pageW, l.norm[1] * pageH, l.norm[2] * pageW, l.norm[3] * pageH];
-    const la = Math.max(0, (lb[2] - lb[0]) * (lb[3] - lb[1]));
-    if (!(la > 0)) continue;
-    const cands: { i: number; cov: number }[] = [];
+    const lc = (lb[1] + lb[3]) / 2;
+    const cands: { i: number; dy: number; cov: number }[] = [];
     holes.forEach((hb, i) => {
       if ((lb[0] < mid) !== (hb[0] < mid)) return; // 列一致：行与洞的 x0 同侧
+      const ov = overlapArea(lb, hb);
+      if (!(ov > 0)) return; // 必须有交集
+      const dy = Math.abs(lc - holeCY[i]!);
+      if (dy > LINE_HOLE_CENTER_DY_MAX) return; // 同一行（半行距内）
       const ha = Math.max(0, (hb[2] - hb[0]) * (hb[3] - hb[1]));
-      if (!(ha > 0)) return;
-      const cov = overlapArea(lb, hb) / ha; // 行框盖住洞的比例（分母=洞面积，2026-11-05 实测修订）
-      if (cov >= LINE_HOLE_OVERLAP_MIN) cands.push({ i, cov });
+      cands.push({ i, dy, cov: ha > 0 ? ov / ha : 0 });
     });
     if (!cands.length) continue;
-    cands.sort((a, b) => b.cov - a.cov);
+    // 两级排序：先「中心距离」（区分跨行的高框），再「覆盖率」（区分同排的多个窄洞）
+    cands.sort((a, b) => a.dy - b.dy || b.cov - a.cov);
     holeLines[cands[0]!.i]!.push(l);
     if (cands.length > 1) {
       const note =
-        `lineMultiHole：行「${l.text.trim().slice(0, 18)}」同时压中 ${cands.length} 个洞，` +
-        `归重叠最大者 #${cands[0]!.i}，其余 {${cands.slice(1).map((c) => c.i).join(",")}} 不猜`;
+        `lineMultiHole：行「${l.text.trim().slice(0, 18)}」中心同时靠近 ${cands.length} 个洞，` +
+        `归最近者 #${cands[0]!.i}（dy=${cands[0]!.dy.toFixed(1)}pt），其余 {${cands.slice(1).map((c) => c.i).join(",")}} 不猜`;
       for (const c of cands.slice(1)) conflicts[c.i] ??= note;
     }
   }

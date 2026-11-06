@@ -9,6 +9,8 @@ sample/*
 .superpowers/
 # 本地 Agent 工作区（记忆/日志，不入库）
 .workbuddy-ai/
+# ZCode 本地插件配置（工具生成，不入库）
+.zcode/
 # 用户提供的资料 PDF（大文件，不入库）
 *.pdf
 
