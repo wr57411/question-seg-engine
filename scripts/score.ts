@@ -313,12 +313,13 @@ export function scoreQuestions(docId: string, gold: GoldDoc, system: Question[])
   const notes: string[] = [];
   if (isStructure) {
     const missing = gold.questions.filter((q) => q.needsReview).length;
-    notes.push("结构金标：只算切题 recall/precision；文本・公式・图保真率不适用（未转写全文）");
+    notes.push("结构金标：只作评分器联调；文本・公式・图保真率不适用（未转写全文）");
     notes.push(`独立 OCR 题号证据 ${gold.questions.length - missing}/${gold.questions.length}；${missing} 题 needs_review，须回原卷页图复核`);
     notes.push(
-      "⚠ 结构金标的 (page,number) 骨架与系统产物同源 ⇒ P/R 只作评分器联调，不能读作系统准确率；" +
-        "完全独立分母（逐页回原卷数题号）另立子目标",
+      "⚠ 结构金标的 (page,number) 骨架与系统产物同源 ⇒ 违反本文件第 7 行「金标准独立于系统产物」；" +
+        "系统漏掉的题不在分母里，recall/precision 都不具验收意义。正式报表两格显示「—」，数值只留在返回值供单测联调",
     );
+    notes.push("完全独立分母（逐页回原卷数题号 + 每题起止边界）另立子目标 S2；本册 33/31 题数冲突与 L-01 已知漏题须先解释");
   } else if (!gold.complete) {
     notes.push("partial gold：只算 recall 与匹配题上的选项/答案指标，precision 不计算");
   }
@@ -452,10 +453,13 @@ function main(): void {
     "",
     "| 卷 | 金标 | 系统 | 匹配 | recall | precision | 严格文本 | 选项完整 | 选项CER | 答案配对 | 图片召回 | 待复核 | 自动通过 |",
     "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
-    ...results.map(
-      (r) =>
-        `| ${r.docId}${r.goldKind === "structure" ? "（结构）" : r.goldComplete ? "" : "（部分）"} | ${r.goldQuestions} | ${r.systemQuestions} | ${r.matched} | ${pct(r.recall)} | ${pct(r.precision)} | ${pct(r.strictTextMatch)} | ${pct(r.optionCompleteness)} | ${pct(r.optionCer)} | ${pct(r.answerPairing)} | ${pct(r.imageRecall)} | ${pct(r.needsReviewRate)} | ${r.autoPass ? "是" : "否"} |`,
-    ),
+    ...results.map((r) => {
+      const structural = r.goldKind === "structure";
+      const label = structural ? "（结构·仅联调）" : r.goldComplete ? "" : "（部分）";
+      const recallCell = structural ? "—" : pct(r.recall);
+      const precisionCell = structural ? "—" : pct(r.precision);
+      return `| ${r.docId}${label} | ${r.goldQuestions} | ${r.systemQuestions} | ${r.matched} | ${recallCell} | ${precisionCell} | ${pct(r.strictTextMatch)} | ${pct(r.optionCompleteness)} | ${pct(r.optionCer)} | ${pct(r.answerPairing)} | ${pct(r.imageRecall)} | ${pct(r.needsReviewRate)} | ${r.autoPass ? "是" : "否"} |`;
+    }),
     "",
     ...results.flatMap((r) => [
       `## ${r.docId}`,
@@ -469,13 +473,15 @@ function main(): void {
   writeFileSync(join("data", "score", "report.md"), lines.join("\n"));
   console.log(lines.slice(0, 5).join("\n"));
   for (const r of results) {
+    const structural = r.goldKind === "structure";
     console.log(
-      `\n${r.docId}${r.goldComplete ? "" : "（部分）"}：匹配 ${r.matched}/${r.goldQuestions} · recall ${pct(r.recall)}` +
+      `\n${r.docId}${structural ? "（结构·仅联调）" : r.goldComplete ? "" : "（部分）"}：匹配 ${r.matched}/${r.goldQuestions} · recall ${structural ? "—（同源，不验收）" : pct(r.recall)}` +
         ` · 严格文本 ${pct(r.strictTextMatch)} · 选项完整 ${pct(r.optionCompleteness)} · 选项CER ${pct(r.optionCer)}` +
         ` · 答案配对 ${pct(r.answerPairing)} · 图片召回 ${pct(r.imageRecall)} · 待复核 ${pct(r.needsReviewRate)}` +
         ` · 自动通过 ${r.autoPass ? "是" : "否"}`,
     );
-    if (!r.goldComplete) console.log("  注：部分金标准，precision/误切不计算；完整金标准后才能算。");
+    if (structural) console.log("  注：结构金标分母与系统同源，recall/precision 不作准确率读数；见 notes。");
+    if (!structural && !r.goldComplete) console.log("  注：部分金标准，precision/误切不计算；完整金标准后才能算。");
     if (r.unmatchedGold.length) console.log(`  未匹配：${r.unmatchedGold.map((x) => `p${x.page + 1}#${x.number}`).join("、")}`);
     if (r.strictTextMismatches.length)
       console.log(

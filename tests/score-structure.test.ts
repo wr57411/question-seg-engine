@@ -26,12 +26,22 @@ const structure: GoldDoc = {
   ],
 };
 
-test("结构金标：recall 与 precision 首次同时可算（分母是独立题目清单）", () => {
+test("结构金标：返回值保留 P/R 仅供联调，notes 必须声明不可作准确率验收", () => {
   const r = scoreQuestions("测试册", structure, [sys(0, "1"), sys(0, "2")]);
   assert.equal(r.goldKind, "structure");
   assert.equal(r.matched, 2);
   assert.equal(r.recall, 1);
   assert.equal(r.precision, 1);
+  assert.ok(r.notes.some((n) => n.includes("正式报表两格显示「—」")), "必须锁住「同源分母不进正式报表」");
+  assert.ok(r.notes.some((n) => n.includes("金标准独立于系统产物")), "必须写明违反的规格约束");
+});
+
+test("对抗性反例：系统漏题但金标也漏 ⇒ recall 仍 100%（同源分母的固有盲区）", () => {
+  const sameSourceGold: GoldDoc = { ...structure, questions: [structure.questions[0]!] };
+  const r = scoreQuestions("测试册", sameSourceGold, [sys(0, "1")]);
+  assert.equal(r.recall, 1);
+  assert.equal(r.precision, 1);
+  assert.equal(r.unmatchedGold.length, 0);
 });
 
 test("结构金标：漏题同时拉低 recall 与 precision，不能只报好看的那个", () => {
