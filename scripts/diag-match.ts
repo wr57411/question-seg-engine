@@ -183,12 +183,20 @@ function main(): void {
     );
     const holes = holesOf(page);
     const gray = renderGrayPage(join(dir, "origin.pdf"), pageNo + 1);
-    // 生产口径（与 ocr-page-fill-jobs 同源）：纯吸附 resolver；x 混合形态已回退（§110）
+    // 生产口径（与 ocr-page-fill-jobs 同源）：纯吸附 resolver + 精准融合 gate（§110）
     const resolveCenter = (anchor: Box): number | null => {
       const band = inkLineAround(gray, page.width, page.height, anchor);
       return band ? (band.bbox[1] + band.bbox[3]) / 2 : null;
     };
-    const { holeLines } = matchLinesToHoles(lines, holes, page.width, page.height, resolveCenter);
+    const xAligned = alignLinesToBands(lines, gray, page.width, page.height, { replaceY: false });
+    const gateMap = new Map<PaddleLine, Box>();
+    lines.forEach((l, i) => {
+      const an = xAligned.lines[i]?.norm;
+      if (an) gateMap.set(l, [an[0] * page.width, an[1] * page.height, an[2] * page.width, an[3] * page.height]);
+    });
+    const { holeLines } = matchLinesToHoles(lines, holes, page.width, page.height, resolveCenter, (l) =>
+      gateMap.get(l) ?? null,
+    );
     const centerY = (anchor: Box): number => resolveCenter(anchor) ?? (anchor[1] + anchor[3]) / 2;
 
     holes.forEach((bbox, i) => {

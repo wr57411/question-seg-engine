@@ -130,6 +130,7 @@ export function matchLinesToHoles(
   pageW: number,
   pageH: number,
   resolveCenter?: (anchor: Box) => number | null,
+  gateOf?: (l: PaddleLine) => Box | null,
 ): MatchResult {
   const holeLines: PaddleLine[][] = holes.map(() => []);
   const conflicts: (string | null)[] = holes.map(() => null);
@@ -142,11 +143,15 @@ export function matchLinesToHoles(
     if (hardChars(l.text) < 2) continue; // 单字行无法核对，不参与落位
     const lb: Box = [l.norm[0] * pageW, l.norm[1] * pageH, l.norm[2] * pageW, l.norm[3] * pageH];
     const lc = resolveCenter?.(lb) ?? (lb[1] + lb[3]) / 2;
+    // 准入框（§110 精准融合，2026-11-07）：整行墨迹带 x（mergeSameRowX）仅用于「有交集」判定，
+    // 排序分（dy/cov）仍用原 V3 框 —— 混合形态（x 整体替换）的抢洞副作用因此消除
+    const gate = gateOf?.(l) ?? null;
     const cands: { i: number; dy: number; cov: number }[] = [];
     holes.forEach((hb, i) => {
       if ((lb[0] < mid) !== (hb[0] < mid)) return; // 列一致：行与洞的 x0 同侧
       const ov = overlapArea(lb, hb);
-      if (!(ov > 0)) return; // 必须有交集
+      const ovGate = gate ? overlapArea(gate, hb) : 0;
+      if (!(ov > 0) && !(ovGate > 0)) return; // 行框或其整行墨迹带与洞有交集
       const dy = Math.abs(lc - holeCY[i]!);
       if (dy > LINE_HOLE_CENTER_DY_MAX) return; // 同一行（半行距内）
       const ha = Math.max(0, (hb[2] - hb[0]) * (hb[3] - hb[1]));
@@ -436,8 +441,15 @@ async function main(): Promise<void> {
         return (band.bbox[1] + band.bbox[3]) / 2;
       };
       // 生产口径：纯吸附（2026-11-06 用户拍板 + 2026-11-07 loop 验证最优：diag 11/14、accepted 6）。
-      // x 换墨迹带真值的混合形态实测无净收益（组成互换+抢洞），已回退——实验数据见 DECISIONS §110。
-      const r1 = matchLinesToHoles(lines, holes, p.width, p.height, resolveCenter);
+      // 精准融合（§110 下一步）：gate 框 = 整行墨迹带 x（mergeSameRowX）**仅用于准入判定**，
+      // 排序分（dy/cov）仍用原 V3 框 —— 混合形态（x 整体替换）的抢洞副作用因此消除。
+      const xAligned = alignLinesToBands(lines, gray, p.width, p.height, { replaceY: false });
+      const gateMap = new Map<PaddleLine, Box>();
+      lines.forEach((l, i) => {
+        const an = xAligned.lines[i]?.norm;
+        if (an) gateMap.set(l, [an[0] * p.width, an[1] * p.height, an[2] * p.width, an[3] * p.height]);
+      });
+      const r1 = matchLinesToHoles(lines, holes, p.width, p.height, resolveCenter, (l) => gateMap.get(l) ?? null);
       orderedLines = r1.orderedLines;
       holeLines = r1.holeLines;
       conflicts = r1.conflicts;
