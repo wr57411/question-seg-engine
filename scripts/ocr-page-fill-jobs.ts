@@ -535,11 +535,27 @@ async function main(): Promise<void> {
       let reason: string | undefined;
       let label = "";
       if (ls.length) {
-        const text = ls.map((l) => l.text.trim()).filter(Boolean).join(" ");
-        const j = judgeHole(bb[2] - bb[0], fontPt, text, cropByBbox.get(bb.map((v) => Math.round(v)).join(",")) ?? "");
-        const scores = ls.map((l) => l.score).filter((s): s is number => typeof s === "number");
+        let effLines = ls;
+        let text = ls.map((l) => l.text.trim()).filter(Boolean).join(" ");
+        let j = judgeHole(bb[2] - bb[0], fontPt, text, cropByBbox.get(bb.map((v) => Math.round(v)).join(",")) ?? "");
+        // 碎片过滤重试（§110 第五轮）：组内混入「LaTeX 命令行且无汉字」的碎片
+        // （p91 h2 实测「(3)|g，方向竖直向下|{1-{\frac…」，碎片把宽度比拉到 0.05 越界）
+        // ⇒ 滤掉后重判；全 LaTeX 公式组（p91 h4「解得|\boldsymbol{…」）滤后仍拒 ⇒ 结果不变，无伤害。
+        if (!j.ok && ls.length > 1) {
+          const clean = ls.filter((l) => !/\\[a-zA-Z]/.test(l.text) || /[\u4e00-\u9fff]/.test(l.text));
+          if (clean.length > 0 && clean.length < ls.length) {
+            const text2 = clean.map((l) => l.text.trim()).filter(Boolean).join(" ");
+            const j2 = judgeHole(bb[2] - bb[0], fontPt, text2, cropByBbox.get(bb.map((v) => Math.round(v)).join(",")) ?? "");
+            if (j2.ok) {
+              effLines = clean;
+              text = text2;
+              j = j2;
+            }
+          }
+        }
+        const scores = effLines.map((l) => l.score).filter((s): s is number => typeof s === "number");
         item.text = text;
-        item.raw = ls.map((l) => l.text).join("\n");
+        item.raw = effLines.map((l) => l.text).join("\n");
         item.ratio = +j.ratio.toFixed(2);
         item.accepted = j.ok;
         item.score = scores.length ? Math.min(...scores) : null;

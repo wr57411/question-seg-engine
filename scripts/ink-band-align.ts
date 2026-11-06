@@ -224,8 +224,11 @@ export function alignLinesToBands(
       .map((l, i) => ({ l, i }))
       .filter(({ l }) => l.norm && (l.text ?? "").trim() && (l.norm[0] * pageW < mid) === (col === 0));
     if (!idx.length) continue;
-    const colX0 = Math.min(...idx.map(({ l }) => l.norm![0] * pageW));
-    const colX1 = Math.max(...idx.map(({ l }) => l.norm![2] * pageW));
+    // 栏界 = 页中线（与洞匹配的「列一致」判据同源）——
+    // ⚠️ 不用行框 min/max x 聚类：跨栏离群框（p150 实测）会把栏区间撑到全页宽，
+    // 左右栏墨迹在同 y 交错 ⇒ 投影无白缝 ⇒ 切出 109pt 巨带，整片行配带全错
+    const colX0 = col === 0 ? 0 : mid;
+    const colX1 = col === 0 ? mid : pageW;
     const bands = bandsForColumn(img, pageW, pageH, colX0, colX1);
     // ⚠️ 行序必须按 y0 排（DP 单调对齐的输入序），不是 V3 缓存序
     idx.sort((a, b) => a.l.norm![1] - b.l.norm![1]);
