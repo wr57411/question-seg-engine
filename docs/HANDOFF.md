@@ -34,7 +34,7 @@
 | 项 | 实况（2026-11-06 08:10 提交后实测） |
 |---|---|
 | 分支 / HEAD | `main` @ `0cf5ed6`（本轮 B-28 批次 3 + B-35 **已提交**，22 文件 / +1518 −32） |
-| 与远端 | **领先 `origin/main` 76 个提交，未 push**（`git rev-list --left-right --count` = `0 76`）；**push 需用户发话** |
+| 与远端 | **领先 `origin/main` 77 个提交，未 push**（写就时实测；**以 `git rev-list --left-right --count origin/main...HEAD` 为准**，这个数字每次提交都会变）；**push 需用户发话** |
 | 工作区 | 干净（`git status --short` 为空） |
 | 质量门 | `npm run check` **585/585** 全绿；凭证 `tmp/.check-stamp`（由 check 自动写，**别手改**） |
 | 其它工作树 | `feature/oxr` @ `e1bcef2`、`merge-int` @ `123622b`（detached），均未合并 |
