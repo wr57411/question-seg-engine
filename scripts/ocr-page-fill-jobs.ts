@@ -359,8 +359,15 @@ async function main(): Promise<void> {
   const EXPERIMENTAL_ALIGN = process.argv.includes("--experimental-align"); // 2026-11-07 实验路径（默认关）
   const OUT_DIR = join("data", "out", DOC);
   const PDF = join(OUT_DIR, "origin.pdf");
-  const CACHE_DIR = join(OUT_DIR, "ocr-jobs-cache");
-  const OUT_JSON = join(OUT_DIR, "ocr-page-fill-jobs.json");
+  // --cache：行框缓存目录名（默认 "ocr-jobs-cache" = 云端 V3，行为不变；
+  // "ocr-jobs-cache-localv3" = 本地 4070 PP-StructureV3 对照，产物落 `ocr-page-fill-jobs.<tag>.json`）
+  const cacheArgIdx = process.argv.indexOf("--cache");
+  const CACHE_TAG = cacheArgIdx >= 0 && process.argv[cacheArgIdx + 1] ? process.argv[cacheArgIdx + 1]! : "ocr-jobs-cache";
+  const CACHE_DIR = join(OUT_DIR, CACHE_TAG);
+  const OUT_JSON =
+    CACHE_TAG === "ocr-jobs-cache"
+      ? join(OUT_DIR, "ocr-page-fill-jobs.json")
+      : join(OUT_DIR, `ocr-page-fill-jobs.${CACHE_TAG}.json`);
   if (!existsSync(PDF)) {
     console.error(`缺少 ${PDF}（先 npm run stages:export）`);
     process.exit(2);

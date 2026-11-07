@@ -147,8 +147,10 @@ function main(): void {
     console.error(`--doc 只接受目录名（不含路径分隔符）：${doc}`);
     process.exit(1);
   }
+  // --cache：行框缓存目录名（默认 "ocr-jobs-cache" = 云端 V3，行为不变；
+  // "ocr-jobs-cache-localv3" = 本地 4070 PP-StructureV3 同判据对照）
   const dir = join(ROOT, "data/out", doc);
-  const cacheDir = join(dir, "ocr-jobs-cache");
+  const cacheDir = join(dir, arg(argv, "--cache", "ocr-jobs-cache"));
   const stagesPath = join(dir, "stages.json");
 
   if (!existsSync(stagesPath)) {

@@ -39,6 +39,10 @@ const arg = (name: string): string | null => {
 
 const doc = arg("--doc") ?? "答案册-合订本";
 const pagesArg = arg("--pages");
+// --cache：行框缓存目录名（默认 "ocr-jobs-cache" = 云端 V3，行为与 2026-11-07 基线一致；
+// "ocr-jobs-cache-localv3" = 本地 4070 PP-StructureV3 同判据对照）
+const cacheArg = arg("--cache") ?? "ocr-jobs-cache";
+const outArg = arg("--out") ?? "line-align-baseline.json";
 const outDir = join(ROOT, "data", "out", doc);
 const stages = JSON.parse(readFileSync(join(outDir, "stages.json"), "utf8")) as {
   pages: { index: number; width: number; height: number }[];
@@ -58,7 +62,7 @@ function main(): void {
   const pages = pagesArg
     ? pagesArg.split(",").map(Number)
     : // 无 --pages 时自动取有 OCR 缓存的页
-      readdirSync(join(outDir, "ocr-jobs-cache"))
+      readdirSync(join(outDir, cacheArg))
         .map((f) => /^p(\d+)\.json$/.exec(f)?.[1])
         .filter((x): x is string => !!x)
         .map(Number);
@@ -70,7 +74,7 @@ function main(): void {
   for (const pno of pages) {
     const meta = stages.pages[pno];
     if (!meta) continue;
-    const cacheFile = join(outDir, "ocr-jobs-cache", `p${String(pno).padStart(2, "0")}.json`);
+    const cacheFile = join(outDir, cacheArg, `p${String(pno).padStart(2, "0")}.json`);
     let lines: V3Line[] = [];
     try {
       lines = (JSON.parse(readFileSync(cacheFile, "utf8")).lines ?? []).filter((l: any) => l.norm && (l.text ?? "").trim());
@@ -148,8 +152,8 @@ function main(): void {
     alignRate8pt: +(((a2 + a5 + a8) / Math.max(1, total)) * 100).toFixed(1),
   };
   console.log(JSON.stringify(summary, null, 1));
-  writeFileSync(join(outDir, "line-align-baseline.json"), JSON.stringify({ summary, recs }, null, 1));
-  console.log(`→ data/out/${doc}/line-align-baseline.json`);
+  writeFileSync(join(outDir, outArg), JSON.stringify({ summary, recs }, null, 1));
+  console.log(`→ data/out/${doc}/${outArg}`);
 }
 
 main();
