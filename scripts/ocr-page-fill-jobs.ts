@@ -41,7 +41,7 @@ import { join } from "node:path";
 import { emWidthOf } from "../stages/font-metrics.js";
 import { medianLineHeightPt } from "./ocr-lib.js";
 import { overlapArea, parseDocParsingJsonl, runJob, type Box, type PaddleLine } from "./paddle-client.js";
-import { inkLineAround, renderGrayPage } from "./audit-hole-geometry.js";
+import { inkExtent, inkLineAround, renderGrayPage } from "./audit-hole-geometry.js";
 import { alignLinesToBands } from "./ink-band-align.js";
 
 /** 公式区域（`formula_res_list[]` 归一化形态，见 `PaddlePage.formulas`；解析层未取 formula score）。 */
@@ -206,10 +206,21 @@ export interface Judgement {
  * + **重复防护**（§110 第四轮，2026-11-07）：候选与该页 MinerU 已有块文本高度重合
  *   ⇒ 它不是「上游漏识别」而是「把已有字重复配进洞」，拒（p91 h0 实测错配即此形态）。
  */
-export function judgeHole(holeW: number, fontPt: number, text: string, cropText: string, pageText?: string): Judgement {
-  const expected = fontPt > 0 ? holeW / fontPt : 0;
+export function judgeHole(
+  holeW: number,
+  fontPt: number,
+  text: string,
+  cropText: string,
+  pageText?: string,
+  inkW?: number,
+): Judgement {
+  // 宽度比分母（§110 第九轮语义级最小闭环）：优先用**洞内墨迹宽**（原卷灰度实测）——
+  // 洞 bbox 是外接矩形，字间空白会稀释判别力（p91 h0 实测：错配解析行按 bbox 宽 ratio 0.51
+  // 合格混过，按墨迹宽 0.36 < 0.45 被拒；正确标签行 0.71 不受影响）
+  const baseW = inkW && inkW > 0 ? inkW : holeW;
+  const expected = fontPt > 0 ? baseW / fontPt : 0;
   const emW = emWidthOf(text);
-  const ratio = emW > 0 && fontPt > 0 ? holeW / (emW * fontPt) : 0;
+  const ratio = emW > 0 && fontPt > 0 ? baseW / (emW * fontPt) : 0;
   const balanced = (text.match(/\$/g) ?? []).length % 2 === 0;
   const agree = !cropText || dice(cropText, text) >= DICE_MIN;
   // 重复防护：候选的 4-gram 有多少已被页面 MinerU 文本包含（hardNorm 口径，剥 LaTeX 记号）
@@ -525,6 +536,10 @@ async function main(): Promise<void> {
     const items: OcrFillItem[] = [];
     let acc = 0;
     holes.forEach((bb, i) => {
+      // 洞内墨迹宽（§110 第九轮语义级最小闭环）：ratio/期望字数的分母优先用它——
+      // 洞 bbox 的外接空白稀释判别力（错配行按 bbox 宽合格混过、按墨迹宽被拒）
+      const inkE = inkExtent(gray, p.width, p.height, bb);
+      const inkW = inkE.bbox && inkE.inkPx > 0 ? inkE.bbox[2] - inkE.bbox[0] : undefined;
       const win: Box = [
         Math.max(0, bb[0] - PAD_X),
         Math.max(0, bb[1] - PAD_Y),
@@ -543,7 +558,7 @@ async function main(): Promise<void> {
       if (ls.length) {
         let effLines = ls;
         let text = ls.map((l) => l.text.trim()).filter(Boolean).join(" ");
-        let j = judgeHole(bb[2] - bb[0], fontPt, text, cropByBbox.get(bb.map((v) => Math.round(v)).join(",")) ?? "");
+        let j = judgeHole(bb[2] - bb[0], fontPt, text, cropByBbox.get(bb.map((v) => Math.round(v)).join(",")) ?? "", undefined, inkW);
         // 碎片过滤重试（§110 第五轮）：组内混入「LaTeX 命令行且无汉字」的碎片
         // （p91 h2 实测「(3)|g，方向竖直向下|{1-{\frac…」，碎片把宽度比拉到 0.05 越界）
         // ⇒ 滤掉后重判；全 LaTeX 公式组（p91 h4「解得|\boldsymbol{…」）滤后仍拒 ⇒ 结果不变，无伤害。
@@ -587,7 +602,7 @@ async function main(): Promise<void> {
           `  p${pno} 洞 ${JSON.stringify(bb.map((v) => Math.round(v)))} 期望${jf.expected.toFixed(1)}字 公式 ${jf.ok ? "✓" : "✗"} ${JSON.stringify(text.slice(0, 44))}${jf.ok ? "" : ` ← ${reason}`}`,
         );
       } else {
-        const j = judgeHole(bb[2] - bb[0], fontPt, "", "");
+        const j = judgeHole(bb[2] - bb[0], fontPt, "", "", undefined, inkW);
         reason = conflicts[i] ?? j.reason;
         console.log(
           `  p${pno} 洞 ${JSON.stringify(bb.map((v) => Math.round(v)))} 期望${j.expected.toFixed(1)}字 比=0.00 score=- ✗ "" ← ${reason}`,
