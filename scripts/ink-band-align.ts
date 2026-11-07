@@ -21,6 +21,9 @@ type Box = [number, number, number, number];
 /** 配带基础分（§110 第六轮 DP 变体）：「配上」动作的固定收益，使序列唯一但零重叠的行入局。 */
 export const ALIGN_BASE_BONUS = 0.1;
 
+/** 带归属行数上限（§110 第七轮去噪）：超过按 DP score 截断，其余降级 noBand——巨组是垃圾拼接源头。 */
+export const MAX_BAND_LINES = 3;
+
 export interface InkBand {
   y0: number;
   y1: number;
@@ -322,8 +325,29 @@ export function alignLinesToBands(
     const mono = alignMono(
       boxes,
       bands,
-      (ri, j) => (sameGroup(j, anchorIdx[ri]!) ? 0.5 : 0) + (bands[j]!.isHole ? 0.5 : 0),
+      (ri, j) =>
+        (sameGroup(j, anchorIdx[ri]!) ? 0.5 : 0) +
+        // 洞带 bonus 只给有几何重叠的行（§110 第七轮去噪）：零重叠行配洞带没有证据，
+        // 只拿基础分——否则洞带吸引巨组（p159 h0 一洞 12 条实测）
+        (bands[j]!.isHole && bandScore(boxes[ri]!, bands[j]!) > 0 ? 0.5 : 0),
     );
+    // ── 组级行数上限（§110 第七轮去噪）：一条带的归属行 >MAX 时按 DP score 截断，
+    //    其余降级 noBand（norm=null，不进洞匹配）——巨组的零重叠基础分行是垃圾拼接的源头
+    const bandRows = new Map<number, { row: number; score: number }[]>();
+    mono.forEach((m, i) => {
+      if (m.bandIdx < 0) return;
+      const arr = bandRows.get(m.bandIdx) ?? [];
+      arr.push({ row: i, score: m.score });
+      bandRows.set(m.bandIdx, arr);
+    });
+    for (const [bi, rows] of bandRows) {
+      if (rows.length <= MAX_BAND_LINES) continue;
+      rows.sort((a, b) => b.score - a.score);
+      for (const r of rows.slice(MAX_BAND_LINES)) {
+        mono[r.row]!.bandIdx = -1;
+        out[idx[r.row]!.i]!.norm = null;
+      }
+    }
     const bandHits = new Map<InkBand, number>();
     idx.forEach(({ l, i }, k) => {
       stats.total++;
