@@ -142,3 +142,25 @@
 - 公式块横向溢出（按裁定豁免夹子）仍最大 +30px，靠视觉审板兜。
 - 画布边界裁切（已登记未闭合风险）；180 块 `rh∈[1.05,1.4)` 轻微偏高（按裁定不压）。
 - 扩数据面（换不同版面真卷）—— 多处阈值带「本卷标定」性质，换卷需重标定。
+
+## 2026-11-07（PP-StructureV3 on 局域网笔记本——GPU 资源接入）
+
+主线：SSH 连接局域网笔记本（192.168.2.35），用其显卡在本地跑 **PP-StructureV3**（PaddleOCR 3.x 文档解析 pipeline），为「换解析源」路线提供**字框级定位**的识别对照。用户已授权自主决策，只在必须用户出手的点（如凭据）才上报。
+
+- [x] 诊断目标机在线（ARP `1c:83:41:d0:59:f0` + ICMP 通 ~1.5ms；SMB 445 开放 → 判定 Windows）
+- [x] 确认仓库无 PPStructure 认知记录（`grep -rni ppstructure` + `git log --all --grep` 均零命中）；模型侧知识（版面分区+表格/公式/印章+文本，输出含行框/字符框坐标）待跑通后补 docs
+- [x] OpenSSH Server 已装好（内网下载站离线 zip 方案，22 端口 07:46 开放；install-ssh.ps1 的 callback 自动回报用户名 wangw）
+- [x] SSH 打通：脚本预置公钥免密生效；`~/.ssh/config` 已加 `laptop` 别名（wangw@192.168.2.35，主机 john57411，Win11 build 26300）
+- [x] GPU 预检：**RTX 4070 Laptop 8GB**（算力 8.9 Ada），驱动 528.23（CUDA 12.0 顶）→ 选 paddle **cu118** 轮子；外网通（百度 200 OK），C 盘余 229GB；无 Python → 已静默装 **Python 3.12.10**（C:\Users\wangw\py312）
+- [x] 部署完成：venv `C:\Users\wangw\ppenv` = paddlepaddle-gpu **3.3.1**（cu118，`run_check` GPU 通过）+ paddleocr **3.7.0** + paddlex **3.7.2**（须补 `paddlex[ocr]` 扩展组，否则 PP-StructureV3 建管线的 DependencyError）；镜像用**阿里云**（TUNA 对该机代理出口 403）
+- [x] 首次解析跑通（`probe45-045.png`，双栏物理答案页）：**145 行框**（`rec_polys`）+ 71 版面框（text/formula/number/paragraph_title/footer）+ 23 语义块（block_content 含行内 LaTeX，公式识别工作正常）+ 阅读顺序；可视化双栏行框全命中。产物：笔记本 `C:\Users\wangw\ppseg\out45\`，本地副本 `/tmp/ppstruct-results/`
+- [x] 字符级探针（test_wordbox.py）：`predict(return_word_box=True)` 被接受但输出**无 word_box/char_box 键**——结构流水线下字符级框不直接输出；行框级已够引擎块/行粒度对接，字符级可由「行框+文本+字宽」推导或走单行识别模式（待决策）
+- [x] 结果回填 docs：BACKLOG 新增 **L-10**（`DONE`：环境+首验，未接入引擎）＋ ROADMAP **P3** 增补观察项（行级框保留 ✓ / 字符级框不直接出 / 接入口径未定）；**DECISIONS 暂不追加**——尚无口径决策可记，留待「接入口径」（换解析源对照 vs 墨迹复核旁路）立项时再追加新 §
+
+### 2026-11-07 插曲与恢复计划
+- **笔记本会睡眠**：用户不在旁 → 闲置/合盖睡眠（~07:52）导致 SSH 断 + ping 不通；WoL 魔术包已发
+  （广播 192.168.2.255:9/7，MAC 1c:83:41:d0:59:f0；现代待机可能有效）。
+- **恢复后第一件事**：试 `powercfg /change standby-timeout-ac 0` + `standby-timeout-dc 0`
+  （非提权改当前电源计划；若拒绝则改用「短平快」策略：每次唤醒先干活，避免长空转）。
+- **部署状态**：venv + paddle-gpu 安装被睡眠打断（ssh exit 255，日志空）；恢复后重跑
+  （venv 已建则跳过，pip 有本地缓存断点续传）。run_ppstruct.py 已写好未上传（scp 255 同因）。
