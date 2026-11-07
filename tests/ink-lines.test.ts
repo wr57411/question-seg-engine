@@ -68,6 +68,7 @@ test("splitTextAmongHoles：snap:true 时才吸到标点边界（默认 false，
   // `ae8199a` 收口时显式改默认为 `{ snap: false }` —— 默认不吸附是收口语义。
   // 因此两个断言都**显式传参**，锁「吸附开/关」两种行为本身，不锁默认值；
   // 默认值语义（生产是否吸附）归支线定案，改默认值时这两个断言都应保持成立。
+  // （2026-11-07 合并注记：主分支 a739daf 与支线 640cb3f 各自改成显式传参，此处取支线超集版本。）
   const snapped = splitTextAmongHoles(text, [{ holeKey: "h1", width: 2 }, { holeKey: "h2", width: 1 }], { snap: true });
   assert.equal(snapped.map((p) => p.text).join(""), text); // 不重不漏
   assert.equal(snapped[0]!.text, "甲乙丙丁，"); // 吸到逗号之后（切点 5）
