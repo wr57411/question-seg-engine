@@ -459,7 +459,13 @@ async function main(): Promise<void> {
     let holeLines: PaddleLine[][] = holes.map(() => []);
     let conflicts: (string | null)[] = holes.map(() => null);
     if (EXPERIMENTAL_ALIGN) {
-      const aligned = alignLinesToBands(lines, gray, p.width, p.height);
+      // 实验路径含三机制（§110 第六轮）：单行块锚 + 洞带候选 + 基础分/洞带 bonus——
+      // 实测配对层 14/14（几何层 100% 形态），但语义层代价实证（巨组/噪声拼接/accepted 8→4），
+      // 不进生产；语义质量需 B-27 文本级验证协同后再评估
+      const mineruBlocks = (p.blocks ?? [])
+        .filter((b: any) => b.text && !b.ocr)
+        .map((b: any) => ({ bbox: b.bbox as Box, text: String(b.text) }));
+      const aligned = alignLinesToBands(lines, gray, p.width, p.height, { mineruBlocks, holes });
       const ast = aligned.stats;
       console.log(
         `  p${pno} [实验]几何换源：配带 ${ast.paired}/${ast.total}（无带 ${ast.noBand} · 过载带 ${ast.bandOverload}）`,

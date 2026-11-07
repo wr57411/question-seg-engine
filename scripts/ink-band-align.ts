@@ -18,12 +18,17 @@ import type { GrayImage } from "./export-stages.js";
 
 type Box = [number, number, number, number];
 
+/** 配带基础分（§110 第六轮 DP 变体）：「配上」动作的固定收益，使序列唯一但零重叠的行入局。 */
+export const ALIGN_BASE_BONUS = 0.1;
+
 export interface InkBand {
   y0: number;
   y1: number;
   x0: number;
   x1: number;
   inkPx: number;
+  /** 洞带（uncovered content 洞作为 DP 候选）：配中 ⇒ 行几何=洞带，洞匹配必命中 */
+  isHole?: boolean;
 }
 
 export interface BandPairResult {
@@ -133,7 +138,9 @@ export function alignMono(
       // 转移 2：行 i 配带 j（来源 = 前 i-1 行最后带 ≤ j 的最优，含 j —— 多行同带）
       // ⚠️ 允许 bandScore=0（零重叠）的配对进入：p150 h0 实测「正确带与框零重叠」，
       // 序列位置（DP 单调上下文）是这类行唯一的配对证据；总分权衡下只在「配了更优」时选中
-      const s = Math.max(bandScore(sRow, bands[j]!), 0) + (bonus?.(i - 1, j) ?? 0);
+      // 配带基础分（§110 第六轮 DP 变体）：「配上」本身优于「跳过」——零重叠/序列唯一的行
+      // （洞带候选的正主）靠它入局；全局总分权衡下乱配仍会被更高分带压制
+      const s = Math.max(bandScore(sRow, bands[j]!), 0) + (bonus?.(i - 1, j) ?? 0) + ALIGN_BASE_BONUS;
       const srcJ = bestPrevJ >= 0 && bestPrev > dpPrev[j]! ? bestPrevJ : j;
       const base = Math.max(bestPrev, dpPrev[j]!);
       if (base > NEG) {
@@ -213,12 +220,50 @@ export function alignLinesToBands(
   img: GrayImage,
   pageW: number,
   pageH: number,
-  opts: { replaceY?: boolean } = {},
+  opts: { replaceY?: boolean; mineruBlocks?: { bbox: Box; text: string }[]; holes?: Box[] } = {},
 ): AlignedPage {
   const replaceY = opts.replaceY !== false;
   const mid = pageW / 2;
   const stats: AlignStats = { total: 0, paired: 0, noBand: 0, bandOverload: 0 };
   const out = lines.map((l) => ({ ...l }));
+  // ── 单行块锚（§110 第六轮 DP 变体）：V3 框集体偏移的行，用「文本包含匹配到的单行 MinerU 块」
+  //    的 bbox 替代行框——解「拆行错占带 → 单调锁死」（p91 h1 实测根因链）。
+  //    条件取严（AND）：行 hardNorm ≥4 字（短文本防误匹配）+ 块 hardNorm 包含行 hardNorm +
+  //    块高 ≤1.6×页面行高中位（单行块）+ 框与块 y 距离 >8pt（框没跑偏的不动）。
+  if (opts.mineruBlocks?.length) {
+    const hs = lines
+      .filter((l) => l.norm && (l.text ?? "").trim())
+      .map((l) => l.norm![3] * pageH - l.norm![1] * pageH)
+      .sort((a, b) => a - b);
+    const medH = hs.length ? hs[Math.floor(hs.length / 2)]! : 0;
+    const hard = (s: string): string => s.replace(/[\s$\\{}]/g, "");
+    const singleLineBlocks = opts.mineruBlocks.filter((b) => {
+      const bh = b.bbox[3] - b.bbox[1];
+      return bh > 0 && medH > 0 && bh <= 1.6 * medH && hard(b.text ?? "").length >= 4;
+    });
+    for (const l of out) {
+      if (!l.norm) continue;
+      const lt = hard(l.text ?? "");
+      if (lt.length < 4) continue;
+      const ly0 = l.norm[1] * pageH;
+      const ly1 = l.norm[3] * pageH;
+      let best: { bbox: Box; dist: number } | null = null;
+      for (const b of singleLineBlocks) {
+        if (!hard(b.text ?? "").includes(lt)) continue;
+        const dist = Math.max(0, b.bbox[1] - ly1, ly0 - b.bbox[3]);
+        if (dist <= 8) continue; // 框没跑偏，不动
+        if (!best || dist < best.dist) best = { bbox: b.bbox, dist };
+      }
+      if (best) {
+        l.norm = [
+          best.bbox[0] / pageW,
+          best.bbox[1] / pageH,
+          best.bbox[2] / pageW,
+          best.bbox[3] / pageH,
+        ];
+      }
+    }
+  }
   for (const col of [0, 1]) {
     const idx = out
       .map((l, i) => ({ l, i }))
@@ -230,6 +275,15 @@ export function alignLinesToBands(
     const colX0 = col === 0 ? 0 : mid;
     const colX1 = col === 0 ? mid : pageW;
     const bands = bandsForColumn(img, pageW, pageH, colX0, colX1);
+    // ── 洞带候选（§110 第六轮 DP 变体）：uncovered content 洞是「应有行」的真值信号——
+    //    框集体偏移的行与正确带零重叠，但洞带在 DP 序列上位置唯一（p91 h1 实测根因链）。
+    if (opts.holes?.length) {
+      for (const h of opts.holes) {
+        if ((h[0] < mid) !== (col === 0)) continue;
+        bands.push({ y0: h[1], y1: h[3], x0: h[0], x1: h[2], inkPx: 0, isHole: true });
+      }
+      bands.sort((a, b) => a.y0 - b.y0);
+    }
     // ⚠️ 行序必须按 y0 排（DP 单调对齐的输入序），不是 V3 缓存序
     idx.sort((a, b) => a.l.norm![1] - b.l.norm![1]);
     const boxes: Box[] = idx.map(({ l }) => [
@@ -265,7 +319,11 @@ export function alignLinesToBands(
       const ovH = Math.min(a.y1, c.y1) - Math.max(a.y0, c.y0);
       return ovH > 0.4 * (c.y1 - c.y0);
     };
-    const mono = alignMono(boxes, bands, (ri, j) => (sameGroup(j, anchorIdx[ri]!) ? 0.5 : 0));
+    const mono = alignMono(
+      boxes,
+      bands,
+      (ri, j) => (sameGroup(j, anchorIdx[ri]!) ? 0.5 : 0) + (bands[j]!.isHole ? 0.5 : 0),
+    );
     const bandHits = new Map<InkBand, number>();
     idx.forEach(({ l, i }, k) => {
       stats.total++;
