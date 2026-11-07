@@ -229,6 +229,8 @@ export function alignLinesToBands(
   const mid = pageW / 2;
   const stats: AlignStats = { total: 0, paired: 0, noBand: 0, bandOverload: 0 };
   const out = lines.map((l) => ({ ...l }));
+  /** 被单行块锚定的行（out 下标）——洞带组成员资格过滤用（§110 第十轮） */
+  const anchoredRows = new Set<number>();
   // ── 单行块锚（§110 第六轮 DP 变体）：V3 框集体偏移的行，用「文本包含匹配到的单行 MinerU 块」
   //    的 bbox 替代行框——解「拆行错占带 → 单调锁死」（p91 h1 实测根因链）。
   //    条件取严（AND）：行 hardNorm ≥4 字（短文本防误匹配）+ 块 hardNorm 包含行 hardNorm +
@@ -244,7 +246,7 @@ export function alignLinesToBands(
       const bh = b.bbox[3] - b.bbox[1];
       return bh > 0 && medH > 0 && bh <= 1.6 * medH && hard(b.text ?? "").length >= 4;
     });
-    for (const l of out) {
+    for (const [li, l] of out.entries()) {
       if (!l.norm) continue;
       const lt = hard(l.text ?? "");
       if (lt.length < 4) continue;
@@ -258,6 +260,7 @@ export function alignLinesToBands(
         if (!best || dist < best.dist) best = { bbox: b.bbox, dist };
       }
       if (best) {
+        anchoredRows.add(li);
         l.norm = [
           best.bbox[0] / pageW,
           best.bbox[1] / pageH,
@@ -344,6 +347,23 @@ export function alignLinesToBands(
       if (rows.length <= MAX_BAND_LINES) continue;
       rows.sort((a, b) => b.score - a.score);
       for (const r of rows.slice(MAX_BAND_LINES)) {
+        mono[r.row]!.bandIdx = -1;
+        out[idx[r.row]!.i]!.norm = null;
+      }
+    }
+    // ── 洞带组成员资格过滤（§110 第十轮 · B-27 最小可交付）：洞带组内存在「几何重叠
+    //    （bandScore>0）或块锚定」的行（A 类）时，纯基础分行（B 类）出局——
+    //    巨组的零重叠行是垃圾拼接源头（p159 h0 一洞 12 条实测）；全 B 类组全留
+    //    （p91 h1 形态：零重叠行是序列唯一正主，不能误伤）。
+    for (const [bi, rows] of bandRows) {
+      if (!bands[bi]?.isHole) continue;
+      const live = rows.filter((r) => mono[r.row]!.bandIdx >= 0);
+      if (live.length < 2) continue;
+      const isA = (r: { row: number }): boolean =>
+        bandScore(boxes[r.row]!, bands[bi]!) > 0 || anchoredRows.has(idx[r.row]!.i);
+      if (!live.some(isA)) continue;
+      for (const r of live) {
+        if (isA(r)) continue;
         mono[r.row]!.bandIdx = -1;
         out[idx[r.row]!.i]!.norm = null;
       }
