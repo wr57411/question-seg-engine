@@ -11,12 +11,17 @@
  * 只读、零 API、不进 check。
  * 用法：npx tsx scripts/audit-band-pair.ts [--doc 答案册-合订本]
  *   [--cache ocr-jobs-cache] [--pages 74,91,150,159] [--out band-pair.xxx.json]
+ *   [--diag] [--max-band-lines N] [--band-exempt]
+ *   --diag：noBand 降级原因细分（maxTrunc/holeFilter/dpSkip）+ 页面带形态统计（实验读数专用）；
+ *   --max-band-lines N：MAX_BAND_LINES 实验旋钮（默认 3 = 生产默认）。
+ *   --band-exempt：组内全重叠豁免实验旗标（opts.bandExemptFullyOverlapping），
+ *     over-capacity 组全成员真重叠且带高 ≤1.6×页面行高中位 → 整组免截断（实验读数专用）。
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderGrayPage } from "./audit-hole-geometry.js";
 import { holesOf } from "./ocr-page-fill-jobs.js";
-import { alignLinesToBands } from "./ink-band-align.js";
+import { alignLinesToBands, bandsForColumn, MAX_BAND_LINES } from "./ink-band-align.js";
 import type { Box } from "./paddle-client.js";
 
 const ROOT = process.cwd();
@@ -29,6 +34,18 @@ interface LineRow {
   overload: number;
   /** paired/total ×100，保留 1 位小数 */
   rate: number;
+  /** 实验分支（--diag）：noBand 三类降级原因计数（与 noBand 相加相等；Ov/Z = 截断行与带真重叠/零重叠细分） */
+  noBandCause?: { maxTrunc: number; holeFilter: number; dpSkip: number; maxTruncOverlap?: number; maxTruncZero?: number };
+  /** 实验分支（--diag --band-exempt）：被豁免免截断的组数/行数（豁免行进 paired，不在 noBandCause 里） */
+  exemptGroups?: number;
+  exemptRows?: number;
+  /** 实验分支（--diag）：左右栏切带形态（条数 / 最高带 pt / 高带 h>25pt 数 / 巨带 h>100pt 数） */
+  bandsL?: number;
+  bandsR?: number;
+  maxBandHL?: number;
+  maxBandHR?: number;
+  tallBands?: number;
+  giantBands?: number;
 }
 
 function main(): void {
@@ -41,6 +58,12 @@ function main(): void {
   const cacheArg = arg("--cache") ?? "ocr-jobs-cache";
   const pagesArg = arg("--pages");
   const outArg = arg("--out") ?? "band-pair.json";
+  // 实验分支旗标（默认关：不传时 opts 与输出结构同旧版逐字节一致）
+  const diag = argv.includes("--diag");
+  const mblArg = arg("--max-band-lines");
+  const maxBandLines = mblArg ? Number(mblArg) : undefined;
+  const bandExempt = argv.includes("--band-exempt");
+  const bandMask = argv.includes("--band-mask");
   const dir = join(ROOT, "data/out", doc);
 
   const stages = JSON.parse(readFileSync(join(dir, "stages.json"), "utf8")) as {
@@ -70,6 +93,9 @@ function main(): void {
   let noBand = 0;
   let overload = 0;
   let corrupt = 0;
+  const byCause = { maxTrunc: 0, holeFilter: 0, dpSkip: 0, maxTruncOverlap: 0, maxTruncZero: 0 };
+  let exemptGroups = 0;
+  let exemptRows = 0;
 
   for (const pno of pages) {
     const page = stages.pages[pno];
@@ -107,16 +133,44 @@ function main(): void {
       .filter((b) => b.text && !b.ocr)
       .map((b) => ({ bbox: b.bbox as Box, text: String(b.text) }));
     const holes = holesOf(page);
-    const { stats } = alignLinesToBands(lines, gray, page.width, page.height, { mineruBlocks, holes });
-    const rate = stats.total > 0 ? +((stats.paired / stats.total) * 100).toFixed(1) : 0;
-    rows.push({
-      page: pno,
-      total: stats.total,
-      paired: stats.paired,
-      noBand: stats.noBand,
-      overload: stats.bandOverload,
-      rate,
+    const { stats } = alignLinesToBands(lines, gray, page.width, page.height, {
+      mineruBlocks,
+      holes,
+      ...(diag ? { diagNoBand: true } : {}),
+      ...(maxBandLines !== undefined ? { maxBandLines } : {}),
+      ...(bandExempt ? { bandExemptFullyOverlapping: true } : {}),
+      ...(bandMask ? { bandMaskFrameBars: true } : {}),
     });
+    const rate = stats.total > 0 ? +((stats.paired / stats.total) * 100).toFixed(1) : 0;
+    const row: LineRow = { page: pno, total: stats.total, paired: stats.paired, noBand: stats.noBand, overload: stats.bandOverload, rate };
+    if (diag && stats.noBandByCause) {
+      row.noBandCause = { ...stats.noBandByCause };
+      byCause.maxTrunc += stats.noBandByCause.maxTrunc;
+      byCause.holeFilter += stats.noBandByCause.holeFilter;
+      byCause.dpSkip += stats.noBandByCause.dpSkip;
+      byCause.maxTruncOverlap += stats.noBandByCause.maxTruncOverlap ?? 0;
+      byCause.maxTruncZero += stats.noBandByCause.maxTruncZero ?? 0;
+    }
+    if (stats.exemptRows !== undefined) {
+      row.exemptGroups = stats.exemptGroups;
+      row.exemptRows = stats.exemptRows;
+      exemptGroups += stats.exemptGroups!;
+      exemptRows += stats.exemptRows;
+    }
+    if (diag) {
+      const mid = page.width / 2;
+      const maskO = bandMask ? { bandMaskFrameBars: true } : {};
+      const bL = bandsForColumn(gray, page.width, page.height, 0, mid, maskO);
+      const bR = bandsForColumn(gray, page.width, page.height, mid, page.width, maskO);
+      const hts = [...bL, ...bR].map((b) => b.y1 - b.y0);
+      row.bandsL = bL.length;
+      row.bandsR = bR.length;
+      row.maxBandHL = bL.length ? Math.round(Math.max(...bL.map((b) => b.y1 - b.y0))) : 0;
+      row.maxBandHR = bR.length ? Math.round(Math.max(...bR.map((b) => b.y1 - b.y0))) : 0;
+      row.tallBands = hts.filter((h) => h > 25).length;
+      row.giantBands = hts.filter((h) => h > 100).length;
+    }
+    rows.push(row);
     total += stats.total;
     paired += stats.paired;
     noBand += stats.noBand;
@@ -134,6 +188,10 @@ function main(): void {
     noBand,
     bandOverload: overload,
     corruptFiles: corrupt,
+    ...(diag ? { noBandByCause: byCause, maxBandLines: maxBandLines ?? MAX_BAND_LINES } : {}),
+    ...(bandExempt ? { bandExempt: true } : {}),
+    ...(bandMask ? { bandMask: true } : {}),
+    ...(bandExempt && diag ? { exemptGroups, exemptRows } : {}),
   };
   console.log(JSON.stringify(summary, null, 1));
   writeFileSync(join(dir, outArg), JSON.stringify({ summary, rows }, null, 1));

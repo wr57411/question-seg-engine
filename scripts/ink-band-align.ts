@@ -13,6 +13,7 @@
  * >2 是异常信号），不做硬拦。
  */
 import { splitInkLines, DEFAULT_SPLIT } from "./ink-lines.js";
+import { maskFrameBars } from "./band-mask.js";
 import { inkLineAround } from "./audit-hole-geometry.js";
 import type { GrayImage } from "./export-stages.js";
 
@@ -21,8 +22,12 @@ type Box = [number, number, number, number];
 /** 配带基础分（§110 第六轮 DP 变体）：「配上」动作的固定收益，使序列唯一但零重叠的行入局。 */
 export const ALIGN_BASE_BONUS = 0.1;
 
-/** 带归属行数上限（§110 第七轮去噪）：超过按 DP score 截断，其余降级 noBand——巨组是垃圾拼接源头。 */
+/** 带归属行数容量（§110 第七轮去噪）：超过按 DP score 截断，其余降级 noBand——巨组是垃圾拼接源头。 */
 export const MAX_BAND_LINES = 3;
+
+/** 组内全重叠豁免的带高守卫系数（实验分支 opts.bandExemptFullyOverlapping）：
+ *  带高 ≤1.6×页面行高中位才算「同视觉行/碎片行」合法形态——与单行块锚（§110）同系数口径。 */
+export const BAND_EXEMPT_H_FACTOR = 1.6;
 
 export interface InkBand {
   y0: number;
@@ -190,6 +195,23 @@ export interface AlignStats {
   noBand: number;
   /** 一条墨迹带被 >2 条行框认领的异常带数 */
   bandOverload: number;
+  /** 实验分支（opts.diagNoBand=true 才产出）：noBand 按降级原因细分，生产默认路径不产出此字段 */
+  noBandByCause?: {
+    /** MAX_BAND_LINES 组容量截断降级（§110 第七轮去噪） */
+    maxTrunc: number;
+    /** 截断行里与带真重叠（bandScore>0）——同视觉行多 cell 的合法形态被容量误伤 */
+    maxTruncOverlap?: number;
+    /** 截断行里与带零重叠（bandScore=0）——§110 担心的「垃圾拼接源头」 */
+    maxTruncZero?: number;
+    /** 洞带组成员资格过滤降级（§110 第十轮） */
+    holeFilter: number;
+    /** DP 未配上：真无墨区 / 偏移过大 / 序列权衡牺牲 */
+    dpSkip: number;
+  };
+  /** 实验分支（diagNoBand + bandExemptFullyOverlapping 双开才产出）：被豁免免截断的组数/行数——
+   *  豁免 = over-capacity 组整组保留，这些行进 paired，不进 noBandByCause。 */
+  exemptGroups?: number;
+  exemptRows?: number;
 }
 
 export interface AlignedPage {
@@ -205,8 +227,11 @@ export function bandsForColumn(
   pageH: number,
   colX0: number,
   colX1: number,
+  opts: { bandMaskFrameBars?: boolean } = {},
 ): InkBand[] {
-  const raw = splitInkLines(img, pageW, pageH, [colX0, 0, colX1, pageH], { ...DEFAULT_SPLIT, minInkPx: 6, minGapPx: 8 });
+  // ── 遮框（实验分支 opts.bandMaskFrameBars）：边缘竖条列置白后再投影切带（旗标关=原 img 直传）
+  const eff = opts.bandMaskFrameBars === true ? maskFrameBars(img, pageW) : img;
+  const raw = splitInkLines(eff, pageW, pageH, [colX0, 0, colX1, pageH], { ...DEFAULT_SPLIT, minInkPx: 6, minGapPx: 8 });
   const sy = img.height / pageH;
   return raw
     .filter((r) => (r.py1 - r.py0 + 1) / sy >= 3) // 碎带（<3pt 高）不参与配对
@@ -223,11 +248,46 @@ export function alignLinesToBands(
   img: GrayImage,
   pageW: number,
   pageH: number,
-  opts: { replaceY?: boolean; mineruBlocks?: { bbox: Box; text: string }[]; holes?: Box[] } = {},
+  opts: {
+    replaceY?: boolean;
+    mineruBlocks?: { bbox: Box; text: string }[];
+    holes?: Box[];
+    /** 实验分支（audit-band-pair --diag）：noBand 降级原因记账旗标——只加记账，不改任何判定 */
+    diagNoBand?: boolean;
+    /** 实验分支（audit-band-pair --max-band-lines）：MAX_BAND_LINES 实验旋钮，默认 = 生产默认 3 */
+    maxBandLines?: number;
+    /** 实验分支（audit-band-pair --band-exempt）：组内全重叠豁免——over-capacity 组先判组：
+     *  组内每个成员与该带真重叠（bandScore>0）且带高 ≤1.6×页面行高中位 → 整组免截断；
+     *  任一成员零重叠或带过高（多行连墨巨带）→ 维持 top-3 截断（零重叠「不猜」底线不动）。
+     *  默认关闭 = 生产路径逐字节不变。 */
+    bandExemptFullyOverlapping?: boolean;
+    /** 实验分支（audit-band-pair --band-mask）：切带投影前遮蔽页边缘竖条列（x<15pt ∪ x>页宽−15pt
+     *  且列墨>50% 窗高，scripts/band-mask.ts）。默认关闭=原 img 直传。 */
+    bandMaskFrameBars?: boolean;
+  } = {},
 ): AlignedPage {
   const replaceY = opts.replaceY !== false;
   const mid = pageW / 2;
+  // ── 实验分支记账：只加 diag 常量与旋钮回退，生产默认路径所有判定/输出逐字节不变
+  const diag = opts.diagNoBand === true;
+  const maxBandLines = opts.maxBandLines ?? MAX_BAND_LINES;
+  const exemptOn = opts.bandExemptFullyOverlapping === true;
+  // 页面行高中位数（豁免带高守卫用）：口径与单行块锚（§110）一致——有效行（norm 非空且
+  // 文本非空白）框高 ×pageH，排序取中位。旗标关时不计算（生产路径零额外工作）；
+  // medH=0（页面无有效行）时守卫 `bandH ≤ 1.6×medH` 永不通过 → 豁免不触发（保守）。
+  let medHPage = 0;
+  if (exemptOn) {
+    const hs = lines
+      .filter((l) => l.norm && (l.text ?? "").trim())
+      .map((l) => l.norm![3] * pageH - l.norm![1] * pageH)
+      .sort((a, b) => a - b);
+    medHPage = hs.length ? hs[Math.floor(hs.length / 2)]! : 0;
+  }
   const stats: AlignStats = { total: 0, paired: 0, noBand: 0, bandOverload: 0 };
+  if (diag) stats.noBandByCause = { maxTrunc: 0, holeFilter: 0, dpSkip: 0 };
+  if (diag && exemptOn) { stats.exemptGroups = 0; stats.exemptRows = 0; }
+  /** noBand 降级原因记账（全局行下标 → 降级机制）；diag 旗标下才填充 */
+  const noBandCause = diag ? new Map<number, "maxTruncOv" | "maxTruncZ" | "holeFilter">() : null;
   const out = lines.map((l) => ({ ...l }));
   /** 被单行块锚定的行（out 下标）——洞带组成员资格过滤用（§110 第十轮） */
   const anchoredRows = new Set<number>();
@@ -280,7 +340,7 @@ export function alignLinesToBands(
     // 左右栏墨迹在同 y 交错 ⇒ 投影无白缝 ⇒ 切出 109pt 巨带，整片行配带全错
     const colX0 = col === 0 ? 0 : mid;
     const colX1 = col === 0 ? mid : pageW;
-    const bands = bandsForColumn(img, pageW, pageH, colX0, colX1);
+    const bands = bandsForColumn(img, pageW, pageH, colX0, colX1, opts.bandMaskFrameBars ? { bandMaskFrameBars: true } : {});
     // ── 洞带候选（§110 第六轮 DP 变体）：uncovered content 洞是「应有行」的真值信号——
     //    框集体偏移的行与正确带零重叠，但洞带在 DP 序列上位置唯一（p91 h1 实测根因链）。
     if (opts.holes?.length) {
@@ -344,14 +404,33 @@ export function alignLinesToBands(
       bandRows.set(m.bandIdx, arr);
     });
     for (const [bi, rows] of bandRows) {
-      if (rows.length <= MAX_BAND_LINES) continue;
+      if (rows.length <= maxBandLines) continue;
+      // ── 组内全重叠豁免（实验分支 opts.bandExemptFullyOverlapping）：截断循环先判组——
+      //    组内每个成员与该带真重叠（bandScore>0）且带高 ≤1.6×页面行高中位（BAND_EXEMPT_H_FACTOR，
+      //    同视觉行/碎片行的合法形态）→ 整组免截断；任一成员零重叠（bandScore≤0）或带过高
+      //    （多行连墨巨带：网格页全页带/公式块巨带）→ 维持 top-3 截断——保住零重叠行的
+      //    「不猜」底线（diag-mbl3q 实测全册仅 12 条零重叠截断行）。
+      if (exemptOn) {
+        const band = bands[bi]!;
+        const bandH = band.y1 - band.y0;
+        const allOv = rows.every((r) => bandScore(boxes[r.row]!, band) > 0);
+        if (allOv && bandH <= BAND_EXEMPT_H_FACTOR * medHPage) {
+          if (stats.exemptRows !== undefined) {
+            stats.exemptGroups = (stats.exemptGroups ?? 0) + 1;
+            stats.exemptRows = stats.exemptRows + rows.length;
+          }
+          continue;
+        }
+      }
       rows.sort((a, b) => b.score - a.score);
-      for (const r of rows.slice(MAX_BAND_LINES)) {
+      for (const r of rows.slice(maxBandLines)) {
         mono[r.row]!.bandIdx = -1;
         out[idx[r.row]!.i]!.norm = null;
+        if (noBandCause) noBandCause.set(idx[r.row]!.i, bandScore(boxes[r.row]!, bands[bi]!) > 0 ? "maxTruncOv" : "maxTruncZ");
       }
     }
     // ── 洞带组成员资格过滤（§110 第十轮 · B-27 最小可交付）：洞带组内存在「几何重叠
+
     //    （bandScore>0）或块锚定」的行（A 类）时，纯基础分行（B 类）出局——
     //    巨组的零重叠行是垃圾拼接源头（p159 h0 一洞 12 条实测）；全 B 类组全留
     //    （p91 h1 形态：零重叠行是序列唯一正主，不能误伤）。
@@ -366,6 +445,7 @@ export function alignLinesToBands(
         if (isA(r)) continue;
         mono[r.row]!.bandIdx = -1;
         out[idx[r.row]!.i]!.norm = null;
+        if (noBandCause) noBandCause.set(idx[r.row]!.i, "holeFilter");
       }
     }
     const bandHits = new Map<InkBand, number>();
@@ -374,6 +454,12 @@ export function alignLinesToBands(
       const m2 = mono[k]!;
       if (m2.bandIdx < 0) {
         stats.noBand++;
+        if (stats.noBandByCause) {
+          const cause = noBandCause?.get(i) ?? "dpSkip";
+          if (cause === "maxTruncOv") { stats.noBandByCause.maxTrunc++; stats.noBandByCause.maxTruncOverlap = (stats.noBandByCause.maxTruncOverlap ?? 0) + 1; }
+          else if (cause === "maxTruncZ") { stats.noBandByCause.maxTrunc = stats.noBandByCause.maxTrunc + 1; stats.noBandByCause.maxTruncZero = (stats.noBandByCause.maxTruncZero ?? 0) + 1; }
+          else { stats.noBandByCause[cause]++; }
+        }
         return;
       }
       stats.paired++;
