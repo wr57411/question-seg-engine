@@ -294,3 +294,12 @@
 - [ ] jev 盲评待启用：插件为 TYPESAFE 判定工具集（非 MiniCPM 模型），需配 `TYPESAFE_API_KEY` 或
       `OPENROUTER_API_KEY`；当前可用形态 = jev_compare 分歧检测路由器；MiniCPM 第四方读者待接
 - [ ] 生产化拍板项不变：hole-crop-rec 立项 / B-37 / 图N-方法技巧口径（L8）+ 新增裁窗自适应 padding
+
+### 2026-11-09 jev 盲评接通（MiniCPM-OCR-Jev，modelbest 官方决策 API）
+- [x] 接口打通：`POST api.modelbest.cn/v1/chat/completions`，model=`MiniCPM-OCR-Jev`，
+      mode=score_best_batch（key=用户 .zshrc MiniCPM_API_KEY；**限流按候选数 64/次** → 42 洞拆 2 批）
+- [x] 42 洞盲评完成（9905 tokens）：**金标对照 1/1 一致 ✓**（p100_h3：jev 选 OXR 0.92 vs rec 0.01，
+      与用户"rec 切字漏 ½"判决完全一致）；产物 `hole-read/jev-best-batch.json`
+- [x] 附带发现：prob_yes = 与"读者一致性"无关的独立质量信号——低分洞（p091_h1/p051/p111/p102 等）
+      = "一致但读得烂"，是未来"一致也升级人工"的自动信号 ⇒ 递减人工闭环最后一块拼图
+- [ ] jev 接入生产化的两个决策：① 低分阈值定多少（如 prob_yes<0.3 升级人工）② MiniCPM 计费口径确认
