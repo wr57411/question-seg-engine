@@ -69,18 +69,27 @@ function main(): void {
   let paired = 0;
   let noBand = 0;
   let overload = 0;
+  let corrupt = 0;
 
   for (const pno of pages) {
     const page = stages.pages[pno];
     if (!page) continue;
-    const cachePath = join(dir, cacheArg, `p${pno}.json`);
+    const cachePath = join(dir, cacheArg, `p${String(pno).padStart(2, "0")}.json`);
     if (!existsSync(cachePath)) {
       console.error(`缺缓存 p${pno}.json，跳过`);
       continue;
     }
-    const raw = JSON.parse(readFileSync(cachePath, "utf8")) as {
-      lines?: { text?: unknown; score?: unknown; bbox?: unknown; norm?: unknown }[];
-    };
+    let raw: { lines?: { text?: unknown; score?: unknown; bbox?: unknown; norm?: unknown }[] };
+    try {
+      raw = JSON.parse(readFileSync(cachePath, "utf8")) as {
+        lines?: { text?: unknown; score?: unknown; bbox?: unknown; norm?: unknown }[];
+      };
+    } catch {
+      console.error(`坏 JSON（截断/损坏）：${cachePath}，计为 corrupt 行`);
+      rows.push({ page: pno, total: 0, paired: 0, noBand: 0, overload: 0, rate: -1 });
+      corrupt += 1;
+      continue;
+    }
     const lines = (raw.lines ?? [])
       .filter((l) => !!l.norm && !!String(l.text ?? "").trim())
       .map((l) => ({
@@ -124,6 +133,7 @@ function main(): void {
     rate,
     noBand,
     bandOverload: overload,
+    corruptFiles: corrupt,
   };
   console.log(JSON.stringify(summary, null, 1));
   writeFileSync(join(dir, outArg), JSON.stringify({ summary, rows }, null, 1));
