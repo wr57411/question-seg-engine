@@ -1,7 +1,8 @@
 // scripts/hole-read-export.ts
 /**
  * 轮 6「直接读洞」实验：洞条导出器。holesOf 取框（与生产同源），pdftoppm 150dpi 裁洞条：
- * x=洞 bbox 外扩 6pt，y=洞上下各扩 0.6×页面行高中位（medianLineHeightPt，与 fontPt 同源）。
+ * x=洞 bbox 外扩 6pt，y=洞上下各扩 padY：洞框高 ≥0.8×medH（疑似高字形/分数洞）取 1.1×medH，否则 0.6×medH
+ *   （自适应 padding，2026-11-09 p100_h3 ½ 切顶漏读教训）。
  * 输出 holes.json（bbox/medH/inkW/crop），供笔记本 PP-OCRv5_server_rec 逐洞识别。
  * 用法：npx tsx scripts/hole-read-export.ts --pages 74,91,150,159 [--out holes14.json]
  *       npx tsx scripts/hole-read-export.ts --sample 30 [--seed 20261108] [--out holes30.json]
@@ -29,7 +30,7 @@ const arg = (k: string): string | null => {
   return i >= 0 ? (argv[i + 1] ?? null) : null;
 };
 const pagesArg = arg("pages");
-const outArg = arg("out") ?? (pagesArg ? "holes14.json" : "holes30.json");
+const outArg = arg("out") ?? (allFlag ? "holes-all.json" : pagesArg ? "holes14.json" : "holes30.json");
 mkdirSync(join(OUT, "crops"), { recursive: true });
 const stages = JSON.parse(readFileSync(join(DIR, "stages.json"), "utf8")) as {
   pages: { index: number; width: number; height: number; blocks?: { bbox: number[] }[]; uncovered?: { kind: string; bbox: number[] }[] }[];
@@ -54,8 +55,12 @@ const pick = (pno: number, hi: number, bb: [number, number, number, number]): vo
   const inkW = inkE.bbox && inkE.inkPx > 0 ? inkE.bbox[2] - inkE.bbox[0] : null;
   const x0 = Math.max(0, bb[0] - PAD_X);
   const x1 = Math.min(pg.width, bb[2] + PAD_X);
-  const y0 = Math.max(0, bb[1] - PAD_Y_F * medH);
-  const y1 = Math.min(pg.height, bb[3] + PAD_Y_F * medH);
+  // 自适应竖向 padding（2026-11-09 L14 教训：0.6×medH 会切掉分数/上下标等高字形，
+  // rec 对残缺字形会放弃——p100_h3 的 ½ 漏读实证）。洞框高 ≥0.8×medH 判为疑似高字形洞。
+  const bbH = bb[3] - bb[1];
+  const padY = bbH >= 0.8 * medH ? 1.1 * medH : PAD_Y_F * medH;
+  const y0 = Math.max(0, bb[1] - padY);
+  const y1 = Math.min(pg.height, bb[3] + padY);
   execFileSync("pdftoppm", ["-png", "-r", String(DPI), "-f", String(pno + 1), "-l", String(pno + 1),
     "-x", String(Math.floor(x0 * S)), "-y", String(Math.floor(y0 * S)),
     "-W", String(Math.ceil((x1 - x0) * S)), "-H", String(Math.ceil((y1 - y0) * S)), PDF, join(OUT, "crops", id)], { stdio: "pipe" });
@@ -75,6 +80,7 @@ const gray = (pno: number): ReturnType<typeof import("./audit-hole-geometry.js")
 import { renderGrayPage } from "./audit-hole-geometry.js";
 
 const sick = [185, 186, 76, 127];
+const allFlag = argv.includes("--all");
 const pageList = pagesArg
   ? pagesArg.split(",").map(Number).filter(Number.isFinite)
   : stages.pages.filter((p) => holesOf(p).length > 0).map((p) => p.index);
@@ -82,7 +88,9 @@ const wanted = new Map<number, number[]>();
 for (const p of pageList) wanted.set(p, holesOf(stages.pages[p]!).map((_, i) => i));
 
 let targets: { p: number; h: number }[] = [];
-if (pagesArg) {
+if (allFlag) {
+  for (const [p, hs] of wanted) for (const h of hs) targets.push({ p, h });
+} else if (pagesArg) {
   for (const p of pageList) for (const h of wanted.get(p) ?? []) targets.push({ p, h });
 } else {
   let s = Number(arg("seed") ?? 20261108) >>> 0;
