@@ -14,9 +14,20 @@ import { join } from "node:path";
 import { normalizeEq } from "./ocr-lib.js";
 
 const DIR = join(process.cwd(), "data/out", "答案册-合订本", "hole-read");
+const argv = process.argv.slice(2);
+const arg = (k: string): string | null => {
+  const i = argv.indexOf("--" + k);
+  return i >= 0 ? (argv[i + 1] ?? null) : null;
+};
+const OXR_FILE = arg("oxr") ?? "oxr-v3-filtered.json";
+const OUT_FILE = arg("out") ?? "equiv-v4.json";
 
 const rec = JSON.parse(readFileSync(join(DIR, "readings-v3.json"), "utf8")) as { id: string; recText: string | null }[];
-const oxr = JSON.parse(readFileSync(join(DIR, "oxr-v3-filtered.json"), "utf8")) as Record<string, string>;
+const oxrRaw = JSON.parse(readFileSync(join(DIR, OXR_FILE), "utf8")) as unknown;
+const oxr: Record<string, string> =
+  (typeof oxrRaw === "object" && oxrRaw !== null && "candidates" in oxrRaw)
+    ? (oxrRaw as { candidates: Record<string, string> }).candidates
+    : (oxrRaw as Record<string, string>);
 const iter2 = JSON.parse(readFileSync(join(DIR, "iter2-review-data.json"), "utf8")) as { id: string; stage: string }[];
 
 const recMap = new Map(rec.map((r) => [r.id, r.recText ?? ""]));
@@ -38,5 +49,5 @@ for (const r of changed) {
   console.log(`    rec="${r.rec}"`);
   console.log(`    oxr="${r.oxr}"`);
 }
-writeFileSync(join(DIR, "equiv-v4.json"), JSON.stringify({ rows, changed: changed.map((r) => r.id) }, null, 1));
-console.log(`→ hole-read/equiv-v4.json`);
+writeFileSync(join(DIR, OUT_FILE), JSON.stringify({ oxrSource: OXR_FILE, rows, changed: changed.map((r) => r.id) }, null, 1));
+console.log(`→ hole-read/` + OUT_FILE);
