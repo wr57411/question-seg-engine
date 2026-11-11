@@ -83,6 +83,24 @@ export function cleanOcrLines(s: string): string {
     .trim();
 }
 
+/**
+ * 等价性归一化（**只用于判等**，不进识别/判据主链路）：全角→半角、点号族（。．・･‧•·）
+ * 统一为 "."、抹平全部空白。口径依据 = 用户拍板（2026-11-10/11）：点号大小/全半角/空格
+ * 差异 = 语义等价，不算错（迭代 2 ⑥）。p016_h0 实证：rec「5.C 必刷方法·正交分解法」vs
+ * OXR「5. C 必刷方法·正交分解法」仅空格差，旧比对判不等价 → 无谓升级人工。
+ * 保守边界：**不折叠大小写、不合并形近字**（J/j、O/0 等仍判不等价）。
+ */
+export function normalizeEq(s: string): string {
+  let t = "";
+  for (const ch of s) {
+    const c = ch.codePointAt(0)!;
+    t += c >= 0xff01 && c <= 0xff5e ? String.fromCodePoint(c - 0xfee0) : ch;
+  }
+  return t
+    .replace(/[。．・･‧•·]/g, ".")
+    .replace(/[\s\u3000]+/g, "");
+}
+
 type Box = [number, number, number, number];
 
 export const inter = (a: Box, b: Box) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
