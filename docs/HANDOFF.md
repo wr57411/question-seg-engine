@@ -34,6 +34,39 @@
 
 （2026-11-07 合并注记：以上 2026-11-05 轮摘要为**历史存档**；当前最新交接 = 下方 §0.3，其「推进顺序」段已含十轮 Loop 与 §110 终局状态。）
 
+## 0.4 本轮（2026-11-11 · feature/oxr 并入 tool-no-mineru + 换源决策待拍板）的交接要点
+
+> 最新轮置顶（§0.3 为上一轮）。
+
+**一句话**：`feature/tool-no-mineru` 已 **fast-forward 合并 `feature/oxr`**（28 提交，零冲突），换源主线证据全部就位——**L-13 探针证明 OXR/云端 VL 能根除 MinerU 漏行**（4 页样本），§111 推翻旧禁区 N-07；[换源立项建议书](plans/2026-11-09-换源立项建议书-OXR与云端VL.md)**待拍板**。
+
+**⚠️ 接手第一件事：确认提交与远端状态**
+
+| 项 | 实况（2026-11-11 本轮实测） |
+|---|---|
+| 分支 / HEAD | `feature/tool-no-mineru` @ `36813bf`（= oxr `6ba134c` + 唤醒脚本提交） |
+| 与远端 | 领先 `origin/main` **123** 个提交，未 push；本分支无 upstream（**以 `git rev-list --left-right --count origin/main...HEAD` 为准**）；**push 需用户发话** |
+| 工作区 | 干净（未跟踪 `.mimosa/` `.serena/` 为工具目录，不入库） |
+| 质量门 | `npm run check` 本轮实跑全绿：**605 测试（604 pass / 0 fail / 1 skip）**、渲染审计 7/7 卷、配对 431 条、各审计新增 0；凭证 `tmp/.check-stamp`（别手改） |
+| 其它工作树 | `feature/oxr` @ `6ba134c`（已并入本线）、`merge-int` @ `123622b`（detached） |
+
+**本轮完成**
+
+| 做了什么 | 证据 |
+|---|---|
+| 合并 `feature/oxr` → `feature/tool-no-mineru`（ff，28 提交）：L-13 换源探针、§111 改判、hole-read 判定链、配带审计、立项建议书 | `git log 00118d7..6ba134c`；BACKLOG L-13 / DECISIONS §111 |
+| **一键唤醒局域网 OCR 笔记本**：`npm run wake:laptop`（WoL 魔术包广播+直发 9/7 端口 + ping 等待 90s） | `scripts/wake-laptop.mjs`（`36813bf`）；实测可达；目标 wangw@192.168.2.35（RTX 4070 本地 V3 产线） |
+| L-13 探针脚本复制到本工作树（原在 oxr worktree 的 gitignore tmp 里） | `tmp/source-swap-probe/compare.py`（数据输入 `/tmp/oxr4`、`/tmp/vl-pull` 为当时临时产物，复跑需重拉） |
+
+**换源主线关键事实**（细节见 [立项建议书](plans/2026-11-09-换源立项建议书-OXR与云端VL.md) 与 BACKLOG L-13）：
+- L-13（4 页 / 14 漏行洞 + 286 MinerU 已读行，位置级双向审计）：**OXR 14/14=100% 且新造漏行 0/286**；云端 VL 14/14、真实新漏 0.7%。两案均免费额度。
+- §111：N-07「换 vlm 净退化」改判——63→14 是行合并约定（文字覆盖 92~99%），病根 = **下游对行粒度的强依赖**；换源前置 = 全册验证 + 去行粒度重构（建议书 A2/B3 粒度映射层）。
+- 本地 4070 V3 行框对齐率 70.7% vs 云端 25.3%（4 页）；全册配带率报告 `out/ppv3-band-pair-report.md`（93.9% 不可复现已审计定案）。
+
+**未闭合**：① **换源立项待拍板**（建议书两案 A=OXR / B=云端 VL，建议 A1/B1 全册双向验证都跑再定主源）② B-37 judgeHole dup 门生产 bug（`ocr-page-fill-jobs.ts` 三处 pageText=undefined，行为变更需拍板）③ 笔记本长任务前须确认电源设置（会睡眠；WoL 只对睡眠生效，关机需物理开机）。
+
+**下一轮开工**：`npm run check`（须全绿）→ 读立项建议书拍板 A/B → 全册双向验证（A1 免费档分片 / B1 jobs 显式页清单，**L12：不传范围=全册烧配额**）。
+
 ## 0.3 本轮（2026-11-06 · B-28 批次 3 洞几何核查 + B-35 诊断命令化）的交接要点
 
 > 编号沿用追加式（§0.2 已被 2026-11-02 bgx 会话引用，正文在合并重写中由该轮 §0 覆盖，见 `docs/dev/bgx/INDEX.md`）；最新轮置顶。
@@ -785,6 +818,7 @@ layout.json / content_list.json
 | 演示（夹具全流程） | `npm run demo` |
 | **成品页（像原版书的那一份）** | `npm run view`（本机）→ http://localhost:4173/final/?doc=<docId> |
 | **手机/平板（同一 WiFi）** | `npm run view:lan`（`HOST=0.0.0.0`；共享网络加 `TAGS_WRITE=0` 只读） |
+| **唤醒局域网 OCR 笔记本（4070 本地 V3）** | `npm run wake:laptop`（WoL + ping 等待 90s；只对睡眠生效，关机需物理开机） |
 | 阶段样品 + 对比模式（主验收） | `npm run stages` → http://localhost:4173/stages/?doc=<docId> |
 | 仅重导快照 | `npm run stages:export` |
 | 阅读版 viewer（检索/答案开关） | http://localhost:4173/viewer/?doc=<docId> |
@@ -818,6 +852,9 @@ layout.json / content_list.json
 | `docs/PRD-viewer.md` | viewer 的产品需求（设计输入稿） | 状态为「待设计验证」，实现以 viewer/ 实际为准 |
 | `docs/real-api-notes.md` | MinerU API 字段事实 | 字段争议以它为准 |
 | **`docs/plans/2026-11-03-vl-text-v3-lines.md`** | 补字线（VL 出字 + V3 出行框）的方案、18 条实测、**收口结论** | 结论 `B-32 DROPPED`；工具与判据保留可复用 |
+| **`docs/plans/2026-11-09-换源立项建议书-OXR与云端VL.md`** | **主解析源替换（MinerU → OXR / 云端 VL）两案工作分解 + 验收口径** | **待拍板**；证据 = BACKLOG L-13 + DECISIONS §111 |
+| `docs/plans/2026-11-07-line-ink-align.md` | V3 行框↔墨迹配带十轮 Loop 方案与数据（§110） | 几何层实验已收口；接续项 B-36 |
+| `out/ppv3-band-pair-report.md` | 本地 4070 全册 vs 云端 V3 配带率大样本报告 | 93.9% 不可复现的审计定案在此 |
 | `docs/evidence/2026-11-03-paddle-two-routes-probe.md` | 两条产线的字段/时延实测（MCP 丢坐标的证据） | `§107` 的事实来源 |
 | `docs/evidence/2026-11-03-paddle-structure-audit.md` | StructureV3 vs MinerU 结构计数（13 本） | `table 39/39` 全等，只报警 |
 | `docs/evidence/2026-11-03-paddle-pos-diff.md` | 摊字符 vs VL 块位置（v1 作废、v2 读数） | 只报警；结论不可外推 |
