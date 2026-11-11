@@ -30,6 +30,7 @@ const arg = (k: string): string | null => {
   return i >= 0 ? (argv[i + 1] ?? null) : null;
 };
 const pagesArg = arg("pages");
+const allFlag = argv.includes("--all");
 const outArg = arg("out") ?? (allFlag ? "holes-all.json" : pagesArg ? "holes14.json" : "holes30.json");
 mkdirSync(join(OUT, "crops"), { recursive: true });
 const stages = JSON.parse(readFileSync(join(DIR, "stages.json"), "utf8")) as {
@@ -53,8 +54,36 @@ const pick = (pno: number, hi: number, bb: [number, number, number, number]): vo
   const medH = medianLineHeightPt(pg.blocks ?? []);
   const inkE = inkExtent(gray(pno), pg.width, pg.height, bb as [number, number, number, number]);
   const inkW = inkE.bbox && inkE.inkPx > 0 ? inkE.bbox[2] - inkE.bbox[0] : null;
-  const x0 = Math.max(0, bb[0] - PAD_X);
-  const x1 = Math.min(pg.width, bb[2] + PAD_X);
+  // X 向边缘切字检测（2026-11-10 用户指出：左缘字被切一半 ⇒ rec 读不出而 OXR 猜对，
+  // 无谓分歧）。最小成本 = 纯像素扫描（灰度图已在内存，零 token）：窗缘贴墨 ⇒
+  // 向白缝扩展（连续 ≥3 空白列），护栏 1.5×medH 防吞前字。
+  const gimg = gray(pno);
+  const syPx = gimg.height / pg.height;
+  const yInk0 = Math.max(0, Math.floor((bb[1] - 1) * syPx));
+  const yInk1 = Math.min(gimg.height - 1, Math.ceil((bb[3] + 1) * syPx));
+  const px = gimg.data as Uint8Array;
+  const colInk = (xpx: number): boolean => {
+    for (let y = yInk0; y <= yInk1; y++) if ((px[y * gimg.width + xpx] ?? 255) < 200) return true;
+    return false;
+  };
+  const capPx = Math.ceil(1.5 * medH * S);
+  let x0px = Math.max(0, Math.floor((bb[0] - PAD_X) * S));
+  let x1px = Math.min(gimg.width - 1, Math.ceil((bb[2] + PAD_X) * S));
+  if (colInk(x0px)) {
+    let run = 0, guard = 0;
+    while (x0px > 0 && guard < capPx) {
+      if (!colInk(x0px)) { run++; if (run >= 3) { x0px += 3; break; } } else run = 0;
+      x0px--; guard++;
+    }
+  }
+  if (colInk(x1px - 1)) {
+    let run = 0, guard = 0;
+    while (x1px < gimg.width - 1 && guard < capPx) {
+      if (!colInk(x1px)) { run++; if (run >= 3) { x1px -= 3; break; } } else run = 0;
+      x1px++; guard++;
+    }
+  }
+  const x0 = x0px / S, x1 = x1px / S;
   // 自适应竖向 padding（2026-11-09 L14 教训：0.6×medH 会切掉分数/上下标等高字形，
   // rec 对残缺字形会放弃——p100_h3 的 ½ 漏读实证）。洞框高 ≥0.8×medH 判为疑似高字形洞。
   const bbH = bb[3] - bb[1];
@@ -62,8 +91,8 @@ const pick = (pno: number, hi: number, bb: [number, number, number, number]): vo
   const y0 = Math.max(0, bb[1] - padY);
   const y1 = Math.min(pg.height, bb[3] + padY);
   execFileSync("pdftoppm", ["-png", "-r", String(DPI), "-f", String(pno + 1), "-l", String(pno + 1),
-    "-x", String(Math.floor(x0 * S)), "-y", String(Math.floor(y0 * S)),
-    "-W", String(Math.ceil((x1 - x0) * S)), "-H", String(Math.ceil((y1 - y0) * S)), PDF, join(OUT, "crops", id)], { stdio: "pipe" });
+    "-x", String(x0px), "-y", String(Math.floor(y0 * S)),
+    "-W", String(x1px - x0px), "-H", String(Math.ceil((y1 - y0) * S)), PDF, join(OUT, "crops", id)], { stdio: "pipe" });
   const png = join(OUT, "crops", `${id}-${String(pno + 1).padStart(3, "0")}.png`);
   rows.push({ id, page: pno, holeIdx: hi, bbox: bb, medH, inkW, crop: png });
 };
@@ -80,7 +109,6 @@ const gray = (pno: number): ReturnType<typeof import("./audit-hole-geometry.js")
 import { renderGrayPage } from "./audit-hole-geometry.js";
 
 const sick = [185, 186, 76, 127];
-const allFlag = argv.includes("--all");
 const pageList = pagesArg
   ? pagesArg.split(",").map(Number).filter(Number.isFinite)
   : stages.pages.filter((p) => holesOf(p).length > 0).map((p) => p.index);
