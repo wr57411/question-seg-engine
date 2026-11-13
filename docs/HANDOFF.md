@@ -34,6 +34,25 @@
 
 （2026-11-07 合并注记：以上 2026-11-05 轮摘要为**历史存档**；当前最新交接 = 下方 §0.3，其「推进顺序」段已含十轮 Loop 与 §110 终局状态。）
 
+## 0.5 本轮（2026-11-13 · 密集页根因测量命令化 + B-38 登记）的交接要点
+
+> 最新轮置顶（§0.4 为上一轮）。
+
+**一句话**：p76/p127 两密集页 noBand 根因实测并命令化（`scripts/audit-gap-roots.ts`，零 API）——**主因不是缝阈值**：两页 175 条截断行里 113 条插图巨带、21 条单行拆多框、22 条零白缝、19 条公式小缝；缝宽分布在文本区两峰分开（行间断缝中位 16/18px vs 行内缝 2/1px），8px 阈值在文本区没切错。BACKLOG L-14（DONE）/ B-38（TODO 待拍板）已登记；换源立项建议书**仍待拍板**。
+
+| 项 | 实况（2026-11-13 本轮实测） |
+|---|---|
+| 分支 / HEAD | `feature/tool-no-mineru` @ `26d8f56` + 本轮检查点提交（audit-gap-roots + L-14/B-38 + 交接） |
+| 质量门 | `npm run check` 本轮实跑全绿：**605 测试（604 pass / 0 fail / 1 skip）**、配对 431 条、渲染 7/7 卷；凭证 `3b1e2693d4b8bbef` |
+| 新命令 | `npx tsx scripts/audit-gap-roots.ts --page N`（缝宽分布 + 超容量带四分类；判据 import 不重写，B-35） |
+| 数据 | `data/out/答案册-合订本/gap-roots.p76/p127.json` + `band-pair.p76/p127-*.json`；localv3 缓存 p76/p127 自 oxr worktree 复制（全册 154 页仍在该 worktree） |
+
+**关键事实**：豁免旗标对照 p76 59.5→70.9→79.5%（救 44/89）、p127 59.4→60.8→69.3%（救 21/86）⇒ 旗标只治单行拆多框类，插图巨带需专属识别（B-38）。裁图证据 `tmp/p76-evidence/`（gitignore；R5 三页校验过，参数留痕 crops.txt）。
+
+**未闭合**：① 换源立项待拍板（承 §0.4）② B-37 dup 门（承 §0.4）③ 笔记本电源（承 §0.4）④ **B-38 密集页页型适配待拍板**（插图框识别 + 豁免旗标转生产 = 行为变更）。
+
+**下一轮开工**：`npm run check` → 低配带率页逐页跑 `audit-gap-roots` 量全册插图框占比（B-38 拍板前置）→ 换源 A/B 拍板。
+
 ## 0.4 本轮（2026-11-11 · feature/oxr 并入 tool-no-mineru + 换源决策待拍板）的交接要点
 
 > 最新轮置顶（§0.3 为上一轮）。
@@ -478,6 +497,12 @@ layout.json / content_list.json
 
 ## 2. 当前状态（事实，非计划）
 
+### 2026-11-13 状态（密集页根因测量命令化）
+
+- `npm run check` 实跑全绿：605 测试（604 pass / 0 fail / 1 skip）、配对 431 条、渲染审计 7/7 卷；凭证 `3b1e2693d4b8bbef`。
+- 新增 `scripts/audit-gap-roots.ts`（只读、零 API、不进 check）：p76/p127 noBand 全为 maxTrunc 真重叠；超容量带四分类与缝宽分布见 BACKLOG L-14；插图巨带为两页共同最大头（113/175 行）。
+- B-38 登记（TODO 待拍板）：插图框识别 + 容量按视觉行计；豁免旗标转生产 = 行为变更，需拍板 + 小试对照。
+
 ### 2026-11-03 状态（OCR 传输层 / 公式五方 / 补字线收口）
 
 - 分支 `feature/oxr`，今日 **20 个提交**；`npm run check` **546/546 绿**（实跑）。
@@ -809,6 +834,7 @@ layout.json / content_list.json
 | 整本提交 OCR 作业（留 `prunedResult`） | `npm run ocr:job -- --doc "<docId>" --model PP-StructureV3`（或 `PaddleOCR-VL-1.6`） |
 | 结构计数 vs MinerU（只报警） | `npm run audit:paddle`（≤40 页/本，超限跳过并登记） |
 | 位置审计（只报警） | `npm run audit:pos` |
+| **密集页根因测量（只报警、零 API）** | `npx tsx scripts/audit-gap-roots.ts --page N`（缝宽分布 + 超容量带四分类；B-38 依据） |
 | 公式五方对照（只读） | `npm run audit:formula` |
 | **可疑题号行审计（只报警）** | `npm run audit:suspicious` —— S1 行首 `N.$数字` / S2 题干以 `$数字` 开头；命中 exit 1，不改数据 |
 | 批量导入（MVP） | `npm run batch -- --inbox inbox`（`--no-ocr`/`--limit`/`--retry`/`--parser`；同哈希跳过，失败隔离） |
@@ -939,6 +965,7 @@ layout.json / content_list.json
 | **6-28** | **整页 OCR 补行没有位置信息，硬配回洞会错位（表格文字画到页眉）** | **已收敛（`§91`）**：默认不画 + `?fill=1`/工具栏开关；根治需动 `classifyUncovered` 家具体级判据 |
 | **6-30** | **分支分叉未收口：main 侧 5 个独有提交（专题知识库 ≈4.0k 行）不在本分支；`main` 另有 34 个提交未 push** | **未处理（P1，交付基线 + 覆盖丢失风险）** |
 | **6-29** | **展示层 `.d.ts` 遮蔽实现：`dts-drift` 只锁名字、不锁形状** | **未做（试删已回退）。删除有两个阻塞：① `noUncheckedIndexedAccess` 下 113 处数组读取；② 主程序无 DOM lib（`§94` + `§95`）** |
+| **6-31** | **密集页 noBand 根因 = 插图巨带 + 容量按框计 + 零白缝（非缝阈值问题；p76/p127 实测 175 行）** | **未修（B-38 待拍板；测量已命令化 `scripts/audit-gap-roots.ts`，BACKLOG L-14）** |
 
 13. **字母 `O` 被 MinerU 读成数字 `0`（2026-10-15 用第二套 OCR 交叉核对发现，未修）**：
     物理题里的**点标号 O**（"悬挂于O点""对O点受力分析""将结点拉至O点"）被系统性读成数字 0。
