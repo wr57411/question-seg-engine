@@ -15,7 +15,7 @@
  * 产物：data/out/<doc>/giant-crop.pNN.json + giant-crop/crops/*.png
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderGrayPage, inkExtent } from "./audit-hole-geometry.js";
 import { holesOf } from "./ocr-page-fill-jobs.js";
@@ -41,8 +41,11 @@ const doc = arg("doc") ?? "答案册-合订本";
 const nocrop = argv.includes("--nocrop");
 const allNoband = argv.includes("--all-noband");
 const cropFallback = argv.includes("--crop-fallback");
+const allPages = argv.includes("--all");
 const dir = join(ROOT, "data/out", doc);
-const pages = (arg("pages") ?? "76,127").split(",").map(Number).filter(Number.isFinite);
+const pages = allPages
+  ? readdirSync(join(dir, "ocr-jobs-cache-localv3")).filter((f) => /^p\d+\.json$/.test(f)).map((f) => Number(f.slice(1, -5))).sort((a, b) => a - b)
+  : (arg("pages") ?? "76,127").split(",").map(Number).filter(Number.isFinite);
 const stages = JSON.parse(readFileSync(join(dir, "stages.json"), "utf8")) as {
   pages: { index: number; width: number; height: number; blocks?: { bbox: number[]; text?: unknown; ocr?: unknown; kind?: string }[]; uncovered?: { kind: string; bbox: number[] }[] }[];
 };
@@ -57,6 +60,9 @@ interface Victim {
 
 const category = (h: number, runs: number): string =>
   h <= 12 ? "singleLineMultiBox" : runs === 1 ? "zeroGap" : h > GIANT_H_PT ? "figureGiant" : "formulaSmallGap";
+
+/** 跨页聚合收集器（--all 全册测量用；正常裁图模式逐页 push，--crop-fallback 验证模式不收集） */
+const agg: { page: number; total: number; paired: number; noBand: number; recovered: number; valid: number }[] = [];
 
 for (const pno of pages) {
   const page = stages.pages[pno];
@@ -155,7 +161,32 @@ for (const pno of pages) {
     validWithFallbackRate: +(((paired + valid) / total) * 100).toFixed(1),
     medH: +medH.toFixed(1),
   };
+  agg.push({ page: pno, total, paired, noBand: base.stats.noBand, recovered, valid });
   writeFileSync(join(dir, `giant-crop.p${String(pno).padStart(2, "0")}.json`), JSON.stringify({ summary, typedBands, victims }, null, 1));
   console.log(JSON.stringify(summary, null, 1));
   console.log(`→ data/out/${doc}/giant-crop.p${String(pno).padStart(2, "0")}.json` + (nocrop ? "" : ` + ${recovered} 裁图`));
+}
+
+// ── 跨页聚合（全册测量口径，B-39 前置「全册双向测量」的可执行命令）─────────────
+//    覆盖率=(paired+recovered)/total；正确率保守下界=(paired+valid)/total（机器筛：单行高+框内有墨）。
+//    95% 正确率金标需笔记本 PP-OCRv5 rec 交叉（独立来源），机器下界达标≠金标达标。
+if (!cropFallback && agg.length) {
+  const T = agg.reduce((s, p) => s + p.total, 0);
+  const P = agg.reduce((s, p) => s + p.paired, 0);
+  const R = agg.reduce((s, p) => s + p.recovered, 0);
+  const V = agg.reduce((s, p) => s + p.valid, 0);
+  const aggregate = {
+    doc, pagesMeasured: agg.length, mode: allNoband ? "all-noband" : "figureGiant-only",
+    totalLines: T, baselinePaired: P, baselineRate: +((P / T) * 100).toFixed(1),
+    recovered: R, validRecoveries: V, suspect: R - V,
+    coverageWithFallback: +(((P + R) / T) * 100).toFixed(1),
+    validLowerBound: +(((P + V) / T) * 100).toFixed(1),
+    target95LowerBoundMet: T > 0 && (P + V) / T >= 0.95,
+    perPageByNoBand: [...agg].sort((a, b) => b.noBand - a.noBand),
+    note: "validLowerBound=机器筛保守下界（误标合法分式高框/短标签）；95% 正确率金标需笔记本 rec 交叉。覆盖率≠正确率。全册需 --all + 全册 localv3 缓存（笔记本物理开机）。",
+  };
+  writeFileSync(join(dir, "giant-crop.aggregate.json"), JSON.stringify(aggregate, null, 1));
+  console.log("=== AGGREGATE ===");
+  console.log(JSON.stringify(aggregate, null, 1));
+  console.log(`→ data/out/${doc}/giant-crop.aggregate.json`);
 }
