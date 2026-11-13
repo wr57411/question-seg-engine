@@ -212,11 +212,24 @@ export interface AlignStats {
    *  豁免 = over-capacity 组整组保留，这些行进 paired，不进 noBandByCause。 */
   exemptGroups?: number;
   exemptRows?: number;
+  /** 实验分支（truncationCropFallback 旗标开启才产出）：巨带容量截断行回退保留 V3 紧框的行数——
+   *  这些行有坐标（coordSource=crop，裁图例外），不计入 noBand。默认路径不产出此字段。 */
+  cropFallback?: number;
+}
+
+/** 对齐后的行。coordSource 仅 truncationCropFallback 旗标开启时产出（默认路径无此字段，逐字节不变）。 */
+export interface AlignedLine {
+  text: string;
+  score: number | null;
+  bbox: Box | null;
+  norm: Box | null;
+  /** 坐标来源：crop=巨带截断行回退用 V3 紧框（下游裁图例外）；缺省=墨迹带真值（配对行）/V3 原框（noBand）。 */
+  coordSource?: "ink" | "crop";
 }
 
 export interface AlignedPage {
   /** 几何替换后的行（配上的行 norm=墨迹带；其余保留 V3 原框） */
-  lines: { text: string; score: number | null; bbox: Box | null; norm: Box | null }[];
+  lines: AlignedLine[];
   stats: AlignStats;
 }
 
@@ -264,6 +277,11 @@ export function alignLinesToBands(
     /** 实验分支（audit-band-pair --band-mask）：切带投影前遮蔽页边缘竖条列（x<15pt ∪ x>页宽−15pt
      *  且列墨>50% 窗高，scripts/band-mask.ts）。默认关闭=原 img 直传。 */
     bandMaskFrameBars?: boolean;
+    /** 实验分支（B-39 巨带裁图坐标补充）：容量截断行不再置 norm=null，而是保留该行 V3 紧框
+     *  作为回退坐标并标 coordSource=crop（下游裁图例外，goal item 2）。巨带吞行的 V3 框本就是
+     *  紧单行框（audit-giant-crop 实测 p76/p127），故回退坐标=V3 框本身，无需重新切带。
+     *  只作用于 MAX_BAND_LINES 容量截断（maxTrunc），不动 holeFilter/dpSkip。默认关闭=生产路径逐字节不变。 */
+    truncationCropFallback?: boolean;
   } = {},
 ): AlignedPage {
   const replaceY = opts.replaceY !== false;
@@ -272,6 +290,7 @@ export function alignLinesToBands(
   const diag = opts.diagNoBand === true;
   const maxBandLines = opts.maxBandLines ?? MAX_BAND_LINES;
   const exemptOn = opts.bandExemptFullyOverlapping === true;
+  const cropFallbackOn = opts.truncationCropFallback === true;
   // 页面行高中位数（豁免带高守卫用）：口径与单行块锚（§110）一致——有效行（norm 非空且
   // 文本非空白）框高 ×pageH，排序取中位。旗标关时不计算（生产路径零额外工作）；
   // medH=0（页面无有效行）时守卫 `bandH ≤ 1.6×medH` 永不通过 → 豁免不触发（保守）。
@@ -288,9 +307,11 @@ export function alignLinesToBands(
   if (diag && exemptOn) { stats.exemptGroups = 0; stats.exemptRows = 0; }
   /** noBand 降级原因记账（全局行下标 → 降级机制）；diag 旗标下才填充 */
   const noBandCause = diag ? new Map<number, "maxTruncOv" | "maxTruncZ" | "holeFilter">() : null;
-  const out = lines.map((l) => ({ ...l }));
+  const out: AlignedLine[] = lines.map((l) => ({ ...l }));
   /** 被单行块锚定的行（out 下标）——洞带组成员资格过滤用（§110 第十轮） */
   const anchoredRows = new Set<number>();
+  /** 巨带截断回退行（out 下标）——truncationCropFallback 旗标开启才填充，统计与 coordSource 标记用 */
+  const cropFallbackRows = new Set<number>();
   // ── 单行块锚（§110 第六轮 DP 变体）：V3 框集体偏移的行，用「文本包含匹配到的单行 MinerU 块」
   //    的 bbox 替代行框——解「拆行错占带 → 单调锁死」（p91 h1 实测根因链）。
   //    条件取严（AND）：行 hardNorm ≥4 字（短文本防误匹配）+ 块 hardNorm 包含行 hardNorm +
@@ -425,8 +446,16 @@ export function alignLinesToBands(
       rows.sort((a, b) => b.score - a.score);
       for (const r of rows.slice(maxBandLines)) {
         mono[r.row]!.bandIdx = -1;
-        out[idx[r.row]!.i]!.norm = null;
-        if (noBandCause) noBandCause.set(idx[r.row]!.i, bandScore(boxes[r.row]!, bands[bi]!) > 0 ? "maxTruncOv" : "maxTruncZ");
+        const oi = idx[r.row]!.i;
+        if (cropFallbackOn) {
+          // 巨带吞行回退：保留该行 V3 紧框（out[oi].norm 此刻仍是 V3/锚定框，配对替换在后面的
+          // bandHits 循环才发生；bandIdx=-1 使其不会被替换），标 coordSource=crop 供下游裁图例外。
+          out[oi]!.coordSource = "crop";
+          cropFallbackRows.add(oi);
+        } else {
+          out[oi]!.norm = null;
+        }
+        if (noBandCause) noBandCause.set(oi, bandScore(boxes[r.row]!, bands[bi]!) > 0 ? "maxTruncOv" : "maxTruncZ");
       }
     }
     // ── 洞带组成员资格过滤（§110 第十轮 · B-27 最小可交付）：洞带组内存在「几何重叠
@@ -453,6 +482,11 @@ export function alignLinesToBands(
       stats.total++;
       const m2 = mono[k]!;
       if (m2.bandIdx < 0) {
+        if (cropFallbackOn && cropFallbackRows.has(i)) {
+          // 回退行有坐标（V3 紧框，coordSource=crop），不算 noBand；单独记账。
+          stats.cropFallback = (stats.cropFallback ?? 0) + 1;
+          return;
+        }
         stats.noBand++;
         if (stats.noBandByCause) {
           const cause = noBandCause?.get(i) ?? "dpSkip";

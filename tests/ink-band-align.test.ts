@@ -1,7 +1,8 @@
 // tests/ink-band-align.test.ts —— V3 行框→墨迹带配对（几何换源，2026-11-07 用户目标）
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pairLineToBand, type InkBand } from "../scripts/ink-band-align.js";
+import { pairLineToBand, alignLinesToBands, type InkBand } from "../scripts/ink-band-align.js";
+import type { GrayImage } from "../scripts/export-stages.js";
 
 type Box = [number, number, number, number];
 
@@ -51,4 +52,50 @@ test("pairLineToBand：LaTeX 行正常配对（无宽度守卫）", () => {
   const bands = [band(100, 110, 20, 100)];
   const r = pairLineToBand([20, 100, 100, 110], bands);
   assert.ok(r, "配对只看几何，不看文本内容");
+});
+
+// ── B-39 巨带裁图坐标补充（truncationCropFallback 旗标）──────────────────────
+// 合成巨带页：200×200pt（1px=1pt），左栏一条 100pt 高实心墨迹巨带（x20-90, y20-120，无内部白缝），
+// 5 条紧单行 V3 框全落在带内 ⇒ 一条带认领 5 行 > MAX_BAND_LINES=3 ⇒ 截断 2 行。
+type LineIn = { text: string; score: number | null; bbox: null; norm: Box };
+function giantBandPage(): { img: GrayImage; lines: LineIn[] } {
+  const W = 200, H = 200;
+  const data = new Uint8Array(W * H).fill(255);
+  for (let y = 20; y < 120; y++) for (let x = 20; x < 90; x++) data[y * W + x] = 0;
+  const img: GrayImage = { width: W, height: H, data };
+  const ys: [number, number][] = [[25, 35], [40, 50], [55, 65], [70, 80], [85, 95]];
+  const lines: LineIn[] = ys.map(([y0, y1], i) => ({
+    text: `行${i}`, score: 0.9, bbox: null, norm: [20 / W, y0 / H, 90 / W, y1 / H],
+  }));
+  return { img, lines };
+}
+
+test("truncationCropFallback 默认关：巨带截断行 norm=null、无 coordSource、无 cropFallback 统计（逐字节不变）", () => {
+  const { img, lines } = giantBandPage();
+  const r = alignLinesToBands(lines, img, 200, 200);
+  assert.equal(r.stats.total, 5);
+  assert.equal(r.stats.paired, 3, "top-3 配对");
+  assert.equal(r.stats.noBand, 2, "截断 2 行降级 noBand");
+  assert.equal(r.stats.cropFallback, undefined, "默认不产出 cropFallback 字段");
+  assert.equal(r.lines.filter((l) => l.norm === null).length, 2);
+  assert.ok(r.lines.every((l) => l.coordSource === undefined), "默认路径无 coordSource 字段");
+});
+
+test("truncationCropFallback 开：截断行保留 V3 紧框 + coordSource=crop，计入 cropFallback 不算 noBand", () => {
+  const { img, lines } = giantBandPage();
+  const r = alignLinesToBands(lines, img, 200, 200, { truncationCropFallback: true });
+  assert.equal(r.stats.total, 5);
+  assert.equal(r.stats.paired, 3);
+  assert.equal(r.stats.noBand, 0, "回退行有坐标，不算 noBand");
+  assert.equal(r.stats.cropFallback, 2);
+  const crop = r.lines.filter((l) => l.coordSource === "crop");
+  assert.equal(crop.length, 2);
+  for (const c of crop) {
+    assert.ok(c.norm, "回退行保留坐标");
+    const orig = lines.find((l) => l.text === c.text)!;
+    assert.deepEqual(c.norm, orig.norm, "回退坐标=V3 原紧框，不重新切带");
+  }
+  const paired = r.lines.filter((l) => l.coordSource !== "crop");
+  assert.equal(paired.length, 3);
+  assert.ok(paired.every((l) => l.norm && l.coordSource === undefined), "配对行仍换墨迹带几何，无 crop 标记");
 });

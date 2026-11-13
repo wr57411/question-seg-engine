@@ -40,6 +40,7 @@ const arg = (k: string): string | null => {
 const doc = arg("doc") ?? "答案册-合订本";
 const nocrop = argv.includes("--nocrop");
 const allNoband = argv.includes("--all-noband");
+const cropFallback = argv.includes("--crop-fallback");
 const dir = join(ROOT, "data/out", doc);
 const pages = (arg("pages") ?? "76,127").split(",").map(Number).filter(Number.isFinite);
 const stages = JSON.parse(readFileSync(join(dir, "stages.json"), "utf8")) as {
@@ -73,6 +74,26 @@ for (const pno of pages) {
   const mineruBlocks = (page.blocks ?? []).filter((b) => b.text && !b.ocr).map((b) => ({ bbox: b.bbox as Box, text: String(b.text) }));
   const holes = holesOf(page);
   const base = alignLinesToBands(lines, gray, pageW, pageH, { mineruBlocks, holes, diagNoBand: true });
+
+  // ── 生产旗标验证模式（--crop-fallback）：直接跑生产 truncationCropFallback，核对回退坐标=V3 原框。
+  //    与上面审计自有的裁图回退（fallbackBox）相互独立——这条验的是 ink-band-align 生产插桩本身。
+  if (cropFallback) {
+    const prod = alignLinesToBands(lines, gray, pageW, pageH, { mineruBlocks, holes, truncationCropFallback: true });
+    let coordExact = 0;
+    prod.lines.forEach((l, i) => {
+      if (l.coordSource === "crop" && JSON.stringify(l.norm) === JSON.stringify(lines[i]!.norm)) coordExact++;
+    });
+    const cropRows = prod.lines.filter((l) => l.coordSource === "crop").length;
+    console.log(JSON.stringify({
+      doc, page: pno, mode: "production-crop-fallback",
+      totalLines: prod.stats.total,
+      baselinePaired: base.stats.paired, baselineNoBand: base.stats.noBand, baselineNoBandByCause: base.stats.noBandByCause,
+      prodPaired: prod.stats.paired, prodNoBand: prod.stats.noBand, prodCropFallback: prod.stats.cropFallback,
+      cropRows, coordExactVsV3: coordExact,
+      prodWithFallbackRate: +(((prod.stats.paired + (prod.stats.cropFallback ?? 0)) / prod.stats.total) * 100).toFixed(1),
+    }, null, 1));
+    continue;
+  }
 
   // 每栏生产带 + 类型（吞并 minGapPx=0 原始墨行 runs）
   const mid = pageW / 2;
