@@ -31,23 +31,50 @@ const oxr: Record<string, string> =
 const iter2 = JSON.parse(readFileSync(join(DIR, "iter2-review-data.json"), "utf8")) as { id: string; stage: string }[];
 
 const recMap = new Map(rec.map((r) => [r.id, r.recText ?? ""]));
+const recScoreMap = new Map(rec.map((r) => [r.id, (r as { score?: number | null }).score ?? null]));
 const stageMap = new Map(iter2.map((x) => [x.id, x.stage]));
+// 采纳基线（jev best 映射）——路由规则产出新采纳，翻转处逐洞审计
+const adoptedBase = JSON.parse(readFileSync(join(DIR, "adopted-v3.json"), "utf8")) as Record<string, string>;
 
+const REC_GIVEUP = 0.01; // rec 分数近零 = rec 自弃（识别放弃/乱码），让位 OXR
+/** LaTeX 括号畸形检测：花括号不配对，或括号组内无字母/数字/反斜杠（空组/纯标点组）。
+ *  依据 = ⑦a 三乱码实证（p023_h3「{}」/p070_h3「201}小球」/p100_h3「a^{，}」——自信的乱码，
+ *  rec 分数 0.38~0.63 不低，分数判据被数据否决）。合法读数（$v_{1}^{2}$、$\frac{q}{a^{2}}$ 等）不触发。 */
+const malformed = (s: string): boolean => {
+  const open = (s.match(/\{/g) ?? []).length;
+  const close = (s.match(/\}/g) ?? []).length;
+  if (open !== close) return true;
+  const groups = s.match(/\{([^{}]*)\}/g) ?? [];
+  return groups.some((g) => !/[A-Za-z0-9\\]/.test(g.slice(1, -1)));
+};
 const rows = [...recMap.keys()].map((id) => {
   const a = recMap.get(id) ?? "";
   const b = oxr[id] ?? "";
   const oldStage = stageMap.get(id) ?? "?";
+  const rs = recScoreMap.get(id) ?? null;
   const eq = normalizeEq(a) === normalizeEq(b) && a !== "";
-  const newStage = eq ? "autoPass(归一化等价)" : oldStage;
-  return { id, rec: a, oxr: b, oldStage, newStage, changed: newStage !== oldStage };
+  let route: string;
+  let adopted: string;
+  if (eq) {
+    route = "autoPass(归一化等价)";
+    adopted = adoptedBase[id] ?? "?"; // 等价=填谁都对，采纳保持基线
+  } else if (malformed(a) && b !== "" && !malformed(b)) {
+    route = "adopt-oxr(rec括号畸形)";
+    adopted = "oxr";
+  } else {
+    route = oldStage;
+    adopted = adoptedBase[id] ?? "?";
+  }
+  return { id, rec: a, oxr: b, recScore: rs, oldStage, route, adopted, changed: route !== oldStage };
 });
 
 const changed = rows.filter((r) => r.changed);
-console.log(`41 洞路由重演：等价自动过 ${rows.filter((r) => r.newStage.startsWith("autoPass")).length} 洞；路由变化 ${changed.length} 洞：`);
-for (const r of changed) {
-  console.log(`  ${r.id}: ${r.oldStage} → ${r.newStage}`);
+const flips = rows.filter((r) => r.adopted !== (adoptedBase[r.id] ?? "?"));
+console.log(`41 洞路由重演：等价自动过 ${rows.filter((r) => r.route.startsWith("autoPass")).length} 洞；路由变化 ${changed.length} 洞；采纳翻转 ${flips.length} 洞：`);
+for (const r of flips) {
+  console.log(`  ${r.id}: 采纳 ${adoptedBase[r.id]} → ${r.adopted}（recScore=${r.recScore}）`);
   console.log(`    rec="${r.rec}"`);
   console.log(`    oxr="${r.oxr}"`);
 }
-writeFileSync(join(DIR, OUT_FILE), JSON.stringify({ oxrSource: OXR_FILE, rows, changed: changed.map((r) => r.id) }, null, 1));
+writeFileSync(join(DIR, OUT_FILE), JSON.stringify({ oxrSource: OXR_FILE, route: "v4: autoPass/adopt-oxr(rec自弃)/沿用", flips: flips.map((r) => r.id), rows }, null, 1));
 console.log(`→ hole-read/` + OUT_FILE);
