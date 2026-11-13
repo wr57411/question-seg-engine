@@ -19,7 +19,6 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path";
 import { renderGrayPage, inkExtent } from "./audit-hole-geometry.js";
 import { holesOf } from "./ocr-page-fill-jobs.js";
-import { medianLineHeightPt } from "./ocr-lib.js";
 import { splitInkLines, DEFAULT_SPLIT } from "./ink-lines.js";
 import { alignLinesToBands, bandsForColumn } from "./ink-band-align.js";
 import type { Box } from "./paddle-client.js";
@@ -76,7 +75,11 @@ for (const pno of pages) {
   const pageW = page.width, pageH = page.height;
   const gray = renderGrayPage(join(dir, "origin.pdf"), pno + 1);
   const sy = gray.height / pageH;
-  const medH = medianLineHeightPt(page.blocks ?? []);
+  // 行高尺子取 V3 行框高中位（与生产 ink-band-align §110 同口径，独立 OCR 源）。
+  // 不用 medianLineHeightPt(page.blocks)：答案表页整页仅 1 个 table 块 ⇒ medH=表高(724pt)，
+  // 会把所有正常单行框(h≈10pt)误判 suspect（p185/p186 实测 1083 行假阴性）。
+  const lineHs = lines.map((l) => l.norm[3] * pageH - l.norm[1] * pageH).sort((a, b) => a - b);
+  const medH = lineHs.length ? lineHs[Math.floor(lineHs.length / 2)]! : 0;
   const mineruBlocks = (page.blocks ?? []).filter((b) => b.text && !b.ocr).map((b) => ({ bbox: b.bbox as Box, text: String(b.text) }));
   const holes = holesOf(page);
   const base = alignLinesToBands(lines, gray, pageW, pageH, { mineruBlocks, holes, diagNoBand: true });
