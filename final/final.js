@@ -25,6 +25,7 @@
  * 不碰快照（快照每次导出都会被冲掉）。
  */
 import { CANVAS_W, el, enc, mergeContext, renderPaper } from "../stages/reconstruct.js";
+import { renderFaithful } from "../stages/render-faithful.js";
 import { entryCrop, entrySegments, fitEntryCrops } from "./entry-paper.js";
 import { pickQuestionAt } from "./pick-hit.js";
 import { prettifyLatex } from "../stages/latex-display.js";
@@ -108,6 +109,7 @@ import {
  * @property {SnapBlock[]} blocks
  * @property {SnapQuestion[]} questions
  * @property {SnapOcrItem[]} [ocrFill]
+ * @property {"abs"|"flow"} [mode] faithful.json 才有：该页的定位方式（选渲染内核用）
  *
  * @typedef {Object} Snap 整册 stages.json 快照
  * @property {SnapPage[]} pages
@@ -507,13 +509,16 @@ function paper(p) {
     const wrap = flowPaper(p);
     return { wrap, canvas: wrap };
   }
-  return renderPaper(p, {
+  // 渲染内核二选一（**只换内核，不动工具栏/标签/搜索**）：
+  // - faithful.json（页上带 mode）→ renderFaithful（1:1，公式直通、字号认 fontPt）；
+  // - stages.json（引擎 bbox，无 mode）→ renderPaper（原路径，行为一字未改）。
+  const opts = {
     doc: state.doc,
     paneW: state.paneW,
     diagnostics: state.audit,
     candidateStyle: state.ocrStyle,
     ocrFill: state.ocrFill,
-    onChipClick: (q, page) => {
+    onChipClick: (/** @type {SnapQuestion} */ q, /** @type {SnapPage} */ page) => {
       if (state.pickMode) pickQuestion(q, page);
       else void openSheet(q, page);
     },
@@ -522,7 +527,9 @@ function paper(p) {
       const a = assignmentFor(state.teach?.bindings ?? emptyTeachBindings(), q.id);
       return a.topicIds.length || a.categoryIds.length ? badgeCounts(a) : null;
     },
-  });
+  };
+  if (p.mode === "abs" || p.mode === "flow") return renderFaithful(p, opts);
+  return renderPaper(p, opts);
 }
 
 /* ── 挑题模式（第一步：选中 + 高亮 + 托盘空壳；归类在下一步接入） ── */
@@ -2103,7 +2110,17 @@ async function loadDocs() {
  */
 async function loadDoc(doc) {
   try {
-    state.data = /** @type {Snap} */ (await fetchJson(`/data/out/${enc(doc)}/stages.json`));
+    // 1:1 复刻快照优先（faithful.json，页上带 mode）；没有就回退引擎快照（stages.json）。
+    // 两条路的数据形状对齐（pages[].{index,width,height,columns,blocks,questions}），
+    // 差别只在 block 带 html/fontPt、页带 mode ⇒ 由 paper() 按 mode 选渲染内核。
+    /** @type {unknown} */
+    let snap;
+    try {
+      snap = await fetchJson(`/data/out/${enc(doc)}/faithful.json`);
+    } catch {
+      snap = await fetchJson(`/data/out/${enc(doc)}/stages.json`);
+    }
+    state.data = /** @type {Snap} */ (snap);
     state.doc = doc;
     /** @type {HTMLSelectElement} */ ($("doc-pick")).value = doc;
     /** @type {HTMLAnchorElement} */ ($("lnk-stages")).href = `/stages/?doc=${enc(doc)}&stage=6&page=1`;

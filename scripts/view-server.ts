@@ -346,6 +346,12 @@ interface DocListItem {
   id: string;
   label: string;
   kind: "quiz" | "answer";
+  /**
+   * 该 doc 是否有 `stages.json` 快照。
+   * false 表示它只有 `faithful.json`（DOCX 1:1 复刻），成品页能开、**stages 页不能开**，
+   * 前端据此避免去拉不存在的 stages.json（否则 404 或读到空 pages 后崩）。
+   */
+  hasStages: boolean;
   /** 有 meta.json = 跑过 `npm run daily` 的体检；false 时前端显示「未体检」，不假装健康 */
   examined: boolean;
   stats: Record<string, unknown> | null;
@@ -354,7 +360,8 @@ interface DocListItem {
 
 /**
  * 扫 `data/out/<docId>/`：
- * - **只列有 stages.json 的目录**（没有快照 = 成品页打不开，列出来只会点出 404）；
+ * - 列**有 `stages.json` 或 `faithful.json` 的目录**（二者任一即可打开成品页）；
+ * - `hasStages=false` 的只有 1:1 复刻快照，stages 阶段页不得去读它的 stages.json；
  * - 有 meta.json 就带上体检摘要，没有就 `examined: false`（不猜）。
  */
 async function listDocs(): Promise<DocListItem[]> {
@@ -364,7 +371,9 @@ async function listDocs(): Promise<DocListItem[]> {
   for (const e of entries) {
     if (!e.isDirectory()) continue;
     const dir = join(outRoot, e.name);
-    if (!existsSync(join(dir, "stages.json"))) continue;
+    const hasStages = existsSync(join(dir, "stages.json"));
+    const hasFaithful = existsSync(join(dir, "faithful.json"));
+    if (!hasStages && !hasFaithful) continue;
     let meta: {
       label?: string;
       kind?: "quiz" | "answer";
@@ -380,6 +389,7 @@ async function listDocs(): Promise<DocListItem[]> {
       id: e.name,
       label: meta?.label ?? e.name,
       kind: meta?.kind ?? (/答案|解析/.test(e.name) ? "answer" : "quiz"),
+      hasStages,
       examined: Boolean(meta),
       stats: meta?.stats ?? null,
       health: meta?.health ?? null,

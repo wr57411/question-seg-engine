@@ -22,12 +22,22 @@ export function tagsWriteEnabled(env: NodeJS.ProcessEnv = process.env): boolean 
   return env.TAGS_WRITE !== "0";
 }
 
-/** doc 必须是 `data/out/<doc>/stages.json` 真实存在的目录名：目录名即白名单。 */
+/**
+ * doc 必须是 `data/out/<doc>/` 下**真的有一份纸面快照**的目录名：目录名即白名单。
+ *
+ * 两种快照都算数：
+ * - `stages.json` —— 引擎快照（`renderPaper` 的输入）；
+ * - `faithful.json` —— 1:1 复刻快照（DOCX 原卷坐标，`renderFaithful` 的输入）。
+ * 只认前者会让 faithful 卷「能看不能打标签」（POST 直接 403），见目标文档 G2-6。
+ */
 export async function isKnownDoc(root: string, doc: unknown): Promise<boolean> {
   if (typeof doc !== "string" || !doc || doc.length > DOC_MAX_LEN) return false;
   if (BAD_DOC_CHARS.test(doc)) return false;
-  const info = await stat(join(root, "data", "out", doc, "stages.json")).catch(() => null);
-  return !!info?.isFile();
+  const dir = join(root, "data", "out", doc);
+  const infos = await Promise.all(
+    ["stages.json", "faithful.json"].map((f) => stat(join(dir, f)).catch(() => null)),
+  );
+  return infos.some((info) => !!info?.isFile());
 }
 
 /** 只校验「能不能安全落盘」的最小结构；语义正确性由前端负责。返回错误说明或 null（=通过）。 */
