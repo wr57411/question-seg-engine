@@ -241,14 +241,59 @@ def build_blocks(q):
     return blocks
 
 
+def copy_pages():
+    """返回 {印刷页号: [(文本, H, V), ...]}，只包含「排版副本」section（全册 16 页）。
+
+    为什么需要：原卷 107 页上半是「知识梳理」大表，题目在页面下半部；
+    若复刻页从顶部起排，位置与原卷对不上，就无法「按纸上位置在电子版录入」。
+    副本页的页脚有页码（V>1450 的纯数字框），据此给副本标页号。
+    """
+    pages = {}
+    for blk in top_blocks:
+        if blk["kind"] != "p":
+            continue
+        p = blk["el"]
+        draws = list(p.iter(W + "drawing"))
+        if len(draws) < 20:
+            continue
+        objs, page_no = [], None
+        for d in draws:
+            h = d.find(".//" + WP + "positionH/" + WP + "posOffset")
+            v = d.find(".//" + WP + "positionV/" + WP + "posOffset")
+            t = "".join(x.text or "" for x in d.iter(W + "t")).strip()
+            if h is None or v is None:
+                continue
+            vv = int(v.text) / EMU
+            if t and re.fullmatch(r"\d{1,3}", t) and vv > 1450:
+                page_no = int(t)
+            if t:
+                objs.append((t, round(int(h.text) / EMU, 1), round(vv, 1)))
+        if page_no is not None:
+            pages[page_no] = objs
+    return pages
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     qs = json.load(open(os.path.join(ROOT, "data", "out-doc", "教材基础练-电路", "questions.json"), encoding="utf-8"))
 
+    copies = copy_pages()
     out = []
     for q in qs:
         key = q["id"].split(":")[-1]
         blocks = build_blocks(q)
+        # 题号行文本（qnum 块）→ 在**该题所在页**的副本里精确匹配，避免跨页/跨题撞车
+        qnum_txt = ""
+        for b in blocks:
+            if b.get("cls") == "qnum":
+                qnum_txt = re.sub(r"<[^>]+>", "", b["html"]).strip()[:14]
+                break
+        pos = None
+        if qnum_txt:
+            for t, hh, vv in copies.get(q["page"], []):
+                if t.replace(" ", "")[:14].startswith(qnum_txt.replace(" ", "")):
+                    pos = {"h": hh, "v": vv}
+                    break
         # 题目自带图片（questions.json 由 match_images 写入，已含浮动层配图）
         imgs = q.get("images") or []
         has_inline = any("@@IMG:" in b.get("html", "") for b in blocks if b["t"] == "p")
@@ -267,6 +312,7 @@ def main():
         out.append({
             "key": key, "id": q["id"], "page": q["page"], "answer": q["answer"],
             "column": q["column"], "number": q["number"], "blocks": blocks,
+            "pos": pos,
         })
 
     json.dump({"questions": out, "imgDims": img_dims},
