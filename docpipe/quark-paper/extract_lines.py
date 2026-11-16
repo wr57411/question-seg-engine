@@ -122,8 +122,11 @@ def build_items(q, objs):
         raw = "".join(t.text or "" for t in p.iter(W + "t")).strip()
         # 注意：公式段落没有 w:t（只有 OMML），raw 为空但**不能当空段跳过**，
         # 否则 C/D 选项的分式会静默消失（54-1 实测丢过一次）。
+        # 同理：内联图独占一个 w:p（54-4/55-3/55-4 实测），raw 空且无公式，
+        # 跳过会把题目配图静默丢掉 —— 判据必须加 blip（DOC 真值 diff 抓到）。
         has_math = p.find(".//" + M + "oMath") is not None
-        if (not raw and not has_math) or (raw and (FOOTER.match(raw) or any(rx.match(raw) for rx in STRUCT))):
+        has_img = p.find(".//" + A + "blip") is not None
+        if (not raw and not has_math and not has_img) or (raw and (FOOTER.match(raw) or any(rx.match(raw) for rx in STRUCT))):
             continue
         tb = anc_el(p, W + "tbl")
         if tb is not None:
