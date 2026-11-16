@@ -102,3 +102,47 @@
 - 不补知识梳理表（已定为虚线占位，见 `2026-11-16-quark-format-todo.md`）；
 - 不做手机端文本流（`flowPaper`）与 1:1 内核的适配 —— 留待下一期；
 - 不扩量到其他册。
+
+## 4.3 G1-4 补验：pnpm 迁移（2026-11-16 22:25）
+
+**原判据 G1-4 `npm run check` exit=127（无 `node_modules`）→ 现已全绿（exit=0）。**
+
+### 为什么迁 pnpm
+
+| 项 | 实测 |
+|---|---|
+| 依赖规模 | 6 个 devDependencies，node_modules 47MB |
+| worktree 数 | 6 个，其中 2 个装了依赖（94MB） |
+| pnpm 安装耗时 | **1.1–1.3 秒**（`CI=true pnpm install`） |
+| npm 安装耗时 | 数十秒级 |
+| 磁盘 | 可用 35GB / 228GB（83% 已用）⇒ 省空间非伪需求 |
+
+**主收益不是省那 200MB，而是：每个新 worktree 秒级拥有依赖** —— 直接消除「check 跑不起来」这个反复出现的阻塞。
+
+### 处理过程（含一个危险陷阱）
+
+1. `pnpm import` 在本项目无输出、不生成 lockfile；改用 `pnpm install --lockfile-only` 成功（757ms）。
+2. **危险**：直接 `pnpm install` 提示要删除并重装 **`/Users/john/node_modules`（599MB，用户主目录）**。
+   根因：`/Users/john/pnpm-workspace.yaml`（创建于 2026-11-16 21:37）使主目录成为 workspace 根，
+   本项目在其子树下，pnpm 向上继承。该文件当前内容只有 `allowBuilds`（5 个 AI 相关包），无 `packages` 字段。
+   **处置**：未执行该提示；用 `--ignore-workspace` 完成安装；随后 pnpm 在本项目自动生成了
+   `pnpm-workspace.yaml`，它把项目变成最近的 workspace 根，`pnpm root -w` 已指向项目自身，继承被阻断。
+   **主目录文件未做任何修改**（属个人文件，需用户自行决定是否清理）。
+3. `allowBuilds` 的占位值 `set this to true or false` 会触发交互确认（沙箱内 SIGTERM）；
+   改为 `esbuild: true` + `CI=true` 后无交互，构建脚本正常执行。
+
+### 固化改动
+
+- `package.json` +`packageManager: pnpm@11.1.0`
+- `pnpm-lock.yaml`（17.8KB，由 `pnpm install --lockfile-only` 生成）
+- `pnpm-workspace.yaml`（`allowBuilds: esbuild: true`，兼作 workspace 隔离）
+- 保留 `package-lock.json` 未删（降低回滚成本；两者并存不影响 pnpm）
+
+### 最终验证（实测）
+
+| 步骤 | 结果 |
+|---|---|
+| `CI=true pnpm install` | exit 0，1.1s，esbuild postinstall 正常 |
+| `npm run check` | **exit 0 全绿**；605 例 600 pass / 0 fail / 5 skipped；stamp `30cc8b7992bcd4c7` |
+| 主目录 `node_modules` | 时间戳/大小未变（21:37 / 599MB） |
+| 原 `renderPaper` 路径 | 与改动前像素差 0.0000%（G1-2 复验有效） |
