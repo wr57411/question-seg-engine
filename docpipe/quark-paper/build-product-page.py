@@ -116,6 +116,20 @@ dialog{border:1px solid #ccc;border-radius:8px;padding:14px;max-width:520px;font
 h3{margin:0 0 8px;font-size:14px}
 .paper-host{display:flex;justify-content:center}
 @media(max-width:900px){.pages{flex-direction:column;align-items:center}.page-wrap{max-width:100%}}
+@media print{
+  @page{size:A4;margin:0}
+  header.top,.toolbar,.legend,.page-wrap .cap,.q-chip{display:none !important}
+  body{background:#fff}
+  /* 交互视图只在屏幕显示；打印只看 print-root 的三页，否则 PDF 第 1 页是当前交互页 */
+  #main{display:none !important}
+  main{padding:0;max-width:none}
+  #print-root{display:block}
+  #print-root .page-wrap{border:0;box-shadow:none;page-break-after:always;break-after:page;
+    height:761px;overflow:visible}
+  #print-root .canvas{height:761px !important;width:538px !important}
+  #print-root .page-wrap:last-child{page-break-after:auto;break-after:auto}
+}
+#print-root{display:none}
 """
 
 JS = r"""
@@ -215,6 +229,24 @@ function jump() {
   if (!isNaN(n) && n>=1 && n<=DATA.pages.length) { pageIdx=n-1; draw(); }
 }
 
+// A10/B18：打印时把三页全部展开（默认是交互视图只渲染当前页，直接打印只有 1 页）。
+function buildPrintRoot() {
+  let root = document.getElementById('print-root');
+  if (root) return root;
+  root = el('div'); root.id = 'print-root'; document.body.appendChild(root);
+  const saved = pageIdx;
+  DATA.pages.forEach((pg, i) => {
+    const w = el('div', 'page-wrap');
+    const inner = el('div'); inner.style.width = '538px'; inner.style.margin = '0 auto';
+    renderFaithfulHost(inner, pg, {});
+    w.appendChild(inner); root.appendChild(w);
+  });
+  pageIdx = saved;
+  return root;
+}
+// headless --print-to-pdf 不触发 beforeprint ⇒ 加载后延迟直接建好，
+// 屏幕靠 @media print{display:block} 之外默认 #print-root{display:none} 隐藏。
+buildPrintRoot();
 document.getElementById('btn-product').onclick = () => { mode='product'; draw(); };
 document.getElementById('btn-compare').onclick = () => { mode='compare'; draw(); };
 document.getElementById('go').onclick = jump;
@@ -229,6 +261,14 @@ NEW_SRC = 'img.src = (p.imgData && p.imgData[b.img]) || `/data/out/${enc(doc)}/i
 if OLD_SRC not in KERNEL:
     raise SystemExit("内核图片路径写法已变，打包脚本需同步（拒绝静默丢图）")
 KERNEL = KERNEL.replace(OLD_SRC, NEW_SRC)
+# flow 页的行内占位符走 injectImages()，同样有服务路径写法 —— 之前漏改，
+# 导致 108/109 页 8 张图全显示「原卷插图」占位文字（原尺寸截图才发现）。
+OLD_SRCS = 'const src = `/data/out/${enc(doc)}/images/${enc(rid)}.jpeg`;'
+NEW_SRCS = ('const src = (p.imgData && p.imgData[rid + ".jpeg"]) || '
+            '`/data/out/${enc(doc)}/images/${enc(rid)}.jpeg`;')
+if OLD_SRCS not in KERNEL:
+    raise SystemExit("内核行内图片路径写法已变，打包脚本需同步（拒绝静默丢图）")
+KERNEL = KERNEL.replace(OLD_SRCS, NEW_SRCS)
 
 # 注入数据与页图
 pages_img = {}
@@ -244,8 +284,15 @@ for i, p in enumerate(all_pages, start=1):
 data = json.load(open(os.path.join(DOC, "faithful.json"), encoding="utf-8"))
 # 只内嵌真正被引用的插图：images/ 下有 238 张，本品只用其中十几张，
 # 全量内嵌会把单文件从 ~10MB 撑到 25MB（实测）。
-used = {b.get("img") for pg in data["pages"] for b in pg["blocks"]
-        if b.get("kind") == "image" and b.get("img")}
+used = set()
+for pg in data["pages"]:
+    for b in pg["blocks"]:
+        if b.get("kind") == "image" and b.get("img"):
+            used.add(b["img"])
+        # flow 页：图片是文本里的 @@IMG:rid@@ 占位符，必须一并收集，
+        # 否则 108/109 页的 8 张图会以「原卷插图」占位文字显示（原尺寸截图才发现）
+        for rid in re.findall(r"@@IMG:(\w+)@@", str(b.get("html", ""))):
+            used.add(rid + ".jpeg")
 imgs = {}
 for fn in os.listdir(os.path.join(DOC, "images")):
     if fn not in used:

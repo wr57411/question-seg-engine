@@ -190,6 +190,20 @@ export function renderFaithful(p, opts = {}) {
         // ★ 字号只认 fontPt（原卷 19pt），行盒高另用 linePt（G2-7）
         txt.style.fontSize = `${px(b.fontPt ?? 19)}px`;
         txt.style.lineHeight = `${px(b.linePt ?? 16.4)}px`;
+        // 行内公式框在 DOCX 里常比公式本身窄（bbox 29pt 却要放 60pt 的 5×10^18）。
+        // 严格按 bbox 限宽会让文字溢出到邻栏/纸张外（截图验收 A5 实测 4 处）。
+        // 做法：让块宽按内容自适应，但上限锁在**本栏右缘**，既不裁字，也不越栏。
+        // left/top 不变 ⇒ 1:1 纵向位置保留。
+        const x0pt = b.bbox?.[0] ?? 0;
+        const rightEdge = () => {
+          // 右栏块从右半页开始，右缘用页宽；左栏块到栏分界
+          return x0pt > (p.originWidth ?? p.width) / 2
+            ? (p.originWidth ?? p.width) - 8
+            : (p.originWidth ?? p.width) / 2 - 8;
+        };
+        node.style.width = "auto";
+        node.style.maxWidth = `${px(Math.max(20, rightEdge() - x0pt))}px`;
+        txt.style.whiteSpace = "nowrap";
         node.append(txt);
       }
       node.dataset.bi = String(i);

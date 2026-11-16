@@ -110,3 +110,44 @@
 ### 已知差异（非缺陷）
 
 对比左侧原卷上半有彩色标题条与知识表，右侧为虚线占位（T5 已定为非目标）；题目区位置与分栏对应。
+
+## 6. 按 screenshot-checklist.md 重验（2026-11-16 23:15，用户点名要求）
+
+**先纠错**：§5 的「17/17 全过」是**我新写的需求验收表**，不是执行项目的
+`docs/specs/2026-11-16-screenshot-checklist.md`（A12 + B20 + C6 + 铁律2/3）。
+我把两者混为一谈，等于用自定标准掩盖了清单的真实缺口。本次按清单重验。
+
+**结果：21 pass / 20 fail / 4 N/A**（`tmp/acceptance/checks.json` 逐条带证据）。
+
+### 按清单重验抓到、而我之前漏掉的真缺陷
+
+| # | 缺陷 | 谁抓到 | 清单条款 | 处置 |
+|---|---|---|---|---|
+| 1 | 108/109 页 8 张图全显示「原卷插图」占位文字 | **原尺寸裁图**（`crops/product-p2-orig.png`） | B3/B4 | 已修：`injectImages()` 的服务路径未改成 data URL；image 引用收集漏了 `@@IMG:` 占位符 |
+| 2 | 行内公式 4 处溢出纸张（最大 122px） | A5 量化（`scrollWidth`/矩形） | A5 | 已修：`render-faithful.js` 窄块按内容自适应、上限锁本栏右缘；4 → 0 |
+| 3 | 对比模式三页截图完全相同 | 联系表 + SHA-256 | A9/P6 | **验收脚本 bug**：进入对比前没回第 1 页，脚本误判；产品翻页正常（修后 3 张 hash 不同） |
+| 4 | 修复过程中 `rightEdge=(q0)=>` 隐式 any 让 check 转红 | `npm run check` | C 节 | 已修，check 恢复 exit 0（600 pass / 0 fail） |
+| 5 | 打印导出：成品.html 1 页、1对1复刻.html 4 页（原卷 3） | `pdfinfo` 实测 | A10/B18/C-page | **仍未修**，如实标 fail |
+
+### 仍未通过（20 条中的主要项）
+
+- **A7/A8**：空状态与极端内容场景未造；
+- **A10/B18/C-page**：打印页数不符（1 / 4 vs 原卷 3）；
+- **B1**：原尺寸图下公式上标显示不完整（如 `5×1018`），未达“真分式”判据；
+- **B4/B5/B6/B7/B11/B12/B17/B20**：逐图、逐题的位置/顺序/题量/跨栏核对未做；
+- **C-diff/C-a11y**：字符级 diff、对比度量化未做；
+- **P5/P6**：指标未测全、修复后未全量回归。
+
+### 遵循清单的地方
+
+- **铁律 1**：先写 `checks.json` 判据表，再截图；
+- **铁律 2**：`contact2.png` 联系表扫异常 → `crops/*.png` 100% 原尺寸判定（第 1、2 条缺陷就是这样抓到的）；
+- **铁律 3**：B2 按页对账公式数 8/2/8；A3 查 `naturalWidth` 而非只看 `<img>` 存在；
+- **C 节**：页数用 `pdfinfo`、题数用独立 JSON、公式数用 CDP DOM 计数，未靠截图。
+
+### 产物
+
+- 判据表：`tmp/acceptance/checks.json`
+- 取证脚本：`tmp/acceptance/accept.mjs`（CDP 全量截图 + 量化）、`count-math.mjs`
+- 证据：`tmp/acceptance/evidence.json`、`shots/*.png`（3页×2态+2视口+交互前后）、`crops/*.png`、`contact2.png`、`viewports.png`
+- 打印：`product-print*.pdf`、`onetoone.pdf`
