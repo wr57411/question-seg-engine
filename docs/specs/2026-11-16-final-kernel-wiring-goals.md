@@ -146,3 +146,30 @@
 | `npm run check` | **exit 0 全绿**；605 例 600 pass / 0 fail / 5 skipped；stamp `30cc8b7992bcd4c7` |
 | 主目录 `node_modules` | 时间戳/大小未变（21:37 / 599MB） |
 | 原 `renderPaper` 路径 | 与改动前像素差 0.0000%（G1-2 复验有效） |
+
+## 4.4 收尾：主目录 workspace 撤销 + 基线夹具命令（2026-11-16 22:35）
+
+### 主目录 workspace 文件：已撤销（经用户授权「不合适就撤销」）
+
+- 文件：`/Users/john/pnpm-workspace.yaml`，21:37 由用户在终端直接跑 `pnpm install` 时生成，
+  内容全是未填写占位符 `set this to true or false`（5 个包），**不是有效配置**。
+- 风险确认：它使 `/Users/john` 成为 workspace 根，子树项目 `pnpm install` 会被吸到主目录；
+  实测曾提示「删除并重装 /Users/john/node_modules（599MB）」。
+- 处置（遵守个人文件安全）：先备份到 `tmp/backup/pnpm-workspace.home.yaml`（SHA-1 校验一致），
+  再用 macOS `/usr/bin/trash` 送废纸篓，**未直接删除**。
+- 复核：主目录 workspace 已不存在；`node_modules/jsdom`、`@deepseek-ai/dsh` 完好；项目 check 仍 exit 0。
+
+### 基线夹具命令：`pnpm run fixtures:baseline`
+
+- 脚本：`scripts/fixtures-baseline.mjs`；`package.json` 新增 script（紧跟 check）。
+- 设计（第一性原理）：`data/out` 是 gitignore 快照，**不能进 git**；新 worktree 必须从已有快照复制。
+  源**不硬编码路径** —— 走 `git worktree list --porcelain` 自动发现，也可 `FIXTURE_SOURCE=<path>` 显式指定。
+- 范围：从 `scripts/audit-render-all.mjs` 正则提取 `BASELINE_DOCS`（避免两处硬编码漂移），
+  再从 `bank-bindings.json` 取 quiz/answer 并集 → 8 卷 × 3 文件（`stages.json`/`questions.json`/`meta.json`），共 12MB。
+- 实测：
+  - 干净克隆目录（无 `data/out`）首次运行 → 复制 24 个文件、落盘 8 卷 12MB；
+  - 再跑一次 → 复制 0、跳过 24（幂等）；
+  - 本工作区再跑 → 复制 0、跳过 24（幂等）；
+  - 随后 `npm run check` exit 0，605 例 600 pass / 0 fail / 5 skipped。
+- 过程中修了 3 个真 bug：`FIXTURE_SOURCE` 被 `candidates.length` 提前返回挡住；
+  macOS `/tmp` → `/private/tmp` 软链导致路径比较失效；占位符 `allowBuilds` 触发交互确认（改 `esbuild: true` + `CI=true`）。
