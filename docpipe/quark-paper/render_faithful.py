@@ -93,6 +93,16 @@ def abs_sheet(qs, copy_imgs, blanks):
                 used_img.add(crid)
                 parts.append('<img class="aimg" src="%s" style="left:%.1fpt;top:%.1fpt;width:%.1fpt;height:%.1fpt">'
                              % (img_src(crid), h * SCALE, v * SCALE, w * SCALE, hh * SCALE))
+    # 大面积未渲染区（如 107 页 978x574pt 的知识梳理表）：画虚线框并标注，
+    # 既保持版面比例，也不让人误以为「原卷这里什么都没有」。
+    topic_rids = {r for q in qs for r in q.get("_img_rids", [])}
+    for crid, h, v, w, hh in copy_imgs:
+        if crid in used_img or crid in topic_rids:
+            continue
+        if w * SCALE > 300 and hh * SCALE > 150:
+            parts.append('<div class="gapbox" style="left:%.1fpt;top:%.1fpt;width:%.1fpt;height:%.1fpt">'
+                         '原卷此处：知识梳理表（%.0f×%.0fpt）<br>本层未渲染</div>'
+                         % (h * SCALE, v * SCALE, w * SCALE, hh * SCALE, w, hh))
     return '<section class="sheet abs">%s<div class="folio">%d</div></section>' % (
         "".join(parts), qs[0]["page"])
 
@@ -145,6 +155,9 @@ body{font-family:"Songti SC","SimSun","Noto Serif CJK SC",serif;color:#111;
   overflow:hidden}
 .sheet.abs .aln{position:absolute;white-space:nowrap;line-height:16.4pt}
 .sheet.abs .aimg{position:absolute}
+.gapbox{position:absolute;border:0.6pt dashed #c9c2b2;color:#a89f8c;font-size:8pt;
+  line-height:1.5;display:flex;align-items:center;justify-content:center;text-align:center;
+  background:#fcfbf7}
 .fcol{position:absolute;top:0;width:__CW__pt}
 .fcol.left{left:__LM__pt}
 .fcol.right{left:__RM__pt}
