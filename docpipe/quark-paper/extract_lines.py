@@ -140,7 +140,9 @@ def build_items(q, objs):
         if html:
             # 匹配口径：两边去全部空白（含 \t——文本内的制表符 replace(" ") 清不掉）
             # + 包含匹配（LO 渲染会给题号加前缀，如 "–42024广西卷…"，前缀等值会失配）
-            # + 从上一命中处单调推进（同页重复的选项行不会错配到前一题）。
+            # + 单调推进。注意：_match_at 是题级游标，跨题会重置——同页跨题的
+            # 重复行（短选项行）存在错配到前一题的风险；重启 LO_COORDS 前必须
+            # 把游标提升到页级（独立评审 2026-11-17 WARN2）。
             key_txt = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "",
                              re.sub(r"@@IMG:\w+@@", "", html)))[:10]
             pos = None
@@ -254,8 +256,12 @@ def main():
     copy_imgs = copy_images()
     # LO 渲染坐标：DOCX 排版副本没覆盖的页（108/109）用它补行级坐标。
     # 坐标系同为 1107×1584pt；副本页的坐标权威度更高，只在副本缺失时回退。
+    # LO 渲染坐标默认关闭：它是「LO 绕排片段」的坐标，而成品行是「原卷整行」——
+    # 绕图排版的片段起点 + 整行 nowrap 渲染 = 文字压图/跨栏叠印（2026-11-17 实测，
+    # 截图用户点名）。要启用需先解决「整行按可用宽度绕图重排」，见 diff-report §六。
     lo_path = os.path.join(OUT, "lo_coords.json")
-    lo_coords = json.load(open(lo_path, encoding="utf-8")) if os.path.exists(lo_path) else {}
+    lo_coords = (json.load(open(lo_path, encoding="utf-8"))
+                 if os.environ.get("LO_COORDS") == "1" and os.path.exists(lo_path) else {})
     out = []
     for q in qs:
         key = q["id"].split(":")[-1]

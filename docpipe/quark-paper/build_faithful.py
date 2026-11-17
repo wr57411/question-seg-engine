@@ -43,6 +43,7 @@ def blocks_from_page(qs, pno, copy_imgs, blanks, qjson, img_dims=None):
     qdefs = []
     used_blank = set()
     used_img = set()
+    drops = {"无坐标文本行": 0, "公式行无空框": 0, "内联图无坐标": 0, "表格无坐标": 0, "图缺尺寸": 0}
 
     for q in qs:
         idxs = []
@@ -50,6 +51,8 @@ def blocks_from_page(qs, pno, copy_imgs, blanks, qjson, img_dims=None):
         for it in q["items"]:
             if it["t"] == "tbl":
                 # 55-6 的参数表：abs 页按插值坐标落位，宽=栏宽，高=行数×行距。
+                if not it.get("pos"):
+                    drops["表格无坐标"] += 1
                 if it.get("pos"):
                     rows = it["rows"]
                     cw = [c.get("w") or 60 for c in (rows[0] if rows else [])]
@@ -82,15 +85,23 @@ def blocks_from_page(qs, pno, copy_imgs, blanks, qjson, img_dims=None):
                     continue
                 has_float = any(crid == rid for crid, _, _, _, _ in copy_imgs)
                 used_img.add(rid)
-                if has_float or not pos:
-                    continue  # 浮动图走下面的 copyImages 落位；无坐标行不落
-                dw, dh = (img_dims or {}).get(rid, (150.0, 120.0))
+                if has_float:
+                    continue  # 浮动图走下面的 copyImages 落位
+                if not pos:
+                    drops["内联图无坐标"] += 1
+                    continue
+                if rid not in (img_dims or {}):
+                    drops["图缺尺寸"] += 1
+                    continue  # 不给假尺寸，宁可显式丢并报数
+                dw, dh = img_dims[rid]
                 idxs.append(len(blocks))
                 blocks.append({"kind": "image", "img": rid + ".jpeg",
                                "bbox": [r(pos["h"] * SCALE), r(pos["v"] * SCALE),
                                         r((pos["h"] + dw) * SCALE),
                                         r((pos["v"] + dh) * SCALE)]})
             if pos is None:
+                if "<math" not in html:
+                    drops["无坐标文本行"] += 1
                 if "<math" in html and prev is not None:
                     # 同栏 + 代价 10·|Δv| + |Δh|（v 优先、同 v 时按 h）。
                     # v 必须先看：一行里可以并排两个公式（教材 54-2 的
@@ -99,6 +110,8 @@ def blocks_from_page(qs, pno, copy_imgs, blanks, qjson, img_dims=None):
                     cand = [(10 * abs(bv - prev["v"]) + abs(bh - prev["h"]), i)
                             for i, (bh, bv, bw, bhh) in enumerate(blanks)
                             if i not in used_blank and (bh < mid) == (prev["h"] < mid)]
+                    if not cand:
+                        drops["公式行无空框"] += 1
                     if cand:
                         _, bi = min(cand)
                         bh, bv, bw, bhh = blanks[bi]
@@ -133,6 +146,9 @@ def blocks_from_page(qs, pno, copy_imgs, blanks, qjson, img_dims=None):
                                             r((h + w) * SCALE), r((v + hh) * SCALE)]})
                     break
 
+    # 丢弃账目（独立评审 WARN3）：静默丢=第 4 次事故的温床，当场报数
+    if any(drops.values()):
+        print("  [abs丢弃账目] 页%d: %s" % (pno, {k: v for k, v in drops.items() if v}))
     # 大面积未渲染区（知识梳理表）：虚线占位，保持版面比例（与 1对1复刻 同文案）
     topic_rids = {im.get("rid") for q in qs for im in (qjson.get(q["key"]) or {}).get("images", [])}
     for crid, h, v, w, hh in copy_imgs:
