@@ -148,7 +148,7 @@ def build_items(q, objs):
             pos = None
             if key_txt:
                 for i in range(_match_at[0], len(objs)):
-                    t, hh, vv = objs[i]
+                    t, hh, vv = objs[i][0], objs[i][1], objs[i][2]
                     if key_txt in re.sub(r"\s+", "", t):
                         pos = {"h": hh, "v": vv}
                         _match_at[0] = i + 1

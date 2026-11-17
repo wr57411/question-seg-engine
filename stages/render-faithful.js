@@ -36,7 +36,7 @@ export const FAITHFUL_EXP_GUTTER = FAITHFUL_GUTTER + 14;
  * @typedef {{ id: string, number: string, section?: string, type?: string, blocks: number[],
  *   startsHere?: boolean, col?: number }} FaithfulQuestion
  * @typedef {{ index: number, pageNo?: number, width: number, height: number, columns?: number,
- *   mode?: "abs" | "flow", originWidth?: number, originHeight?: number,
+ *   mode?: "abs" | "flow", wrap?: boolean, originWidth?: number, originHeight?: number,
  *   blocks: FaithfulBlock[], questions: FaithfulQuestion[],
  *   flow?: { left: number, right: number, width: number, linePt: number },
  *   imgDims?: Record<string, number[]> }} FaithfulPage
@@ -209,9 +209,18 @@ export function renderFaithful(p, opts = {}) {
             ? (p.originWidth ?? p.width) - 8
             : (p.originWidth ?? p.width) / 2 - 8;
         };
-        node.style.width = "auto";
-        node.style.maxWidth = `${px(Math.max(20, rightEdge() - x0pt))}px`;
-        txt.style.whiteSpace = "nowrap";
+        if (p.wrap) {
+          // LO 坐标页：块定位于首片段，宽度已由 posStyle 按 bbox 百分比给足，
+          // 块内按栏宽换行（字号/行距=DOC 实测值 ⇒ 拆行位置与 DOC 渲染一致）。
+          // 注意：不能用 px(bbox宽) 覆盖宽度——px 是原卷 pt 换算，bbox 是 sheet pt，
+          // 会把宽度砍半（实测 120/226）。
+          // 宽度交由 posStyle 按 bbox 百分比设置，这里不覆盖、不清空。
+          txt.style.whiteSpace = "normal";
+        } else {
+          node.style.width = "auto";
+          node.style.maxWidth = `${px(Math.max(20, rightEdge() - x0pt))}px`;
+          txt.style.whiteSpace = "nowrap";
+        }
         node.append(txt);
       }
       node.dataset.bi = String(i);

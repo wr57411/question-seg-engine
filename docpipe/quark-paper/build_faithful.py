@@ -17,6 +17,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 DOC = "教材基础练-电路"
 OUT = os.path.join(ROOT, "data", "out-doc", DOC)
 LINES = os.path.join(ROOT, "tmp", "docpipe-m6", "lines.json")
+M6 = os.path.join(ROOT, "tmp", "docpipe-m6")
 
 PAGE_W, PAGE_H = 1107.0, 1584.0
 SCALE = 842.0 / PAGE_H           # 0.53156
@@ -190,6 +191,124 @@ def blocks_from_flow(qs, qjson, img_dims):
     return blocks, qdefs
 
 
+
+def blocks_from_lofrag(frag_data, qjson):
+    """LO 片段级坐标（108/109 页）：frag_blocks.json 的行/图/gap 全部按 DOC 渲染坐标落位。"""
+    blocks, qdefs_acc = [], {}
+    def qid_of(qid):
+        return qid  # "54-3" 形式
+    for f in frag_data.get("frags", []):
+        for b in f.get("blocks", []):
+            idx = len(blocks)
+            bbox = [r(b["x"] * SCALE), r(b["y"] * SCALE),
+                    r((b["x"] + COL_W) * SCALE), r((b["y"] + LINE_BOX) * SCALE)]
+            blocks.append({"kind": "text", "bbox": bbox,
+                           "html": (b["html"] or "").strip() or " ",
+                           "fontPt": ORIG_FONT, "linePt": LINE_BOX})
+            qk = b.get("qid")
+            if qk:
+                qdefs_acc.setdefault(qk, []).append(idx)
+    for im in frag_data.get("images", []):
+        blocks.append({"kind": "image", "img": im["rid"] + ".jpeg",
+                       "bbox": [r(im["x"] * SCALE), r(im["y"] * SCALE),
+                                r((im["x"] + im["w"]) * SCALE), r((im["y"] + im["h"]) * SCALE)]})
+    for g in frag_data.get("gapBoxes", []):
+        blocks.append({"kind": "gap",
+                       "bbox": [r(g["x"] * SCALE), r(g["y"] * SCALE),
+                                r((g["x"] + g["w"]) * SCALE), r((g["y"] + g["h"]) * SCALE)],
+                       "html": '原卷此处：%s<br>本层未渲染' % g["label"]})
+    # qdefs 必须与 pq 同序（下游 zip 按位置配对）
+    return blocks, qdefs_acc
+
+
+
+
+def blocks_from_lo_items(pq, pno, imgpos_page, pitch_orig, qjson):
+    """item 级换行 abs（108/109 页，LO 坐标）：每个 item 定位到其首片段坐标，
+    块内按栏宽换行（字号/行距用 DOC 渲染实测值），图片用 pdfminer 精确 bbox。
+    内容完整性由构造保证（不切片）。"""
+    blocks, qdefs_acc = [], {}
+    pitch = pitch_orig * SCALE
+    img_by_rid = {m["rid"]: m for m in imgpos_page}
+    img_rects = [(m["x"], m["yTop"], m["x"] + m["w"], m["yTop"] + m["h"])
+                 for m in imgpos_page]
+    for q in pq:
+        idxs = []
+        for it in q["items"]:
+            pos = it.get("pos")
+            if it["t"] == "tbl":
+                # 55-6 风扇参数表：题目内容，必须渲染（插值坐标 + 表格 html）
+                if not pos:
+                    continue
+                rows = it["rows"]
+                cw = [c.get("w") or 60 for c in (rows[0] if rows else [])]
+                total = sum(cw) or 1
+                colgroup = "".join('<col style="width:%.1f%%">' % (100.0 * w / total) for w in cw)
+                body = "".join(
+                    "<tr>" + "".join("<td>%s</td>" % c.get("html", "") for c in row) + "</tr>"
+                    for row in rows)
+                thtml = ('<table class="faithful-table"><colgroup>%s</colgroup>'
+                         '<tbody>%s</tbody></table>' % (colgroup, body))
+                nh = max(len(rows), 1) * pitch
+                idxs.append(len(blocks))
+                blocks.append({"kind": "table",
+                               "bbox": [r(pos["h"] * SCALE), r(pos["v"] * SCALE),
+                                        r((pos["h"] + COL_W) * SCALE), r((pos["v"] + nh) * SCALE)],
+                               "html": thtml, "fontPt": ORIG_FONT})
+                continue
+            if it["t"] != "ln":
+                continue
+            html = re.sub(r"@@IMG:\w+@@", "", it["html"])
+            plain, _ = strip_math_txt(html)
+            if not plain.strip() and "<math" in html:
+                # 纯公式 item：整行 MathML，按插值坐标落位（内容零丢失）
+                if not pos:
+                    continue
+                idxs.append(len(blocks))
+                blocks.append({"kind": "text",
+                               "bbox": [r(pos["h"] * SCALE), r(pos["v"] * SCALE),
+                                        r((pos["h"] + COL_W) * SCALE), r((pos["v"] + pitch) * SCALE)],
+                               "html": html, "fontPt": ORIG_FONT, "linePt": r(pitch, 2),
+                               "wrap": True})
+                continue
+            if not plain.strip():
+                continue  # 纯图 item：图片按题归属落位
+            if pos is None:
+                continue  # 无坐标（不应发生，extract_lines 已 100% 匹配）
+            # 图形感知宽度：块与图垂直相交时，块宽缩到图左缘（文字绕图，不压图）。
+            # 与 54-3 题干压风速仪图实测对应；图在块左侧的情形（少见）本册无，留待需要时扩展。
+            bw = COL_W
+            bx = pos["h"]
+            for (ix0, iy0, ix1, iy1) in img_rects:
+                if iy0 < pos["v"] + pitch and iy1 > pos["v"] and ix0 > bx:
+                    bw = min(bw, ix0 - bx - 6)
+            bw = max(60, bw)
+            idxs.append(len(blocks))
+            blocks.append({"kind": "text",
+                           "bbox": [r(bx * SCALE), r(pos["v"] * SCALE),
+                                    r((bx + bw) * SCALE), r((pos["v"] + pitch) * SCALE)],
+                           "html": html, "fontPt": ORIG_FONT, "linePt": r(pitch, 2),
+                           "wrap": True})
+        # 题图：按题归属 + DOC 渲染精确位置
+        meta = qjson.get(q["key"]) or {}
+        for im in meta.get("images", []):
+            m = img_by_rid.get(im.get("rid"))
+            if not m:
+                continue
+            idxs.append(len(blocks))
+            blocks.append({"kind": "image", "img": m["rid"] + ".jpeg",
+                           "bbox": [r(m["x"] * SCALE), r(m["yTop"] * SCALE),
+                                    r((m["x"] + m["w"]) * SCALE), r((m["yTop"] + m["h"]) * SCALE)]})
+        qdefs_acc[q["key"]] = idxs
+    qdefs = [{"key": q["key"], "idxs": qdefs_acc.get(q["key"], [])} for q in pq]
+    return blocks, qdefs
+
+
+def strip_math_txt(html):
+    t = re.sub(r"<math[\s\S]*?</math>", "", html)
+    t = re.sub(r"<[^>]+>", "", t)
+    return t, []
+
 def main():
     data = json.load(open(LINES, encoding="utf-8"))
     qs_all = data["questions"]
@@ -198,6 +317,23 @@ def main():
     blanks = {int(k): v for k, v in data.get("blanks", {}).items()}
     qjson = {q["id"].split(":")[-1]: q for q in
              json.load(open(os.path.join(OUT, "questions.json"), encoding="utf-8"))}
+    frag_path = os.path.join(M6, "frag_blocks.json")
+    lofrag_data = json.load(open(frag_path, encoding="utf-8")) if os.path.exists(frag_path) else {}
+    imgpos_path = os.path.join(M6, "lo_imgpos.json")
+    imgpos_data = json.load(open(imgpos_path, encoding="utf-8")) if os.path.exists(imgpos_path) else {}
+    # 每页行距实测（LO 渲染相邻行 y 差的中位数，原卷 pt）
+    lo_path = os.path.join(M6, "lo_coords.json")
+    PITCH_ORIG = {}
+    if os.path.exists(lo_path):
+        _lo = json.load(open(lo_path, encoding="utf-8"))
+        import statistics as _st
+        for _pg, _lines in _lo.items():
+            _pitches = []
+            for _col in (0, 1):
+                _ls = sorted([l for l in _lines if (l[1] < 553) == (_col == 0)], key=lambda l: l[2])
+                _pitches += [b[2] - a[2] for a, b in zip(_ls, _ls[1:])]
+            if _pitches:
+                PITCH_ORIG[int(_pg)] = _st.median(_pitches)
 
     pages_src = sorted({q["page"] for q in qs_all})
     pages = []
@@ -206,7 +342,17 @@ def main():
         lines = [it for q in pq for it in q["items"] if it["t"] == "ln"]
         npos = sum(1 for it in lines if it.get("pos"))
         has_pos = bool(lines) and npos >= len(lines) * 0.7
-        if has_pos:
+        lofrag = lofrag_data.get(str(pno))
+        if lofrag:
+            # LO 坐标 item 级换行 abs：首片段坐标 + 块内换行（内容零切片零丢失）
+            pitch_orig = PITCH_ORIG.get(pno, 38.0)
+            blocks, qdefs = blocks_from_lo_items(pq, pno, imgpos_data.get(str(pno), []),
+                                                 pitch_orig, qjson)
+            page = {"index": arr_i, "pageNo": pno, "width": SHEET_W, "height": SHEET_H,
+                    "columns": 2, "mode": "abs", "originWidth": PAGE_W, "originHeight": PAGE_H,
+                    "originScale": round(SCALE, 6), "blocks": blocks,
+                    "wrap": True}
+        elif has_pos:
             blocks, qdefs = blocks_from_page(pq, pno, copy_imgs.get(pno, []),
                                              blanks.get(pno, []), qjson, img_dims)
             page = {"index": arr_i, "pageNo": pno, "width": SHEET_W, "height": SHEET_H,

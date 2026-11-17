@@ -82,15 +82,16 @@ def lines_from_bbox(xml_path):
         col = 0 if x0 < MID else 1
         hit = None
         for ln in reversed(lines[-6:]):
-            if ln["col"] == col and abs(ln["y"] - y) <= 4.0:
+            if ln["col"] == col and abs(ln["y"] - y) <= 1.5:
                 hit = ln
                 break
         if hit is not None:
             hit["text"] += t
+            hit["x0"] = min(hit["x0"], x0)  # 杂散词（如游离的连字符）不能带偏行起点
             hit["x1"] = max(hit["x1"], x1)
         else:
             lines.append({"y": y, "x0": x0, "x1": x1, "text": t, "col": col})
-    return [[ln["text"], round(ln["x0"], 1), round(ln["y"], 1)]
+    return [[ln["text"], round(ln["x0"], 1), round(ln["y"], 1), round(ln["x1"], 1)]
             for ln in sorted(lines, key=lambda l: (l["y"], l["x0"]))]
 
 
