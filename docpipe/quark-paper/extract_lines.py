@@ -117,6 +117,7 @@ def build_items(q, objs):
     """
     s, e = q["paraRange"]
     items, seen = [], set()
+    _match_at = [0]  # objs 里的单调游标（跨题共享列表，闭包可写）
     for n in range(s, e + 1):
         p = paras[n - 1]
         raw = "".join(t.text or "" for t in p.iter(W + "t")).strip()
@@ -137,12 +138,18 @@ def build_items(q, objs):
             continue
         html = run_html(p).strip()
         if html:
-            key_txt = re.sub(r"<[^>]+>", "", re.sub(r"@@IMG:\w+@@", "", html)).replace(" ", "")[:10]
+            # 匹配口径：两边去全部空白（含 \t——文本内的制表符 replace(" ") 清不掉）
+            # + 包含匹配（LO 渲染会给题号加前缀，如 "–42024广西卷…"，前缀等值会失配）
+            # + 从上一命中处单调推进（同页重复的选项行不会错配到前一题）。
+            key_txt = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "",
+                             re.sub(r"@@IMG:\w+@@", "", html)))[:10]
             pos = None
             if key_txt:
-                for t, hh, vv in objs:
-                    if t.replace(" ", "")[:10] == key_txt:
+                for i in range(_match_at[0], len(objs)):
+                    t, hh, vv = objs[i]
+                    if key_txt in re.sub(r"\s+", "", t):
                         pos = {"h": hh, "v": vv}
+                        _match_at[0] = i + 1
                         break
             items.append({"t": "ln", "html": html, "pos": pos})
     return items
@@ -210,16 +217,50 @@ def copy_images():
     return pages
 
 
+LO_LINE = 43.75  # 原卷行距（pt）：插值用，与 build-faithful 的 LINE_BOX 同源
+
+
+def interpolate_pos(items):
+    """给没匹配到坐标的行插值：沿用同栏上一行的 (H, V+行距·间隔)。
+
+    题目行在原卷是等行距节奏（43.75pt），前一行有坐标时直接外推；
+    没有前行就借后面最近的同行行（V - 行距·间隔）。仍无则放弃（保持 None，
+    调用方按缺坐标页处理，不许静默给个假坐标）。
+    """
+    prev = None
+    for i, it in enumerate(items):
+        if it.get("pos"):
+            prev = it["pos"]
+            continue
+        nxt = None
+        for it2 in items[i + 1:]:
+            if it2.get("pos"):
+                nxt = it2["pos"]
+                break
+        if prev is not None:
+            it["pos"] = {"h": prev["h"], "v": round(prev["v"] + LO_LINE, 1)}
+        elif nxt is not None:
+            it["pos"] = {"h": nxt["h"], "v": round(nxt["v"] - LO_LINE, 1)}
+        else:
+            continue
+        prev = it["pos"]
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     qs = json.load(open(os.path.join(ROOT, "data", "out-doc", "教材基础练-电路", "questions.json"),
                         encoding="utf-8"))
     copies = copy_pages()
     copy_imgs = copy_images()
+    # LO 渲染坐标：DOCX 排版副本没覆盖的页（108/109）用它补行级坐标。
+    # 坐标系同为 1107×1584pt；副本页的坐标权威度更高，只在副本缺失时回退。
+    lo_path = os.path.join(OUT, "lo_coords.json")
+    lo_coords = json.load(open(lo_path, encoding="utf-8")) if os.path.exists(lo_path) else {}
     out = []
     for q in qs:
         key = q["id"].split(":")[-1]
-        items = build_items(q, copies.get(q["page"], {}).get("objs", []))
+        objs = copies.get(q["page"], {}).get("objs") or lo_coords.get(str(q["page"]), [])
+        items = build_items(q, objs)
         head = ""
         for it in items:
             if it["t"] == "ln":
@@ -230,6 +271,10 @@ def main():
             if head and t.replace(" ", "")[:14].startswith(head.replace(" ", "")):
                 pos = {"h": hh, "v": vv}
                 break
+        # LO 坐标页：没匹配上的行（公式行/断行差异）按等行距外推补坐标。
+        # 副本页不动（107 页的 DOCX 坐标 + 公式空框机制是原口径）。
+        if not copies.get(q["page"], {}).get("objs"):
+            interpolate_pos(items)
         out.append({"key": key, "page": q["page"], "answer": q["answer"],
                     "column": q["column"], "number": q["number"],
                     "items": items, "pos": pos})
