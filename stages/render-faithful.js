@@ -48,24 +48,32 @@ export const FAITHFUL_EXP_GUTTER = FAITHFUL_GUTTER + 14;
  */
 
 /**
- * 行内图片占位（`@@IMG:rId123@@`）→ 真实 `<img>`。尺寸取页面 `imgDims`（原卷 pt × 页面比例）。
- * 只在 `mode:'flow'` 的 html 里出现（abs 页的图由 `copyImages` 单独成块）。
+ * 行内图片占位（`@@IMG:rId123@@`）→ 真实 `<img>`。尺寸取页面 `imgDims`（原卷 pt）。
+ * 只在 html 里出现（abs 页的图由 `copyImages` 单独成块）。
+ * ★ 尺寸必须走 `toPx`（与文字同一 pt→px 映射）。不能写 CSS `pt`：CSS 的 1pt=1.333px
+ *   是绝对单位，不随画布缩放走，实测图被放大 1.59 倍溢出栏外压住邻栏文字（108/109 页）。
+ * `maxWPx`（可选）：栏宽上限，超宽时等比缩到栏内（不裁切、不失真）。
  * @param {string} html
  * @param {FaithfulPage} p
  * @param {string} doc
+ * @param {(pt: number) => number} toPx 原卷 pt → 画布 px
+ * @param {number} [maxWPx] 图片宽度上限（px，通常为本栏宽）
  * @returns {string}
  */
-function injectImages(html, p, doc) {
+function injectImages(html, p, doc, toPx, maxWPx) {
   if (!html || html.indexOf("@@IMG:") < 0) return html;
-  const k = p.originWidth ? p.width / p.originWidth : 1;
   return html.replace(/@@IMG:(\w+)@@/g, (_m, /** @type {string} */ rid) => {
     const d = p.imgDims?.[rid];
-    const w = d ? d[0] * k : 60;
-    const h = d ? d[1] * k : 45;
+    let w = toPx(d ? d[0] : 60);
+    let h = toPx(d ? d[1] : 45);
+    if (maxWPx && w > maxWPx && w > 0) {
+      h = (h * maxWPx) / w;
+      w = maxWPx;
+    }
     const src = `/data/out/${enc(doc)}/images/${enc(rid)}.jpeg`;
     return (
       `<img class="faithful-img" src="${src}" alt="原卷插图" ` +
-      `style="width:${w.toFixed(2)}pt;height:${h.toFixed(2)}pt;object-fit:contain;vertical-align:middle">`
+      `style="width:${w.toFixed(2)}px;height:${h.toFixed(2)}px;object-fit:contain;vertical-align:middle">`
     );
   });
 }
@@ -186,7 +194,7 @@ export function renderFaithful(p, opts = {}) {
       } else {
         const txt = el("span", "txt");
         // ★ 公式直通：html（MathML）原样写入，绝不过 prettifyLatex（G2-5）
-        txt.innerHTML = injectImages(b.html ?? "", p, doc);
+        txt.innerHTML = injectImages(b.html ?? "", p, doc, px);
         // ★ 字号只认 fontPt（原卷 19pt），行盒高另用 linePt（G2-7）
         txt.style.fontSize = `${px(b.fontPt ?? 19)}px`;
         txt.style.lineHeight = `${px(b.linePt ?? 16.4)}px`;
@@ -237,7 +245,9 @@ export function renderFaithful(p, opts = {}) {
           node.append(tableNode(b, px(b.fontPt ?? 19)));
         } else {
           const txt = el("span", "txt");
-          txt.innerHTML = injectImages(b.html ?? "", p, doc);
+          // 图片宽度钳到本栏宽内（rId444 缩放后 234pt ≥ 栏宽 232pt，不钳会溢出到邻栏）
+          const colWPx = (flow.width / p.width) * innerW;
+          txt.innerHTML = injectImages(b.html ?? "", p, doc, px, colWPx);
           txt.style.fontSize = `${px(b.fontPt ?? 19)}px`;
           txt.style.lineHeight = `${px(flow.linePt)}px`;
           node.append(txt);
