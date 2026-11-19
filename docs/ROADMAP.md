@@ -4,6 +4,7 @@
 > **画法约定**：`┌─┐ │ └─┘` 是方框，`→ ↓` 是流向，`✓` 已成立 / `✗` 已证伪，`⚠` 未闭合风险。
 > 数字均为 **2026-11-02 实跑**（`git log` / `npm test` / `npm run preflight`），不写死过期值。
 > 配套阅读：`docs/HANDOFF.md`（当前状态与风险）、`docs/BACKLOG.md`（台账）、`docs/DECISIONS.md`（决策全文，§1–§99）。
+> **目标意图/背景**见 `docs/INTENT.md`（管家记录的用户目标，防上下文遗漏）；**目标→路线→可验收子目标清单**见 `docs/ROUTE-LEDGER.md`（长程任务主导清单）。
 
 ---
 
