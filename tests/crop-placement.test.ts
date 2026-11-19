@@ -316,6 +316,82 @@ test("diagnostics 开：crop 节点带 bbox 审计框；默认不画", () => {
   assert.equal(c2.querySelectorAll(".crop-audit-box").length, 0, "默认不画审计框");
 });
 
+/* ── ⑦ N12 回归：表内容行框过冲表框仍须抑制（双像），真表外行绝不抑（不丢内容） ──
+   几何取自曲线运动 page-10（idx9）实测：表 bbox 右缘 550.84，第4列三行右缘 570.01
+   （过冲 19.17pt = 行宽 15.7% = 表宽 3.8%），行中心在表内 ⇒ 截图已含 ⇒ 必须抑制。
+   守卫：中心在表外 / 重叠不足 / 单边过冲超表边长 10%（table-render 反例锁同几何）⇒ 不抑。 */
+
+const N12_TABLE_BBOX = [41.32, 89.46, 550.84, 378.89];
+const N12_COL4_ROWS = [
+  { i: 1, kind: "text", bbox: [448.17, 103.52, 570.01, 113.81], text: "两物块用轻绳连接, 分别位" },
+  { i: 2, kind: "text", bbox: [448.17, 118.43, 570.01, 128.72], text: "于圆盘中心两侧 (" },
+  { i: 3, kind: "text", bbox: [448.17, 133.34, 570.01, 143.63], text: "rA>rB,mA=mB,μ 相同)" },
+  // 底缘过冲同判：过冲 5.11pt（表高 1.8%），垂直重叠 78.7% ≥ 70%，中心在表内
+  { i: 4, kind: "text", bbox: [448.17, 360, 540, 384], text: "表底缘过冲行" },
+];
+
+test("N12 回归：image 表内容行框过冲表框（中心在表内+实质重叠）⇒ 抑制，不叠双像", () => {
+  const table = {
+    i: 0, kind: "table", bbox: N12_TABLE_BBOX, text: "整表压平文字",
+    tableClass: "image", tableSource: "v3",
+    crop: "table-crops/p010-t0.png", cropSize: [895, 490],
+  };
+  const p = { ...page, blocks: [table, ...N12_COL4_ROWS] };
+  const c = makeNode("div");
+  const nodes = appendBlockNodes(c, p, 346, 12, null, "doc", true) as (Stub | null)[];
+  assert.ok(nodes[0], "image 表整表截图必须渲染");
+  for (const r of N12_COL4_ROWS) {
+    assert.equal(nodes[r.i], null, `行 ${r.i}（${r.text}）是表内容且截图已含 ⇒ 必须抑制（否则双像）`);
+  }
+});
+
+test("N12 回归：text 表网格同样抑制过冲表框的内容行（网格已呈现）", () => {
+  const table = {
+    i: 0, kind: "table", bbox: N12_TABLE_BBOX, text: "整表压平文字",
+    html: "<table><tr><td>格1</td><td>两物块用轻绳连接, 分别位于圆盘中心两侧</td></tr></table>",
+    tableClass: "text", tableSource: "v3",
+  };
+  const p = { ...page, blocks: [table, ...N12_COL4_ROWS] };
+  const c = makeNode("div");
+  const nodes = appendBlockNodes(c, p, 346, 12, null, "doc", true) as (Stub | null)[];
+  assert.equal(findAll(c, "table").length, 1, "text 表画网格");
+  for (const r of N12_COL4_ROWS) {
+    assert.equal(nodes[r.i], null, `行 ${r.i} 已由网格呈现 ⇒ 抑制`);
+  }
+});
+
+test("N12 守卫：真表外行（中心在表外 / 重叠不足 / 过冲超表边长10%）绝不抑制", () => {
+  const table = {
+    i: 0, kind: "table", bbox: N12_TABLE_BBOX, text: "整表压平文字",
+    tableClass: "image", tableSource: "v3",
+    crop: "table-crops/p010-t0.png", cropSize: [895, 490],
+  };
+  const outside = [
+    // 中心在表外（右侧邻行）：纯表外行
+    { i: 1, kind: "text", bbox: [560, 103.52, 680, 113.81], text: "表右邻行" },
+    // 跨表右缘但中心在表外：仍是表外行
+    { i: 2, kind: "text", bbox: [500, 103.52, 620, 113.81], text: "跨右缘中心在外" },
+    // 中心在表内但水平重叠仅 50.2% < 70%：横穿表的宽正文行，不抑
+    { i: 3, kind: "text", bbox: [350, 103.52, 750, 113.81], text: "横穿宽行" },
+  ];
+  const p = { ...page, blocks: [table, ...outside] };
+  const c = makeNode("div");
+  const nodes = appendBlockNodes(c, p, 346, 12, null, "doc", true) as (Stub | null)[];
+  for (const r of outside) {
+    assert.ok(nodes[r.i], `行 ${r.i}（${r.text}） genuinely 表外 ⇒ 必须照常渲染（不丢内容红线）`);
+  }
+  // 过冲超表边长 10% 的反例锁（与 table-render 旧锁同几何）：中心在表内、重叠 79.6%，
+  // 但右缘过冲 100pt = 表宽 25% ⇒ 不是表内容框过冲，不抑
+  const t2 = {
+    i: 0, kind: "table", bbox: [0, 100, 400, 300], text: "甲\t乙",
+    html: "<table><tr><td>格</td></tr></table>",
+  };
+  const bigOver = { i: 1, kind: "text", bbox: [10, 120, 500, 140], text: "越出右边界的行" };
+  const c2 = makeNode("div");
+  const n2 = appendBlockNodes(c2, { ...page, blocks: [t2, bigOver] }, 760, 12, null, "d", true) as (Stub | null)[];
+  assert.ok(n2[1], "过冲达表宽 25% 的行不是表内容框过冲 ⇒ 保留（否则会丢内容）");
+});
+
 /* ── ⑥ 旧快照逐字节不变（字面量在改动前用现行实现实测捕获） ── */
 
 test("旧快照（无新字段）：渲染序列化与改动前逐字节一致", () => {

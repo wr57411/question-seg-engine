@@ -439,9 +439,9 @@ function wireCropZoom(root) {
  */
 export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", candidateStyle = true, diagnostics = false) {
   // ── 表格（DECISIONS §76）──
-  // 表格块自带 bbox（就是表格整块框）。被这个框**完整覆盖**的其它行块，其文本已由网格呈现
-  // ⇒ 不再重复画（否则网格上叠一层压平文字，正是用户看到的「几行乱字」）。
-  // 判据是**几何包含**（确定性），不是"猜哪些块属于表格"。
+  // 表格块自带 bbox（就是表格整块框）。被这个框**呈现**的其它行块，其文本已由网格/截图呈现
+  // ⇒ 不再重复画（否则网格/截图上叠一层压平文字，正是用户看到的「几行乱字」/双像）。
+  // 判据是**确定性几何**（中心在表内 + 实质重叠 + 过冲有界，见下），不是"猜哪些块属于表格"。
   // S2：抑制只对「**实际会渲染的表**」成立——text 表（html 网格）与 image 表（整表截图）都抑制；
   // borderless 双保险跳过 tableNode 且**不进 coveredByTable**（行文本照常渲染，不丢内容）。
   /** @param {Block} b @returns {boolean} */
@@ -452,10 +452,27 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
   const coveredByTable = new Set();
   for (const t of tableBlocks) {
     const [rx0, ry0, rx1, ry1] = t.bbox;
+    const tw = rx1 - rx0;
+    const th = ry1 - ry0;
     for (const b of p.blocks) {
       if (b === t) continue;
       const [x0, y0, x1, y1] = b.bbox;
-      if (x0 >= rx0 - 1 && y0 >= ry0 - 1 && x1 <= rx1 + 1 && y1 <= ry1 + 1) coveredByTable.add(b.i);
+      // N12 回归（曲线运动 p10 第4列）：OCR 行框过冲表框 19.2pt，旧**严格包含**判据漏抑
+      // ⇒ 整表截图上叠 DOM 文本成双像。改最严 AND 三件（page-10 实测几何校准）：
+      // ① 行中心落在表框内——中心在表外 = genuinely 表外行，绝不抑（不丢内容红线）；
+      // ② 实质重叠：两轴重叠 ≥ 行宽/行高的 70%（实测 84.3%/100%，留裕度）；
+      // ③ 单边过冲 ≤ 表对应边长的 10%（实测过冲=表宽 3.8%；table-render 反例锁的
+      //    过冲=表宽 25% 正文行不得误抑）。包含关系是三件的特例，旧行为被超集覆盖。
+      const cx = (x0 + x1) / 2;
+      const cy = (y0 + y1) / 2;
+      const ow = Math.min(x1, rx1) - Math.max(x0, rx0);
+      const oh = Math.min(y1, ry1) - Math.max(y0, ry0);
+      const overBounded =
+        Math.max(rx0 - x0, x1 - rx1, 0) <= 0.1 * tw && Math.max(ry0 - y0, y1 - ry1, 0) <= 0.1 * th;
+      if (
+        cx >= rx0 && cx <= rx1 && cy >= ry0 && cy <= ry1 &&
+        ow >= 0.7 * (x1 - x0) && oh >= 0.7 * (y1 - y0) && overBounded
+      ) coveredByTable.add(b.i);
     }
   }
   const nodes = p.blocks.map((b) => {
