@@ -11,7 +11,7 @@
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ruleStrategy } from "../src/index.js";
 import { looksLikeAnswerEntry, matchFirstLine } from "../src/patterns.js";
@@ -45,6 +45,23 @@ export interface StageBlock {
   text: string;
   /** 图片块的裸文件名（拼 images/ 前缀由展示层负责） */
   img?: string;
+  /** 上游表格 HTML（MinerU spans[].html；text 路由时被 table-v3.json 的 V3 pred_html 替换） */
+  html?: string;
+  /** OCR 补入行标记（injectOcrQuestionLines / injectOcrFullTextLines） */
+  ocr?: boolean;
+  /** 人工已核对修正标记（corrections/） */
+  correction?: boolean;
+  /* ── S2 放置新增字段（spec 2026-11-13 §5.1，只增不改旧字段；产物缺失时不产出 ⇒ 旧快照逐字节兼容） ── */
+  /** 上游表格分类（table-v3.json）：text=V3 HTML / image=整表截图 / borderless=守卫跳过 */
+  tableClass?: "text" | "image" | "borderless";
+  /** html 的来源旗标（缺省=mineru） */
+  tableSource?: "v3" | "mineru";
+  /** 相对 doc 目录的裁图子路径（table-crops/… 或 giant-crop/crops/…） */
+  crop?: string;
+  /** 裁图原生像素 [w,h]（放置器只缩不放的依据） */
+  cropSize?: [number, number];
+  /** 行级坐标来源：crop=巨带截断回退（B-39 truncationCropFallback），展示层裁图例外放置 */
+  coordSource?: "ink" | "crop";
 }
 
 /**
@@ -765,6 +782,193 @@ export function readOcrJsonFile(path: string): { json: unknown; error: string | 
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * S2 放置上游透传（spec docs/plans/2026-11-13-表格与巨带放置实现.md §5.1）
+ *
+ * 纪律：
+ * - **只消费产物、只增新字段**：table-v3.json / giant-crop.pNN.json 缺失或为空时，
+ *   快照逐字节不变（与 B-39 truncationCropFallback 默认关旗标同纪律）。
+ * - **判据取最严 AND**：表格按 bbox IoU≥0.5；巨带行按 norm 框四边近等 + 文本归一化包含。
+ *   段落块包含某行文本**不挂** —— 整段换单行裁图会丢其余行内容（红线：不丢内容）。
+ * - **不静默**：未匹配/缺 html/缺裁图的条目计数返回，由 main() 打日志。
+ * - 分类与守卫在 scripts/（上游），展示层只消费快照字段（解耦红线）。
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** table-v3.json 的一条表格分类（上游显式产物；bbox 为 PDF 点，page 为 0 基页索引） */
+export interface TableV3Entry {
+  page: number;
+  bbox: BBox;
+  class: "text" | "image" | "borderless";
+  source?: "v3" | "mineru";
+  /** text 路由的 V3 结构化 HTML（G3：缺 html 的 text 条目不挂，防半路降级丢格） */
+  html?: string;
+  /** image 路由：相对 doc 目录的整表裁图 */
+  crop?: string;
+  cropSize?: [number, number];
+  /** G1 墨迹守卫测量值（留证，展示层不重算） */
+  guard?: { hRunW: number; vRunH: number };
+  note?: string;
+}
+
+/** giant-crop.pNN.json 的一条受害者行（scripts/audit-giant-crop.ts 产物） */
+export interface GiantCropVictim {
+  id: string;
+  /** 0 基页索引 */
+  page: number;
+  text: string;
+  v3box: BBox;
+  /** 回退框（PDF 点）：B-39 截断行保留 V3 紧框 */
+  fallbackBox: BBox;
+  /** 裁图绝对路径；null = 未回填 JSON（按约定命名 {id}-{page+1:03d}.png 解析，仍须盘上存在） */
+  crop: string | null;
+}
+
+/** 表格匹配门槛：IoU≥0.5（两源框实测近等，见 spec §5.1 数值核对） */
+const TABLE_MATCH_MIN_IOU = 0.5;
+
+function bboxIoU(a: BBox, b: BBox): number {
+  const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0]));
+  const iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const inter = ix * iy;
+  const union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter;
+  return union > 0 ? inter / union : 0;
+}
+
+/**
+ * 消费 table-v3.json：按 IoU≥0.5 匹配同页 table 块，挂 tableClass/tableSource/html|crop。
+ * - text：必须有 html（G3 完整性门），替换既有 html（tableSource=v3 留来源旗标）；
+ * - image：挂 crop/cropSize，**既有 html 保留不丢**（渲染分支优先 crop）；
+ * - borderless：只标 class（renderPaper 双保险跳过网格 + coveredByTable）。
+ * 返回 {attached, unmatched}：未匹配/缺件条目计数可见，不静默。
+ */
+export function applyTableV3(page: StagePage, entries: TableV3Entry[]): { attached: number; unmatched: number } {
+  let attached = 0;
+  let unmatched = 0;
+  for (const e of entries) {
+    if (e.page !== page.index) continue;
+    if (e.class === "text" && !e.html) {
+      unmatched++;
+      continue;
+    }
+    if (e.class === "image" && (!e.crop || !e.cropSize)) {
+      unmatched++;
+      continue;
+    }
+    let best: StageBlock | null = null;
+    let bestIou = TABLE_MATCH_MIN_IOU;
+    for (const b of page.blocks) {
+      if (b.kind !== "table") continue;
+      const iou = bboxIoU(b.bbox, e.bbox);
+      if (iou >= bestIou) {
+        bestIou = iou;
+        best = b;
+      }
+    }
+    if (!best) {
+      unmatched++;
+      continue;
+    }
+    best.tableClass = e.class;
+    best.tableSource = e.source ?? "v3";
+    if (e.class === "text") best.html = e.html;
+    if (e.class === "image") {
+      best.crop = e.crop;
+      best.cropSize = e.cropSize;
+    }
+    attached++;
+  }
+  return { attached, unmatched };
+}
+
+/** 从 PNG 文件头读原生宽高（签名 + IHDR，大端 u32 @16/@20）。零依赖，放置器只缩不放的依据。 */
+export function pngSizeFromHeader(buf: Uint8Array): [number, number] {
+  const sig = [137, 80, 78, 71, 13, 10, 26, 10];
+  if (buf.length < 24 || sig.some((v, i) => buf[i] !== v)) {
+    throw new Error("不是 PNG（缺签名/IHDR），无法读原生尺寸");
+  }
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (dv.getUint32(12) !== 0x49484452) throw new Error("PNG 首块不是 IHDR");
+  return [dv.getUint32(16), dv.getUint32(20)];
+}
+
+/** norm 框四边近等的容差（相对页宽/高）：行级紧框 vs 段落框差一个量级以上 */
+const CROP_NORM_TOL = 0.005;
+
+/**
+ * 消费 giant-crop.pNN.json 的 victims：把「截断巨带行」透传为 coordSource=crop。
+ * 判据取最严 AND：同页 + kind=text + 文本归一化互相包含（≥4 字）+ **四边近等**
+ * （段落块包含该行文本但框是整段 ⇒ 不挂，防整段换单行裁图丢内容）+ 裁图文件存在。
+ * crop 落相对 outDir 的子路径；cropSize 从 PNG IHDR 实测（不信产物里的数字，L7）。
+ * 返回 {attached, skipped}：未匹配/缺件计数可见。
+ */
+export function attachGiantCropVictims(
+  page: StagePage,
+  victims: GiantCropVictim[],
+  outDir: string,
+): { attached: number; skipped: number } {
+  let attached = 0;
+  let skipped = 0;
+  const used = new Set<number>();
+  const blockNorms = page.blocks.map((b) => normForMatch(b.text));
+  for (const v of victims) {
+    if (v.page !== page.index) {
+      skipped++;
+      continue;
+    }
+    // crop 字段优先；为 null 时按**两个裁图产出方共同的命名约定**解析：
+    // audit-giant-crop.ts 与 export-gold-crops.ts 都落 giant-crop/crops/{id}-{page+1:03d}.png
+    // （实测 6616 条 victims 的 crop 字段全为 null，裁图在盘上）。仍过存在性 + IHDR 自检，不猜内容。
+    const rel = v.crop
+      ? isAbsolute(v.crop)
+        ? relative(outDir, v.crop)
+        : v.crop
+      : join("giant-crop", "crops", `${v.id}-${String(v.page + 1).padStart(3, "0")}.png`);
+    const abs = join(outDir, rel);
+    if (!existsSync(abs)) {
+      skipped++;
+      continue;
+    }
+    const vt = normForMatch(v.text);
+    if (vt.length < 4) {
+      skipped++;
+      continue;
+    }
+    let best: StageBlock | null = null;
+    let bestDiff = Infinity;
+    for (let bi = 0; bi < page.blocks.length; bi++) {
+      const b = page.blocks[bi]!;
+      if (b.kind !== "text" || used.has(b.i)) continue;
+      const bt = blockNorms[bi]!;
+      if (!(bt.includes(vt) || vt.includes(bt))) continue;
+      const dx = Math.max(Math.abs(b.bbox[0] - v.fallbackBox[0]), Math.abs(b.bbox[2] - v.fallbackBox[2])) / page.width;
+      const dy = Math.max(Math.abs(b.bbox[1] - v.fallbackBox[1]), Math.abs(b.bbox[3] - v.fallbackBox[3])) / page.height;
+      if (dx > CROP_NORM_TOL || dy > CROP_NORM_TOL) continue;
+      const diff = dx + dy;
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = b;
+      }
+    }
+    if (!best) {
+      skipped++;
+      continue;
+    }
+    let size: [number, number];
+    try {
+      size = pngSizeFromHeader(new Uint8Array(readFileSync(abs)));
+    } catch {
+      skipped++;
+      continue;
+    }
+    best.coordSource = "crop";
+    best.crop = rel;
+    best.cropSize = size;
+    used.add(best.i);
+    attached++;
+  }
+  return { attached, skipped };
+}
+
 /**
  * **把 OCR 读到的「题号行」补成块**（2026-10-12 用户当场指出「第 1 题漏识别」后加）。
  *
@@ -1097,6 +1301,60 @@ function main(): void {
     console.log(
       `  OCR 候选补全：裁图 ${nCrop} 条 + 整页补 ${nPage} 条（整页只补裁图没补上的洞）` +
         (nShape ? `；形状前置条件否掉 ${nShape} 条` : ""),
+    );
+  }
+  // ── S2 放置上游透传（spec 2026-11-13 §5.1）：只消费产物、只增新字段，缺失=逐字节不变 ──
+  // table-v3.json：上游显式表格三分流（text=V3 HTML / image=整表截图 / borderless=守卫跳过）。
+  const tv3 = readOcrJsonFile(join(outDir, "table-v3.json"));
+  if (tv3.error) {
+    ocrInputErrors.push(tv3.error);
+    console.warn(`  ⚠️ ${tv3.error}（表格分类透传跳过）`);
+  }
+  if (tv3.json) {
+    const entries = (tv3.json as { tables?: TableV3Entry[] }).tables ?? [];
+    let tAtt = 0;
+    let tUnm = 0;
+    for (const pg of snapshot.pages) {
+      const r = applyTableV3(pg, entries);
+      tAtt += r.attached;
+      tUnm += r.unmatched;
+    }
+    console.log(
+      `  表格三分流（table-v3.json）：挂 ${tAtt} 表` +
+        (tUnm ? `（⚠️ ${tUnm} 条未匹配/缺 html/缺裁图，未静默透传）` : ""),
+    );
+  }
+  // giant-crop.pNN.json：B-39 巨带截断回退的受害者行 ⇒ 行级 coordSource=crop 透传。
+  const gcFiles = readdirSync(outDir)
+    .filter((f) => /^giant-crop\.p\d+\.json$/.test(f))
+    .sort();
+  if (gcFiles.length) {
+    const victimsByPage = new Map<number, GiantCropVictim[]>();
+    for (const f of gcFiles) {
+      const r = readOcrJsonFile(join(outDir, f));
+      if (r.error) {
+        ocrInputErrors.push(r.error);
+        console.warn(`  ⚠️ ${r.error}（巨带裁图透传跳过该文件）`);
+        continue;
+      }
+      for (const v of ((r.json as { victims?: GiantCropVictim[] })?.victims ?? [])) {
+        const list = victimsByPage.get(v.page) ?? [];
+        list.push(v);
+        victimsByPage.set(v.page, list);
+      }
+    }
+    let gAtt = 0;
+    let gSkip = 0;
+    for (const pg of snapshot.pages) {
+      const vs = victimsByPage.get(pg.index);
+      if (!vs) continue;
+      const r = attachGiantCropVictims(pg, vs, outDir);
+      gAtt += r.attached;
+      gSkip += r.skipped;
+    }
+    console.log(
+      `  巨带裁图回退透传：${gAtt} 行 coordSource=crop` +
+        (gSkip ? `（${gSkip} 条受害者未匹配/无裁图，原样保留不静默）` : ""),
     );
   }
   // questions.json 与 stages.json 同源重生成：viewer 与 stages 消费同一份引擎产物，

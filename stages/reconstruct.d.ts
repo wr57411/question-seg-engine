@@ -48,6 +48,7 @@ export function appendBlockNodes(
   mergeCtx: any,
   doc?: string,
   candidateStyle?: boolean,
+  diagnostics?: boolean,
 ): any[];
 /** 单条 OCR 候选 → 节点（纸面与面板裁切共用这一份实现）。 */
 export function ocrFillNode(it: any, p: any, canvasW: number, baseFont: number, candidateStyle?: boolean): any;

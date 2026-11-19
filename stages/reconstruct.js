@@ -27,8 +27,13 @@ import { parseTableHtml } from "./table-html.js";
  * - `Block` / `Uncovered` / `OcrItem` 来自 `stages.json` 的页内数据；
  * - `PageQuestion` 是页内 `questions[]`（`blocks` 是块下标，不是块对象）；
  * - `RenderOpts` 是 `renderPaper` 的选项。
+ *
+ * S2 放置新增字段（spec 2026-11-13 §5.1，**只增不改旧字段**；旧快照无这些字段 ⇒ 缺省走现状路径）：
+ * - `tableClass`/`tableSource`：上游分类产物 table-v3.json（展示层只消费，不做识别）；
+ * - `crop`/`cropSize`：相对 doc 目录的裁图子路径 + 原生像素 [w,h]（整表截图 / 巨带回退行）；
+ * - `coordSource`：行级坐标来源（B-39 truncationCropFallback 旗标产出，export-stages 透传）。
  * @typedef {[number, number, number, number]} Rect
- * @typedef {{ i: number, kind?: string, bbox: number[], text?: string, html?: string, img?: string, dtype?: string, ocr?: boolean, correction?: boolean }} Block
+ * @typedef {{ i: number, kind?: string, bbox: number[], text?: string, html?: string, img?: string, dtype?: string, ocr?: boolean, correction?: boolean, tableClass?: "text" | "image" | "borderless", tableSource?: "v3" | "mineru", crop?: string, cropSize?: [number, number], coordSource?: "ink" | "crop" }} Block
  * @typedef {{ bbox: number[], area: number, kind?: string }} Uncovered
  * @typedef {{ bbox: number[], win?: number[], text?: string, source?: string, accepted?: boolean, ratio?: number, crop?: string, raw?: string }} OcrItem
  * @typedef {{ id: string, number: string, blocks: number[], startsHere?: boolean }} PageQuestion
@@ -301,9 +306,126 @@ export function mergeContext(p) {
   return mergePlan(p.blocks);
 }
 
+/* ── S2 裁图放置器（spec 2026-11-13 §2/§5.2；内部函数，不 export ⇒ reconstruct.d.ts 不动） ── */
+
+/**
+ * 裁图例外放置（整表截图 / 巨带截断回退行共用同一放置器，A 内联）：
+ * - posStyle 原位（bbox 左上角），宽 = min(nativeW, 栏宽)，height:auto，**只缩不放**
+ *   （放大=海报化，entry-paper.js maxFontPx 教训）；无 cropSize 时退回 bbox 框内 contain。
+ * - 文本不丢：原文本 + 放置说明 + 证据路径全留 title（search/面板可核对）；
+ *   回退行是**引擎原文+回退坐标**，不是 OCR 候选 ⇒ 不套青绿候选框，以 data-coord-source 供审计区分。
+ * - 宽裁图可读性补丁（§2.3）：nativeW > innerW/0.7 ⇒ 缩放后正文 <10px，内联只是缩略图
+ *   ⇒ 挂 data-zoom，renderPaper 挂载后统一接「点按看原生尺寸」浮层。
+ * @param {Block} b
+ * @param {Page} p
+ * @param {number} canvasW
+ * @param {string} doc
+ * @param {boolean} [diagnostics]
+ * @returns {HTMLElement}
+ */
+function cropFigureNode(b, p, canvasW, doc, diagnostics = false) {
+  const node = posStyle(el("div", `blk blk-crop kind-${b.kind ?? "text"}`), b.bbox, p.width, p.height);
+  const cropPath = String(b.crop ?? "");
+  const src = `/data/out/${enc(doc)}/${cropPath.split("/").map(enc).join("/")}`;
+  const nw = b.cropSize?.[0] ?? 0;
+  const nh = b.cropSize?.[1] ?? 0;
+  const img = /** @type {HTMLImageElement} */ (el("img"));
+  img.src = src;
+  img.alt = b.tableClass === "image" ? "插图表整表截图（无损侧）" : "巨带裁图回退行（coordSource=crop）";
+  if (nw > 0) {
+    // 只缩不放 + 坐标保真：可用宽 = min(栏宽, bbox 框宽的画布像素)。
+    // 裁图原生像素处在**页图域**（如 1000px 宽渲染），比坐标纸面画布密度大；
+    // 若按 min(nativeW, 整栏宽) 放置会越出原 bbox ⇒ 压住邻块标题、右缘被 canvas
+    // overflow:hidden 裁掉（2026-11-19 成品页实测事故）。故「可用栏宽」取该块框宽。
+    // 原生宽小于框宽时仍按原生入页（不放大=海报化教训）；阅读原生尺寸走 data-zoom 浮层。
+    const bboxW = ((b.bbox[2] - b.bbox[0]) / p.width) * canvasW;
+    const availW = Math.min(canvasW, bboxW);
+    node.style.width = `${Math.min(nw, availW)}px`;
+    node.style.height = "auto";
+    img.style.cssText = "display:block;width:100%;height:auto;";
+  } else {
+    img.style.cssText = "display:block;max-width:100%;max-height:100%;object-fit:contain;";
+  }
+  node.append(img);
+  const why = b.tableClass === "image" ? "插图表整表截图" : "coordSource=crop 巨带裁图回退";
+  node.title = `${b.text ?? ""} ｜ 裁图例外放置（${why}）｜ 证据：/data/out/${doc}/${cropPath}`;
+  if (b.coordSource) node.dataset.coordSource = b.coordSource;
+  if (b.tableClass) node.dataset.tableClass = b.tableClass;
+  if (nw > 0 && nh > 0) {
+    node.dataset.nativeW = String(nw);
+    node.dataset.nativeH = String(nh);
+    // 保守判据（§2.3）：实际缩放比 <0.7 时正文高 <10px ⇒ 必须提供原生尺寸阅读路径。
+    // 实际渲染宽 = min(nw, 框宽, 栏宽) ⇒ 阈值用同一可用宽口径。
+    const availW = Math.min(canvasW, ((b.bbox[2] - b.bbox[0]) / p.width) * canvasW);
+    if (nw > availW / 0.7) node.dataset.zoom = "1";
+  }
+  if (diagnostics) {
+    // bbox 审计框：裁图含 ±3px 外扩、高按同比例 ⇒ 与原框略有出入，审计时把原框画出来供核对
+    const box = el("div", "crop-audit-box");
+    const bw = ((b.bbox[2] - b.bbox[0]) / p.width) * canvasW;
+    const bh = ((b.bbox[3] - b.bbox[1]) / p.height) * ((canvasW * p.height) / p.width);
+    box.style.cssText = `position:absolute;left:0;top:0;width:${bw}px;height:${bh}px;border:1px dashed rgba(200,0,120,.6);pointer-events:none;`;
+    box.append(el("span", "tag", "裁图例外"));
+    node.append(box);
+  }
+  return node;
+}
+
+/**
+ * 「点按看原生尺寸」浮层（§2.3 / R8）。**只此一处实现**：renderPaper 挂载后 rAF 统一接线，
+ * final/ 与 stages/ 零改动自动获得（纸面重建只此一处红线）。
+ * ⚠️ 浮层必须挂 **document.body**（canvas 外）：`.canvas{overflow:hidden}` 会把挂里面的浮层裁掉
+ * （号牌事故同型，R8）。fixed 定位、可滚动、点背景/Esc 关。
+ * @param {HTMLElement} node 带 data-zoom 的裁图节点
+ */
+function openCropZoom(node) {
+  const img0 = /** @type {HTMLImageElement | null} */ (node.querySelector("img"));
+  if (!img0 || typeof document === "undefined" || !document.body) return;
+  const ov = el("div", "crop-zoom-overlay");
+  ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);overflow:auto;padding:16px;";
+  ov.title = "原生尺寸阅读（点背景或 Esc 关闭）";
+  const img = /** @type {HTMLImageElement} */ (el("img"));
+  img.src = img0.src;
+  img.alt = "原生尺寸裁图";
+  const nw = Number(node.dataset.nativeW) || 0;
+  img.style.cssText = `display:block;background:#fff;max-width:none;height:auto;${nw > 0 ? `width:${nw}px;` : ""}`;
+  ov.append(img);
+  /** @param {KeyboardEvent} e */
+  const onKey = (e) => {
+    if (e.key === "Escape") close();
+  };
+  const close = () => {
+    ov.remove();
+    document.removeEventListener("keydown", onKey);
+  };
+  ov.addEventListener("click", (e) => {
+    if (e.target === ov) close(); // 点背景关；点图本身不关（可滚动看全图）
+  });
+  document.addEventListener("keydown", onKey);
+  document.body.append(ov);
+}
+
+/**
+ * 给 [data-zoom] 裁图节点接点按浮层（与 fitTables 同模式：挂载后 rAF 调用）。
+ * @param {HTMLElement | null | undefined} root
+ */
+function wireCropZoom(root) {
+  const nodes = root?.querySelectorAll ? root.querySelectorAll("[data-zoom]") : [];
+  for (const rawNode of nodes) {
+    const node = /** @type {HTMLElement} */ (rawNode);
+    if (node.dataset.zoomWired) continue;
+    node.dataset.zoomWired = "1";
+    node.style.cursor = "zoom-in";
+    node.title = `${node.title} ｜ 点按看原生尺寸`;
+    node.addEventListener("click", () => openCropZoom(node));
+  }
+}
+
 /** 追加本页行级块节点（跳过被合并掉的块；返回与 p.blocks 对齐的节点数组，null = 未渲染）。
  *  `candidateStyle=false` ⇒ OCR 补入行**按普通正文样式**渲染（成品页的默认外观），
- *  但 title 仍写明来源（G1 的信息不丢，只是不抢视觉）。 */
+ *  但 title 仍写明来源（G1 的信息不丢，只是不抢视觉）。
+ *  S2 三分流（spec §3/§5.2）：image 表整表截图内联 / text 表走 tableNode / borderless 双保险跳过；
+ *  行级 coordSource=crop 走裁图例外放置。**无新字段的旧快照逐字节走现状路径**。 */
 /**
  * @param {HTMLElement} c
  * @param {Page} p
@@ -312,14 +434,20 @@ export function mergeContext(p) {
  * @param {{ drop: Set<number>, keep: Map<number, { text: string, bbox: number[] }> } | null} mergeCtx
  * @param {string} [doc]
  * @param {boolean} [candidateStyle]
+ * @param {boolean} [diagnostics]
  * @returns {(HTMLElement | null)[]}
  */
-export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", candidateStyle = true) {
+export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", candidateStyle = true, diagnostics = false) {
   // ── 表格（DECISIONS §76）──
   // 表格块自带 bbox（就是表格整块框）。被这个框**完整覆盖**的其它行块，其文本已由网格呈现
   // ⇒ 不再重复画（否则网格上叠一层压平文字，正是用户看到的「几行乱字」）。
   // 判据是**几何包含**（确定性），不是"猜哪些块属于表格"。
-  const tableBlocks = p.blocks.filter((b) => b.kind === "table" && b.html);
+  // S2：抑制只对「**实际会渲染的表**」成立——text 表（html 网格）与 image 表（整表截图）都抑制；
+  // borderless 双保险跳过 tableNode 且**不进 coveredByTable**（行文本照常渲染，不丢内容）。
+  /** @param {Block} b @returns {boolean} */
+  const rendersTable = (b) =>
+    b.kind === "table" && b.tableClass !== "borderless" && (!!b.html || (b.tableClass === "image" && !!b.crop));
+  const tableBlocks = p.blocks.filter(rendersTable);
   /** @type {Set<number>} */
   const coveredByTable = new Set();
   for (const t of tableBlocks) {
@@ -332,9 +460,42 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
   }
   const nodes = p.blocks.map((b) => {
     if (coveredByTable.has(b.i)) return null;
-    if (b.kind === "table" && b.html) {
+    // 插图表：整表截图内联（无损侧，优先于 html 分支——V3 对插图表会丢图/丢文，§1）
+    if (b.kind === "table" && b.tableClass === "image" && b.crop) {
+      return cropFigureNode(b, p, canvasW, doc, diagnostics);
+    }
+    if (b.kind === "table" && b.html && b.tableClass !== "borderless") {
       const tn = tableNode(b, p, canvasW, baseFont, doc);
       if (tn) return tn;
+    }
+    // borderless 双保险：即使误入快照也跳过网格，退回文本渲染；全文留 title（不丢内容），
+    // 诊断模式挂灰虚线注记（R4：误杀方向安全但必须可见）。
+    if (b.kind === "table" && b.tableClass === "borderless") {
+      const n = blockNode(b, p, canvasW, baseFont, mergeCtx, doc);
+      if (n && b.html) {
+        const { rows } = parseTableHtml(b.html);
+        const flat = rows.map((r) => r.cells.map((cell) => cell.text).join("\t")).join("\n");
+        n.title = `${flat}\n（无边框索引页，守卫跳过表格渲染；全文保留于此）`;
+        // 快照 text 被上游 240 字夹过（整页索引实测只看见开头）⇒ 可见文本改用 html 全文
+        // 扁平化：高度自适应 + 预换行 + 正文字号，成品页看得见全文才算不丢内容。
+        const txt = /** @type {HTMLElement | null} */ (n.querySelector(".txt"));
+        if (txt) {
+          txt.textContent = flat;
+          txt.style.whiteSpace = "pre-wrap";
+          txt.style.fontSize = `${(canvasW / p.width) * 10.5}px`;
+        }
+        n.style.height = "auto";
+        if (diagnostics) {
+          n.style.outline = "1px dashed rgba(0,0,0,.3)";
+          n.append(el("span", "tag", "无边框索引·守卫跳过"));
+        }
+      }
+      return n;
+    }
+    // 巨带截断回退行（B-39）：坐标回退行用截图代替文字放置（用户许可的截图例外）；
+    // 文本仍留 title 与快照，纸面呈现为裁图 ⇒ 不再出现 noBand 丢行。
+    if (b.coordSource === "crop" && b.crop) {
+      return cropFigureNode(b, p, canvasW, doc, diagnostics);
     }
     return blockNode(b, p, canvasW, baseFont, mergeCtx, doc);
   });
@@ -679,7 +840,7 @@ export function renderPaper(p, opts = {}) {
   c.style.width = `${innerW}px`;
   if (diagnostics) renderDiscardedInto(c, p, innerW); // 对比栏宽口径：丢弃块也必须用 innerW（R2）
   const baseFont = baseFontOfPage(p.blocks, p.width, innerW);
-  appendBlockNodes(c, p, innerW, baseFont, mergeContext(p), doc, candidateStyle); // 同页块级重复并集合并（Task 15）
+  appendBlockNodes(c, p, innerW, baseFont, mergeContext(p), doc, candidateStyle, diagnostics); // 同页块级重复并集合并（Task 15）
 
   // ⚠️ 号牌**不能**挂在画布内部：`.canvas` 有 `overflow: hidden`（「画布边界裁切」的既定决策，不改），
   // 挂在画布外侧的号牌会被**裁掉**（DOM 里有、位置也对，就是看不见 —— 2026-10-12 实测踩到）。
@@ -777,7 +938,11 @@ export function renderPaper(p, opts = {}) {
   // 号牌就又回到被 `.canvas{overflow:hidden}` 裁掉的状态。
   // 表格字号适配必须在**挂载后**做：节点进文档才有 clientHeight。
   // 用 rAF 排到下一帧，两个调用方（final / stages）都不用改一行（纸面重建只此一处）。
-  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => fitTables(wrap));
+  // S2：宽裁图的「点按看原生尺寸」浮层同模式接线（浮层挂 body，canvas 外，R8）。
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => {
+    fitTables(wrap);
+    wireCropZoom(wrap);
+  });
 
   return { wrap, canvas: c, innerW };
 }
