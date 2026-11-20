@@ -62,6 +62,8 @@ export interface StageBlock {
   cropSize?: [number, number];
   /** 行级坐标来源：crop=巨带截断回退（B-39 truncationCropFallback），展示层裁图例外放置 */
   coordSource?: "ink" | "crop";
+  /** M2 markdown 漏泄组：本块由该 i 的首块并集裁图呈现（展示层不重复画，原文仍留 text/title） */
+  leakCoveredBy?: number;
 }
 
 /**
@@ -1017,6 +1019,144 @@ export function consumeGiantCropArtifacts(
   return { attached, skipped, errors, files: gcFiles.length };
 }
 
+/* ── M2：markdown 图片漏泄行 → 原卷页图裁图（no-MinerU 生产化） ── */
+
+/** 漏泄组裁图外扩（PDF 点）：与巨带/整表裁图同量级的边距，防切掉贴边墨迹。 */
+const LEAK_PAD_PT = 2;
+/** 漏泄组链长上限（块数）：OXR 图描述拆行实测 ≤5 行；超限宁可不吞（最严 AND，防吞正常正文）。 */
+const LEAK_GROUP_MAX_BLOCKS = 8;
+
+/** 漏泄行种子：kind=text 且（trim 后以 `![` 开头 或 含 `](http`）。table/image 不在本步处理（M3 范围）。 */
+function isMarkdownLeakSeed(b: StageBlock): boolean {
+  if (b.kind !== "text") return false;
+  return b.text.trimStart().startsWith("![") || b.text.includes("](http");
+}
+
+/** y 邻接 + 同栏守卫：gap∈[-0.5×较小行高, 较大行高]，x 重叠 ≥0.7×较小行宽（跨栏绝不聚组）。 */
+function leakAdjacent(a: StageBlock, b: StageBlock): boolean {
+  const ha = a.bbox[3] - a.bbox[1];
+  const hb = b.bbox[3] - b.bbox[1];
+  const gap = b.bbox[1] - a.bbox[3];
+  if (gap < -0.5 * Math.min(ha, hb) || gap > Math.max(ha, hb)) return false;
+  const ox = Math.min(a.bbox[2], b.bbox[2]) - Math.max(a.bbox[0], b.bbox[0]);
+  return ox >= 0.7 * Math.min(a.bbox[2] - a.bbox[0], b.bbox[2] - b.bbox[0]);
+}
+
+/**
+ * M2：把 markdown 图片漏泄行组换成原卷页图裁图（检测不改写原文，只增放置字段）。
+ *
+ * 病灶（M1 查明）：OXR 把 `![图描述](http…)` 当文字行漏出，同一漏泄常被拆成多个相邻 text 块
+ * （曲线运动 page index3 实测 i5/6/7：`![` 开头 / 纯描述中间行 / `](http` 收尾）。
+ *
+ * 聚组判据（最严 AND）：`![` 开头块沿数组序吸收 **kind=text + y 邻接 + 同栏** 的后续块，
+ * 直到含 `](http` 的收尾块（含自身即单块组）；链长 ≤ LEAK_GROUP_MAX_BLOCKS；
+ * **找不到收尾块 ⇒ 只保留开头块自身**（中间行绝不吞——它们可能是正常正文）。
+ * 未被吸收的 `](http` 块自成单块组。
+ *
+ * 裁图：组 bbox 并集外扩 LEAK_PAD_PT 夹到页界；pt→px 按页图 IHDR 实测宽/页宽 pt 换算
+ * （x/y 向下取整、远边向上取整，再夹到页图像素界）；ffmpeg -vf crop（禁 sips）；
+ * cropSize 从裁图 IHDR 实测且必须等于换算期望（不符 ⇒ 删件 + skipped，不静默 L7/G1）。
+ *
+ * 挂接（照 attachGiantCropVictims 的下游消费口径 coordSource=crop + crop + cropSize）：
+ * **组首块**挂并集裁图；组内其余块标 leakCoveredBy=首块 i —— 展示层由首块一张图呈现整组
+ * （同一并集图各挂一份=叠影），尾块原文仍留快照 text、由展示层补进首块 title（不丢内容）。
+ *
+ * 返回 {attached, skipped}（按**组**计数）：无漏泄 ⇒ {0,0} 且页面对象逐字节不变；
+ * 页图缺失/读不动、ffmpeg 失败、尺寸自检不符 ⇒ 该组 skipped、块不污染。
+ */
+export function attachMarkdownLeakCrops(
+  page: StagePage,
+  outDir: string,
+  pageImage: string,
+): { attached: number; skipped: number } {
+  // ── 聚组 ──
+  const groups: StageBlock[][] = [];
+  const assigned = new Set<number>();
+  const blocks = page.blocks;
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i]!;
+    if (assigned.has(b.i) || !isMarkdownLeakSeed(b)) continue;
+    const group: StageBlock[] = [b];
+    assigned.add(b.i);
+    if (b.text.trimStart().startsWith("![") && !b.text.includes("](http")) {
+      let cur = b;
+      for (let j = i + 1; j < blocks.length && group.length < LEAK_GROUP_MAX_BLOCKS; j++) {
+        const n = blocks[j]!;
+        if (assigned.has(n.i) || n.kind !== "text" || !leakAdjacent(cur, n)) break;
+        group.push(n);
+        assigned.add(n.i);
+        cur = n;
+        if (n.text.includes("](http")) break; // 收尾块命中 ⇒ 组闭合
+      }
+      if (!group[group.length - 1]!.text.includes("](http")) {
+        // 没找到收尾块：中间行可能是正常正文 ⇒ 全部退回，只裁开头块自身（最严 AND）
+        for (const g of group.slice(1)) assigned.delete(g.i);
+        group.length = 1;
+      }
+    }
+    groups.push(group);
+  }
+  if (!groups.length) return { attached: 0, skipped: 0 };
+
+  // ── 页图尺寸（IHDR 实测，pt→px 换算的分母来自页图自身，不信快照数字 L7） ──
+  let imgW: number;
+  let imgH: number;
+  try {
+    [imgW, imgH] = pngSizeFromHeader(new Uint8Array(readFileSync(pageImage)));
+  } catch {
+    return { attached: 0, skipped: groups.length };
+  }
+  const sx = imgW / page.width;
+  const sy = imgH / page.height;
+
+  let attached = 0;
+  let skipped = 0;
+  const cropDir = join(outDir, "leak-crops");
+  mkdirSync(cropDir, { recursive: true });
+  for (let gi = 0; gi < groups.length; gi++) {
+    const group = groups[gi]!;
+    const u: BBox = [
+      Math.max(0, Math.min(...group.map((b) => b.bbox[0])) - LEAK_PAD_PT),
+      Math.max(0, Math.min(...group.map((b) => b.bbox[1])) - LEAK_PAD_PT),
+      Math.min(page.width, Math.max(...group.map((b) => b.bbox[2])) + LEAK_PAD_PT),
+      Math.min(page.height, Math.max(...group.map((b) => b.bbox[3])) + LEAK_PAD_PT),
+    ];
+    const x = Math.max(0, Math.floor(u[0] * sx));
+    const y = Math.max(0, Math.floor(u[1] * sy));
+    const w = Math.min(imgW - x, Math.ceil(u[2] * sx) - x);
+    const h = Math.min(imgH - y, Math.ceil(u[3] * sy) - y);
+    if (w < 1 || h < 1) {
+      skipped++;
+      continue;
+    }
+    const rel = join("leak-crops", `p${String(page.index + 1).padStart(3, "0")}-g${String(gi + 1).padStart(2, "0")}.png`);
+    const abs = join(outDir, rel);
+    try {
+      execFileSync("ffmpeg", ["-y", "-v", "error", "-i", pageImage, "-vf", `crop=${w}:${h}:${x}:${y}`, abs], {
+        stdio: "pipe",
+        timeout: 60_000,
+      });
+      const size = pngSizeFromHeader(new Uint8Array(readFileSync(abs)));
+      if (size[0] !== w || size[1] !== h) {
+        rmSync(abs, { force: true });
+        skipped++;
+        continue;
+      }
+      const head = group[0]!;
+      head.coordSource = "crop";
+      head.crop = rel;
+      head.cropSize = size;
+      for (const b of group.slice(1)) b.leakCoveredBy = head.i;
+      attached++;
+    } catch {
+      // ffmpeg 不在场/裁切失败：不静默吞组（skipped 计数可见），块保持原样
+      rmSync(abs, { force: true });
+      skipped++;
+    }
+  }
+  return { attached, skipped };
+}
+
 /**
  * **把 OCR 读到的「题号行」补成块**（2026-10-12 用户当场指出「第 1 题漏识别」后加）。
  *
@@ -1445,6 +1585,29 @@ function main(): void {
         console.log(`  pdftoppm 失败（${reason}）⇒ 页图 ${have} 张 / 本次 ${doc.pages.length} 页，张数不符不复用，原卷对照降级为 PDF 内嵌`);
       }
     }
+  }
+
+  // ── M2：markdown 漏泄行 → 原卷页图裁图（生产默认通电：页图在即生效，无布尔旗标） ──
+  // 与 consumeGiantCropArtifacts 同风格：只消费产物（原卷页图）、只增新字段；
+  // 无漏泄/无页图 ⇒ 快照逐字节不变。页图命名两种历史形态都认（3 位/2 位，与 table-v3-sample 同）。
+  let leakAttached = 0;
+  let leakSkipped = 0;
+  for (const pg of snapshot.pages) {
+    const pagesDir = join(outDir, "pages");
+    const candidates = [
+      join(pagesDir, `page-${String(pg.index + 1).padStart(3, "0")}.png`),
+      join(pagesDir, `page-${String(pg.index + 1).padStart(2, "0")}.png`),
+    ];
+    const pageImage = candidates.find((c) => existsSync(c)) ?? candidates[0]!;
+    const r = attachMarkdownLeakCrops(pg, outDir, pageImage);
+    leakAttached += r.attached;
+    leakSkipped += r.skipped;
+  }
+  if (leakAttached || leakSkipped) {
+    console.log(
+      `  markdown 漏泄行裁图：${leakAttached} 组挂原卷裁图（coordSource=crop，原文留 text/title）` +
+        (leakSkipped ? `（⚠️ ${leakSkipped} 组因页图缺失/裁切失败跳过，原样保留不静默）` : ""),
+    );
   }
 
   // 墨迹覆盖率检查（Task 16）：用原卷页图当地面真值，找「解析漏掉的墨迹」。

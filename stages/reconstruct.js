@@ -30,10 +30,11 @@ import { parseTableHtml } from "./table-html.js";
  *
  * S2 放置新增字段（spec 2026-11-13 §5.1，**只增不改旧字段**；旧快照无这些字段 ⇒ 缺省走现状路径）：
  * - `tableClass`/`tableSource`：上游分类产物 table-v3.json（展示层只消费，不做识别）；
- * - `crop`/`cropSize`：相对 doc 目录的裁图子路径 + 原生像素 [w,h]（整表截图 / 巨带回退行）；
- * - `coordSource`：行级坐标来源（B-39 truncationCropFallback 旗标产出，export-stages 透传）。
+ * - `crop`/`cropSize`：相对 doc 目录的裁图子路径 + 原生像素 [w,h]（整表截图 / 巨带回退行 / M2 漏泄组）；
+ * - `coordSource`：行级坐标来源（B-39 truncationCropFallback 旗标产出，export-stages 透传）；
+ * - `leakCoveredBy`：M2 markdown 漏泄组尾块 ⇒ 由该 i 的首块并集裁图呈现（不重复画，原文进首块 title）。
  * @typedef {[number, number, number, number]} Rect
- * @typedef {{ i: number, kind?: string, bbox: number[], text?: string, html?: string, img?: string, dtype?: string, ocr?: boolean, correction?: boolean, tableClass?: "text" | "image" | "borderless", tableSource?: "v3" | "mineru", crop?: string, cropSize?: [number, number], coordSource?: "ink" | "crop" }} Block
+ * @typedef {{ i: number, kind?: string, bbox: number[], text?: string, html?: string, img?: string, dtype?: string, ocr?: boolean, correction?: boolean, tableClass?: "text" | "image" | "borderless", tableSource?: "v3" | "mineru", crop?: string, cropSize?: [number, number], coordSource?: "ink" | "crop", leakCoveredBy?: number }} Block
  * @typedef {{ bbox: number[], area: number, kind?: string }} Uncovered
  * @typedef {{ bbox: number[], win?: number[], text?: string, source?: string, accepted?: boolean, ratio?: number, crop?: string, raw?: string }} OcrItem
  * @typedef {{ id: string, number: string, blocks: number[], startsHere?: boolean }} PageQuestion
@@ -475,8 +476,20 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
       ) coveredByTable.add(b.i);
     }
   }
+  // M2 漏泄组：首块 i → 尾块原文列表（尾块不画，原文补进首块裁图 title，不丢内容）
+  /** @type {Map<number, string[]>} */
+  const leakTails = new Map();
+  for (const b of p.blocks) {
+    if (b.leakCoveredBy === undefined) continue;
+    const list = leakTails.get(b.leakCoveredBy) ?? [];
+    list.push(b.text ?? "");
+    leakTails.set(b.leakCoveredBy, list);
+  }
   const nodes = p.blocks.map((b) => {
     if (coveredByTable.has(b.i)) return null;
+    // M2 markdown 漏泄组尾块：由首块的并集裁图呈现（同一张图再画一遍=叠影）；
+    // 原文不丢——快照 text 原样保留，下面补进首块 title（search/面板可核对）。
+    if (b.leakCoveredBy !== undefined) return null;
     // 插图表：整表截图内联（无损侧，优先于 html 分支——V3 对插图表会丢图/丢文，§1）
     if (b.kind === "table" && b.tableClass === "image" && b.crop) {
       return cropFigureNode(b, p, canvasW, doc, diagnostics);
@@ -509,10 +522,13 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
       }
       return n;
     }
-    // 巨带截断回退行（B-39）：坐标回退行用截图代替文字放置（用户许可的截图例外）；
-    // 文本仍留 title 与快照，纸面呈现为裁图 ⇒ 不再出现 noBand 丢行。
+    // 巨带截断回退行（B-39）/ M2 markdown 漏泄组首块：坐标回退/漏泄行用截图代替文字放置
+    // （用户许可的截图例外）；文本仍留 title 与快照，纸面呈现为裁图 ⇒ 不再出现 noBand 丢行/网址上页。
     if (b.coordSource === "crop" && b.crop) {
-      return cropFigureNode(b, p, canvasW, doc, diagnostics);
+      const n = cropFigureNode(b, p, canvasW, doc, diagnostics);
+      const tails = leakTails.get(b.i);
+      if (tails) n.title = `${n.title} ｜ markdown 漏泄组并集裁图（同组原文）：${tails.join(" ")}`;
+      return n;
     }
     return blockNode(b, p, canvasW, baseFont, mergeCtx, doc);
   });
