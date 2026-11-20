@@ -198,6 +198,13 @@ export interface StageSnapshot {
   version: number;
   docId: string;
   generatedAt: string;
+  /**
+   * 骨架输入溯源（M1 no-MinerU）：本次导出喂入的 layout.json 路径（argv[3] 原样）。
+   * 导出器源无关 —— 喂 MinerU layout 产 MinerU 骨架、喂 OXR layout 产 OXR 骨架；
+   * 此字段让「blocks 来源是哪份 layout」可从快照自身核对，不靠命令行口说。
+   * **仅新增字段**：旧快照缺省（undefined），展示层不消费也不受影响。
+   */
+  layoutInput?: string;
   stats: SegmentationResult["stats"];
   /** 答案区条目总数（0 表示本卷无答案区，展示层据此换文案） */
   answerEntriesTotal: number;
@@ -1269,6 +1276,8 @@ function main(): void {
 
   const result = ruleStrategy.segment(doc);
   const snapshot = buildStageSnapshot(doc, result, extractRawBlocks(raw), extractDiscardedBlocks(raw));
+  // 骨架输入溯源（M1）：快照自报喂入的 layout 路径 —— 换源（MinerU→OXR）后可从产物核对来源
+  snapshot.layoutInput = layoutPath;
   snapshot.corrections = correctionReport;
   // 先挂引用：后面候选合并若再发现 OCR 读取错误，会追加到同一数组（写快照前已全部发生）
   snapshot.ocrInputErrors = ocrInputErrors;
