@@ -970,6 +970,47 @@ export function attachGiantCropVictims(
 }
 
 /**
+ * 生产默认通电接线（B-39 用户拍板全量开）：从 outDir 读全部 `giant-crop.pNN.json`，
+ * 按页聚合 victims，再逐页调 attachGiantCropVictims 挂 coordSource=crop。
+ * **产物在即生效，无布尔旗标**——这就是「生产快照默认带 crop 放置」的实现本体。
+ * 纪律与 attachGiantCropVictims 一致：缺产物 ⇒ 快照逐字节不变；损坏产物 ⇒ errors 可见不静默（G1）。
+ * 返回 {attached, skipped, errors, files}：files=读到的产物文件数（main() 据此决定是否打透传日志）。
+ */
+export function consumeGiantCropArtifacts(
+  pages: StagePage[],
+  outDir: string,
+): { attached: number; skipped: number; errors: string[]; files: number } {
+  const errors: string[] = [];
+  const gcFiles = readdirSync(outDir)
+    .filter((f) => /^giant-crop\.p\d+\.json$/.test(f))
+    .sort();
+  if (!gcFiles.length) return { attached: 0, skipped: 0, errors, files: 0 };
+  const victimsByPage = new Map<number, GiantCropVictim[]>();
+  for (const f of gcFiles) {
+    const r = readOcrJsonFile(join(outDir, f));
+    if (r.error) {
+      errors.push(r.error);
+      continue;
+    }
+    for (const v of ((r.json as { victims?: GiantCropVictim[] })?.victims ?? [])) {
+      const list = victimsByPage.get(v.page) ?? [];
+      list.push(v);
+      victimsByPage.set(v.page, list);
+    }
+  }
+  let attached = 0;
+  let skipped = 0;
+  for (const pg of pages) {
+    const vs = victimsByPage.get(pg.index);
+    if (!vs) continue;
+    const r = attachGiantCropVictims(pg, vs, outDir);
+    attached += r.attached;
+    skipped += r.skipped;
+  }
+  return { attached, skipped, errors, files: gcFiles.length };
+}
+
+/**
  * **把 OCR 读到的「题号行」补成块**（2026-10-12 用户当场指出「第 1 题漏识别」后加）。
  *
  * 动机：MinerU 会**整行漏识别** —— 答案册 p17 的 `1. AD 必刷模型·传送带模型` 在原卷清晰可见，
@@ -1325,36 +1366,14 @@ function main(): void {
     );
   }
   // giant-crop.pNN.json：B-39 巨带截断回退的受害者行 ⇒ 行级 coordSource=crop 透传。
-  const gcFiles = readdirSync(outDir)
-    .filter((f) => /^giant-crop\.p\d+\.json$/.test(f))
-    .sort();
-  if (gcFiles.length) {
-    const victimsByPage = new Map<number, GiantCropVictim[]>();
-    for (const f of gcFiles) {
-      const r = readOcrJsonFile(join(outDir, f));
-      if (r.error) {
-        ocrInputErrors.push(r.error);
-        console.warn(`  ⚠️ ${r.error}（巨带裁图透传跳过该文件）`);
-        continue;
-      }
-      for (const v of ((r.json as { victims?: GiantCropVictim[] })?.victims ?? [])) {
-        const list = victimsByPage.get(v.page) ?? [];
-        list.push(v);
-        victimsByPage.set(v.page, list);
-      }
-    }
-    let gAtt = 0;
-    let gSkip = 0;
-    for (const pg of snapshot.pages) {
-      const vs = victimsByPage.get(pg.index);
-      if (!vs) continue;
-      const r = attachGiantCropVictims(pg, vs, outDir);
-      gAtt += r.attached;
-      gSkip += r.skipped;
-    }
+  // 生产默认通电（产物在即生效，无布尔旗标）；接线本体见 consumeGiantCropArtifacts。
+  const gc = consumeGiantCropArtifacts(snapshot.pages, outDir);
+  ocrInputErrors.push(...gc.errors);
+  for (const e of gc.errors) console.warn(`  ⚠️ ${e}（巨带裁图透传跳过该文件）`);
+  if (gc.files) {
     console.log(
-      `  巨带裁图回退透传：${gAtt} 行 coordSource=crop` +
-        (gSkip ? `（${gSkip} 条受害者未匹配/无裁图，原样保留不静默）` : ""),
+      `  巨带裁图回退透传：${gc.attached} 行 coordSource=crop` +
+        (gc.skipped ? `（${gc.skipped} 条受害者未匹配/无裁图，原样保留不静默）` : ""),
     );
   }
   // questions.json 与 stages.json 同源重生成：viewer 与 stages 消费同一份引擎产物，

@@ -17,6 +17,7 @@ import {
   applyTableV3,
   attachGiantCropVictims,
   buildStageSnapshot,
+  consumeGiantCropArtifacts,
   pngSizeFromHeader,
   type StageBlock,
   type StagePage,
@@ -206,4 +207,62 @@ test("buildStageSnapshot：无产物消费时快照不含任何 S2 新字段（�
   for (const key of ["tableClass", "tableSource", "cropSize", "coordSource"]) {
     assert.ok(!json.includes(`"${key}"`), `快照不应含新字段 ${key}（产物缺失=默认关）`);
   }
+});
+
+/* ── 生产默认通电：main() 的 giant-crop 产物消费接线（consumeGiantCropArtifacts） ──
+ * 上面 attachGiantCropVictims 测的是「单页匹配判据」；这里测的是 export-stages 真正
+ * 从 outDir 读 giant-crop.pNN.json → 按页分发 → 挂 coordSource=crop 的**生产接线**。
+ * 用户拍板 B-39 全量开进生产 = 产物在即生效（无布尔旗标），故此接线必须被测试锁死：
+ *   ① 有 victims 产物 ⇒ 匹配行 coordSource=crop + crop + cropSize（默认通电）；
+ *   ② 缺产物 ⇒ 快照逐字节不变（向后兼容，与默认关旗标同纪律）；
+ *   ③ 产物损坏 ⇒ 错误可见不静默（G1），不污染快照。 */
+
+test("consumeGiantCropArtifacts：outDir 有 giant-crop.pNN.json ⇒ 匹配行 coordSource=crop（生产默认通电）", () => {
+  withCropDir((dir) => {
+    const crops = join(dir, "giant-crop", "crops");
+    mkdirSync(crops, { recursive: true });
+    writeFileSync(join(crops, "p076_g0-077.png"), fakePng(290, 22));
+    const line: StageBlock = { i: 0, kind: "text", bbox: [290.8, 130.7, 429.7, 141.4] as never, text: "1.A【解析】本题考查波的传播.根" };
+    const pg = mkPage([line]);
+    // crop=null ⇒ 走两产出方共同命名约定 {id}-{page+1:03d}.png（与真实 6616 条 victims 同形态）
+    writeFileSync(join(dir, "giant-crop.p76.json"), JSON.stringify({
+      victims: [{ id: "p076_g0", page: 76, text: line.text, v3box: line.bbox, fallbackBox: line.bbox, crop: null }],
+    }));
+    const r = consumeGiantCropArtifacts([pg], dir);
+    assert.equal(r.files, 1);
+    assert.equal(r.attached, 1);
+    assert.equal(r.skipped, 0);
+    assert.deepEqual(r.errors, []);
+    assert.equal(line.coordSource, "crop");
+    assert.equal(line.crop, join("giant-crop", "crops", "p076_g0-077.png"));
+    assert.deepEqual(line.cropSize, [290, 22]);
+    assert.equal(line.text, "1.A【解析】本题考查波的传播.根", "引擎原文一个字不动（文本留快照/title）");
+  });
+});
+
+test("consumeGiantCropArtifacts：缺 giant-crop 产物 ⇒ 快照逐字节不变（向后兼容）", () => {
+  withCropDir((dir) => {
+    const pg = mkPage([
+      { i: 0, kind: "text", bbox: [290.8, 130.7, 429.7, 141.4] as never, text: "1.A【解析】本题考查波的传播.根" },
+      { i: 1, kind: "table", bbox: [10, 100, 300, 200] as never, text: "甲\t乙", html: TABLE_HTML },
+    ]);
+    const pages = [pg];
+    const before = JSON.stringify(pages);
+    const r = consumeGiantCropArtifacts(pages, dir);
+    assert.deepEqual(r, { attached: 0, skipped: 0, errors: [], files: 0 });
+    assert.equal(JSON.stringify(pages), before, "无产物 ⇒ 一个字节都不改（默认关旗标纪律）");
+  });
+});
+
+test("consumeGiantCropArtifacts：产物损坏 ⇒ 错误可见不静默（G1），快照不污染", () => {
+  withCropDir((dir) => {
+    const pg = mkPage([{ i: 0, kind: "text", bbox: [290.8, 130.7, 429.7, 141.4] as never, text: "1.A【解析】本题考查波的传播.根" }]);
+    const before = JSON.stringify(pg.blocks);
+    writeFileSync(join(dir, "giant-crop.p76.json"), "{ 这不是合法 JSON ");
+    const r = consumeGiantCropArtifacts([pg], dir);
+    assert.equal(r.files, 1);
+    assert.equal(r.attached, 0);
+    assert.equal(r.errors.length, 1, "损坏产物必须报错，不静默吞");
+    assert.equal(JSON.stringify(pg.blocks), before);
+  });
 });
