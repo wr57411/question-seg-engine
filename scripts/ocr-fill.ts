@@ -244,11 +244,17 @@ const out = {
 writeFileSync(join(OUT_DIR, "ocr-fill.json"), JSON.stringify(out, null, 1));
 console.log(`\n===== 候选补全：${accepted}/${todo.length} 条通过合理性判据 =====`);
 console.log(`落盘 ${join(OUT_DIR, "ocr-fill.json")}；裁图证据在 ${CROP_DIR}/`);
-// 自动重导快照（同一 docId），让候选真正进入 stages.json —— 这样本步骤对**任意文档**都可重复，
-// 不必再手工敲 export（export 需要 layout 路径，默认值只对样卷成立）。
-const layoutPath = existsSync(join(OUT_DIR, "layout.json"))
-  ? join(OUT_DIR, "layout.json")
-  : join("data", "smoke", "unpacked", "layout.json");
+// 自动重导快照（同一 docId），让候选真正进入 stages.json —— 这样本步骤对**任意文档**都可重复。
+// M5-B（no-MinerU）：拆掉 MinerU smoke 默认回退 —— 本书缺 layout.json 时报错退出，
+// 绝不拿样卷骨架冒充本书重导（静默混源 = 内容事故；红线：不静默失败）。
+const layoutPath = join(OUT_DIR, "layout.json");
+if (!existsSync(layoutPath)) {
+  console.error(
+    `❌ 缺 ${layoutPath}，无法重导快照（M5 起已拆 MinerU 默认输入）。` +
+      `先 npm run daily 产出 layout，或显式传 layoutPath 手动重导。`,
+  );
+  process.exit(2);
+}
 console.log(`重导快照：export-stages.ts "${DOC}" "${layoutPath}"`);
 execFileSync(process.execPath, ["--import", "tsx", "scripts/export-stages.ts", DOC, layoutPath], {
   stdio: "inherit",

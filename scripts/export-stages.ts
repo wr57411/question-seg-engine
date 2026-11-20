@@ -5,8 +5,9 @@
  * 把各阶段中间产物收进 data/out/<docId>/stages.json，
  * 供 stages/ 前端（不 import 引擎代码）做可视化展示。
  *
- * 运行：npm run stages:export [-- <docId> <layoutPath>]
- * 默认：docId = 23必刷题 2相互作用，layout = data/smoke/unpacked/layout.json
+ * 运行：npm run stages:export -- <docId> <layoutPath>（两参均必传）
+ * M5-B（no-MinerU）：MinerU 默认输入已拆 —— 缺 layoutPath 用法报错退出 2，不再落
+ * data/smoke/unpacked/layout.json；骨架源无关，喂哪份 layout 由调用方显式决定（daily 自动传）。
  */
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -1487,8 +1488,22 @@ export function injectOcrFullTextLines(doc: ParsedDocument, outDir: string): { i
 }
 
 function main(): void {
-  const docId = process.argv[2] ?? "23必刷题 2相互作用";
-  const layoutPath = process.argv[3] ?? join("data", "smoke", "unpacked", "layout.json");
+  const docId = process.argv[2];
+  const layoutPath = process.argv[3];
+  // M5-B（no-MinerU）：拆掉 MinerU 默认输入（旧缺省 = data/smoke/unpacked/layout.json）。
+  // 导出器源无关：喂哪份 layout 产哪份骨架，必须由调用方显式传参（daily/ocr-fill/fuse-doc 均显式传）；
+  // 缺参 ⇒ 用法报错退出 2，绝不静默回退任何默认源（红线：不静默失败；拿默认源冒充本书=内容事故）。
+  if (!docId || !layoutPath) {
+    console.error(
+      [
+        "用法: npx tsx scripts/export-stages.ts <docId> <layoutPath>",
+        "  layoutPath 必须显式传参（OXR layout 或其它骨架源）；M5 起已拆除 MinerU 默认输入。",
+        '  例: npx tsx scripts/export-stages.ts "物理_教材基础练 曲线运动" "data/out/物理_教材基础练 曲线运动/layout.json"',
+        "  一键导入走 npm run daily -- <pdf|layout.json>（会自动显式传 layout）。",
+      ].join("\n"),
+    );
+    process.exit(2);
+  }
   const raw = JSON.parse(readFileSync(layoutPath, "utf8"));
 
   const doc = normalizeLayout(raw, docId);

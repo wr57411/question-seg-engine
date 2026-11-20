@@ -575,9 +575,16 @@ console.log(`\n===== 整页补全：${totalAccepted}/${totalHoles} 条通过判�
 console.log(`落盘 ${PAGE_JSON}；整页图与识别原文在 ${PAGE_DIR}/`);
 
 // 自动重导快照（同一 docId），让候选真正进入 stages.json。
-const layoutPath = existsSync(join(OUT_DIR, "layout.json"))
-  ? join(OUT_DIR, "layout.json")
-  : join("data", "smoke", "unpacked", "layout.json");
+// M5-B（no-MinerU）：拆掉 MinerU smoke 默认回退 —— 本书缺 layout.json 时报错退出，
+// 绝不拿样卷骨架冒充本书重导（静默混源 = 内容事故；红线：不静默失败）。
+const layoutPath = join(OUT_DIR, "layout.json");
+if (!existsSync(layoutPath)) {
+  console.error(
+    `❌ 缺 ${layoutPath}，无法重导快照（M5 起已拆 MinerU 默认输入）。` +
+      `先 npm run daily 产出 layout，或显式传 layoutPath 手动重导。`,
+  );
+  process.exit(2);
+}
 console.log(`重导快照：export-stages.ts "${DOC}" "${layoutPath}"`);
 execFileSync(process.execPath, ["--import", "tsx", "scripts/export-stages.ts", DOC, layoutPath], {
   stdio: "inherit",

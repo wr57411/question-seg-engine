@@ -110,6 +110,7 @@
 | 105 | **实验区题号定案「实验10」**（B-20）：引擎/编号审计/号牌留白与测试同步 | 2026-11-02 |
 | 106 | **金标准恢复为「每本必做」，形态改为「机器起草 + 人判对错」**（≈15–40 分钟/日）——理由是三台机器源在**公式**上集体失明，不只是吞吐改口 | 2026-11-02 |
 | 107 | **OCR 校验线换传输层**：坐标只有直连异步作业接口才拿得到（MCP 结构性丢弃）；StructureV3 登记为独立结构计数器（只报警）；串位判据改覆盖率；`daily` 凭据门改「可用性」而非「存在性」 | 2026-11-03 |
+| 113 | **M5-B 拆 MinerU 默认输入**（export-stages 两参必传/缺参 exit 2；ocr-fill 回退同拆）+ raw 文案无-MinerU 多源口径 + 公式叠印根因登记不修（B-45） | 2026-11-20 |
 
 ## 1. 公式指标修正：语义正确率替代可编译率
 
@@ -5036,3 +5037,46 @@ formula-ink.json 是答案册 191 产物字节守卫锁定的 B-41 基线产物�
 **红线自检**：不静默失败（遮罩命中全记录 bandMasked）；检测不改写（审计只读、生产接线在调用侧）；
 判据同源（judgeInkBox/judge-rulers 单一实现，composite 消费不重算）；分母独立（V3 totalLines）。
 门绿凭证 31def822f1b3990d。测量资产 tmp/m4b/（git 忽略，同 M4 先例）。
+
+## 113 M5-B 拆 MinerU 默认输入 + 展示层文案无-MinerU 口径 + 公式叠印根因登记（2026-11-20）
+
+**决策**：
+1. `scripts/export-stages.ts` 的 `argv[2] docId` / `argv[3] layoutPath` **均必传**；缺参 ⇒ 用法报错
+   `process.exit(2)`（与 `daily.ts` 用法错误约定一致），**不再回退** `data/smoke/unpacked/layout.json`
+   （MinerU 样卷）。报错文案点名 layoutPath 需显式传参并给 OXR 示例。
+2. `scripts/ocr-fill.ts` / `scripts/ocr-page-fill.ts` 自动重导的 smoke 默认回退**同拆**：本书
+   `data/out/<docId>/layout.json` 缺失 ⇒ 报错退出 2。旧回退会拿样卷骨架冒充本书重导（静默混源）。
+3. `stages/stages.js` EXPLAIN.raw.do 文案改如实多源：OXR 读字 + 本地 PP-StructureV3 行框/表格 +
+   原卷墨迹带坐标校准 + 页图裁图兜底；不再提 MinerU 为当前来源。DOM 展示层不写 `@ts-check`（§95）。
+4. **显式传参行为逐字节不变**：导出器源无关（M1 §见 4529c0c layoutInput 溯源），本轮只删缺省分支；
+   `tests/oxr-input.test.ts`（M1 真 spawn 锁）继续绿。`daily.ts` 调用处本就显式传 layout（:486），无需改。
+5. 公式叠印（wy-p002/qx-p002，M4 登记预存缺陷）**只登记不修**（BACKLOG B-45），根因见下。
+
+**理由**：默认源 = 静默混源风险（红线：不静默失败、不丢内容）；生产入口 daily/ocr-fill/fuse-doc 均已
+显式传参，缺省只服务 MinerU 时代样卷 demo，拆除后无任何生产调用方受影响。TDD 红→绿：
+`tests/export-layout-required.test.ts`（2 用例：只传 docId / 完全无参 ⇒ exit 2 + 不写快照）、
+`tests/no-mineru-copy.test.ts`（1 用例：raw 文案多源口径源码扫描锁）；红日志 tmp/m5-b/red.log、
+绿日志 tmp/m5-b/green.log（含 oxr-input 显式传参锁 4/4）。
+
+**叠印根因（实测，tmp/m5-b/overprint-rootcause.json，用真实 font-metrics 模块算）**：
+上游 OXR 把显示公式组/表头行切成**逐行薄片**（bboxH 仅 5–5.4pt、行距 8–10.4pt；wy p1 i3–16、
+qx p1 i12/13），而渲染侧字号模型两处把薄片抬到页面基准字号：
+① `stages/font-metrics.js:372`「含 LaTeX 源码即用 baseFont」——为 MinerU 时代「公式块 bbox 被二维
+结构撑高」设计，不覆盖 OXR 反向缺陷（bbox 被压薄）⇒ wy 公式行 14.99px；
+② `font-metrics.js:264-269` reconcileFont「fontH/fontW 比 >1.3 ⇒ baseFont」——为「框被撑大」碎片
+设计，对「框被压薄」薄片误触发（fontH 6.9 vs fontW 14.0）⇒ qx 表头行 15.39px；
+③ `clampByWidth`（:432-453）只夹宽不夹高、`\frac` 豁免 ⇒ 救不了纵向；`stages.css:22` line-height 1.6
+⇒ 行盒 22–24.6px vs 行距 10.2–17px ⇒ 邻行墨迹互叠 = 叠印；qx 表头行 x95 还压竖标签列 x91–105
+（竖标签单字块自身字号正常）。重导出块级 diff=0 与此归因自洽：缺陷 = 上游薄片 × 渲染字号模型，
+非近期回归；原卷单印干净因真实行距/字号自洽。证据图 tmp/m4-remeasure/shots/{wy,qx}-p002.png。
+
+**为什么不修（B-45）**：改 baseFont/reconcile 判据 = 字号保真口径变更（波及全册公式行/碎片行，含
+答案册 187 页），需独立决策 + 全量逐页截图审板 + 基线重锁；薄片重并整块则动导出骨架（答案册 191
+产物字节守卫对象）或 renderPaper 分组逻辑（纸面重建只此一处红线）——两条都是大改，超 M5-B 小修范围。
+
+**遗留文案**：`final/final.js:1875`、`final/entry-paper.js:431` 洞提示仍说「MinerU 和 OCR 都没读出来」；
+本轮提交范围限 scripts/tests/stages/docs，留后续小修（B-45 附记）。
+
+**状态**：代码+文案落地（TDD 红绿 + 显式传参锁绿 + 答案册守卫 191/191，tmp/m5-b/guard-answer.log）；
+叠印不修登记 B-45。门状态见 BACKLOG B-46：M5-A 并发写 data/out 期间三数据态测试红、三轮重试同障碍
+按纪律登记跳过（归因与重试记录 tmp/m5-b/check*.log）；M5-B 自身验证独立成立（新测试+oxr-input 4/4 绿）。
