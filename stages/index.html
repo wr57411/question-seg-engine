@@ -27,6 +27,10 @@
       <select id="page-jump" aria-label="跳转到页"></select>
       <a id="origin-link" class="btn" href="#" target="_blank" rel="noopener" hidden>原卷 PDF ↗</a>
       <span class="page-meta" id="page-meta"></span>
+      <label id="uncovered-toggle" class="tb-toggle" hidden
+             title="解析遗漏标记（内容级洋红框 / 家具级灰虚线 + 底部图例）——原版书上没有这些标记，默认不显示；需要核查漏识别时勾选">
+        <input type="checkbox" id="uncovered-check" /> 解析遗漏标记
+      </label>
     </section>
     <section class="canvas-wrap" id="canvas-wrap"></section>
     <section class="detail" id="detail" hidden></section>

@@ -183,6 +183,36 @@ test("③b 单栏页只留一侧留白：738（号牌全在左侧，右侧不该
   assert.equal(innerW, 738);
 });
 
+test("④b 解析遗漏标记开关：diagnostics 且 uncovered 才画；关掉不改版式（对比视图默认关）", () => {
+  // 夹具页带两条未覆盖墨迹：内容级 + 家具级。对应 UI 开关三态（URL/复选框/localStorage）。
+  const UNCOV_PAGE = {
+    ...PAGE,
+    uncovered: [
+      { bbox: [50, 400, 280, 420], area: 4000, kind: "content" },
+      { bbox: [320, 30, 545, 44], area: 1300, kind: "furniture" },
+    ],
+  };
+  /** @param {Stub} root @param {string} cls */
+  const countCls = (root: Stub, cls: string): number => {
+    let n = 0;
+    const walk = (x: Stub): void => {
+      if (x.classList.contains(cls)) n++;
+      x.children.forEach(walk);
+    };
+    walk(root);
+    return n;
+  };
+  const off = renderPaper(UNCOV_PAGE, { paneW: 760, diagnostics: true, uncovered: false } as never);
+  const on = renderPaper(UNCOV_PAGE, { paneW: 760, diagnostics: true } as never);
+  const noDiag = renderPaper(UNCOV_PAGE, { paneW: 760, diagnostics: false } as never);
+  assert.equal(countCls(off.wrap, "uncovered-mark"), 0, "开关关掉不得画解析遗漏标记（默认态）");
+  assert.equal(countCls(noDiag.wrap, "uncovered-mark"), 0, "diagnostics 关时不得画");
+  assert.equal(countCls(on.wrap, "uncovered-mark"), 2, "diagnostics 开且未传 uncovered ⇒ 维持原行为（画两个）");
+  assert.equal(countCls(off.wrap, "uncovered-tag"), 0, "关掉时连可见标签也不画");
+  assert.ok(countCls(on.wrap, "uncovered-tag") >= 1, "打开时内容级应有可见标签");
+  assert.deepEqual(paperGeometry(on.wrap), paperGeometry(off.wrap), "开关不得改变正文块/号牌版式");
+});
+
 test("④ 标签列挂在号牌所在的同一侧（右栏题不能标到左栏去）", () => {
   const { wrap } = render(() => TAGS);
   const stacks = (n: Stub, acc: Stub[] = []): Stub[] => {

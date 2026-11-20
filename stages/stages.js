@@ -87,7 +87,7 @@ const EXPLAIN = {
   },
   compare: {
     do: "左边是原卷，右边是用结构化数据按原始坐标重建的纸面——引擎读到什么就画什么，不借助原卷图像。排版保真度一目了然。",
-    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。**洋红标记框=「解析遗漏·内容级」**（原卷有墨迹、解析块没覆盖到，含上游漏识别的整行/整段）；**灰色细虚线=「解析遗漏·家具级」**（页眉装饰/栏间竖线/页边标等版式墨迹，非内容丢失，悬停看详情）。另外：上游偶发把**同一行**读成两个重叠的块，展示层会把它们**合并成一行**（悬停该行可见「已合并」说明），不丢内容、也不叠字。",
+    look: "看：两边是否逐块对得上——文字有没有少、图片在不在原位、题号顺序是否一致。右侧明显空掉/错位的地方，就是引擎的问题所在。要查「哪里可能漏读了」，勾顶部「解析遗漏标记」开关（默认关）：**洋红标记框=「解析遗漏·内容级」**（原卷有墨迹、解析块没覆盖到，含上游漏识别的整行/整段）；**灰色细虚线=「解析遗漏·家具级」**（页眉装饰/栏间竖线/页边标等版式墨迹，非内容丢失，悬停看详情）。另外：上游偶发把**同一行**读成两个重叠的块，展示层会把它们**合并成一行**（悬停该行可见「已合并」说明），不丢内容、也不叠字。",
   },
 };
 
@@ -125,8 +125,34 @@ const CANDIDATE_STYLE = new URLSearchParams(location.search).get("ocr") === "1";
  */
 const SHOW_OCR_FILL = new URLSearchParams(location.search).get("fill") === "1";
 
-/** @type {{ doc: string | null, effectiveDoc: string | null, data: Snapshot | null, stage: number, page: number, highlight: string | null }} */
-const state = { doc: null, effectiveDoc: null, data: null, stage: 0, page: 0, highlight: null };
+/** 对比视图「解析遗漏」开关的本机记忆键（换视图/重载保持；与 URL 参数同口径）。 */
+const UNCOVERED_KEY = "stages.uncovered";
+
+/**
+ * 对比视图是否显示「解析遗漏」标记（内容级洋红框 / 家具级灰虚线 + 底部图例）：**默认关**。
+ *
+ * 三处一致（照 final 页 `?audit=1` 的风格）：
+ *   ① URL 参数 `?uncovered=1` 开、`?uncovered=0` 关（可分享/收藏，优先级最高）；
+ *   ② 工具栏复选框（仅「对比」阶段可见，触屏目标 ≥44px）；
+ *   ③ localStorage 记忆（`stages.uncovered`），无参数时按上次选择。
+ *
+ * 默认关的理由与 `ocr` / `fill` 同：这些标记原版书上没有，默认糊在页面上不像原版书，
+ * 需要核查漏识别时再开。
+ * @returns {boolean}
+ */
+function resolveUncovered() {
+  const q = new URLSearchParams(location.search).get("uncovered");
+  if (q === "1") return true;
+  if (q === "0") return false;
+  try {
+    return localStorage.getItem(UNCOVERED_KEY) === "1";
+  } catch {
+    return false; // 隐私模式等 localStorage 不可用：不猜，按默认关
+  }
+}
+
+/** @type {{ doc: string | null, effectiveDoc: string | null, data: Snapshot | null, stage: number, page: number, highlight: string | null, uncovered: boolean }} */
+const state = { doc: null, effectiveDoc: null, data: null, stage: 0, page: 0, highlight: null, uncovered: resolveUncovered() };
 
 /**
  * 取页面骨架（index.html）里的固定节点。这些 id 全部写死在骨架里、本文件的每次调用都命中，
@@ -186,6 +212,7 @@ async function load() {
   viewerLink.href = `/viewer/?doc=${enc(/** @type {string} */ (state.effectiveDoc))}`;
   buildStepper();
   buildPager();
+  initCompareToggle();
   render();
 }
 
@@ -252,6 +279,25 @@ function buildPager() {
   });
   next.addEventListener("click", () => {
     if (state.page < data.pages.length - 1) { state.page++; render(); }
+  });
+}
+
+/* ── 对比视图「解析遗漏」开关 ── */
+/**
+ * 绑定工具栏复选框（仅「对比」阶段可见，见 render）。
+ * 勾选变化：更新 state → 写 localStorage（换视图/重载保持）→ 重渲染当前页。
+ */
+function initCompareToggle() {
+  const box = /** @type {HTMLInputElement} */ ($("uncovered-check"));
+  box.checked = state.uncovered;
+  box.addEventListener("change", () => {
+    state.uncovered = box.checked;
+    try {
+      localStorage.setItem(UNCOVERED_KEY, box.checked ? "1" : "0");
+    } catch {
+      /* localStorage 不可写（隐私模式等）：只本次会话生效，不猜 */
+    }
+    render();
   });
 }
 
@@ -623,11 +669,13 @@ function renderCompare(p) {
   right.append(el("p", "pane-title", "成品（结构化数据按原坐标重建，非原图）"));
   // 纸面重建的**唯一实现**在 ./reconstruct.js —— 成品页（final/）用的是同一个函数，
   // 所以「成品 = 对比右侧」是结构保证的，不是两处各写一遍碰巧长得像。
-  // 对比模式是**审计视图** ⇒ diagnostics 全开（解析遗漏框 + 丢弃块）。
+  // 对比模式是**审计视图** ⇒ diagnostics 全开（丢弃块始终画）；「解析遗漏」标记则交给
+  // 用户开关（state.uncovered，默认关）—— 标记原版书上没有，默认糊一脸不像原版书。
   const paper = renderPaper(p, {
     doc,
     paneW,
     diagnostics: true,
+    uncovered: state.uncovered,
     candidateStyle: CANDIDATE_STYLE,
     ocrFill: SHOW_OCR_FILL,
     onChipClick: showDetail,
@@ -636,12 +684,14 @@ function renderCompare(p) {
 
   row.append(left, right);
   $("canvas-wrap").append(row);
-  $("canvas-wrap").append(
-    legend([
-      ["rgba(216,27,96,.85)", "解析遗漏·内容级：原卷有墨迹、解析块未覆盖（疑似漏识别正文）"],
-      ["transparent", "解析遗漏·家具级：页眉装饰/栏间竖线/页边标等版式墨迹（灰细虚线，悬停看详情）"],
-    ]),
-  );
+  if (state.uncovered) {
+    $("canvas-wrap").append(
+      legend([
+        ["rgba(216,27,96,.85)", "解析遗漏·内容级：原卷有墨迹、解析块未覆盖（疑似漏识别正文）"],
+        ["transparent", "解析遗漏·家具级：页眉装饰/栏间竖线/页边标等版式墨迹（灰细虚线，悬停看详情）"],
+      ]),
+    );
+  }
 
   // 整页 OCR 全文（`scripts/ocr-page-fill.ts` 的产物）：**没有 bbox**，所以不能画在纸面上定位；
   // 但它有整页的**完整上下文** —— 单给一份「可通读」的对照文本，用户核对时能一眼看到
@@ -674,6 +724,8 @@ function render() {
   const noToolbar = state.stage === 4; // 质检是列表视图、无页码；成品是逐页重建 ⇒ 要翻页栏
   $("toolbar").hidden = noToolbar;
   $("origin-link").hidden = noToolbar;
+  // 「解析遗漏标记」是对比视图专属开关：别的阶段没有这个视图，摆出来只会误导
+  $("uncovered-toggle").hidden = state.stage !== 6;
 
   const wrap = $("canvas-wrap");
   const extra = $("stage-extra");

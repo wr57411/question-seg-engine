@@ -41,7 +41,7 @@ import { parseTableHtml } from "./table-html.js";
  * @typedef {{ width: number, height: number, blocks: Block[], questions: PageQuestion[], columns?: number, discarded?: Block[], uncovered?: Uncovered[], ocrFill?: OcrItem[] }} Page
  * @typedef {{ text: string, short: string, name: string, color: string }} TagLike
  * @typedef {{ key: string, q: PageQuestion, tags: TagLike[], side: "left" | "right", topPx: number }} TagEntry
- * @typedef {{ doc?: string, paneW: number, diagnostics?: boolean, candidateStyle?: boolean, onChipClick?: ((q: PageQuestion, p: Page) => void) | null, resolveTags?: ((q: PageQuestion, p: Page) => TagLike[] | null) | null, ocrFill?: boolean, assignmentBadge?: ((q: PageQuestion, p: Page) => { topics: number, categories: number } | null) | null }} RenderOpts
+ * @typedef {{ doc?: string, paneW: number, diagnostics?: boolean, uncovered?: boolean, candidateStyle?: boolean, onChipClick?: ((q: PageQuestion, p: Page) => void) | null, resolveTags?: ((q: PageQuestion, p: Page) => TagLike[] | null) | null, ocrFill?: boolean, assignmentBadge?: ((q: PageQuestion, p: Page) => { topics: number, categories: number } | null) | null }} RenderOpts
  * @typedef {import("./table-html.js").ParsedTable} ParsedTable
  */
 
@@ -709,7 +709,7 @@ export function rectHits(a, b) {
  *   候选位都压正文，则不挂可见标签（改 title）—— 这是硬保证（验收：任何标记都不得盖住正文）。
  *
  * ⚠️ 成品页默认**不画**这些标记（它们不是原版书上的东西，默认画就不像原版书了）——
- * 由 `renderPaper({ diagnostics })` 控制，一键可开。
+ * 由 `renderPaper({ diagnostics })` 控制；对比视图再叠一层 `uncovered` 开关（默认关）。
  */
 /**
  * **没被补上的**内容级未覆盖洞（纯函数，无 DOM ⇒ 纸面与面板共用一份判据）。
@@ -837,6 +837,10 @@ export function legend(items) {
  * @param opts.paneW           该栏可用宽度（px）；字号换算与留白都按它算
  * @param opts.diagnostics     是否画审计标记（解析遗漏 + 丢弃块）。**默认 false**
  *                             —— 这些标记原版书上没有，默认画就不像原版书了
+ * @param opts.uncovered       是否画「解析遗漏」标记（内容级洋红框 / 家具级灰虚线）。
+ *                             **默认 true**（仅当 `diagnostics` 为真时才有意义）——
+ *                             既有调用方（成品页/对比页）不传即维持原行为；对比视图用它做
+ *                             用户开关（默认关，页面更干净），见 `stages.js` 的 `state.uncovered`。
  * @param opts.candidateStyle  是否给 OCR 补入内容加候选样式。**默认 true**
  *                             —— 红线 G1：候选不得与引擎原文混淆
  * @param opts.onChipClick     点题号牌的回调 `(question, page) => void`
@@ -857,6 +861,7 @@ export function renderPaper(p, opts = {}) {
     doc = "",
     paneW = 0,
     diagnostics = false,
+    uncovered = true,
     candidateStyle = true,
     onChipClick = null,
     resolveTags = null,
@@ -990,7 +995,7 @@ export function renderPaper(p, opts = {}) {
   }
 
   if (ocrFill) ocrFillInto(c, p, innerW, candidateStyle); // 候选补行：默认不画（见 opts.ocrFill）
-  if (diagnostics) uncoveredInto(c, p, innerW); // 再画遗漏标记（盖得住候选，符合原顺序）
+  if (diagnostics && uncovered) uncoveredInto(c, p, innerW); // 再画遗漏标记（盖得住候选，符合原顺序）；开关见 opts.uncovered
   // 注意：**不要再次 append(c)** —— c 已经在 wrap 里；重复 append 会把它移出容器，
   // 号牌就又回到被 `.canvas{overflow:hidden}` 裁掉的状态。
   // 表格字号适配必须在**挂载后**做：节点进文档才有 clientHeight。

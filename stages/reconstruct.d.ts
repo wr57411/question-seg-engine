@@ -16,6 +16,8 @@ export interface PaperOptions {
   doc?: string;
   paneW: number;
   diagnostics?: boolean;
+  /** 是否画「解析遗漏」标记（内容级洋红框 / 家具级灰虚线）；默认 true（仅在 diagnostics 为真时生效）。 */
+  uncovered?: boolean;
   candidateStyle?: boolean;
   onChipClick?: ((q: any, p: any) => void) | null;
   /** 标签解析器：返回该题的标签（纸面**只读渲染**，不做增删）。 */

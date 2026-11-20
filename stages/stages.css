@@ -130,6 +130,25 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
   border-radius: 2px;
   font-size: 13px;
 }
+/* 对比视图「解析遗漏标记」开关：与 final 页 .fb-toggle 同风格；
+   min-height 44px 是移动端触屏目标下限（本项目主设备是手机/平板）。 */
+.tb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  border: 1.5px solid var(--line);
+  border-radius: 2px;
+  background: var(--paper);
+}
+.tb-toggle:hover { border-color: var(--ink-soft); }
+.tb-toggle input { width: 18px; height: 18px; accent-color: var(--cinnabar); }
+.tb-toggle[hidden] { display: none; }
 
 /* ── 纸张画布 ─────────────────────────────── */
 .canvas-wrap { display: flex; flex-direction: column; align-items: center; }
