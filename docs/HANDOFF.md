@@ -1681,3 +1681,10 @@ layout.json / content_list.json
 - **M5 收口**：M5-B `5918238`（拆 MinerU 默认输入+文案）；M5-A 14 册实跑 **12 册 composite 95.17–97.84 达标**（磁场 93.16=B-48 诚实天花板、qx 94.10=B-44）；M5-C **答案册切换暂缓**（13 真丢页）⇒ **答案册仍 MinerU=总目标唯一未闭合项**。T1 `642072e`（B-47 composite 97.6%）、T2 `db4e0b9`/`fbefe8d`/`40761c3`（B-50+B-56 16/16 恢复、X2 8→0、anchor exit 0）、T3 `3ebebc4`（墨迹基线 31→378，§115）、T5 `4c7535f`（B-55 audit 7/7）、T6 `588c54e`（血缘标注；B-52 闭 `43aa324`）均已落盘。
 - **在飞代理：无**（t2 已完；m5-residuals/m5-leak/t1-leak/t5-stray 均收口）。
 - **下一步**：M6 回喂工作流（NodeResult `done=true`，notCovered 含答案册切换暂缓/N13/B-45/T4 遗留）；RETURN 后 T6（答案册切换）作为新一 run 立项。
+
+### 9.2 M7 答案册切换完成（2026-11-20，总目标生产层面达成）
+
+**结论**：`答案册-合订本` 已切 OXR（`layout.json` 无 `_backend`=OXR 态；MinerU 原件留档 `layout.mineru.json`；`title-guard.json` 就位）。**15/15 生产册均为 OXR 血缘**——分支总目标「生产链彻底移除 MinerU」在生产层面达成。
+**证据**：M7-A 标题守卫（5ec1f59/9cc29ab：V3 内容标题守卫 score≥0.98 全册 6 处真丢标题零误报 + 16 条 curated 补识）；M7-B 切换+裁定（7ffa8ad：628 行 oldMissing 逐条回原卷=FORMAT 615/IMAGE 7/OLD_NOISE 4/真丢 2 已补识；corrections 5 条 MinerU 期修正 disabled 留审计）；composite **97.76%**；`npm run check` 全绿 EXIT=0（主 Agent 复跑确认，凭证 30cc8b7992bcd4c7）。
+**剩余（notCovered）**：T4 表格三分流残余（d13/d14 未通电+codeIssuesForM5B 4 条）；B-45 公式叠印登记不修；N13 真机+全册审板（用户设备）；B-57 workflow facade 用法待探明；B-54 合成框错位修向待独立决策。
+**在飞**：L1 缺陷扫描器（l1-defect-scan，手册 L1 落地）。
