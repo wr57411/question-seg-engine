@@ -86,9 +86,9 @@
 
 **总目标**：生产链彻底移除 MinerU。N1–N12 的替换本体（OXR 读字/墨迹+V3 坐标/V3 表格/裁图兜底/源无关显示层）全部复用，M 阶段=最后接线（输入切 OXR + 表区域 V3 插入 + markdown 漏泄裁图 + 巨带挂 OXR + 拆 MinerU）。
 **计划+每节点可验收子目标**：`docs/plans/2026-11-20-去MinerU生产化.md`；分支节点表 `docs/branches/tool-no-mineru.md` §7。
-**当前步**：M2（markdown 漏泄裁图）。工作流 workflow_tool 自主驱动，无人工 gate；硬件不在线记 notCovered 继续。
+**当前步**：M3（V3 表格插入+全册三分流）。工作流 workflow_tool 自主驱动，无人工 gate；硬件不在线记 notCovered 继续。
 - [x] M1 输入切 OXR（门绿+对照登记+成品页不崩）——4529c0c，门 ddd002003969f2d3；血缘发现：曲线运动生产 layout 已是 OXR 转换件（真 MinerU 归档 layout.mineru.json），8 表块=§90 重建
-- [ ] M2 markdown 漏泄行→裁图（page-4 表上3行修好，TDD）
+- [x] M2 markdown 漏泄行→裁图（page-4 表上3行修好，TDD）——936cb1b，门 016b0c33e35f65b4；整表完整单印留 M3
 - [ ] M3 V3 表插入+全覆盖（index3/8/11+万有引力0，不双像/order 不串）
 - [ ] M4 巨带挂 OXR+复测 ≥95%
 - [ ] M5 其余册通电+拆 MinerU+文案

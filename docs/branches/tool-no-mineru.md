@@ -118,7 +118,7 @@ N13 需用户真机，清单+局域网地址已备（`docs/plans/2026-11-20-N13�
 | 节点 | 内容 | 可验收子目标（摘要） | 状态 |
 |---|---|---|---|
 | M1 | 生产输入切 OXR（曲线运动先行） | 喂 OXR layout 重导出+门绿；对照差异登记；成品页不崩 | ✅ 4529c0c（门 ddd002003969f2d3；tmp/m1-oxr-compare/compare.json；**血缘发现：本书生产 layout.json 已是 OXR 转换件，真 MinerU 归档 layout.mineru.json；8 表块=§90 压平行重建非 MinerU**） |
-| M2 | markdown 漏泄行→原卷裁图 | page-4 表上3行改贴小图、网址不上页、原文留 title；TDD 红绿 | □ |
+| M2 | markdown 漏泄行→原卷裁图 | page-4 表上3行改贴小图、网址不上页、原文留 title；TDD 红绿 | ✅ 936cb1b（门 016b0c33e35f65b4；attached=1组3块；tmp/m2-leak-crop/shots/ 纸面验收；整表完整单印留 M3） |
 | M3 | V3 表区域插入+三分流全覆盖 | OXR 无表块⇒V3 插入；index3/8/11+万有引力0 修好；不双像；order 不串 | □ |
 | M4 | 巨带补行挂 OXR+复测 | attached>0、配对不降、composite≥95% target95Met=true | □ |
 | M5 | 其余册通电+拆 MinerU+文案 | 补缓存通电（硬件在线则做否则 notCovered）；移除 MinerU 输入；stages.js:69 改无-MinerU | □ |
