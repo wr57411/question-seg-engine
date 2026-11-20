@@ -108,6 +108,9 @@
         │  src/normalize.ts   ← 唯一耦合点        │
         │  行级展开 · 跨页行搬迁 · 块去重         │
         └───────────────────┬────────────────────┘
+<!-- 2026-11-20 现状（feature/tool-no-mineru 增量备注）：上图输入框为历史定位——生产主链已改
+     「OXR 读字（主）+ 本地 PP-StructureV3 行框/表格/坐标」；MinerU layout.json 为兼容输入；
+     分支目标=生产链彻底移除 MinerU（见 docs/branches/tool-no-mineru.md）。 -->
                             ▼
         ┌────────────────────────────────────────┐
         │  src/layout.ts     版面层（只认坐标）    │

@@ -3,6 +3,10 @@
 本仓库是 **question-seg-engine**：MinerU 解析结果的后处理层（试卷 → 结构化题目 JSON），
 TypeScript ESM + node:test，零运行时依赖。
 
+> **2026-11-20 现状（`feature/tool-no-mineru` 分支增量备注；合并时以本注为准）**：上文为历史定位。
+> 上游已切多源——OXR 读字 + 本地 PP-StructureV3 行框/表格/坐标；MinerU layout.json 降为兼容输入；
+> 本分支目标 = 生产链彻底移除 MinerU（见 `docs/branches/tool-no-mineru.md`）。
+
 ## 必读顺序（按序读，不要跳）
 
 1. `docs/HANDOFF.md` —— 当前状态、未闭合风险、红线、前 30 分钟指引。**这是主入口。**

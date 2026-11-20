@@ -1,6 +1,10 @@
 # question-seg-engine
 
 试题结构化切分引擎骨架 —— MinerU 解析结果（layout.json 优先，content_list.json 为退化路径）的后处理层。
+> **2026-11-20 现状（`feature/tool-no-mineru` 分支增量备注；合并时以本注为准）**：上文为历史定位。
+> 上游已切多源——OXR 读字 + 本地 PP-StructureV3 行框/表格/坐标；MinerU layout.json 为兼容输入；
+> 本分支目标 = 生产链彻底移除 MinerU（进展见 `docs/branches/tool-no-mineru.md`）。下文涉及 MinerU 的
+> 流程/工具描述同属历史兼容口径，以本注与分支文档为准。
 「垂直演进模型」的起点：功能链路纵向打通、横向只覆盖高中试卷的典型版面，
 但代码姿态是生产级的（正式 schema、正式接口），后续直接演进为正式模块。
 
@@ -69,6 +73,9 @@ npm run check   # typecheck + test + 基线渲染/题号/题库审计
   2 needs_review 全部为上游公式选项漏检的真问题，见 DECISIONS §14）。
 
 ## 真实 MinerU API
+
+> **2026-11-20 注**：本节为历史兼容内容。分支 `feature/tool-no-mineru` 的目标是移除 MinerU，
+> 生产主链已改 OXR 读字 + 本地 V3（见文首现状备注与 `docs/branches/tool-no-mineru.md`）。
 
 真实云 API 的接入脚本（走真实网络，需 `mineru_API_KEY`，产物不入库）：
 
