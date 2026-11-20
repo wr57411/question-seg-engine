@@ -10,11 +10,12 @@
  *     A2 含 '$' 的公式 delimiter 碎片（"v$"、"$x"，印刷为 v₀/x 数学斜体）；
  *     A3 上下标/图内点标碎片（"F2"、"v0"、"0α"、"IH"，印刷为 F₂/v₀/O+α/尺寸标记）。
  *   B 标点字形族变体：印刷半角 ( ) , : 与 V3 全角（），：、减号 −/-、中点 •/·、
- *     罗马数字连字 Ⅱ/II（wy p008_g17 裁图证实为同一数字的两种字形）。
+ *     罗马数字连字 Ⅱ/II（wy p008_g17 裁图证实为同一数字的两种字形）；
+ *     角落括号「」（M7-C ④新增：原卷有、rec 漏读 ⇒ 删除归一，非 V3 内容错）。
  *
  * 红线守住：
  *  - 文本行 rec **汉字字形错**（"下课练天星"→"下课认听"）仍判失败，族归一不碰汉字/希腊字母；
- *  - 族归一仅覆盖蒙太奇逐条实证的字形族，未实证的（。/、/；等）一律不归一；
+ *  - 族归一仅覆盖逐条实证的字形族（蒙太奇 55 条 + M7-C ④「」），未实证的（。/、/；等）一律不归一；
  *  - 墨迹判据仍同源 judgeInkBox（audit-formula-ink.ts），本模块不新造几何阈值；
  *  - audit-formula-ink.ts 的 isFormulaText **不动**：formula-ink.json 是答案册 191 产物
  *    字节守卫锁定的 B-41 基线产物；M4b 扩路由只作用于复合裁判（composite.mjs），
@@ -32,7 +33,11 @@ const FRAGMENT_RE =
 export const isFormulaTextM4b = (s: string): boolean =>
   isFormulaTextBase(s) || /\\/.test(s) || s.includes("$") || FRAGMENT_RE.test(s.replace(/\s+/g, ""));
 
-/** 实证字形族归一（含 nows 去空白）。族集合 = 蒙太奇 55 条 B 组裁图逐条证实者，不多不少。 */
+/**
+ * 实证字形族归一（含 nows 去空白）。族集合 = 蒙太奇 55 条 B 组裁图逐条证实者 + M7-C ④ 的「」。
+ * 「」归一为**删除**（非映射）：原卷印「2024年1月浙江卷「鲁」，笔记本 rec 漏读括号 ⇒ 保序子序列
+ * 会因多一个「判失败（裁判伪影，非 V3 内容错）。证据 tmp/m7-table/shots/d14-p001-g28-orig.png。
+ */
 export const famNorm = (s: string): string =>
   s
     .replace(/\s+/g, "")
@@ -42,7 +47,8 @@ export const famNorm = (s: string): string =>
     .replace(/：/g, ":")
     .replace(/−/g, "-")
     .replace(/•/g, "·")
-    .replace(/Ⅱ/g, "II");
+    .replace(/Ⅱ/g, "II")
+    .replace(/[「」]/g, "");
 
 /** a 是否为 b 的字符级保序子序列（不要求连续）。 */
 export const isSubseq = (a: string, b: string): boolean => {

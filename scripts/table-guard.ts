@@ -30,6 +30,15 @@ export const G1_LINE_THRESHOLD = 240;
 /** hRunW <0.3 ⇒ borderless（实测 0.04 vs ≥0.62，裕度 >15×） */
 export const G1_BORDERLESS_HRUN_MAX = 0.3;
 
+/**
+ * 灰度缓存键：docId → 文件名安全且**无碰撞**。
+ * ⚠️ 不能用 `doc.replace(/[^\w-]/g,"_")`：JS `\w` 是 ASCII，CJK 逐字折成下划线，
+ * 「物理_教材基础练 曲线运动」与「…运动和力」都折成 13 个下划线 ⇒ 两册互串 PGM，
+ * G1 拿别册页图判边框（M7-C ③：qx p4 i8 因此被误判 borderless、漏泄 html 直显）。
+ * base64url 单射 + 纯 ASCII，防同名撞车。
+ */
+export const grayCacheKey = (doc: string): string => Buffer.from(doc, "utf8").toString("base64url");
+
 /** bbox 像素域夹到图界（防越界读） */
 function clampRegion(img: GuardGray, bboxPx: [number, number, number, number]): [number, number, number, number] {
   const x0 = Math.max(0, Math.floor(bboxPx[0]));

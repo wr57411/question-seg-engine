@@ -46,6 +46,13 @@ test("famNorm 仅实证字形族：全半角括号/逗号/冒号、减号、中�
   assert.equal(famNorm("μ相同"), "μ相同"); // 汉字/希腊字母不动
 });
 
+test("famNorm 角落括号「」归一（M7-C ④：原卷实证「鲁，rec 漏读括号 ⇒ 裁判伪失败）", () => {
+  // 证据：data/out/教材基础练 磁场/pages/page-001.png p000_g28 窗（tmp/m7-table/shots/d14-p001-g28-orig.png）
+  // 原卷印「2024年1月浙江卷「鲁」，V3 读到有「、笔记本 rec 漏读 ⇒ 不归一则 V3⊄rec 误判。
+  assert.equal(famNorm("2024年1月浙江卷「鲁"), "2024年1月浙江卷鲁");
+  assert.equal(confirmTextM4b("2024年1月浙江卷「鲁", "2024年1月浙江卷鲁"), true);
+});
+
 test("isSubseq 字符级保序子序列", () => {
   assert.equal(isSubseq("abc", "aXbYc"), true);
   assert.equal(isSubseq("abc", "acb"), false);

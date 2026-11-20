@@ -20,7 +20,8 @@
  * 实测在真表内却在合成框外）；note 写明来源，不冒充 V3 检出。守卫判无边框 ⇒ 不出 entry（行文本照常）。
  *
  * 页号口径：res 文件 pNN = 1 基 = stages index+1（R5 已抽页核对）；构建器逐页再自检：
- * 页图 IHDR == res 坐标域 + V3 首行文本出现在骨架前 3 个 text 块内，不符响亮中止（不静默错页）。
+ * 页图 IHDR == res 坐标域 + R5 页号守卫（scripts/r5-align.ts）——严判据「V3 首行落在骨架前 3 个
+ * text 块」；页眉碎屑假红时退回整页内容重合（≥5 条长行，实测相邻页 ≤3），不符响亮中止（不静默错页）。
  *
  * 用法：npx tsx scripts/table-v3-full.ts <docId> <resDir>
  * 例：npx tsx scripts/table-v3-full.ts "物理_教材基础练 曲线运动-OXR" tmp/m3-table-v3/d08
@@ -29,7 +30,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parsePgm, pngSizeFromHeader } from "./export-stages.js";
-import { G1_LINE_THRESHOLD, isBorderlessByInk, longestHRunRatio, longestVRunRatio } from "./table-guard.js";
+import { checkR5Alignment } from "./r5-align.js";
+import { G1_LINE_THRESHOLD, grayCacheKey, isBorderlessByInk, longestHRunRatio, longestVRunRatio } from "./table-guard.js";
 
 interface ResJson {
   width: number;
@@ -66,7 +68,6 @@ const grayDir = join("tmp", "m3-table-v3", "gray");
 mkdirSync(grayDir, { recursive: true });
 mkdirSync(join(outDir, "table-crops"), { recursive: true });
 
-const norm = (s: string) => s.replace(/\s/g, "");
 const isLeakText = (t: string) => t.trimStart().startsWith("![") || t.includes("](http");
 
 /** 页图路径：三种历史命名（3 位/2 位/不补零）都认，缺则响亮报错 */
@@ -84,7 +85,8 @@ function pageImageOf(index: number): string {
 
 /** 原卷页图 → PGM 灰度（ffmpeg，禁 sips）；G1 判据的独立墨迹源 */
 function grayOf(index: number, pagePng: string): ReturnType<typeof parsePgm> {
-  const pgm = join(grayDir, `${doc.replace(/[^\w-]/g, "_")}-p${String(index + 1).padStart(3, "0")}.pgm`);
+  // 键必须无碰撞：CJK docId 用 \w 折叠会撞名（M7-C ③ 根因），改用 grayCacheKey。
+  const pgm = join(grayDir, `${grayCacheKey(doc)}-p${String(index + 1).padStart(3, "0")}.pgm`);
   if (!existsSync(pgm)) {
     execFileSync("ffmpeg", ["-y", "-v", "error", "-i", pagePng, "-vf", "format=gray", "-pix_fmt", "gray", pgm], { stdio: "pipe" });
   }
@@ -117,7 +119,7 @@ const iou = (a: number[], b: number[]) => {
 const entries: Entry[] = [];
 const report: {
   doc: string; resDir: string;
-  pages: { index: number; v3Tables: number; classes: string[]; fallback: string[]; guardSkipped: string[] }[];
+  pages: { index: number; v3Tables: number; r5: "strict" | "overlap"; classes: string[]; fallback: string[]; guardSkipped: string[] }[];
   counts: { text: number; image: number; borderless: number; fallbackImage: number; guardSkipped: number };
 } = { doc, resDir, pages: [], counts: { text: 0, image: 0, borderless: 0, fallbackImage: 0, guardSkipped: 0 } };
 
@@ -135,12 +137,13 @@ for (const f of resFiles) {
   if (pw !== res.width || ph !== res.height) {
     throw new Error(`${f} 坐标域 ${res.width}x${res.height} ≠ 页图 ${pw}x${ph}（R7 错页/错域，中止）`);
   }
-  // R5 逐页首行对齐：V3 首行必须落在骨架前 3 个 text 块内（防 0/1 基错页静默）
-  const v3First = norm(res.overall_ocr_res?.rec_texts?.[0] ?? "");
-  const headText = norm(page.blocks.filter((b) => b.kind === "text").slice(0, 3).map((b) => b.text).join(""));
-  if (!v3First || !headText.includes(v3First)) {
-    throw new Error(`${f} R5 首行对齐失败：V3 首行=${v3First.slice(0, 30)} 不在骨架前 3 text 块（页号口径错？中止）`);
-  }
+  // R5 逐页页号守卫（纯函数 scripts/r5-align.ts）：严判据=首行落骨架前 3 text 块；
+  // 页眉碎屑（OXR 没读的装饰头）致严判据假红时退回整页内容重合（≥5 条长行）。防 0/1 基错页静默。
+  const r5 = checkR5Alignment({
+    v3Lines: res.overall_ocr_res?.rec_texts ?? [],
+    skeletonTexts: page.blocks.filter((b) => b.kind === "text").map((b) => b.text),
+  });
+  if (!r5.ok) throw new Error(`${f} R5 首行对齐失败：${r5.reason}`);
   const gray = grayOf(index, pagePng);
   const sx = page.width / res.width;
   const sy = page.height / res.height;
@@ -151,7 +154,7 @@ for (const f of resFiles) {
   if (v3Boxes.length !== htmls.length) {
     throw new Error(`${f} table 块数 ${v3Boxes.length} ≠ table_res_list ${htmls.length}（对应关系不明，中止）`);
   }
-  const pageRep: (typeof report.pages)[number] = { index, v3Tables: v3Boxes.length, classes: [], fallback: [], guardSkipped: [] };
+  const pageRep: (typeof report.pages)[number] = { index, v3Tables: v3Boxes.length, r5: r5.mode, classes: [], fallback: [], guardSkipped: [] };
   let tIdx = 0;
   for (let k = 0; k < v3Boxes.length; k++) {
     const bboxPx = v3Boxes[k]!;

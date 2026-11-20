@@ -11,6 +11,7 @@ import { test } from "node:test";
 import {
   G1_BORDERLESS_HRUN_MAX,
   G1_LINE_THRESHOLD,
+  grayCacheKey,
   isBorderlessByInk,
   longestHRunRatio,
   longestVRunRatio,
@@ -65,4 +66,13 @@ test("G1：竖 run 口径（vRunH，佐证信号）——单竖分隔线 / 区�
   assert.ok(v >= 0.99, "贯穿竖线 vRunH≈1");
   const none = gray(50, 100);
   assert.equal(longestVRunRatio(none, [0, 0, 50, 100]), 0);
+});
+test("grayCacheKey：CJK docId 无碰撞（\\w 折叠会撞名，M7-C ③ 根因）", () => {
+  // 「物理_教材基础练 曲线运动」与「…运动和力」在 JS \w 口径下都折成 13 个下划线 ⇒ 灰度缓存互串，
+  // G1 拿别的书的 PGM 判边框（qx p4 i8 被误判 borderless，漏泄 html 直显）。
+  const curve = grayCacheKey("物理_教材基础练 曲线运动");
+  const motion = grayCacheKey("物理_教材基础练 运动和力");
+  assert.notEqual(curve, motion, "两个不同册不得撞缓存键");
+  assert.equal(curve, grayCacheKey("物理_教材基础练 曲线运动"), "同册必须稳定");
+  assert.match(curve, /^[A-Za-z0-9_-]+$/, "键须文件名安全（ASCII）");
 });
