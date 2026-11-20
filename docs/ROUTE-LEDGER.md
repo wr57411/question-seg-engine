@@ -86,7 +86,7 @@
 
 **总目标**：生产链彻底移除 MinerU。N1–N12 的替换本体（OXR 读字/墨迹+V3 坐标/V3 表格/裁图兜底/源无关显示层）全部复用，M 阶段=最后接线（输入切 OXR + 表区域 V3 插入 + markdown 漏泄裁图 + 巨带挂 OXR + 拆 MinerU）。
 **计划+每节点可验收子目标**：`docs/plans/2026-11-20-去MinerU生产化.md`；分支节点表 `docs/branches/tool-no-mineru.md` §7。
-**当前步**：M5（三子代理并行：12 册换源通电 / 拆 MinerU 输入+文案 / 答案册内容守卫+条件切换）。工作流 workflow_tool 自主驱动，无人工 gate；硬件不在线记 notCovered 继续。
+**当前步**：**M6 收口中**（M5 已收口：M5-B 5918238 / M5-A 12 册达标 / M5-C 答案册暂缓；M6 子代理更新台账+检查点提交，RETURN 由主 Agent 喂工作流）。工作流 workflow_tool 自主驱动，无人工 gate；硬件不在线记 notCovered 继续。
 - [x] M1 输入切 OXR（门绿+对照登记+成品页不崩）——4529c0c，门 ddd002003969f2d3；血缘发现：曲线运动生产 layout 已是 OXR 转换件（真 MinerU 归档 layout.mineru.json），8 表块=§90 重建
 - [x] M2 markdown 漏泄行→裁图（page-4 表上3行修好，TDD）——936cb1b，门 016b0c33e35f65b4；整表完整单印留 M3
 - [x] M3 V3 表插入+全覆盖（index3/8/11+万有引力0，不双像/order 不串）——901945b，门 30cc8b7992bcd4c7；p11 修复闭环
@@ -95,7 +95,7 @@
       8069b5f 页图命名修复+缓存 p10/p11 归属修复（独立 OXR 文本对照，cache-repair/repair-record.json）；门 0f7023918e4c9071；tmp/m4-remeasure/m4-summary.json
 - [x] M4b 竖条遮罩转生产+重测 —— f619ac3，门 31def822f1b3990d；wy 97.84%✅ 答案册 97.62%✅（新裁判 judge-rulers.ts）；
       qx 94.10% 差 20 行=诚实天花板（真实失败为主）⇒ B-44 OPEN 不硬凑；答案册守卫编排层复跑真 191/191（M4b 自称复跑不实，已补真）；DECISIONS §112
-- [◐] M5 其余册通电+拆 MinerU+文案 —— 三子代理并行中（M5-A 12 册/M5-B 代码文案/M5-C 答案册守卫）；
+- [x] M5 其余册通电+拆 MinerU+文案 —— ✅ 收口（M5-A 12 册/M5-B 代码文案/M5-C 答案册守卫）；M6 复核 `npm run check` 全绿 EXIT=0（stamp 30cc8b7992bcd4c7）；
       前置全备：14 册缓存+203 表 res 本地、电路/磁场/答案册-OXR 解析件、lineage.json、answer-content-guard.json（65 页）；
       **M5-B 代码+文案 ✅**：MinerU 默认输入拆除（export-stages 缺参 exit 2 + ocr-fill 回退同拆，显式传参不变）、
       raw 文案多源口径（活面板验证）、叠印根因定案登记不修（B-45/§113）、答案册守卫 191/191；
@@ -103,5 +103,5 @@
       **M5-A 终报 ✅ 14 册实跑 12 达标**（95.17–97.84；磁场 93.16=诚实天花板已分类、qx 94.10=B-44 复现；配对小降=OXR 块切分差非错位；
       遗留：d13/d14 表格三分流被 R5 首行守卫假红阻断未通电+codeIssuesForM5B 5 条，tmp/m5-books/progress.json）；
       **M5-C ✅ 答案册切换暂缓**（13 真丢页/55 伪影页，tmp/m5-answer-guard/）⇒ 总目标未闭合项；副产物 B-47 跨页泄漏成品叠印实证（tmp/b47/）；
-      在飞：m5-residuals（磁场/配对裁图复核）、m5-leak（B-47 修+答案册基线重锁）；交接正文 docs/HANDOFF.md §9
-- [ ] M6 台账+RETURN+提交
+      在飞：**无**（m5-residuals 磁场/配对裁图复核、m5-leak B-47 修+答案册基线重锁均已收口）；交接正文 docs/HANDOFF.md §9
+- [◐] M6 台账+RETURN+提交 —— 收口中（M6 子代理：台账实跑更新+检查点提交；RETURN 由主 Agent 喂工作流）

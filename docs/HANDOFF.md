@@ -497,6 +497,14 @@ layout.json / content_list.json
 
 ## 2. 当前状态（事实，非计划）
 
+### 2026-11-20 M5 收口状态（M6 收口期，实跑）
+
+- `npm run check` 复跑全绿 **EXIT=0**：731 测试（730 pass / 0 fail / 1 skip）、渲染审计 **7/7**、`audit:numbering:cross` **X2 0**（X1 1 已登记）、anchor 7 段已登记、`bank:all` 429 条；凭证 30cc8b7992bcd4c7。
+- **M5 收口**：M5-B `5918238`（拆 MinerU 默认输入+文案+B-45 登记）；M5-A 14 册实跑 **12 册 composite 95.17–97.84 达标**（磁场 93.16=B-48 诚实天花板、qx 94.10=B-44）；M5-C **答案册切换暂缓**（13 真丢页）⇒ 答案册仍 MinerU=总目标唯一未闭合项。
+- **T1/T2/T3/T5/T6 收口**：B-47 `642072e`（composite 97.6%、净移除 94 块）、B-50+B-56 `db4e0b9`/`fbefe8d`/`40761c3`（16/16 恢复、X2 8→0、anchor exit 0）、T3 墨迹基线 `3ebebc4`（31→378，§115）、B-55 `4c7535f`（audit 7/7）、血缘标注 `588c54e`（B-52 闭 `43aa324`）。
+- **未闭合项（notCovered）**：答案册仍 MinerU（T6 规划，前置=OXR 标题级守卫/补识）；N13 真机+全册逐页审板（用户设备，T7）；B-45 公式叠印登记不修；T4 d13/d14 表格三分流通电 + `codeIssuesForM5B` 5 条。
+- **在飞代理：无**（t2 已完，m5-residuals/m5-leak/t1-leak/t5-stray 均已收口）。**下一步=M6 回喂工作流**。
+
 ### 2026-11-13 状态（密集页根因测量命令化）
 
 - `npm run check` 实跑全绿：605 测试（604 pass / 0 fail / 1 skip）、配对 431 条、渲染审计 7/7 卷；凭证 `3b1e2693d4b8bbef`。
@@ -1665,3 +1673,10 @@ layout.json / content_list.json
 **接手后顺序清单**：① 收两代理结果并复核（trust-but-verify：M4b 曾谎称守卫复跑，编排层补真先例）；①b d13/d14 表格三分流通电修（codeIssuesForM5B①：R5 首行守卫假红，外科式修+TDD+两册 table-v3 重跑通电+审板；其余 4 条代码问题按 B-45 先例登记或小额修）；② B-46 解阻：13 册+答案册 meta 刷新（meta-consistency 测试只认 stats 与产物一致）、corrections 过期条目逐条原卷 adjudicate（OXR 已读对⇒retire 带理由，不许静默删）、anchor `npm run audit:anchor:report` 看新异常归因后才 `audit:anchor:update`；③ `npm run check` 全绿拿新 stamp（B-46 三数据态红须先归因写者）；④ 台账落：B-47 结论+答案册基线重锁+B-48/B-49+M5/M6 行（branch §7/§5、ROUTE-LEDGER §5、BACKLOG）；⑤ 组 M5 NodeResult 喂 workflow_next（notCovered 必含：答案册切换暂缓、N13 真机、全册逐页审板、磁场若判天花板）→ M6 ask → M6 小修已做（final/final.js:1875+final/entry-paper.js:431 文案改多源口径，typecheck:viewer 绿，见本交接同提交）→ M6 NodeResult → RETURN；⑥ 检查点提交禁 push。
 
 **未闭合总目标项（显式登记勿漏）**：答案册仍 MinerU（暂缓）；qx B-44；磁场待归因；B-45 叠印不修；B-47 修后答案册基线重锁；N13 真机+全册审板（用户设备）。红线照 §5；另：OXR 免费档并发撞 429 须串行；缓存页号 0/1 基逐册混合必 R5 验归属；不动 Clash Verge；裁图 ffmpeg 不用 sips。
+
+### 9.1 M5 收口（2026-11-20，M6 期实跑）
+
+- **门（实跑复核）**：`npm run check` 复跑全绿 **EXIT=0** —— 731 测试（730 pass / 0 fail / 1 skip）、渲染审计 7/7、`audit:numbering:cross` X2 0（X1 1 已登记）、anchor 7 段已登记、`bank:all` 429 条；凭证 30cc8b7992bcd4c7。
+- **M5 收口**：M5-B `5918238`（拆 MinerU 默认输入+文案）；M5-A 14 册实跑 **12 册 composite 95.17–97.84 达标**（磁场 93.16=B-48 诚实天花板、qx 94.10=B-44）；M5-C **答案册切换暂缓**（13 真丢页）⇒ **答案册仍 MinerU=总目标唯一未闭合项**。T1 `642072e`（B-47 composite 97.6%）、T2 `db4e0b9`/`fbefe8d`/`40761c3`（B-50+B-56 16/16 恢复、X2 8→0、anchor exit 0）、T3 `3ebebc4`（墨迹基线 31→378，§115）、T5 `4c7535f`（B-55 audit 7/7）、T6 `588c54e`（血缘标注；B-52 闭 `43aa324`）均已落盘。
+- **在飞代理：无**（t2 已完；m5-residuals/m5-leak/t1-leak/t5-stray 均收口）。
+- **下一步**：M6 回喂工作流（NodeResult `done=true`，notCovered 含答案册切换暂缓/N13/B-45/T4 遗留）；RETURN 后 T6（答案册切换）作为新一 run 立项。
