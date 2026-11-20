@@ -13,7 +13,7 @@
  * 产物：data/out/<doc>/giant-crop/crops/*.png
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Box } from "./paddle-client.js";
 
@@ -24,6 +24,20 @@ export function cropRect(v3: Box, scale: number, imgW: number, imgH: number): { 
   const y0 = Math.max(0, Math.floor((v3[1] - 2) * scale));
   const y1 = Math.min(imgH - 1, Math.ceil((v3[3] + 2) * scale));
   return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
+}
+
+/**
+ * 页图路径解析（M4）：不同快照命名不一——答案册 page-001.png（三位）/
+ * 曲线运动-OXR page-01.png（两位）/ 万有引力-OXR page-1.png（无填充）。
+ * pno 为 0 基页索引，页图 1 基。按候选序取第一个存在的；全缺返回 null（调用方显式报错）。
+ */
+export function resolvePageImage(pagesDir: string, pno: number): string | null {
+  const n = pno + 1;
+  for (const name of [`page-${String(n).padStart(3, "0")}.png`, `page-${String(n).padStart(2, "0")}.png`, `page-${n}.png`]) {
+    const p = join(pagesDir, name);
+    if (existsSync(p)) return p;
+  }
+  return null;
 }
 
 /* ── CLI ─────────────────────────────────────────────────────────────────── */
@@ -56,7 +70,8 @@ function main(): void {
     const j = JSON.parse(readFileSync(join(dir, f), "utf8")) as { victims?: { id: string; v3box: Box }[] };
     const victims = j.victims ?? [];
     if (!victims.length) continue;
-    const imgPath = join(dir, "pages", `page-${String(pno + 1).padStart(3, "0")}.png`);
+    const imgPath = resolvePageImage(join(dir, "pages"), pno);
+    if (!imgPath) throw new Error(`页图缺失: ${dir}/pages page-${pno + 1}（三位/两位/无填充候选全缺）`);
     const { w: imgW, h: imgH } = imgSize(imgPath);
     const scale = imgW / stages.pages[pno]!.width;
     for (const v of victims) {
