@@ -14,8 +14,12 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { convertOxrResponse, type OxrResponse } from "../scripts/oxr-convert.js";
 
-function textsOf(layout: { pdf_info: { para_blocks: { lines?: { spans?: { content?: string }[] }[] }[] } }): string[] {
-  return layout.pdf_info[0]!.para_blocks.flatMap((b) =>
+function textsOf(layout: { pdf_info: unknown[] }): string[] {
+  // convertOxrResponse 的返回类型是 pdf_info: unknown[]（与 oxr-dedupe.test.ts 同口径，就地断言）
+  const page = layout.pdf_info[0] as {
+    para_blocks: { lines?: { spans?: { content?: string }[] }[] }[];
+  };
+  return page.para_blocks.flatMap((b) =>
     (b.lines ?? []).flatMap((l) => (l.spans ?? []).map((s) => s.content ?? "")),
   );
 }

@@ -4,12 +4,12 @@
   "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 0,
-    "replaceText": 0,
+    "replaceText": 2,
     "split": 0,
     "insert": 28,
     "bodyHole": 14,
     "disabled": 0,
-    "total": 28
+    "total": 30
   },
   "items": [
     {
@@ -389,6 +389,22 @@
       "verified": false,
       "source": "body-hole",
       "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    },
+    {
+      "page": 8,
+      "kind": "replace_text",
+      "blockText": "知喷管的直径为D,水在喷口处的速度为v_{0",
+      "to": "知喷管的直径为D,水在喷口处的速度为v_{0}",
+      "verified": true,
+      "evidence": "原卷 PDF p8（stages p7）印「…速度为 v₀.」，无游离花括号；OXR 把 v_{0} 的闭括号分到下一块行首。裁图 tmp/t5-stray/crops/zx-p7-b16.png（B-55 逐条回原卷核对）"
+    },
+    {
+      "page": 8,
+      "kind": "replace_text",
+      "blockText": "}.重力加速度为g,不考虑空气阻力的影响,则",
+      "to": ".重力加速度为g,不考虑空气阻力的影响,则",
+      "verified": true,
+      "evidence": "同上：该行首「}」为上一块 v_{0} 的闭括号，原卷此处是「v₀.」后接「重力…」。裁图 tmp/t5-stray/crops/zx-p7-b16.png"
     }
   ],
   "retired": [
