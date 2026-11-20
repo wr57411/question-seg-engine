@@ -8,6 +8,7 @@
     "split": 0,
     "insert": 1,
     "bodyHole": 1,
+    "disabled": 0,
     "total": 5
   },
   "items": [
@@ -25,7 +26,12 @@
       "kind": "insert",
       "source": "body-hole",
       "text": "4. C 必刷考点·x-t 图像问题",
-      "bbox": [21, 455, 253, 466],
+      "bbox": [
+        21,
+        455,
+        253,
+        466
+      ],
       "from": "刷基础 #4 的题号行整行漏读，只剩下一段解析（纵轴截距/横轴截距）",
       "verified": true,
       "evidence": "2026-11-02 回原卷 page-002.png 核对：#3 解析「故D正确.」之后、解析「纵轴截距表示…」之前印的是「4. C 必刷考点·x-t 图像问题」。裁图：docs/evidence/2026-11-02-答案册-p2-刷基础3-4.png"

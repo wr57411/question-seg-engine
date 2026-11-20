@@ -3,10 +3,13 @@
   "generatedAt": "2026-10-28T07:07:55.708Z",
   "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
-    "replace": 4,
+    "replace": 0,
+    "replaceText": 0,
+    "split": 0,
     "insert": 29,
     "bodyHole": 9,
-    "total": 33
+    "disabled": 0,
+    "total": 29
   },
   "items": [
     {
@@ -63,15 +66,6 @@
     },
     {
       "page": 4,
-      "kind": "replace",
-      "blockText": "0点到斜面的距离均为 d. 将滑块从与 0 点等",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 4,
       "kind": "insert",
       "text": "甲",
       "bbox": [
@@ -95,24 +89,6 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 5,
-      "kind": "replace",
-      "blockText": "道圆心0点等高处固定一长度$L _ { 2 } = 0 . 2 \\mathrm { ~ m ~ }$的",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 7,
-      "kind": "replace",
-      "blockText": "定速度后，从跳台上0点水平飞出.某运动员",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
     },
     {
       "page": 9,
@@ -243,15 +219,6 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 18,
-      "kind": "replace",
-      "blockText": "中，光滑水平轻杆固定在竖直转轴的0点，小",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
     },
     {
       "page": 3,
@@ -430,6 +397,52 @@
       "verified": false,
       "source": "body-hole",
       "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    }
+  ],
+  "retired": [
+    {
+      "page": 4,
+      "kind": "replace",
+      "blockText": "0点到斜面的距离均为 d. 将滑块从与 0 点等",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 5,
+      "kind": "replace",
+      "blockText": "道圆心0点等高处固定一长度$L _ { 2 } = 0 . 2 \\mathrm { ~ m ~ }$的",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 7,
+      "kind": "replace",
+      "blockText": "定速度后，从跳台上0点水平飞出.某运动员",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 18,
+      "kind": "replace",
+      "blockText": "中，光滑水平轻杆固定在竖直转轴的0点，小",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
     }
   ]
 }

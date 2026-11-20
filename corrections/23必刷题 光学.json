@@ -4,8 +4,11 @@
   "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
     "replace": 0,
+    "replaceText": 0,
+    "split": 0,
     "insert": 5,
     "bodyHole": 3,
+    "disabled": 0,
     "total": 5
   },
   "items": [

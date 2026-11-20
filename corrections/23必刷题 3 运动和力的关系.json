@@ -4,6 +4,8 @@
   "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）；1 条重复 insert 已 disabled（p2 B；A 选项两条保留；未删，见 HANDOFF §6-19）",
   "counts": {
     "replace": 0,
+    "replaceText": 0,
+    "split": 0,
     "insert": 33,
     "bodyHole": 8,
     "disabled": 1,

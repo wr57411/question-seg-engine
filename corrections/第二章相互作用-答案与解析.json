@@ -3,41 +3,15 @@
   "generatedAt": "2026-10-28T10:29:05.296Z",
   "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）。p13 原有 3 条 body-hole 经 2026-10-28 回原卷核实为「填错文本」（照抄 OXR 行块、y 坐标未换算），已删除，见 docs/oxr-evaluation.md §4.12.4；p18 #3 为 replace_text（半行→完整行，已回原卷核对）；2 条重复 insert 已 disabled（p6；未删，见 HANDOFF §6-19）",
   "counts": {
-    "replace": 7,
-    "replaceText": 1,
+    "replace": 0,
+    "replaceText": 0,
+    "split": 0,
     "insert": 14,
     "bodyHole": 7,
     "disabled": 2,
-    "total": 22
+    "total": 14
   },
   "items": [
-    {
-      "page": 3,
-      "kind": "replace",
-      "blockText": "【解析】如图所示，对0点受力分析，受秤",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 4,
-      "kind": "replace",
-      "blockText": "【解析】对0点受力分析，受到两个弹簧测力计的拉力和橡",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 4,
-      "kind": "replace",
-      "blockText": "皮条的拉力，由于0点位置不变，因此橡皮条长度不变，其拉",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
     {
       "page": 6,
       "kind": "insert",
@@ -63,42 +37,6 @@
       ],
       "verified": true,
       "evidence": "OXR Caption 类型读出；MinerU 同区域无文本；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 8,
-      "kind": "replace",
-      "blockText": "点，对0点受力分析如图丁所示，$T _ { 2 } ^ { \\prime } = T _ { 2 } , T _ { 1 } ^ { \\prime } = T _ { 2 } ^ { \\prime } { \\cos \\theta } = G$不",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 9,
-      "kind": "replace",
-      "blockText": "【解析】对0点受力分析如图所示，",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 9,
-      "kind": "replace",
-      "blockText": "0点由平衡条件可得$G = 2 T \\cos \\alpha$将绳的B端向上缓慢移动",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
-    {
-      "page": 10,
-      "kind": "replace",
-      "blockText": "2.D【解析】本题考查共点力的平衡.对0点进行受力分析，根",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
     },
     {
       "page": 10,
@@ -266,6 +204,85 @@
       "verified": false,
       "source": "body-hole",
       "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    }
+  ],
+  "retired": [
+    {
+      "page": 3,
+      "kind": "replace",
+      "blockText": "【解析】如图所示，对0点受力分析，受秤",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 4,
+      "kind": "replace",
+      "blockText": "【解析】对0点受力分析，受到两个弹簧测力计的拉力和橡",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 4,
+      "kind": "replace",
+      "blockText": "皮条的拉力，由于0点位置不变，因此橡皮条长度不变，其拉",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 8,
+      "kind": "replace",
+      "blockText": "点，对0点受力分析如图丁所示，$T _ { 2 } ^ { \\prime } = T _ { 2 } , T _ { 1 } ^ { \\prime } = T _ { 2 } ^ { \\prime } { \\cos \\theta } = G$不",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 9,
+      "kind": "replace",
+      "blockText": "【解析】对0点受力分析如图所示，",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 9,
+      "kind": "replace",
+      "blockText": "0点由平衡条件可得$G = 2 T \\cos \\alpha$将绳的B端向上缓慢移动",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
+    },
+    {
+      "page": 10,
+      "kind": "replace",
+      "blockText": "2.D【解析】本题考查共点力的平衡.对0点进行受力分析，根",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
     },
     {
       "page": 18,
@@ -273,7 +290,9 @@
       "blockText": "1 \\mathrm { \\ m } / \\mathrm { s } ^ { 2 } \\quad ( 2 ) 5 \\mathrm { \\ m } \\quad ( 3 )",
       "to": "3. (1) 1 \\mathrm { \\ m } / \\mathrm { s } ^ { 2 } \\quad ( 2 ) 5 \\mathrm { \\ m } \\quad ( 3 ) 不能相撞 2.4 \\mathrm { \\ m }",
       "verified": true,
-      "evidence": "原卷 page-18.png 明确印有 3. (1) 1 m/s² (2) 5 m (3) 不能相撞 2.4 m；OXR 同文（2026-10-28）"
+      "evidence": "原卷 page-18.png 明确印有 3. (1) 1 m/s² (2) 5 m (3) 不能相撞 2.4 m；OXR 同文（2026-10-28）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后修正冗余：新骨架已天然读对/自然修复（stages.json 逐条实测 2026-11-20），干跑未命中；按 B-46 解阻退休，原核对结论不变"
     }
   ]
 }

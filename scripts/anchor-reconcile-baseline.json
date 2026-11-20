@@ -1,14 +1,5 @@
 [
  {
-  "doc": "物理_教材基础练 运动和力",
-  "anchor": 15,
-  "diff": -2,
-  "wordCount": 8,
-  "engineCount": 10,
-  "kind": "A",
-  "note": "边界错位：多出的 2 道（2023辽宁卷 P103第5题、粤教版P126资料活页）属上一节，但排在 p3；按页计数被算进本段"
- },
- {
   "doc": "物理_教材基础练万有引力",
   "anchor": 27,
   "diff": -2,
@@ -34,5 +25,32 @@
   "engineCount": 10,
   "kind": "A",
   "note": "与 54 配对（+4/−4 抵消），同一批 4 道题被算到本段"
+ },
+ {
+  "doc": "物理_教材基础练 运动和力",
+  "anchor": 12,
+  "diff": -3,
+  "wordCount": 3,
+  "engineCount": 6,
+  "kind": "回归·假题",
+  "note": "切源后新增 3 条无题号空题（p1：提出了惯性的概念…/揭示了力与运动的关系…/物体不受外力…），blocks=0 且未标 needs_review；切源前 engine=3=Word ⇒ 切题判据缺陷，B-50 待修"
+ },
+ {
+  "doc": "物理_教材基础练机械能守恒定律",
+  "anchor": 34,
+  "diff": -3,
+  "wordCount": 4,
+  "engineCount": 7,
+  "kind": "回归·假题",
+  "note": "切源后新增 3 条 \\text 散文空题（p7：定义角度/做功角度/能量转化角度），blocks=0 未标 needs_review；切源前 engine=4=Word ⇒ 同 B-50"
+ },
+ {
+  "doc": "物理_教材基础练 电路",
+  "anchor": 56,
+  "diff": -9,
+  "wordCount": 4,
+  "engineCount": 13,
+  "kind": "MIX",
+  "note": "① Word 段界口径：Word 3790–3820 仅 4 题号行 vs 引擎 13（p4-13），大差主要疑为 Word 侧题号形态漏认；② 切源回归：切源前 engine=15、切源后 13，按内容比对少 2 条真题（鲁科版P134第4题、粤教版P73第4题）待查，B-50"
  }
 ]

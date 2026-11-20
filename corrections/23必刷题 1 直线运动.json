@@ -3,21 +3,15 @@
   "generatedAt": "2026-10-28T07:07:55.573Z",
   "basis": "两源交叉核对 + 逐条回原卷核对（caption/O→0）；正文漏读行为 hole-scan 判据（verified=false）",
   "counts": {
-    "replace": 1,
+    "replace": 0,
+    "replaceText": 0,
+    "split": 0,
     "insert": 28,
     "bodyHole": 14,
-    "total": 29
+    "disabled": 0,
+    "total": 28
   },
   "items": [
-    {
-      "page": 4,
-      "kind": "replace",
-      "blockText": "体从0点由静止开始做匀加速直线运动，途经",
-      "from": "0点/0角",
-      "to": "O点/O角",
-      "verified": true,
-      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）"
-    },
     {
       "page": 6,
       "kind": "insert",
@@ -395,6 +389,19 @@
       "verified": false,
       "source": "body-hole",
       "evidence": "MinerU 该区域零块（红框）+ OXR 有行块；未逐条回原卷核对，靠页面验证（红框消失 + 文字正确）"
+    }
+  ],
+  "retired": [
+    {
+      "page": 4,
+      "kind": "replace",
+      "blockText": "体从0点由静止开始做匀加速直线运动，途经",
+      "from": "0点/0角",
+      "to": "O点/O角",
+      "verified": true,
+      "evidence": "原卷该字符为斜体拉丁字母 O；已回原卷核对（§4.9）",
+      "retiredAt": "2026-11-20",
+      "reason": "M5-A 切 OXR 后新骨架天然读出「物体从 O 点…」（stages.json 实测），修正冗余未命中（corrections 干跑），按 B-46 解阻退休；原卷核对结论不变（O 为斜体拉丁字母）"
     }
   ]
 }
