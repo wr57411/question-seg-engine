@@ -274,8 +274,9 @@ export function alignLinesToBands(
      *  任一成员零重叠或带过高（多行连墨巨带）→ 维持 top-3 截断（零重叠「不猜」底线不动）。
      *  默认关闭 = 生产路径逐字节不变。 */
     bandExemptFullyOverlapping?: boolean;
-    /** 实验分支（audit-band-pair --band-mask）：切带投影前遮蔽页边缘竖条列（x<15pt ∪ x>页宽−15pt
-     *  且列墨>50% 窗高，scripts/band-mask.ts）。默认关闭=原 img 直传。 */
+    /** 页缘装饰竖条遮罩（M4b 转生产；audit-band-pair --band-mask 同源）：切带投影前遮蔽
+     *  页缘整高窄竖条列（最严 AND：页缘20pt ∩ 整高≥0.8 ∩ 墨比>0.5 ∩ 宽≤6pt，scripts/band-mask.ts）。
+     *  默认关闭=原 img 直传；无命中页即使开启也零行为差（检测驱动）。 */
     bandMaskFrameBars?: boolean;
     /** 实验分支（B-39 巨带裁图坐标补充）：容量截断行不再置 norm=null，而是保留该行 V3 紧框
      *  作为回退坐标并标 coordSource=crop（下游裁图例外，goal item 2）。巨带吞行的 V3 框本就是

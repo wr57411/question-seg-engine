@@ -109,6 +109,7 @@ N13 需用户真机，清单+局域网地址已备（`docs/plans/2026-11-20-N13�
 | 2026-11-20 | 工作流 completed：N9–N12 全绿，全册 composite=0.9661≥95% | 分支主线（去 MinerU 读字+定位+表格）落地；剩 N13 真机+全册逐页审板+全册表格分类（笔记本 table_res_list 硬件依赖）留待后续 |
 | 2026-11-20 | 用户拍板「N13 真机验收 + 生产开旗标」 | 生产通电=产物驱动非布尔旗标（export-stages 无条件消费 giant-crop.pNN.json+table-v3.json）；alignLinesToBands 默认关不动（审计基线依赖）；抽 consumeGiantCropArtifacts+TDD 3 用例；答案册 213 crop 行/4 表生效目视复验，门绿 dc01d6d；备 N13 清单+局域网待用户真机 |
 | 2026-11-20 | M4 复测 done=false：答案册达标但两 OXR 题册首测 90.51/93.86＜95%；根因实测=页缘整高装饰竖条→整页巨带→MAX_BAND_LINES=3 截断（非坐标错，机器下界≥95%）；--band-mask 诊断回收 +386/+180 配对 | 管家依用户委托（客观实验拍板+不在场整轮自决）自主立项 M4b：竖条遮罩转生产（最严 AND 判据+TDD+答案册逐字节守卫）→重测；仍不足再单栏适配/有据裁判修正（B-41 先例，严禁凑数放宽）；诚实天花板不硬凑。M5 通电暂缓至 M4b 收口，避免 shipped 低于验收线 |
+| 2026-11-20 | M5 前置血缘盘点（tmp/m5-prep-oxr/lineage.json，15 册实查）：仅曲线运动/万有引力生产 layout 已是 OXR；**答案册-合订本及其余 11 册生产 layout 仍是 MinerU pipeline 3.4.4**（_backend 标记实证） | 总目标=彻底移除 MinerU ⇒ 答案册也在 M5 切换范围（计划 M5「其余册」含答案册；切换后审计基线预期变化，须重测 composite≥95%+不丢内容对照，非逐字节守卫对象）。答案册 187 页 OXR 免费档分片解析已启动；**教训：免费档并发上传撞 HTTP 429，须串行（电路/磁场跑完再重试答案册）** |
 
 ---
 
@@ -121,7 +122,8 @@ N13 需用户真机，清单+局域网地址已备（`docs/plans/2026-11-20-N13�
 | M1 | 生产输入切 OXR（曲线运动先行） | 喂 OXR layout 重导出+门绿；对照差异登记；成品页不崩 | ✅ 4529c0c（门 ddd002003969f2d3；tmp/m1-oxr-compare/compare.json；**血缘发现：本书生产 layout.json 已是 OXR 转换件，真 MinerU 归档 layout.mineru.json；8 表块=§90 压平行重建非 MinerU**） |
 | M2 | markdown 漏泄行→原卷裁图 | page-4 表上3行改贴小图、网址不上页、原文留 title；TDD 红绿 | ✅ 936cb1b（门 016b0c33e35f65b4；attached=1组3块；tmp/m2-leak-crop/shots/ 纸面验收；整表完整单印留 M3） |
 | M3 | V3 表区域插入+三分流全覆盖 | OXR 无表块⇒V3 插入；index3/8/11+万有引力0 修好；不双像；order 不串 | ✅ 901945b（门 30cc8b7992bcd4c7 编排层复跑；曲线 9 表 text1+image7+兜底1、万有引力 5 表含 index0；qx-p04 目视整表单印无残字；p11 缓存修复 132 行；子代理撞 150 轮上限后编排层清孤儿 GPU 进程+补 p11 闭环） |
-| M4 | 巨带补行挂 OXR+复测 | attached>0、配对不降、composite≥95% target95Met=true | ◐ 答案册 96.61% 达标+逐字节复现（190/191）；题册首测 qx 90.51%/wy 93.86%＜95%（根因=页缘装饰竖条→整页巨带截断，机器下界 97.1/96.8≥95）；8069b5f 命名修复+缓存 p10/p11 归属修复（独立文本对照）；门 0f7023918e4c9071；tmp/m4-remeasure/m4-summary.json ⇒ M4b 遮罩转生产修复中 |
+| M4 | 巨带补行挂 OXR+复测 | attached>0、配对不降、composite≥95% target95Met=true | ◐ 答案册 96.61% 达标+逐字节复现（190/191）；题册首测 qx 90.51%/wy 93.86%＜95%（根因=页缘装饰竖条→整页巨带截断，机器下界 97.1/96.8≥95）；8069b5f 命名修复+缓存 p10/p11 归属修复（独立文本对照）；门 0f7023918e4c9071；tmp/m4-remeasure/m4-summary.json ⇒ M4b 见下行 |
+| M4b | 页缘竖条遮罩转生产+重测+有据裁判标定 | 两册 composite≥95%；答案册 191 产物字节守卫；无据不放宽裁判 | ◐ done=false（wy ✅ / qx 诚实天花板）：遮罩最严 AND 调用侧检测驱动（band-mask.ts+13 测试；答案册 187 页零命中）paired qx 821→1201、wy 331→495；读数迁移 sha256 mismatch=0+补读 23；单栏适配无对象（probe-single-col.json 27 页 0 候选）；裁判标定 judge-rulers.ts+9 测试（A1/A2/A3 公式碎片路由+实证字形族，蒙太奇 85 条逐条裁图证实）⇒ **wy 97.84%✅、答案册 97.62%✅ 守卫 191/191**（aggregate 仅结尾换行豁免）；**qx 94.10% 差 20 行=真实失败为主（水印 rec 错 9/单字符字形分歧~40/公式非 REAL 36）⇒ B-44 登记不硬凑**；DECISIONS §112；门 31def822f1b3990d；tmp/m4b/ |
 | M5 | 其余册通电+拆 MinerU+文案 | 补缓存通电（硬件在线则做否则 notCovered）；移除 MinerU 输入；stages.js:69 改无-MinerU | □ |
 | M6 | 收尾台账+RETURN | 台账更新+BranchReport+检查点提交 | □ |
 

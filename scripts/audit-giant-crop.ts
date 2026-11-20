@@ -11,6 +11,8 @@
  * 三步：① 检测带类型（生产带 h + 吞并 minGapPx=0 原始墨行 runs，判据 import 不重写——B-35）；
  * ② 对 noBand 行按带类型回退（默认仅 figureGiant；--all-noband 扩到全部截断行）→ 裁图；
  * ③ 量覆盖增益 + 机器正确性筛（单行高区间 + 框内有墨），导出裁图供独立核对 / 笔记本 rec。
+ * M4b：基线/生产对齐与切带统一消费页缘竖条遮罩（调用侧开启、检测驱动，无新旗标；
+ * 无命中页逐字节不变 ⇒ 答案册 B-41 基线守卫成立）；命中记录落 summary.bandMasked。
  * 用法：npx tsx scripts/audit-giant-crop.ts --pages 76,127 [--doc ..] [--nocrop] [--all-noband]
  * 产物：data/out/<doc>/giant-crop.pNN.json + giant-crop/crops/*.png
  */
@@ -21,6 +23,7 @@ import { renderGrayPage, inkExtent } from "./audit-hole-geometry.js";
 import { holesOf } from "./ocr-page-fill-jobs.js";
 import { splitInkLines, DEFAULT_SPLIT } from "./ink-lines.js";
 import { alignLinesToBands, bandsForColumn } from "./ink-band-align.js";
+import { detectEdgeFrameBars, maskFrameBars } from "./band-mask.js";
 import type { Box } from "./paddle-client.js";
 
 const ROOT = process.cwd();
@@ -75,6 +78,11 @@ for (const pno of pages) {
   const pageW = page.width, pageH = page.height;
   const gray = renderGrayPage(join(dir, "origin.pdf"), pno + 1);
   const sy = gray.height / pageH;
+  // ── M4b 页缘装饰竖条遮罩·生产通电（调用侧开启，无新旗标）：检测驱动——
+  //    最严 AND 命中页缘整高窄竖条才遮（scripts/band-mask.ts）；无命中 ⇒ eff===gray ⇒ 全链逐字节不变
+  //    （答案册 187 页探针零命中 ⇒ B-41 基线守卫天然成立）。记录落 summary.bandMasked 可核对。
+  const barRuns = detectEdgeFrameBars(gray, pageW);
+  const eff = maskFrameBars(gray, pageW, barRuns);
   // 行高尺子取 V3 行框高中位（与生产 ink-band-align §110 同口径，独立 OCR 源）。
   // 不用 medianLineHeightPt(page.blocks)：答案表页整页仅 1 个 table 块 ⇒ medH=表高(724pt)，
   // 会把所有正常单行框(h≈10pt)误判 suspect（p185/p186 实测 1083 行假阴性）。
@@ -82,12 +90,12 @@ for (const pno of pages) {
   const medH = lineHs.length ? lineHs[Math.floor(lineHs.length / 2)]! : 0;
   const mineruBlocks = (page.blocks ?? []).filter((b) => b.text && !b.ocr).map((b) => ({ bbox: b.bbox as Box, text: String(b.text) }));
   const holes = holesOf(page);
-  const base = alignLinesToBands(lines, gray, pageW, pageH, { mineruBlocks, holes, diagNoBand: true });
+  const base = alignLinesToBands(lines, gray, pageW, pageH, { mineruBlocks, holes, diagNoBand: true, bandMaskFrameBars: true });
 
   // ── 生产旗标验证模式（--crop-fallback）：直接跑生产 truncationCropFallback，核对回退坐标=V3 原框。
   //    与上面审计自有的裁图回退（fallbackBox）相互独立——这条验的是 ink-band-align 生产插桩本身。
   if (cropFallback) {
-    const prod = alignLinesToBands(lines, gray, pageW, pageH, { mineruBlocks, holes, truncationCropFallback: true });
+    const prod = alignLinesToBands(lines, gray, pageW, pageH, { mineruBlocks, holes, truncationCropFallback: true, bandMaskFrameBars: true });
     let coordExact = 0;
     prod.lines.forEach((l, i) => {
       if (l.coordSource === "crop" && JSON.stringify(l.norm) === JSON.stringify(lines[i]!.norm)) coordExact++;
@@ -100,6 +108,7 @@ for (const pno of pages) {
       prodPaired: prod.stats.paired, prodNoBand: prod.stats.noBand, prodCropFallback: prod.stats.cropFallback,
       cropRows, coordExactVsV3: coordExact,
       prodWithFallbackRate: +(((prod.stats.paired + (prod.stats.cropFallback ?? 0)) / prod.stats.total) * 100).toFixed(1),
+      ...(barRuns.length ? { bandMaskedRuns: barRuns.length } : {}),
     }, null, 1));
     continue;
   }
@@ -110,8 +119,8 @@ for (const pno of pages) {
   const bandCat: Record<string, number> = {};
   for (const col of [0, 1]) {
     const colX0 = col === 0 ? 0 : mid, colX1 = col === 0 ? mid : pageW;
-    const runs0 = splitInkLines(gray, pageW, pageH, [colX0, 0, colX1, pageH], { ...DEFAULT_SPLIT, minInkPx: 6, minGapPx: 0 });
-    for (const b of bandsForColumn(gray, pageW, pageH, colX0, colX1)) {
+    const runs0 = splitInkLines(eff, pageW, pageH, [colX0, 0, colX1, pageH], { ...DEFAULT_SPLIT, minInkPx: 6, minGapPx: 0 });
+    for (const b of bandsForColumn(eff, pageW, pageH, colX0, colX1)) {
       const swallowed = runs0.filter((r) => (r.py0 / sy + (r.py1 + 1) / sy) / 2 >= b.y0 && (r.py0 / sy + (r.py1 + 1) / sy) / 2 <= b.y1).length;
       const h = b.y1 - b.y0;
       const cat = category(h, swallowed);
@@ -163,6 +172,7 @@ for (const pno of pages) {
     withFallbackRate: +(((paired + recovered) / total) * 100).toFixed(1),
     validWithFallbackRate: +(((paired + valid) / total) * 100).toFixed(1),
     medH: +medH.toFixed(1),
+    ...(barRuns.length ? { bandMasked: barRuns } : {}),
   };
   agg.push({ page: pno, total, paired, noBand: base.stats.noBand, recovered, valid });
   writeFileSync(join(dir, `giant-crop.p${String(pno).padStart(2, "0")}.json`), JSON.stringify({ summary, typedBands, victims }, null, 1));

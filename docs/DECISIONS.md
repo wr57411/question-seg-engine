@@ -4983,3 +4983,56 @@ pipeline/vlm 配对保存），归一化字符级覆盖率复测（2026-11-09）
    vlm 存在真实但小幅的漏字可能，换源前需逐页核。
 **影响**：换源路线（MinerU→VL 等）的可行性评估应按「粒度归一化 + 下游去行粒度依赖」重做，
 不得引用本条旧结论直接否决。BACKLOG N-07 行已加指向注记。
+
+## 112 M4b 页缘竖条遮罩转生产 + 复合裁判 M4b 标定：wy 97.84% 达标、qx 94.10% 诚实天花板（2026-11-20）
+
+**背景**：M4 首测 qx 90.51% / wy 93.86%＜95%，根因=页缘装饰竖条连墨成整页巨带⇒容量截断丢配对
+（机器下界 97.1/96.8≥95 证明坐标本身大多正确）。M4b 把诊断旗标 `--band-mask` 转生产并复测。
+
+**遮罩判据（最严 AND，L2）**：`scripts/band-mask.ts` `detectEdgeFrameBars` = 页缘 zone 20pt
+∩ 整高 span≥0.8 ∩ 列墨比>0.5 ∩ 连续 run 宽≤6pt。标定证据（`tmp/m4b/probe-cols.ts` /
+`probe-answer-cols.json`）：qx 条宽 5.1pt/span 0.999、wy 宽 1.8–4.8pt/span 0.848–1.0/距缘≤19.3pt；
+正文行 x0≥21.5pt 不入 zone；**答案册 187 页零命中**，p185/186 厚边条 8.1pt 属「拿不准」保守排除
+（宽阈 6pt 留裕量）。`maskFrameBars` 无命中返回原图（零副本零行为差）。
+
+**生产接线（检测驱动，无新布尔旗标）**：`audit-giant-crop.ts` 调用侧 detect+mask 后喂
+align/bandsForColumn；命中记录落 `summary.bandMasked`（EdgeBarRun[]，可核对）。
+`alignLinesToBands` 函数默认（`bandMaskFrameBars`/`truncationCropFallback` 关）**逐字节不动**
+（`tests/band-mask.test.ts` 13 用例含默认关逐字节锁、8pt 厚边条不遮守卫、无条页开关 deepEqual）。
+
+**实跑（tmp/m4b/ 各 log + data/out/<doc>/ 产物）**：qx paired 821→1201、victims 1298→918；
+wy 331→495、548→384。读数迁移协议（行身份=(page,v3box,text)+新旧裁图 sha256 逐字节核对，两侧同
+为 export-gold-crops ffmpeg 页图裁图）mismatch=0；笔记本补读 23/23 零错误合并。M4 裁判复测
+qx 92.35% / wy 94.99%（`tmp/m4-remeasure/composite-<doc>.json` 旧口径副本 tmp/m4b/）。
+
+**单栏适配客观实验（step5 前置）**：`tmp/m4b/probe-single-col.ts`（V3 行框独立源，非切带实现）
+27 页 **0 单栏候选**（跨中线比例>0.5 者无；max 0.488=全宽标题/图注页）、右栏起线−中线中位 12.1pt
+（两栏栏隙）⇒ **无单栏页，适配无对象**，跳过（证据 probe-single-col.json）。残留巨带=插图/表格
+合法巨带，走裁图回退。
+
+**裁判 M4b 标定（step6，B-41 先例最小修正）**：残差逐条拿原卷裁图蒙太奇证实
+（`tmp/m4b/montage/*.png` 8 张：qx A24/B34、wy A7(含Ⅱ)/B20；PIL 拼贴标注，裁图本体=ffmpeg 页图裁图）：
+- A 公式碎片被基线 `isFormulaText` 漏判成文本：A1 任意反斜杠（LaTeX 间距 `\ `，印刷公式排版行 9 条）、
+  A2 含 `$` delimiter 碎片（印刷 v₀/x/m₂ 3 条）、A3 上下标/图内点标碎片形态（F₂/v₀/O+α/尺寸标记 18 条；
+  **罗马数字双字母排除**——wy p008_g17 印刷为 Ⅱ 连字，属文本数字字形族不走墨迹）。
+- B 实证字形族归一 55 条：全半角（），：、减号 −/-、中点 •/·、罗马 Ⅱ/II。**未实证者（。/、/；等）一律不归一**。
+纯函数抽 `scripts/judge-rulers.ts`（TDD `tests/judge-rulers.test.ts` 9 用例红→绿）；composite.mjs
+改 `node --import tsx` 同源消费。**墨迹判定不重渲染**：formula-ink.json rows 含全部 victims 的
+judgeInkBox 判定（与路由无关），扩路由行直接同源消费。**audit-formula-ink.ts 的 isFormulaText 不动**：
+formula-ink.json 是答案册 191 产物字节守卫锁定的 B-41 基线产物；扩路由只作用于复合裁判。
+**rec 汉字字形错仍判失败**（"下课练天星"→"下课认听" 等 9 条水印误读保留为真实失败）。
+
+**结果**：wy **97.84%**（495+320+45=860/879）✅；答案册 **97.62%** ✅ 且**字节守卫 191/191 通过**
+（`tmp/m4b/guard-answer.ts` 对照 sha256-manifest；aggregate 仅结尾换行差异豁免，守卫改双向去尾换行比；
+首轮守卫失败两因已修：重跑漏 `--nocrop` 写裁图路径、豁免方向单向）。qx **94.10%**
+（1201+628+165=1994/2119，需 2014 差 20）✗ ⇒ **step7 诚实天花板，不硬凑**。
+
+**qx 残差构成（89 未确认文本 + 36 公式非 REAL，逐条 dump 见 BACKLOG B-44）**：① 水印 rec 字形错 9（真实失败）；
+② 单字符数学符号 V3/rec 字形分歧约 40（7↔v、O↔0、X↔x、γ↔y 等；**单字符路由墨迹会同时吞掉选项标签
+字形错 ⇒ 红线禁止**）：③ 公式 FRAGMENT/BLOAT 36（含真实坐标错与「图内符号框 vs 整图行带」FRAGMENT
+伪影；改几何=新裁判需独立决策，不在最小标定范围）；④ V3 垃圾文本（虚线 7777777777、反引号引号串）。
+实证可补字形族≤3 行（m.g→mg 等），不足补 20 行缺口 ⇒ 停。
+
+**红线自检**：不静默失败（遮罩命中全记录 bandMasked）；检测不改写（审计只读、生产接线在调用侧）；
+判据同源（judgeInkBox/judge-rulers 单一实现，composite 消费不重算）；分母独立（V3 totalLines）。
+门绿凭证 31def822f1b3990d。测量资产 tmp/m4b/（git 忽略，同 M4 先例）。
