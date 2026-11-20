@@ -1691,7 +1691,7 @@ layout.json / content_list.json
 
 ### 9.3 本轮收尾（2026-11-20，M7-C + 经验脚本化 + 对比开关）
 
-- **M7-C 表格残余 ✅**（24c3b68）：d13 电路/d14 磁场三分流通电（text 3+1 / image 6+5）；③ G1 缓存防撞名、④ famNorm「」归一已修；② 多 `$` 嵌套裸 LaTeX 登记 B-59 不修；B-45 跳过。`npm run check` 全绿 EXIT=0（主 Agent 复跑，凭证 30cc8b7992bcd4c7，767 测试）。
+- **M7-C 表格残余 ✅**（24c3b68）：d13 电路/d14 磁场三分流通电（text 3+1 / image 6+5）；③ G1 缓存防撞名、④ famNorm「」归一已修；② 多 `$` 嵌套裸 LaTeX 登记 B-59 不修；B-45 跳过。`npm run check` 全绿 EXIT=0（主 Agent 复跑，凭证 30cc8b7992bcd4c7）。
 - **经验脚本化（用户新方向）**：L1 聚合缺陷扫描器 `npm run audit:defects`（d7600f5，七类缺陷+归因，与已知 5/5 一致）；L2 经验回流闭环 `npm run audit:feedback`（8f174e4：裁定台账+规则库+归纳器+回放；**AI 裁定率基线 8.69%**=610 命中中 53 待判；6 条候选 1 条可上线）。
 - **对比视图开关**（2f6da4a）：「解析遗漏标记」默认关，`?uncovered=1/0`，localStorage `stages.uncovered` 记忆；三态截图 tmp/stages-toggle/shots/。
 - **未闭合（保持）**：B-45 叠印（登记不修）、N13 真机+全册审板（用户设备）、B-57 facade 用法、B-59；B-54 修向待独立决策。
