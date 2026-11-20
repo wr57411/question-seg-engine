@@ -76,6 +76,58 @@ interface Draft {
   firstLineOfQuestion: string;
 }
 
+/**
+ * **教材知识萃取参考区**（B-50，2026-11-20）：按 `(页, y)` 时间线预先划出的区间。
+ *
+ * 为什么不能只靠块流状态 `extractBand`：切源（MinerU→OXR）后行级框在栏间略有重叠，
+ * `estimateGutter` 可能估不出栏间 ⇒ 阅读顺序退化为「左栏整列在前、右栏整列在后」，
+ * 跨栏栏目头被分给右栏、**排到左栏正文之后**；等块流走到它时，参考框内的
+ * 编号散文（`1. 提出了惯性的概念…`）早已被切成空题（实测《运动和力》p1、
+ * 《机械能守恒》p7）。标题一定在内容上方 ⇒ 按 y 传播与分栏无关，
+ * 与 `buildHeadingTimeline` 同思路。
+ */
+interface ExtractRegion {
+  startPage: number;
+  startY: number;
+  endPage: number;
+  endY: number;
+}
+
+/**
+ * 从骨架预扫「教材知识萃取」板块区间：板块头本身是其起点，
+ * 之后**任意**章/节/板块头或答案区标题都是它的终点（与块流语义一致）。
+ * 跨页延续（参考框翻到下一页而没有重复栏目头）由区间自然覆盖。
+ */
+function buildExtractRegions(doc: ParsedDocument): ExtractRegion[] {
+  const events: { page: number; y: number; kind: string; band: boolean; text: string }[] = [];
+  for (const page of doc.pages) {
+    for (const b of page.blocks) {
+      if (b.kind !== "text") continue;
+      const m = matchFirstLine(b.firstLine);
+      if (!m.ok) continue;
+      if (m.kind === "chapter" || m.kind === "section" || m.kind === "answer_zone") {
+        events.push({ page: page.index, y: b.bbox[1], kind: m.kind, band: Boolean(m.band), text: b.text });
+      }
+    }
+  }
+  events.sort((a, b) => a.page - b.page || a.y - b.y);
+  const regions: ExtractRegion[] = [];
+  let open: { page: number; y: number } | null = null;
+  const close = (endPage: number, endY: number): void => {
+    if (!open) return;
+    regions.push({ startPage: open.page, startY: open.y, endPage, endY });
+    open = null;
+  };
+  for (const ev of events) {
+    if (open && (ev.page > open.page || ev.y > open.y)) close(ev.page, ev.y);
+    if (ev.kind === "section" && ev.band && /^\s*教材知识萃取/.test(ev.text)) {
+      open = { page: ev.page, y: ev.y };
+    }
+  }
+  if (open) close(doc.pages.length, 0);
+  return regions;
+}
+
 interface AnswerDraft {
   number: string;
   text: string;
@@ -163,8 +215,11 @@ class Ctx {
   private chapterTitle = "";
   private sectionNo = "";
   private section = "";
-  /** 教材知识萃取参考区：区内「1./2./3.」是表格/参考内容，不是题目（2026-10-29 新书实测） */
+  /** 教材知识萃取参考区：区内「1./2./3.」是表格/参考内容，不是题目（2026-10-29 新书实测）。
+   *  ⚠️ 只表示「块流已走过栏目头」；判定优先用 `extractRegions`（与分栏/阅读顺序无关）。 */
   private extractBand = false;
+  /** 按 (页, y) 预先划好的教材知识萃取区间（B-50；见 buildExtractRegions） */
+  private extractRegions: ExtractRegion[] = [];
   /**
    * 当前所处的**教辅栏目板块**标题（`教材实验 10 …` / `教材素材变式 …` / `教材知识 N …`）；
    * 空串 = 不在板块内。用于抑制板块内的知识编号被当成题号（`DECISIONS §78`）。
@@ -211,6 +266,17 @@ class Ctx {
   constructor(doc: ParsedDocument) {
     this.doc = doc;
     this.buildHeadingTimeline();
+    this.extractRegions = buildExtractRegions(doc);
+  }
+
+  /** 该 (页, y) 是否落在某个「教材知识萃取」参考区内（B-50） */
+  private inExtractRegion(page: number, y: number): boolean {
+    for (const r of this.extractRegions) {
+      const afterStart = page > r.startPage || (page === r.startPage && y >= r.startY);
+      const beforeEnd = page < r.endPage || (page === r.endPage && y < r.endY);
+      if (afterStart && beforeEnd) return true;
+    }
+    return false;
   }
 
   /**
@@ -366,7 +432,8 @@ class Ctx {
     // 判据用「出现教材版本词」而不是 `hasTextbookSource`（后者要求 `[人教…版`，带方括号）：
     // 本例原文是 `3人教版必修二P82图8.2-6…`，无方括号，用严格版会继续漏掉。
     const bandBlocksGlued =
-      this.extractBand && !/(人教|鲁科|粤教|沪科|教科|苏教|北师大|外研|冀教|湘教)版/.test(block.text);
+      (this.extractBand || this.inExtractRegion(entry.pageIndex, block.bbox[1])) &&
+      !/(人教|鲁科|粤教|沪科|教科|苏教|北师大|外研|冀教|湘教)版/.test(block.text);
     if (m.kind === "other" && !bandBlocksGlued && !this.boxList) {
       /**
        * 期望题号：
@@ -491,7 +558,10 @@ class Ctx {
         return;
       }
       case "question_no": {
-        if (this.extractBand && !hasTextbookSource(block.text)) {
+        if (
+          (this.extractBand || this.inExtractRegion(entry.pageIndex, block.bbox[1])) &&
+          !hasTextbookSource(block.text)
+        ) {
           // 萃取区内**带教材出处标注**的是真题（`DECISIONS §84`）：
           // 一刀切抑制会把真题一起丢掉（实测机械能 p7 丢 2 道），所以按标注放行。
           this.review(blockIndex, `教材知识萃取栏内的编号条目「${m.captured}.」不是题目（参考表格内容）`, this.current);
