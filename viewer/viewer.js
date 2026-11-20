@@ -38,6 +38,12 @@ import { resolveDoc, loadWithFallback } from "./doc-utils.js";
  * @typedef {{ renderMathInElement?: (el: Element, opts?: Record<string, unknown>) => void }} KatexWindow
  *   KaTeX auto-render 是 `<script>` 直接挂到 window 的第三方全局（无类型包），
  *   这里只声明本文件用到的那一个方法，不用 `any` 蒙过去。
+ *
+ * @typedef {Object} DocMeta /api/docs 的一项（T6 标注字段；形状见 scripts/view-server.ts listDocs）
+ * @property {string} id
+ * @property {string} [label]
+ * @property {"oxr" | "mineru" | "mixed"} [lineage]
+ * @property {"prod" | "parse" | "backup" | "test"} [artifact]
  */
 
 /** URL ?doc= 参数（含"缺失/非法回退默认"容错），由 doc-utils 解析 */
@@ -556,6 +562,39 @@ function escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
+/* ---------------- T6：当前卷血缘徽标 ---------------- */
+/** artifact → 人话（与 scripts/doc-lineage.ts 判据同源） */
+const ARTIFACT_TEXT = { prod: "生产册", parse: "解析件", backup: "备份", test: "测试" };
+
+/**
+ * 在页眉 / 目录头标注当前卷血缘（OXR / MinerU / 混合）。
+ * 阅读版**没有卷切换 UI**（只按 ?doc= 打开），所以这里只标注当前卷；
+ * 清单取 `/api/docs`（判据见 scripts/doc-lineage.ts）。拿不到清单就不显示 —— 不阻塞阅读。
+ * @param {string} doc 实际生效 doc（可能已回退默认）
+ */
+async function renderDocBadge(doc) {
+  let meta = /** @type {DocMeta | null} */ (null);
+  try {
+    const r = await fetch("/api/docs");
+    if (!r.ok) return;
+    const j = /** @type {{ docs?: DocMeta[] }} */ (await r.json());
+    meta = (j.docs ?? []).find((d) => d.id === doc) ?? null;
+  } catch {
+    return;
+  }
+  if (!meta) return;
+  const kind = meta.lineage ?? "mixed";
+  const text = kind === "oxr" ? "OXR" : kind === "mineru" ? "MinerU" : "混合";
+  for (const id of ["masthead-badge", "toc-badge"]) {
+    const box = $(`#${id}`);
+    if (!box) continue;
+    box.className = `doc-badge bd-${kind}`;
+    box.textContent = text;
+    box.title = `血缘 ${kind} · ${ARTIFACT_TEXT[meta.artifact ?? "prod"]}`;
+    box.hidden = false;
+  }
+}
+
 /* ---------------- 启动 ---------------- */
 async function main() {
   // 标题先用初始 DOC 占位；成功加载后再用实际生效 doc（可能回退默认）覆盖
@@ -588,6 +627,7 @@ async function main() {
     BASE = baseFor(effectiveDoc);
     need("#masthead-doc").textContent = effectiveDoc;
     need("#toc-doc").textContent = effectiveDoc;
+    void renderDocBadge(effectiveDoc); // T6：当前卷血缘徽标（失败则不显示，不影响阅读）
   } catch (err) {
     need("#placeholder").hidden = true;
     const flow = need("#paper");

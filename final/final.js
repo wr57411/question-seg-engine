@@ -134,7 +134,9 @@ import {
  *
  * @typedef {{ level: string, short?: string, issues?: string[] }} HealthInfo meta.json 体检结论（本文件读的部分）
  * @typedef {{ questions?: number, pages?: number, ocrFilled?: number }} DocStats meta.json stats（只读这三个键）
- * @typedef {{ id: string, label: string, kind: string, examined: boolean, stats: DocStats | null, health: HealthInfo | null }} DocMeta /api/docs 的一项（形状见 scripts/view-server.ts listDocs）
+ * @typedef {{ id: string, label: string, kind: string, examined: boolean, stats: DocStats | null, health: HealthInfo | null, lineage?: "oxr" | "mineru" | "mixed", artifact?: "prod" | "parse" | "backup" | "test" }} DocMeta /api/docs 的一项（形状见 scripts/view-server.ts listDocs）
+ *   lineage/artifact 是 T6 加的标注（判据见 scripts/doc-lineage.ts）：
+ *   生产册 / 解析件 / 备份分色分组，避免 31 册混在一列看不出进展。
  *
  * @typedef {import("./tag-store.js").Tag} Tag
  * @typedef {import("./tag-store.js").DocTags} DocTags
@@ -2080,6 +2082,9 @@ async function loadDocs() {
           examined: false,
           stats: null,
           health: null,
+          // 读不到清单时的兜底项：不编血缘，按「未知」显式标注（不静默冒充 oxr）
+          lineage: "mixed",
+          artifact: "prod",
         },
       ];
       notice([`读不到文档清单（${String(e).slice(0, 50)}），已按网址里的 doc 参数直接打开这一卷。`], "warn");
@@ -2105,7 +2110,7 @@ async function loadDoc(doc) {
   try {
     state.data = /** @type {Snap} */ (await fetchJson(`/data/out/${enc(doc)}/stages.json`));
     state.doc = doc;
-    /** @type {HTMLSelectElement} */ ($("doc-pick")).value = doc;
+    syncDocPickButton(); // T6：卷切换改为按钮 + 面板后，更新按钮上的当前卷与徽标
     /** @type {HTMLAnchorElement} */ ($("lnk-stages")).href = `/stages/?doc=${enc(doc)}&stage=6&page=1`;
     /** @type {HTMLAnchorElement} */ ($("lnk-viewer")).href = `/viewer/?doc=${enc(doc)}`;
     $("notice").hidden = true;
@@ -2378,24 +2383,93 @@ function restorePosition() {
 
 /* ── 交互 ── */
 
+/** artifact → 人话（徽标用；与 scripts/doc-lineage.ts 的判据同源） */
+const ARTIFACT_TEXT = { prod: "生产册", parse: "解析件", backup: "备份", test: "测试" };
+
+/**
+ * T6：血缘徽标。OXR（当前工作流）/ MinerU（旧源）/ 混合（后缀与 layout 记录矛盾，不猜）。
+ * @param {DocMeta} d
+ * @returns {HTMLElement}
+ */
+function lineageBadge(d) {
+  const kind = d.lineage ?? "mixed";
+  const text = kind === "oxr" ? "OXR" : kind === "mineru" ? "MinerU" : "混合";
+  const b = el("span", `bd bd-${kind}`, text);
+  b.title = `血缘 ${kind} · ${ARTIFACT_TEXT[d.artifact ?? "prod"]}`;
+  return b;
+}
+
+/**
+ * T6：渲染卷切换面板（分组 + 徽标）。
+ * - 生产册一组（名后 OXR/MinerU 徽标）；解析件/备份一组（置底，标角色）；
+ * - `_tablecheck` 已由服务端过滤（B-52），这里只按 artifact 分组，不再判断名字。
+ */
+function renderDocPicker() {
+  const menu = /** @type {HTMLElement} */ ($("doc-menu"));
+  menu.replaceChildren();
+  /** @type {{ key: string, title: string, test: (d: DocMeta) => boolean }[]} */
+  const groups = [
+    { key: "prod", title: "生产册", test: (d) => (d.artifact ?? "prod") === "prod" },
+    { key: "hist", title: "解析件 / 历史", test: (d) => (d.artifact ?? "prod") !== "prod" },
+  ];
+  for (const g of groups) {
+    const list = DOCS.filter(g.test);
+    if (!list.length) continue;
+    menu.append(el("div", "fb-docs-group", `${g.title}（${list.length}）`));
+    for (const d of list) {
+      const b = el("button", "fb-docs-item" + (d.id === state.doc ? " is-current" : ""));
+      b.type = "button";
+      b.setAttribute("role", "option");
+      b.append(el("span", "fb-docs-label", d.label || d.id));
+      b.append(lineageBadge(d));
+      const art = d.artifact ?? "prod";
+      if (art !== "prod") b.append(el("span", `bd bd-art-${art}`, ARTIFACT_TEXT[art]));
+      b.addEventListener("click", () => {
+        closeDocMenu();
+        if (d.id !== state.doc) void loadDoc(d.id);
+      });
+      menu.append(b);
+    }
+  }
+  if (!menu.childElementCount) menu.append(el("div", "fb-docs-group", "（没有可用文档）"));
+}
+
+/** 更新按钮上的当前卷名 + 徽标（loadDoc 与 initBar 都调） */
+function syncDocPickButton() {
+  const d = DOCS.find((x) => x.id === state.doc);
+  const label = /** @type {HTMLElement} */ ($("doc-pick-label"));
+  label.replaceChildren();
+  if (!d) {
+    label.textContent = "（没有可用文档）";
+    return;
+  }
+  label.append(el("span", "fb-docs-label", d.label || d.id));
+  label.append(lineageBadge(d));
+}
+
+function toggleDocMenu() {
+  const menu = /** @type {HTMLElement} */ ($("doc-menu"));
+  const open = menu.hidden;
+  menu.hidden = !open;
+  /** @type {HTMLButtonElement} */ ($("doc-pick")).setAttribute("aria-expanded", String(open));
+}
+
+function closeDocMenu() {
+  /** @type {HTMLElement} */ ($("doc-menu")).hidden = true;
+  /** @type {HTMLButtonElement} */ ($("doc-pick")).setAttribute("aria-expanded", "false");
+}
+
 function initBar() {
-  // index.html 里 doc-pick 是 `<select>`、jump 是 `<input>`、t-* 是 `checkbox`：
+  // index.html 里 doc-pick 是卷切换按钮（T6；原为 `<select>`）、jump 是 `<input>`、t-* 是 checkbox：
   // `$` 只收窄到 HTMLElement（见上方注释），这里按元素实际标签再收一层（tag-panel.js:51 同法）
-  const pick = /** @type {HTMLSelectElement} */ ($("doc-pick"));
-  pick.replaceChildren();
-  for (const d of DOCS) {
-    const o = el("option", "", d.label);
-    o.value = d.id;
-    pick.append(o);
-  }
-  if (!DOCS.length) {
-    const o = el("option", "", "（没有可用文档）");
-    o.value = "";
-    pick.append(o);
-    pick.disabled = true;
-  }
-  pick.value = state.doc;
-  pick.addEventListener("change", () => loadDoc(pick.value));
+  const pick = /** @type {HTMLButtonElement} */ ($("doc-pick"));
+  renderDocPicker();
+  syncDocPickButton();
+  if (!DOCS.length) pick.disabled = true;
+  pick.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleDocMenu();
+  });
 
   const jump = /** @type {HTMLInputElement} */ ($("jump"));
   jump.addEventListener("keydown", (e) => {
@@ -2479,6 +2553,7 @@ function initBar() {
     /** @param {string} id */
     const has = (id) => path.some((n) => /** @type {{ id?: string }} */ (n)?.id === id) || !!/** @type {HTMLElement} */ (e.target)?.closest?.(`#${id}`);
     if (!has("manage-pop") && !has("pick-manage")) closeManage();
+    if (!has("doc-menu") && !has("doc-pick")) closeDocMenu();
     const pop = $("combo-pop");
     if (!pop || pop.hidden) return;
     if (has("combo-pop") || has("combo-add")) return;
@@ -2488,6 +2563,7 @@ function initBar() {
     if (e.key !== "Escape") return;
     closeManage();
     closeComboPop();
+    closeDocMenu();
     if (state.search.on) setSearchOn(false);
   });
   $("pick-add-topics").addEventListener("click", () => openCreate("topics"));

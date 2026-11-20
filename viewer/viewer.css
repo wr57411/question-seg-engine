@@ -64,6 +64,21 @@ body {
 .toc-brand .icon { color: var(--paper); }
 .toc-sub { margin-top: 6px; font-family: var(--mono); font-size: 11px; color: rgba(246,241,231,0.55); letter-spacing: 0.04em; }
 
+/* T6：当前卷血缘徽标（OXR=当前工作流 / MinerU=旧源 / 混合）。亮底用彩色低饱和，
+   暗色目录栏（.toc）单独提对比。数据判据见 scripts/doc-lineage.ts。 */
+.doc-badge {
+  display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 3px;
+  font-family: var(--mono); font-size: 10px; line-height: 1.4; letter-spacing: .04em;
+  vertical-align: middle; white-space: nowrap;
+}
+.doc-badge[hidden] { display: none; }
+.bd-oxr { background: rgba(68, 98, 122, .14); color: var(--slate); }
+.bd-mineru { background: rgba(176, 58, 46, .12); color: var(--cinnabar); }
+.bd-mixed { background: rgba(36, 39, 43, .10); color: var(--slate); }
+.toc .bd-oxr { background: rgba(120, 170, 200, .20); color: #a8cbe0; }
+.toc .bd-mineru { background: rgba(200, 90, 75, .22); color: #e0a294; }
+.toc .bd-mixed { background: rgba(246, 241, 231, .14); color: rgba(246, 241, 231, .7); }
+
 .toc-nav { flex: 1; overflow-y: auto; padding: var(--st-16) var(--st-8); }
 .toc-section { margin-bottom: var(--st-16); }
 .toc-section-title {

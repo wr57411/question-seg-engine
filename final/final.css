@@ -19,11 +19,49 @@
 .fb-left strong { font-family: var(--serif); font-size: 16px; letter-spacing: .06em; }
 .fb-sub { color: var(--ink-soft); font-size: 11.5px; }
 .fb-mid { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; margin-left: 0; }
-.fb-mid select {
-  flex: 0 1 190px; min-width: 0; height: 36px; padding: 0 8px;
+/* T6：卷切换 = 按钮 + DOM 面板（原为 <select>）。
+   面板展开是 DOM，截图可核、分组与徽标可放；移动端触屏目标 44px。 */
+.fb-docs { position: relative; flex: 0 1 190px; min-width: 0; }
+.fb-docs-btn {
+  display: flex; align-items: center; gap: 6px; width: 100%; height: 36px;
+  padding: 0 8px; text-align: left; cursor: pointer;
   font-family: var(--sans); font-size: 13px;
   border: 1px solid var(--line); border-radius: 3px; background: var(--paper); color: var(--ink);
+  white-space: nowrap; overflow: hidden;
 }
+.fb-docs-btn:disabled { opacity: .6; cursor: default; }
+/* 按钮内的卷名容器：flex 才能截断；否则长卷名会换行撑破 36px 高 */
+#doc-pick-label { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.fb-docs-btn .fb-docs-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-docs-caret { flex: none; color: var(--ink-soft); font-size: 11px; }
+.fb-docs-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  width: min(380px, 92vw); max-height: min(70vh, 560px); overflow: auto;
+  padding: 6px; display: grid; gap: 2px;
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 6px;
+  box-shadow: 0 14px 34px rgba(43, 42, 38, .22);
+}
+.fb-docs-menu[hidden] { display: none; }
+.fb-docs-group { padding: 6px 8px 2px; font-size: 11px; color: var(--ink-soft); letter-spacing: .04em; }
+.fb-docs-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px;
+  padding: 6px 8px; text-align: left; cursor: pointer;
+  border: 0; border-radius: 4px; background: transparent;
+  color: var(--ink); font-family: var(--sans); font-size: 13px;
+}
+.fb-docs-item:hover { background: color-mix(in srgb, var(--azurite) 10%, transparent); }
+.fb-docs-item.is-current { background: color-mix(in srgb, var(--azurite) 16%, transparent); }
+.fb-docs-item .fb-docs-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 徽标：OXR=石青（当前工作流）／MinerU=朱砂（旧源）／混合=灰；角色标=浅灰 */
+.bd {
+  flex: none; padding: 3px 5px; border-radius: 3px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px; line-height: 1; letter-spacing: .03em;
+}
+.bd-oxr { background: color-mix(in srgb, var(--azurite) 18%, transparent); color: var(--azurite); }
+.bd-mineru { background: color-mix(in srgb, var(--cinnabar) 16%, transparent); color: var(--cinnabar); }
+.bd-mixed { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink-soft); }
+.bd-art-parse, .bd-art-backup { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-soft); }
 .fb-page {
   flex: none; color: var(--ink-soft); font-size: 12px;
   font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -58,16 +96,17 @@
 @media (max-width: 900px) {
   .fb-sub { display: none; }
   .fb-bar { gap: 6px; padding: 6px 10px; }
-  .fb-mid select { flex-basis: 180px; }
+  .fb-docs { flex-basis: 180px; }
 }
 @media (max-width: 700px) {
   .fb-bar { flex-wrap: wrap; }
   .fb-left { flex: 1 1 auto; }
   .fb-right { order: 2; }
   .fb-mid { order: 3; flex-basis: 100%; }
+  .fb-docs { flex-basis: 100%; }
 }
 @media (pointer: coarse) {
-  .fb-pick, .fb-more { min-height: 44px; }
+  .fb-pick, .fb-more, .fb-docs-btn { min-height: 44px; }
   .fb-more { width: 44px; }
 }
 

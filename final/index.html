@@ -16,7 +16,17 @@
       <span class="fb-sub">按原坐标重建 · 非原图</span>
     </div>
     <div class="fb-mid">
-      <select id="doc-pick" aria-label="选择文档"></select>
+      <!-- T6：卷切换由 <select> 改为按钮 + DOM 面板 —— 原生 select 的展开列表是浏览器
+           UI 层（截图拍不到、移动端触屏目标不可控），且分组/徽标只能放文本里。
+           面板内容见 final.js renderDocPicker()。 -->
+      <div class="fb-docs">
+        <button class="fb-docs-btn" id="doc-pick" type="button" aria-haspopup="listbox"
+                aria-expanded="false" aria-label="选择文档">
+          <span id="doc-pick-label">（没有可用文档）</span>
+          <span class="fb-docs-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="fb-docs-menu" id="doc-menu" role="listbox" aria-label="文档清单" hidden></div>
+      </div>
       <input
         id="jump"
         type="search"

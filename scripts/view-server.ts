@@ -26,6 +26,8 @@ import {
   validateTeachPayload,
 } from "./teach-write-guards.js";
 import { countTeachUsage, planTeachManage, validateManageRequest } from "./teach-manage.js";
+import { classifyDoc, readLayoutBackend, TEST_DOC_NAMES } from "./doc-lineage.js";
+import type { Artifact, Lineage } from "./doc-lineage.js";
 
 const ROOT = process.cwd();
 const PORT = Number(process.env.PORT ?? 4173);
@@ -350,12 +352,21 @@ interface DocListItem {
   examined: boolean;
   stats: Record<string, unknown> | null;
   health: { level: string; issues: string[] } | null;
+  /**
+   * T6：血缘（oxr / mineru / mixed）与产物角色（prod / parse / backup / test）。
+   * 判据见 `scripts/doc-lineage.ts`（目录名后缀 + layout.json 的 `_backend`），
+   * 让成品页能把「M5 切 OXR 的阶段性产物」与旧产物分开。
+   */
+  lineage: Lineage;
+  artifact: Artifact;
 }
 
 /**
  * 扫 `data/out/<docId>/`：
  * - **只列有 stages.json 的目录**（没有快照 = 成品页打不开，列出来只会点出 404）；
- * - 有 meta.json 就带上体检摘要，没有就 `examined: false`（不猜）。
+ * - 有 meta.json 就带上体检摘要，没有就 `examined: false`（不猜）；
+ * - **旧测试目录（`_tablecheck`，B-52）不进列表** —— 它不是可阅读的卷；
+ * - 每册带 lineage/artifact（判据见 doc-lineage.ts，可核对）。
  */
 async function listDocs(): Promise<DocListItem[]> {
   const outRoot = join(ROOT, "data", "out");
@@ -363,8 +374,11 @@ async function listDocs(): Promise<DocListItem[]> {
   const items: DocListItem[] = [];
   for (const e of entries) {
     if (!e.isDirectory()) continue;
+    if ((TEST_DOC_NAMES as readonly string[]).includes(e.name)) continue;
     const dir = join(outRoot, e.name);
     if (!existsSync(join(dir, "stages.json"))) continue;
+    const backend = await readLayoutBackend(join(dir, "layout.json"));
+    const { lineage, artifact } = classifyDoc(e.name, backend);
     let meta: {
       label?: string;
       kind?: "quiz" | "answer";
@@ -383,10 +397,12 @@ async function listDocs(): Promise<DocListItem[]> {
       examined: Boolean(meta),
       stats: meta?.stats ?? null,
       health: meta?.health ?? null,
+      lineage,
+      artifact,
     });
   }
-  // 题册在前、答案册在后，同类按名字（与用户的翻书顺序一致）
-  const rank = (d: DocListItem) => (d.kind === "quiz" ? 0 : 1);
+  // 生产册在前、解析件/历史在后；同类里题册在前、答案册在后，再按名字（与翻书顺序一致）
+  const rank = (d: DocListItem) => (d.artifact === "prod" ? 0 : 2) + (d.kind === "quiz" ? 0 : 1);
   items.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id, "zh"));
   return items;
 }
