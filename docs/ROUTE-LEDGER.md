@@ -79,3 +79,17 @@
 
 意图/背景 `INTENT.md` · 状态/风险 `HANDOFF.md` · 待办 `BACKLOG.md`（B-38/39/40/41）·
 口径 `DECISIONS.md`（§59/§110/§111）· 走向 `ROADMAP.md` · 巨带方案 `docs/plans/2026-11-13-巨带裁图坐标补充方案.md`。
+
+---
+
+## §5 no-MinerU 生产化路线（M1–M6，2026-11-20 开，当前主线）
+
+**总目标**：生产链彻底移除 MinerU。N1–N12 的替换本体（OXR 读字/墨迹+V3 坐标/V3 表格/裁图兜底/源无关显示层）全部复用，M 阶段=最后接线（输入切 OXR + 表区域 V3 插入 + markdown 漏泄裁图 + 巨带挂 OXR + 拆 MinerU）。
+**计划+每节点可验收子目标**：`docs/plans/2026-11-20-去MinerU生产化.md`；分支节点表 `docs/branches/tool-no-mineru.md` §7。
+**当前步**：M1（生产输入切 OXR）。工作流 workflow_tool 自主驱动，无人工 gate；硬件不在线记 notCovered 继续。
+- [ ] M1 输入切 OXR（门绿+对照登记+成品页不崩）
+- [ ] M2 markdown 漏泄行→裁图（page-4 表上3行修好，TDD）
+- [ ] M3 V3 表插入+全覆盖（index3/8/11+万有引力0，不双像/order 不串）
+- [ ] M4 巨带挂 OXR+复测 ≥95%
+- [ ] M5 其余册通电+拆 MinerU+文案
+- [ ] M6 台账+RETURN+提交
