@@ -517,6 +517,86 @@ export function matchGluedQuestionNumber(line: string, expectedNext: number | nu
   return m[1] ?? null;
 }
 
+/**
+ * **无题号真题块**（B-56 / B-50③，2026-11-20）：行首直接是出处标注，没有题号。
+ *
+ * 实测（M5-A 切 OXR 后）：OXR 解析**偶发丢掉行首题号**，块首变成
+ * `2023 北京卷 [人教版…` / `[人教版必修二 P94 第 5 题设`；同一页里
+ * `2.[粤教版…` / `4 2024 安徽卷` 又带着题号 ⇒ 不是格式差异，是上游逐块丢失。
+ * 引擎认不出 ⇒ 整题丢失，或更糟：被并进上一题题干（《曲线运动》p15 实测）。
+ *
+ * 判据最严（AND）：行首是「四位年份 + 卷」或「`[` + 教材版本 + `版`」+ 块足够长。
+ * 只回答「像不像真题开头」，**不回答题号**（号数由决策层向后反推）。
+ * 宁漏不误：不满足返回 false，退回原行为（正文并入当前题），不硬切、不造假题。
+ */
+const UNNUMBERED_QUESTION = /^(?:\d{4}\s*\S{0,8}卷|\[(?:人教|鲁科|粤教|沪科|教科|苏教|北师大|外研|冀教|湘教)版)/;
+
+export function matchUnnumberedQuestionLine(line: string): boolean {
+  const s = line.trimStart();
+  if (s.length < 12) return false;
+  return UNNUMBERED_QUESTION.test(s);
+}
+
+/**
+ * **标签折行残片**（B-50③）：出处标注被折行、且**带题号的前半段整块丢失**，
+ * 只剩尾部 `第4题情境变式]…` / `[题设问变式]…`（实测《电路》p3、p11）。
+ *
+ * 与「标签正常折行」的区分：正常折行的前半段（`3[多选][鲁科版…`）本身就是题号块，
+ * 会先开题，残片只是它的续行 ⇒ 传 `prevLine` 用于排除（`matchFirstLine` 认作题号即跳过）。
+ */
+const LABEL_FRAGMENT = /^(?:第\s*\d+\s*题|\[\s*题)\S{0,8}变式\]/;
+
+export function matchLabelFragmentQuestionLine(line: string, prevLine: string | null): boolean {
+  const s = line.trimStart();
+  if (s.length < 8 || !LABEL_FRAGMENT.test(s)) return false;
+  if (prevLine !== null) {
+    const pm = matchFirstLine(prevLine);
+    if (pm.ok && pm.kind === "question_no") return false;
+  }
+  return true;
+}
+
+/**
+ * **强信号题号**（B-56 反推用）：`N.` / `N．、)）` / `N[` / `N【` / `N「` / `N`+四位年份。
+ *
+ * 为什么不能直接用 `matchFirstLine`：它的弱信号分支（`N 空格 汉字`，如 `1 被踢出后…`、
+ * `32 第 15 题条件变式]…`）需要 `expectedNext` 佐证，而「向后反推」时没有该上下文 ⇒
+ * 会把正文行误当题号（实测《机械能守恒》p4 的 `1 被踢出后…`、《运动和力》p8 的 `32 第 15 题…`）。
+ * 强信号不依赖上下文，可安全用于反推。
+ */
+const STRONG_QUESTION_NO =
+  /^(?:([1-9]\d{0,2})\s*\.(?!\s*\d)|([1-9]\d{0,2})[．、)）]|([1-9]\d{0,2})\s*(?=[\[【「]|\d{4}(?!\d)))/;
+
+/** 折行残片守卫（与 {@link matchFirstLine} 的 `ARABIC_QUESTION` 分支同款）：`1)条刻线…` 不是题号。 */
+const STRONG_TAIL_GUARD = /^[1-9]\d{0,2}\s*[．、)）][题个种条根块只张段次名位台辆本页章节道项分度所示米秒]/;
+
+export function matchStrongQuestionNumber(line: string): number | null {
+  const s = line.trimStart();
+  const m = STRONG_QUESTION_NO.exec(s);
+  if (!m || STRONG_TAIL_GUARD.test(s)) return null;
+  const n = Number(m[1] ?? m[2] ?? m[3]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * **题号重启头**（B-56 反推用）：跨过它题号会重启，「下一题号 − 1」不再成立 ⇒ 反推必须停。
+ * 只含**重启编号**的头：章 / 第N节 / 专题·全章综合测试·真题自测 / 汉字序号 / 栏目标题
+ * （`教材素材变式`、`教材知识萃取`、`教材实验 N`…）。
+ * `变式 N`（VARIANT_HEAD）**不算**：实测《机械能守恒》p0 / 《万有引力》p3 / 《运动和力》p3，
+ * 变式头两侧的题号是连续的（变式 1→#1、变式 2→#2…），跨它反推才正确。
+ */
+export function isNumberingRestartHeader(line: string): boolean {
+  const s = line.trimStart();
+  if (s.length > 40) return false;
+  return Boolean(
+    CHAPTER_HEAD.exec(s) ||
+      SECTION_HEAD.exec(s) ||
+      SECTION_HEAD_ALT.exec(s) ||
+      CHINESE_SECTION.exec(s) ||
+      BAND_HEAD.exec(s),
+  );
+}
+
 export function stripQuestionPrefix(line: string): string {
   return line
     .trimStart()

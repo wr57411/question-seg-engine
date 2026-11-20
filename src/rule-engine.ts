@@ -20,6 +20,10 @@ import {
   matchBoxListItem,
   matchFirstLine,
   matchGluedQuestionNumber,
+  matchLabelFragmentQuestionLine,
+  matchStrongQuestionNumber,
+  matchUnnumberedQuestionLine,
+  isNumberingRestartHeader,
   nextKey,
   splitConjoinedOptions,
   startsWithQuestionNumber,
@@ -139,16 +143,23 @@ export function segmentWithRules(doc: ParsedDocument): SegmentationResult {
   const ctx = new Ctx(doc);
 
   // 逐页布局并按阅读顺序展平为全局块流（序号跨页连续）
+  // ⚠️ 先**全量**登记 `entries` 再处理：B-56 的「无题号真题块」要看后方题号块反推，
+  // 边处理边登记会看不到尚未处理的块（实测 next 恒为 null）。
   let globalIndex = 0;
+  const laidOut: { page: (typeof doc.pages)[number]; layout: ReturnType<typeof layoutPage> }[] = [];
   for (const page of doc.pages.slice().sort((a, b) => a.index - b.index)) {
     const layout = layoutPage(page);
     ctx.stats.columnsPerPage.push(layout.columns);
-    ctx.pageHeight = page.height;
-    ctx.settleAtPageBoundary();
     for (const entry of layout.ordered) {
       entry.index = globalIndex++;
-      ctx.process(entry);
+      ctx.registerEntry(entry.index, entry);
     }
+    laidOut.push({ page, layout });
+  }
+  for (const { page, layout } of laidOut) {
+    ctx.pageHeight = page.height;
+    ctx.settleAtPageBoundary();
+    for (const entry of layout.ordered) ctx.process(entry);
   }
   ctx.finish();
 
@@ -186,8 +197,17 @@ class Ctx {
     inlineFormulas: 0,
     /** 按「题号黏正文」规则切出的题数（DECISIONS §77；0 表示本册没有这种形态） */
     gluedQuestions: 0,
+    /** 按「无题号真题块」恢复的题数（B-56；0 表示本册没有这种形态） */
+    unnumberedQuestions: 0,
     columnsPerPage: [] as number[],
   };
+  /** 全局块流（序号 → 块），供「无题号真题块」向后反推题号（B-56） */
+  private entries = new Map<number, IndexedBlock>();
+
+  /** 预登记全局块（`segmentWithRules` 在处理前全量登记，反推才看得到后方的块） */
+  registerEntry(index: number, entry: IndexedBlock): void {
+    this.entries.set(index, entry);
+  }
 
   private mode: "questions" | "answers" = "questions";
   private current: Draft | null = null;
@@ -327,6 +347,48 @@ class Ctx {
     return { chapter, chapterTitle, sectionNo, section };
   }
 
+  /**
+   * 该块是不是「无题号真题开头」：行首出处标注，或标签折行残片（B-56 / B-50③）。
+   * `prevFl` 用于排除「正常折行」的残片（其前半段是题号块，残片只是续行）。
+   */
+  private isUnnumberedOpening(fl: string, prevFl: string | null): boolean {
+    return matchUnnumberedQuestionLine(fl) || matchLabelFragmentQuestionLine(fl, prevFl);
+  }
+
+  /**
+   * 向后反推**本块应得的题号**，供「无题号真题块」恢复（B-56 / B-50③）。
+   *
+   * 为什么向后而不是向前：号数在节内连续，但**跨页/跨栏时 `current` 可能已被
+   * 页界结算清空**（`settleAtPageBoundary`），向前会退化成 1；而「下一题号」是
+   * 已印在卷面上的确定信号，与阅读顺序无关。
+   *
+   * 号数 = `下一个强信号题号 − 1 − 其后连续的无题号真题块数`：
+   * 一列无题号块（实测《运动和力》p8：#1、#2 都丢了，下一题是 #3）要按
+   * `N−k … N−1` 降序分，不能一律 `N−1`（否则两块都叫 #2）。
+   *
+   * 判据最严（AND）：只认**强信号**题号（`N.` / `N[` / `N`+年份…），
+   * 弱信号（`1 被踢出后…`）不算；遇到**题号重启头**（章/节/栏目）即停 ⇒ 返回 null，
+   * 调用方退回原行为，不猜、不造假题。
+   */
+  private inferQuestionNumber(fromIndex: number): number | null {
+    let runAfter = 0;
+    for (let i = fromIndex + 1; i < this.entries.size; i++) {
+      const e = this.entries.get(i);
+      if (!e || e.block.kind !== "text") continue;
+      const fl = (e.block.firstLine ?? "").trimStart();
+      if (isNumberingRestartHeader(fl)) return null;
+      const strong = matchStrongQuestionNumber(fl);
+      if (strong !== null) {
+        const num = strong - runAfter - 1;
+        return num > 0 ? num : null;
+      }
+      const prev = this.entries.get(i - 1);
+      const prevFl = prev && prev.block.kind === "text" ? (prev.block.firstLine ?? "").trimStart() : null;
+      if (this.isUnnumberedOpening(fl, prevFl)) runAfter++;
+    }
+    return null;
+  }
+
   process(entry: IndexedBlock): void {
     this.stats.totalBlocks++;
     const { block, index: blockIndex } = entry;
@@ -464,6 +526,32 @@ class Ctx {
         this.stats.gluedQuestions = (this.stats.gluedQuestions ?? 0) + 1;
         this.review(blockIndex, `题号黏正文：按「第 ${glued} 题」切分（原行「${stripped.slice(0, 24)}…」）`, this.current);
         return;
+      }
+      /**
+       * **无题号真题块**（B-56 / B-50③）：行首直接是出处标注（`2023 北京卷 [人教版…` /
+       * `[人教版必修二 P94 第 5 题设`），或标签折行残片（`第4题情境变式]…`），
+       * 题号被上游（OXR）逐块丢掉。号数由**后一个强信号题号反推**，与页界/分栏无关；
+       * 记 review 便于人工复核。判据最严：形态匹配 + 后方确有强信号题号，否则退回原行为
+       * （不猜、不造假题）。
+       */
+      const prevEntry = blockIndex > 0 ? this.entries.get(blockIndex - 1) : undefined;
+      const prevFl =
+        prevEntry && prevEntry.block.kind === "text" ? (prevEntry.block.firstLine ?? "").trimStart() : null;
+      if (this.isUnnumberedOpening(block.firstLine, prevFl)) {
+        const num = this.inferQuestionNumber(blockIndex);
+        if (num !== null) {
+          const numStr = String(num);
+          this.settleOptions(null);
+          this.pendingBand = null;
+          this.openDraft(numStr, block, entry);
+          this.stats.unnumberedQuestions = (this.stats.unnumberedQuestions ?? 0) + 1;
+          this.review(
+            blockIndex,
+            `无题号真题块：按「第 ${numStr} 题」切分（由后一个强信号题号反推；原行「${block.firstLine.trim().slice(0, 24)}…」）`,
+            this.current,
+          );
+          return;
+        }
       }
     }
 
