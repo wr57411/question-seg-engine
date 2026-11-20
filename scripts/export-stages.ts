@@ -21,6 +21,7 @@ import { detectColumnCenters, detectColumns, layoutPage } from "../src/layout.js
 import { applyCorrections, type ApplyReport, type CorrectionFile } from "../src/corrections.js";
 import { scanFormulaNoise, type FormulaNoiseReport } from "../src/formula.js";
 import type { BBox, CrossPageLeakRecord, IndexedBlock, ParsedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
+import { normalizeGuardText, type TitleGuardEntry } from "./oxr-title-guard.js";
 
 /** 阶段 1：MinerU 原始段级块（保留 MinerU 自身 type，只截断文本） */
 export interface RawStageBlock {
@@ -242,6 +243,12 @@ export interface StageSnapshot {
    * 非空 = 有行从本页滤除并迁回真页；逐条可核对（页 index + bbox + text + 判据）。
    */
   crossPageLeaks?: CrossPageLeakRecord[];
+  /**
+   * M7-A 标题守卫/补识应用报告（`title-guard.json` 产物驱动）。
+   * 缺省 = 本卷无该产物（快照逐字节不变，与 table-v3/giant-crop 同纪律）。
+   * 非空 = 补回了 OXR 丢失的内容标题/散文/标签；逐条清单见产物本身。
+   */
+  titleGuard?: { entries: number; applied: number; skipped: number };
   pages: StagePage[];
   reviews: SegmentationResult["reviews"];
 }
@@ -1493,6 +1500,49 @@ export function injectOcrFullTextLines(doc: ParsedDocument, outDir: string): { i
   return { injected, skipped, errors };
 }
 
+/**
+ * M7-A 标题守卫/补识：把 `title-guard.json` 的条目插回 doc（**切题之前**，
+ * 让补回的内容标题/散文参与切题与分组）。产物缺失/空 ⇒ doc 逐字节不变。
+ *
+ * 纪律：
+ * - 只增块，不改既有块；补回块标 `fromOcr: true`（来源=独立 OCR/原卷核对，不当上游原文）；
+ * - 同页归一化文本已含该文本 ⇒ 跳过（幂等，防重复插入）；
+ * - 页不存在 ⇒ 跳过并计数（不静默）。
+ */
+export function applyTitleGuard(
+  doc: ParsedDocument,
+  entries: TitleGuardEntry[],
+): { applied: number; skipped: number } {
+  let applied = 0;
+  let skipped = 0;
+  for (const e of entries) {
+    const page = doc.pages.find((p) => p.index === e.page - 1);
+    if (!page) {
+      skipped++;
+      continue;
+    }
+    const target = normalizeGuardText(e.text);
+    const dup = page.blocks.some(
+      (b) => (b.kind === "text" || b.kind === "table") && normalizeGuardText(b.text).includes(target),
+    );
+    if (dup) {
+      skipped++;
+      continue;
+    }
+    page.blocks.push({
+      kind: "text",
+      bbox: [...e.bbox] as BBox,
+      text: e.text,
+      firstLine: e.text.split("\n")[0] ?? e.text,
+      lineCount: 1,
+      maxFontSize: 0,
+      fromOcr: true,
+    });
+    applied++;
+  }
+  return { applied, skipped };
+}
+
 function main(): void {
   const docId = process.argv[2];
   const layoutPath = process.argv[3];
@@ -1516,6 +1566,23 @@ function main(): void {
   const outDir = join("data", "out", docId);
   /** OCR 输入文件“存在但读不动”的错误（不静默：写入快照，meta 体检会显示） */
   const ocrInputErrors: string[] = [];
+  /**
+   * M7-A 标题守卫/补识（产物驱动）：`title-guard.json` 缺失 ⇒ 跳过（快照逐字节不变）；
+   * 存在但读不动 ⇒ 错误进 `ocrInputErrors`（不静默）。在 OCR 补行与切题之前插回，
+   * 让补回内容参与切题/分组。
+   */
+  const titleGuardFile = readOcrJsonFile(join(outDir, "title-guard.json"));
+  if (titleGuardFile.error) ocrInputErrors.push(titleGuardFile.error);
+  let titleGuardReport: { entries: number; applied: number; skipped: number } | null = null;
+  if (titleGuardFile.json) {
+    const entries = (titleGuardFile.json as { entries?: TitleGuardEntry[] }).entries ?? [];
+    const r = applyTitleGuard(doc, entries);
+    titleGuardReport = { entries: entries.length, ...r };
+    console.log(
+      `  标题守卫/补识：清单 ${entries.length} 条 · 插回 ${r.applied} 行` +
+        (r.skipped ? `（跳过 ${r.skipped}：已存在/页缺失）` : ""),
+    );
+  }
   // 融合作品：两源已覆盖正文，OCR 题号补行只保留展示候选，**不注入切题流**。
   // 原因（2026-10-28 电路实测）：OCR 候选 bbox 是 OXR 坐标系，融合页是 MinerU 坐标系，
   // 绝对坐标判重失效，同一题会被补成多道；且新书的徽标题号常被 OCR 读成正文数字。
@@ -1562,6 +1629,7 @@ function main(): void {
   snapshot.corrections = correctionReport;
   // 跨页泄漏记录（B-47）：随快照落盘，逐条可核对；空/缺省 = 无（OXR 整体跳过）。
   snapshot.crossPageLeaks = doc.crossPageLeaks;
+  if (titleGuardReport) snapshot.titleGuard = titleGuardReport;
   if (doc.crossPageLeaks?.length) {
     const moved = doc.crossPageLeaks.filter((r) => r.action === "moved").length;
     const dropped = doc.crossPageLeaks.filter((r) => r.action === "dropped").length;
