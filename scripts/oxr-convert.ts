@@ -318,6 +318,15 @@ function isBlankNoise(text: string): boolean {
   return t.length > 0 && /^[\\_]+$/.test(t);
 }
 
+/**
+ * 文本残留**检测**（只读、不改写）—— 供聚合缺陷扫描器 `scripts/audit-defects.ts` 复用
+ * 转换层判据（B-55），避免扫描器自写一份 `\smiles`/blank 判据。
+ * 与 `stripSmilesWrapper`/`isBlankNoise` 同源；命中不等于已清洗（layout 是转换前/后产物皆可含残留形态）。
+ */
+export function detectOxrTextResidue(text: string): { smiles: boolean; blankNoise: boolean } {
+  return { smiles: text.includes("\\smiles{"), blankNoise: isBlankNoise(text) };
+}
+
 function pickImageUrl(block: OxrBlock): string | null {
   if (block.img_url) return block.img_url;
   const md = /!\[[^\]]*\]\(([^)]+)\)/.exec(String(block.content ?? ""));
