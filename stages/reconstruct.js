@@ -451,6 +451,8 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
   const tableBlocks = p.blocks.filter(rendersTable);
   /** @type {Set<number>} */
   const coveredByTable = new Set();
+  /** M3：被抑块 i → 覆盖它的表块（供漏泄残字原文回填表 title，不丢内容） @type {Map<number, Block>} */
+  const coveredByMap = new Map();
   for (const t of tableBlocks) {
     const [rx0, ry0, rx1, ry1] = t.bbox;
     const tw = rx1 - rx0;
@@ -473,7 +475,10 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
       if (
         cx >= rx0 && cx <= rx1 && cy >= ry0 && cy <= ry1 &&
         ow >= 0.7 * (x1 - x0) && oh >= 0.7 * (y1 - y0) && overBounded
-      ) coveredByTable.add(b.i);
+      ) {
+        coveredByTable.add(b.i);
+        coveredByMap.set(b.i, t);
+      }
     }
   }
   // M2 漏泄组：首块 i → 尾块原文列表（尾块不画，原文补进首块裁图 title，不丢内容）
@@ -532,6 +537,25 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
     }
     return blockNode(b, p, canvasW, baseFont, mergeCtx, doc);
   });
+  // M3 防双像：表内被抑的 markdown 漏泄行（M2 裁图首块 / leakCoveredBy 尾块）原文回填覆盖表 title——
+  // 整表截图/网格已含其内容，残字不再重复画；原文留快照 text + 此处 title（不丢内容）。
+  // 只认漏泄行（coordSource=crop 且含 markdown 图语法 / 漏泄尾块），普通表内行与巨带回退行不动。
+  for (const b of p.blocks) {
+    let t = coveredByMap.get(b.i);
+    if (!t && b.leakCoveredBy !== undefined) {
+      // 尾块自身可能在表框外，但首块被表抑 ⇒ 首块节点已不存在，原文同样进表 title
+      const head = p.blocks.find((x) => x.i === b.leakCoveredBy);
+      if (head) t = coveredByMap.get(head.i);
+    }
+    if (!t) continue;
+    const txt = b.text ?? "";
+    const isLeak =
+      (b.coordSource === "crop" && (/!\[/.test(txt) || txt.includes("](http"))) ||
+      b.leakCoveredBy !== undefined;
+    if (!isLeak) continue;
+    const n = nodes[p.blocks.indexOf(t)];
+    if (n) n.title = `${n.title} ｜ 表内 markdown 残字（抑制防双像，原文留证）：${txt}`;
+  }
   // `ocr: true` 的块是**从 OCR 候选补进来的题号行**（上游整行漏识别，见 export-stages 的
   // injectOcrQuestionLines）⇒ 默认用青绿候选样式渲染，绝不与引擎原文混淆（G1）。
   nodes.forEach((n, i) => {

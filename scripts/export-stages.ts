@@ -889,6 +889,126 @@ export function applyTableV3(page: StagePage, entries: TableV3Entry[]): { attach
   return { attached, unmatched };
 }
 
+/**
+ * 表格 HTML 压平为纯文本（仅供插入块的快照 text/title/search 用；渲染仍走 html 本体）。
+ * 单元格→\t、行→\n、<br>→\n；常见实体还原；不是判据、不参与任何匹配。
+ */
+function flattenTableHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/td>/gi, "\t")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+/**
+ * M3（no-MinerU）：消费 table-v3.json 的**插入+覆盖**双模式。
+ *
+ * 背景：OXR 读表为 0，现 kind=table 块来自 DECISIONS §90 压平表格行重建（合成 html，
+ * 单元格可能含 markdown 网址残字）；§90 未重建出的表（曲线运动 index 3/8/11、万有引力 index 0）
+ * 在旧覆盖模式下整段消失 ⇒ 这里按 V3 bbox **插入** kind=table 块补上。
+ *
+ * 行为：
+ * - 与现有 kind=table 块 IoU≥0.5 匹配 ⇒ **逐条委托 applyTableV3 覆盖**（字段写法/判据完全一致，
+ *   全匹配场景与旧 applyTableV3 单跑逐字节相同——行为不变红线）；
+ * - 无匹配的完整条目（text 带 html / image 带 crop+cropSize）⇒ 插入新 kind=table 块：
+ *   i=现有最大 i+1；order 槽按 y（新表中心 y 与 order 中各块中心 y 比较，插首个更大者之前，
+ *   否则追加末尾）；text 路由 html=V3 pred_html 原样 + text=压平全文；image 路由挂 crop/cropSize；
+ * - borderless 无匹配块 ⇒ **守卫跳过不插入**（G1：不画臆造格网；行文本本就照常渲染，不丢内容）；
+ * - text 缺 html / image 缺裁图 ⇒ unmatched 计数可见（G3/缺件门，不静默）。
+ *
+ * 返回 {inserted, unmatched, attached, skipped}：inserted=新插块数、attached=覆盖挂接数、
+ * skipped=守卫跳过数、unmatched=缺件/无法落位条目数。空 entries/它页 entries ⇒ 页面对象逐字节不变。
+ */
+export function insertTableV3Regions(
+  page: StagePage,
+  entries: TableV3Entry[],
+): { inserted: number; unmatched: number; attached: number; skipped: number } {
+  let inserted = 0;
+  let unmatched = 0;
+  let attached = 0;
+  let skipped = 0;
+  const toInsert: TableV3Entry[] = [];
+  for (const e of entries) {
+    if (e.page !== page.index) continue;
+    // 覆盖优先：委托 applyTableV3（同页单条），匹配判据/字段写法与旧路径完全一致。
+    // 此时尚未插入任何新块 ⇒ 匹配域=原有 blocks，全匹配场景与旧 main() 逐字节等价。
+    const r = applyTableV3(page, [e]);
+    if (r.attached) {
+      attached++;
+      // M3：§90 合成表框可能切掉表顶（曲线运动 index3 实测：漏泄行组在真表内却在合成框外
+      // ⇒ coveredByTable 抑不到 ⇒ 整表截图+漏泄裁图双像）。image 路由且被覆盖块是
+      // **html 含 markdown 图语法的合成表**时，把其 bbox 校正为「合成框 ∪ entry 验证表框」。
+      // 正常表（V3/MinerU html 无残字）框一个字节不动 ⇒ 旧样本/MinerU 册行为不变。
+      if (e.class === "image") {
+        let best: StageBlock | null = null;
+        let bestIou = TABLE_MATCH_MIN_IOU;
+        for (const b of page.blocks) {
+          if (b.kind !== "table") continue;
+          const iou = bboxIoU(b.bbox, e.bbox);
+          if (iou >= bestIou) {
+            bestIou = iou;
+            best = b;
+          }
+        }
+        if (best && best.html?.includes("](http")) {
+          best.bbox = [
+            Math.min(best.bbox[0], e.bbox[0]),
+            Math.min(best.bbox[1], e.bbox[1]),
+            Math.max(best.bbox[2], e.bbox[2]),
+            Math.max(best.bbox[3], e.bbox[3]),
+          ];
+        }
+      }
+      continue;
+    }
+    if (e.class === "text" && e.html) toInsert.push(e);
+    else if (e.class === "image" && e.crop && e.cropSize) toInsert.push(e);
+    else if (e.class === "borderless") skipped++;
+    else unmatched++;
+  }
+  // 插入按 y 从上到下，保证多表页的 order 槽位稳定
+  toInsert.sort((a, b) => a.bbox[1] - b.bbox[1]);
+  for (const e of toInsert) {
+    const i = page.blocks.reduce((m, b) => Math.max(m, b.i), -1) + 1;
+    const block: StageBlock = {
+      i,
+      kind: "table",
+      bbox: e.bbox,
+      text: e.class === "text" ? flattenTableHtml(e.html!) : "",
+      tableClass: e.class,
+      tableSource: e.source ?? "v3",
+    };
+    if (e.class === "text") block.html = e.html;
+    if (e.class === "image") {
+      block.crop = e.crop;
+      block.cropSize = e.cropSize;
+    }
+    page.blocks.push(block);
+    // order 槽按 y：插到首个「中心 y 更大」的既有块之前；没有则追加末尾。
+    const cy = (e.bbox[1] + e.bbox[3]) / 2;
+    const byI = new Map(page.blocks.map((b) => [b.i, b]));
+    let slot = page.order.length;
+    for (let k = 0; k < page.order.length; k++) {
+      const b = byI.get(page.order[k]!);
+      if (b && (b.bbox[1] + b.bbox[3]) / 2 > cy) {
+        slot = k;
+        break;
+      }
+    }
+    page.order.splice(slot, 0, i);
+    inserted++;
+  }
+  return { inserted, unmatched, attached, skipped };
+}
+
 /** 从 PNG 文件头读原生宽高（签名 + IHDR，大端 u32 @16/@20）。零依赖，放置器只缩不放的依据。 */
 export function pngSizeFromHeader(buf: Uint8Array): [number, number] {
   const sig = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -1503,14 +1623,21 @@ function main(): void {
   if (tv3.json) {
     const entries = (tv3.json as { tables?: TableV3Entry[] }).tables ?? [];
     let tAtt = 0;
+    let tIns = 0;
+    let tSkip = 0;
     let tUnm = 0;
     for (const pg of snapshot.pages) {
-      const r = applyTableV3(pg, entries);
+      // M3 双模式：IoU 匹配既有 table 块 ⇒ applyTableV3 覆盖（行为不变）；
+      // §90 未重建出的表 ⇒ 按 V3 bbox 插入 kind=table 块（order 槽按 y）。
+      const r = insertTableV3Regions(pg, entries);
       tAtt += r.attached;
+      tIns += r.inserted;
+      tSkip += r.skipped;
       tUnm += r.unmatched;
     }
     console.log(
-      `  表格三分流（table-v3.json）：挂 ${tAtt} 表` +
+      `  表格三分流（table-v3.json）：覆盖 ${tAtt} 表 · 插入 ${tIns} 表` +
+        (tSkip ? ` · 守卫跳过 ${tSkip}（无边框不画臆造格网）` : "") +
         (tUnm ? `（⚠️ ${tUnm} 条未匹配/缺 html/缺裁图，未静默透传）` : ""),
     );
   }
