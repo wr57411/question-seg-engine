@@ -20,7 +20,7 @@ import { normalizeLayout } from "../src/normalize.js";
 import { detectColumnCenters, detectColumns, layoutPage } from "../src/layout.js";
 import { applyCorrections, type ApplyReport, type CorrectionFile } from "../src/corrections.js";
 import { scanFormulaNoise, type FormulaNoiseReport } from "../src/formula.js";
-import type { BBox, IndexedBlock, ParsedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
+import type { BBox, CrossPageLeakRecord, IndexedBlock, ParsedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
 
 /** 阶段 1：MinerU 原始段级块（保留 MinerU 自身 type，只截断文本） */
 export interface RawStageBlock {
@@ -236,6 +236,12 @@ export interface StageSnapshot {
    * 非空 = 题号补行/候选合并可能被跳过，meta 体检会显示。
    */
   ocrInputErrors: string[];
+  /**
+   * 跨页泄漏行记录（B-47，normalize 层产）。空/缺省 = 无跨页泄漏
+   * （OXR 无 `preproc_blocks` ⇒ 判据整体跳过，产物逐字节不变）。
+   * 非空 = 有行从本页滤除并迁回真页；逐条可核对（页 index + bbox + text + 判据）。
+   */
+  crossPageLeaks?: CrossPageLeakRecord[];
   pages: StagePage[];
   reviews: SegmentationResult["reviews"];
 }
@@ -1554,6 +1560,13 @@ function main(): void {
   // 骨架输入溯源（M1）：快照自报喂入的 layout 路径 —— 换源（MinerU→OXR）后可从产物核对来源
   snapshot.layoutInput = layoutPath;
   snapshot.corrections = correctionReport;
+  // 跨页泄漏记录（B-47）：随快照落盘，逐条可核对；空/缺省 = 无（OXR 整体跳过）。
+  snapshot.crossPageLeaks = doc.crossPageLeaks;
+  if (doc.crossPageLeaks?.length) {
+    const moved = doc.crossPageLeaks.filter((r) => r.action === "moved").length;
+    const dropped = doc.crossPageLeaks.filter((r) => r.action === "dropped").length;
+    console.log(`  跨页泄漏滤除 ${doc.crossPageLeaks.length} 行（迁回真页 ${moved} · 真页已有副本丢弃 ${dropped}）`);
+  }
   // 先挂引用：后面候选合并若再发现 OCR 读取错误，会追加到同一数组（写快照前已全部发生）
   snapshot.ocrInputErrors = ocrInputErrors;
 

@@ -5,7 +5,47 @@
  * 结构参考官方文档：{ pdf_info: [{ page_idx, page_size, blocks }], images, formulas }。
  * 所有字段都做容错（缺省给安全默认值），字段名若有出入只改本文件。
  */
-import type { BBox, BlockKind, PageInfo, ParsedBlock, ParsedDocument } from "./types.js";
+import type { BBox, BlockKind, CrossPageLeakRecord, PageInfo, ParsedBlock, ParsedDocument } from "./types.js";
+
+/** 跨页泄漏判据的归一化：去空白 + 去 `$`（与 B-47 实验口径 `[\s$]+` 一致）。 */
+function leakNorm(text: string): string {
+  return text.replace(/[\s$]+/g, "");
+}
+
+/**
+ * 取块集合的行文本（`lines[].spans[].content` 拼接；递归嵌套 `blocks`）。
+ * 用于 `preproc_blocks` / `para_blocks` 的页级文本集（跨页泄漏判据）。
+ */
+function blockLineTexts(blocks: unknown[]): string[] {
+  const out: string[] = [];
+  for (const bRaw of blocks) {
+    const b = asRecord(bRaw);
+    for (const lRaw of asArray(b.lines)) {
+      const parts: string[] = [];
+      for (const sRaw of asArray(asRecord(lRaw).spans)) {
+        const c = String(asRecord(sRaw).content ?? asRecord(sRaw).text ?? "");
+        if (c) parts.push(c);
+      }
+      if (parts.length) out.push(parts.join(""));
+    }
+    if (b.blocks) out.push(...blockLineTexts(asArray(b.blocks)));
+  }
+  return out;
+}
+
+/**
+ * 模糊重复判定（迁回真页前防重）：归一后长度 ≥ 6 且互相包含。
+ * 与 `dropCrossPageLeaks` 旧判据同源（`[\s\\${}]+`），抽出共用避免两处漂移。
+ */
+function fuzzyDupText(text: string, blocks: ParsedBlock[]): boolean {
+  const n = text.replace(/[\s\\${}]+/g, "");
+  if (n.length < 6) return false;
+  return blocks.some((b) => {
+    const nb = b.kind === "text" ? b.text : "";
+    const m = nb.replace(/[\s\\${}]+/g, "");
+    return m.length >= 6 && (m.includes(n) || n.includes(m));
+  });
+}
 
 /** 归一化入口：可直接传 fs.readFileSync 解析出的任意 JSON。
  * 兼容两种真实结构：
@@ -260,8 +300,24 @@ function flattenTableText(html: string): string {
 
 export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocument {
   const root = asRecord(layoutRaw);
-  const pages = asArray(root.pdf_info as unknown)
-    .map((entry) => {
+  const rawPages = asArray(root.pdf_info as unknown);
+  /**
+   * 跨页泄漏判据的页级文本集（B-47）：
+   * - `preprocSets`：`preproc_blocks` 行归一化集合（MinerU 原始 OCR 行）；
+   * - `paraSets`：`para_blocks` 行归一化集合（用于全书页频 C）；
+   * - `hasPreproc`：**只有 preproc 非空才算 MinerU 形态** —— OXR layout 无
+   *   `preproc_blocks` ⇒ 全 false ⇒ 判据整体跳过 ⇒ OXR 产物逐字节不变（红线）。
+   */
+  const preprocSets = rawPages.map((entry) => new Set(blockLineTexts(asArray(asRecord(entry).preproc_blocks)).map(leakNorm)));
+  const paraSets = rawPages.map((entry) => new Set(blockLineTexts(asArray(asRecord(entry).para_blocks)).map(leakNorm)));
+  const hasPreproc = preprocSets.map((s) => s.size > 0);
+  /** 全书 para 页频：某归一行文本出现在多少页的 para（去重）。页频 ≥3 的多页重复（页眉/通用短句）不滤。 */
+  const bookParaFreq = new Map<string, number>();
+  for (const s of paraSets) for (const n of s) bookParaFreq.set(n, (bookParaFreq.get(n) ?? 0) + 1);
+  /** 跨页泄漏行（文本判据命中）：先按页收集，排序后统一迁回真页（内容不丢，G1） */
+  const leakMoves: { fromPageIndex: number; block: ParsedBlock; criteria: CrossPageLeakRecord["criteria"] }[] = [];
+  const pages = rawPages
+    .map((entry, rawIdx) => {
       const rec = asRecord(entry);
       const size = asArray(rec.page_size as unknown);
       const blocks: ParsedBlock[] = [];
@@ -379,6 +435,37 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
             lineCount: 1,
             maxFontSize: 0,
           };
+          /**
+           * **跨页泄漏文本判据**（B-47，比形状判据更准）：
+           * 本页 `preproc_blocks` 无此行（B）+ 下一页 `preproc_blocks` 有此行（D）
+           * + 全书 para 页频 < 3（C，挡多页重复的页眉/通用短句）+ 归一化长度 ≥ 4。
+           * 实测答案册 536 行命中 A&B，其中 2 行是频 ≥3 的通用串（「方法技巧」「D正确.」），
+           * 被 C 挡下；下一页 para 精确含此行（E）的仅 1 行 —— 故 **E 不作为判据**（会把真泄漏全放走）。
+           * 命中即从本页滤除并迁回真页（`leakMoves`），**不丢内容**（G1）。
+           * OXR 无 `preproc_blocks` ⇒ `hasPreproc` 全 false ⇒ 整体跳过（逐字节不变）。
+           */
+          const leakN = leakNorm(text);
+          const inCurPre = preprocSets[rawIdx]?.has(leakN) ?? false;
+          const inNextPre = preprocSets[rawIdx + 1]?.has(leakN) ?? false;
+          if (
+            hasPreproc[rawIdx] &&
+            leakN.length >= 4 &&
+            !inCurPre &&
+            inNextPre &&
+            (bookParaFreq.get(leakN) ?? 0) < 3
+          ) {
+            leakMoves.push({
+              fromPageIndex: asInt(rec.page_idx) ?? rawIdx,
+              block,
+              criteria: {
+                normLen: leakN.length,
+                inCurrentPreproc: inCurPre,
+                inNextPreproc: inNextPre,
+                bookParaFreq: bookParaFreq.get(leakN) ?? 0,
+              },
+            });
+            continue;
+          }
           // 跨页段泄漏行：MinerU 偶发把跨页段落的下一页行并进上一页段落
           // （行坐标是下一页页顶的，物理上压在上一页页眉标题上——2026-10-07 p0 q7 实证，
           // 行在第 2 页并无副本，直接丢弃会截断第 7 题题干）。此处仅收集，迁回见
@@ -386,6 +473,14 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
           const pbBBox = toBBox(pb.bbox);
           const lineBBox = toBBox(line.bbox);
           if (
+            /**
+             * **同页守卫**（B-47 补强）：该行在本页 `preproc_blocks` 里 ⇒ 是真页内内容，
+             * 形状判据不得把它当跨页泄漏迁走。实测《答案册-合订本》p125 左栏叠印根因：
+             * p126 的 `list` 段框跨整页（段框在页顶、行在页底），对称形态误判 ⇒
+             * 6 条真页内行被迁到 p125，与 p125 真内容互叠。有 preproc 时以 preproc 为准；
+             * 无 preproc（OXR / 旧夹具）⇒ 守卫不生效，形状判据行为不变（逐字节兼容）。
+             */
+            (!hasPreproc[rawIdx] || !inCurPre) &&
             isCrossPageLeakShape(lineBBox, pbBBox, pageWidth, pageHeight)
           ) {
             leaks.push(block);
@@ -412,11 +507,47 @@ export function normalizeLayout(layoutRaw: unknown, docId: string): ParsedDocume
     .sort((a, b) => a.index - b.index);
   const withLeaks = pages as (PageInfo & { leaks: ParsedBlock[]; noiseDropped: number })[];
   const droppedNoiseLines = withLeaks.reduce((a, p) => a + (p.noiseDropped ?? 0), 0);
+  // 跨页泄漏行迁回真页（B-47）：在形状判据之前做，二者互补、互不重叠。
+  const crossPageLeaks = migrateCrossPageLeaks(withLeaks, leakMoves);
   return {
     docId,
     pages: dropCrossPageLeaks(withLeaks),
     ...(droppedNoiseLines > 0 ? { droppedNoiseLines } : {}),
+    ...(crossPageLeaks.length > 0 ? { crossPageLeaks } : {}),
   };
+}
+
+/**
+ * 跨页泄漏行迁回真页（B-47）：命中文本判据的行从本页移除，追加到 `page_idx+1`。
+ * 追加前用 `fuzzyDupText` 防重（真页已有近似副本 ⇒ 丢弃，内容已在）；
+ * 无真页可迁（异常形态）⇒ 留在本页，不静默丢（G1）。逐条落 `CrossPageLeakRecord`。
+ */
+function migrateCrossPageLeaks(
+  pages: (PageInfo & { leaks: ParsedBlock[] })[],
+  moves: { fromPageIndex: number; block: ParsedBlock; criteria: CrossPageLeakRecord["criteria"] }[],
+): CrossPageLeakRecord[] {
+  const records: CrossPageLeakRecord[] = [];
+  for (const mv of moves) {
+    const from = pages.find((p) => p.index === mv.fromPageIndex);
+    const target = pages.find((p) => p.index === mv.fromPageIndex + 1);
+    if (!from) continue;
+    if (!target) {
+      from.blocks.push(mv.block);
+      records.push({ fromPageIndex: mv.fromPageIndex, toPageIndex: mv.fromPageIndex, bbox: mv.block.bbox, text: textOf(mv.block), action: "kept", criteria: mv.criteria });
+      continue;
+    }
+    if (fuzzyDupText(textOf(mv.block), target.blocks)) {
+      records.push({ fromPageIndex: mv.fromPageIndex, toPageIndex: target.index, bbox: mv.block.bbox, text: textOf(mv.block), action: "dropped", criteria: mv.criteria });
+      continue;
+    }
+    target.blocks.push(mv.block);
+    records.push({ fromPageIndex: mv.fromPageIndex, toPageIndex: target.index, bbox: mv.block.bbox, text: textOf(mv.block), action: "moved", criteria: mv.criteria });
+  }
+  return records;
+}
+
+function textOf(b: ParsedBlock): string {
+  return b.kind === "text" || b.kind === "table" ? b.text : "";
 }
 
 /**
@@ -704,15 +835,7 @@ function compareReadingOrder(a: [number, number], b: [number, number]): number {
  * **保留在本页**而非丢弃——G1「不静默丢内容」：保留可见（可能压页眉/页脚）优于无声丢弃。
  */
 function dropCrossPageLeaks(pages: (PageInfo & { leaks: ParsedBlock[] })[]): PageInfo[] {
-  const norm = (t: string) => t.replace(/[\s\\${}]+/g, "");
-  const fuzzyDup = (text: string, blocks: ParsedBlock[]): boolean => {
-    const n = norm(text);
-    if (n.length < 6) return false;
-    return blocks.some((b) => {
-      const nb = norm(b.kind === "text" ? b.text : "");
-      return nb.length >= 6 && (nb.includes(n) || n.includes(nb));
-    });
-  };
+  const fuzzyDup = fuzzyDupText;
   for (let i = 0; i < pages.length; i++) {
     const leaks = (pages[i] as PageInfo & { leaks: ParsedBlock[] }).leaks;
     if (!leaks || leaks.length === 0) continue;

@@ -77,6 +77,35 @@ export interface PageInfo {
   blocks: ParsedBlock[];
 }
 
+/**
+ * 跨页泄漏行记录（B-47）：MinerU `para_blocks` 里混进了**属于下一页**的行
+ * （行坐标是下一页页顶的，物理上压在上一页页眉/正文上 ⇒ 成品页叠印）。
+ *
+ * 判据（全部 AND，见 `src/normalize.ts` 的 `isCrossPageLeakText`）：
+ * 本页 `preproc_blocks` 无此行 + 下一页 `preproc_blocks` 有此行 + 全书 para 页频 < 3
+ * + 归一化长度 ≥ 4。命中即从**本页**滤除并迁回真页（`action:"moved"`），
+ * 真页已有近似副本时丢弃（`action:"dropped"`）——**内容不丢**（红线 G1）。
+ *
+ * 每条记录带页 index + bbox + text + 命中判据，供逐条回原卷核对。
+ */
+export interface CrossPageLeakRecord {
+  /** 被滤除时所在的页 index（0 基，`page_idx` 原值） */
+  fromPageIndex: number;
+  /** 迁回的目标页 index（= fromPageIndex + 1）；无目标时 = fromPageIndex */
+  toPageIndex: number;
+  bbox: BBox;
+  text: string;
+  /** moved=迁回真页；dropped=真页已有近似副本；kept=无真页可迁，留在本页 */
+  action: "moved" | "dropped" | "kept";
+  /** 命中判据快照（可核对，不写死结论） */
+  criteria: {
+    normLen: number;
+    inCurrentPreproc: boolean;
+    inNextPreproc: boolean;
+    bookParaFreq: number;
+  };
+}
+
 /** 规范化后的解析文档（上游即 MinerU Zip 中的 content_list.json） */
 export interface ParsedDocument {
   docId: string;
@@ -87,6 +116,11 @@ export interface ParsedDocument {
    * 由 `index.ts` 的摘要与 `daily` 体检打印；`layout.json` 原件不动，可复核。
    */
   droppedNoiseLines?: number;
+  /**
+   * 跨页泄漏行记录（B-47）。空/缺省 = 本页骨架无跨页泄漏（OXR 无 `preproc_blocks`
+   * ⇒ 整体跳过，逐字节不变）。非空 = 有行被滤除并迁回真页，逐条可核对。
+   */
+  crossPageLeaks?: CrossPageLeakRecord[];
 }
 
 /** 带文档内原始序号与页码的块，供决策层回溯 source.blockIndexes / ReviewNote */
