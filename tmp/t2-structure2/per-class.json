@@ -1,0 +1,68 @@
+{
+  "generatedAt": "2026-11-20",
+  "method": "只读复跑（当前 src，HEAD=db4e0b9）+ 原卷页图 ffmpeg 裁图 + MinerU 切源前 backup 对照",
+  "classes": [
+    {
+      "id": "B50-1",
+      "title": "教材知识萃取区散文编号空题（运动和力 p1 +3、机械能守恒 p7 +3）",
+      "verdict": "真缺陷（切题判据依赖阅读顺序）",
+      "status": "已修（db4e0b9）+ 本任务复跑验证",
+      "evidence": {
+        "anchor": "audit:anchor 运动和力 教材知识12 Word 3 vs 引擎 6；机械能守恒 教材知识34 Word 4 vs 引擎 7",
+        "reseg": "当前代码重跑：运动和力 p0=3（产物 6）、机械能守恒 p6=4（产物 7）⇒ 6 条空题全部消除",
+        "rootCause": "切源 OXR 后行级框栏间重叠 ⇒ estimateGutter 失效 ⇒ 阅读顺序退化为左栏整列在前，跨栏栏目头排到正文之后，extractBand 置真前编号散文已开题",
+        "fix": "buildExtractRegions 预扫（页,y）区间，question_no / 黏连判定与块流先后解耦（db4e0b9）",
+        "test": "tests/extract-band-region.test.ts 2/2 绿"
+      }
+    },
+    {
+      "id": "B50-3",
+      "title": "电路疑似丢 2 真题（鲁科版P134第4题、粤教版P73第4题）",
+      "verdict": "真缺陷（切源上游 OXR 丢行首题号）",
+      "status": "待修（与 B56 同根因，合并修）",
+      "evidence": {
+        "backup": "tmp/m5-backup/物理_教材基础练 电路/questions.json（MinerU）p3#2 酒精测试仪、p11#2 油箱均在；当前 reseg 均无",
+        "pageImage": "R7（粤教版P73 油箱）、R8（鲁科版P134 酒精测试仪）",
+        "layout": "p11 blk18 只剩「[题设问变式] 图示为一」，前缀「2 [粤教版必修三 P73 第 4 」丢失；p3 blk26 只剩「第4题情境变式]交警使」，前缀「2 [鲁科版必修三 P134」丢失",
+        "auditGap": "audit:numbering:cross 只报了 p12#2；p3#2 因 OCR 标签折行 + body 汉字 < MIN_CJK(6) 被跳过（判据漏报，非误报）"
+      }
+    },
+    {
+      "id": "B56",
+      "title": "audit:numbering:cross 7 条 X2（机械能守恒 4 + 运动 2 + 电路 1）",
+      "verdict": "真缺陷（全部原卷有、引擎无；非判据误报）",
+      "status": "待修（与 B50-3 同根因，合并修）",
+      "evidence": {
+        "hits": [
+          "机械 p1#2 2023北京卷 一物体在力F…（R1）",
+          "机械 p15#1 2023全国甲卷 铅球（R2）",
+          "机械 p15#3 2024新课标卷 福建舰（R3）",
+          "机械 p17#9 人教版P94第5题 弹簧（R4）",
+          "运动 p3#1 2023辽宁卷 安培（R5）",
+          "运动 p4#2 2024安徽卷 竖直弹簧（R6）",
+          "电路 p12#2 粤教版P73 油箱（R7）"
+        ],
+        "layoutCommon": "7 处 layout 块行首均为「年份卷 [出处]」或「[出处]」，题号被 OXR 逐块丢失；同页其它块（如「2.[…]」「4 2024 安徽卷」）题号尚在 ⇒ 上游逐块丢失，不是格式差异",
+        "extraScan": "全量扫描生产 layout（14 处同形态）：曲线 p7/p15、运动 p8、万有引力 p3/p7、机械 p2/p4；其中曲线 p15「2024 江西卷」当前被并进 #1 题干（比 audit 命中更多）",
+        "notFalsePositive": "逐条 covPool 0.00–0.25（题池确实没有），R1–R8 页图逐张核对为真题；L6 归因：结构性缺题先怀疑流水线，已定位到 OXR 解析层"
+      }
+    },
+    {
+      "id": "X1-cichang",
+      "title": "audit:numbering:cross 1 条 X1（教材基础练 磁场 p1#2）",
+      "verdict": "真缺陷（上游丢字，layout 里就没有）",
+      "status": "DEFERRED（非 B-56 的 X2 范围；上游丢字不可在本仓库修，需登记已知缺陷）",
+      "evidence": "covLayout 0.56；「2 [鲁科版必修三 P146 科学书屋拓展变式] 中国宋代科学家沈括…」在 layout 缺字"
+    }
+  ],
+  "crops": [
+    "tmp/t2-structure2/crops/R1-mech-p1-bj.png",
+    "tmp/t2-structure2/crops/R2-mech-p15-juan.png",
+    "tmp/t2-structure2/crops/R3-mech-p15-fj.png",
+    "tmp/t2-structure2/crops/R4-mech-p17-tan.png",
+    "tmp/t2-structure2/crops/R5-motion-p3-ln.png",
+    "tmp/t2-structure2/crops/R6-motion-p4-ah.png",
+    "tmp/t2-structure2/crops/R7-circuit-p12-yx.png",
+    "tmp/t2-structure2/crops/R8-circuit-p3-p134.png"
+  ]
+}
