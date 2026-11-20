@@ -428,7 +428,7 @@ function cropPageInto(box, page, blockIdxs, doc, widthPx, opts) {
     }
     for (const h of mine) {
       const mark = posStyle(el("div", "uncovered-mark hole"), h.bbox, page.width, page.height);
-      mark.title = `原卷此处有墨迹（${h.area}px），MinerU 与 OCR 都没读出来 —— 内容缺失，不是排版留白`;
+      mark.title = `原卷此处有墨迹（${h.area}px），读字源（OXR / 本地 OCR）都没读出来 —— 内容缺失，不是排版留白`;
       canvas.append(mark);
     }
     const crop = el("div", "entry-crop");

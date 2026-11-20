@@ -1648,3 +1648,20 @@ layout.json / content_list.json
 **S2 追加硬判据（写死，不得绕过）**：新分母必须来自逐页回原卷数题号，且**必须先解释 33/31 差的 2 题、以及 L-01 那道「三电阻滑片题」去哪了**。若 S2 数出来仍是 31 且解释不了这两处 ⇒ **S2 判定失败，不许输出任何准确率数字**。
 
 **什么情况下这个质疑不成立**：若 S1 的产出从一开始就被明确当作「评分器单元测试夹具」、不进 `gold/`、不进正式报表，那用同源数据测管道完全合规 —— 测管道本来就不要求判据独立。用户质疑打中的不是「用了同源数据」，是「**用同源数据产出了一个看起来像准确率的读数**」。
+
+---
+
+## 9. 2026-11-20 M5 收口期换模型交接（正文，L9）
+
+**背景**：分支 `feature/tool-no-mineru` 总目标=生产链彻底移除 MinerU。工作流 runId `wfrun-30dc0519-db73-476d-90c4-4452e2dd1328`（门→M1→M2→M3→hole→M4→M5→M6→RETURN）。**M5 的 ask 待喂：key `hole#f5ebe614/ask#4@1`**（actorName m5-rollout），用 `mcp__workflow_tool__workflow_next {runId, results:[{key,value}]}` 喂 NodeResult `{node,done,evidence[],commits[],notCovered[],notes}`（additionalProperties false）；喂完出 M6 ask，M6=台账+BranchReport RETURN。用户不在场授权全程自决（停理由仅浪费 token）。
+
+**已收口**：M1–M4b 见 `docs/branches/tool-no-mineru.md` §7 表（门凭证都在行内）。M5-B=5918238（拆 MinerU 默认输入+文案+B-45 登记不修）。M5-A 终报=**14 册实跑（12 切换+2 重导出），12 册 composite 95.17–97.84 达标**+抽页审板 clean；**磁场 93.16%=诚实天花板**（M5-A 分类：短标签 rec 空/乱、「」归一差、p008 公式碎屑，validLB 97.8，未放宽裁判）；qx 94.10%=B-44 逐字复现；配对小降（-4/-3/-2/-21 总量不变）=OXR 与 MinerU 块切分差非错位（m5-residuals 裁图复核中）。**M5-A 遗留代码问题 5 条在 tmp/m5-books/progress.json `codeIssuesForM5B`：① d13 电路/d14 磁场表格三分流未通电（table-v3-full R5 首行守卫对页眉碎屑假红阻断非空书，表内容仍在 skeleton 不丢）② d11 裸 LaTeX 直显 ③ qx-p4 表 html 漏泄残字/OSS URL 预存 ④ famNorm「」归一缺口 ⑤ 预存叠印（B-45）**。M5-C=**答案册切换暂缓**（65 页原卷裁图判定：13 真丢页/55 MinerU 伪影页；tmp/m5-answer-guard/）⇒ **答案册仍 MinerU=总目标未闭合项**（前置=OXR 标题级守卫/补识）。M5-C 副产物 **B-47**：MinerU para_blocks 跨页泄漏进 stages 且成品叠印实证（tmp/b47/ 截图+裁图参数）。
+
+**交接时在飞子代理（先查落盘再决定等/收，别重跑）**：
+- `m5-residuals`：只读归因（磁场残差分类+4 册配对丢行归因，裁图取证）。产物 `tmp/m5-residuals/{report.md,cichang-residuals.json,pairing-deltas.json,crops/}`，含 B-48/B-49 条目草稿；不提交不改 docs。
+- `m5-leak`：B-47 修复（src/normalize.ts 跨页泄漏滤除，OXR 无 preproc_blocks 须整体跳过保 13 册逐字节不变；TDD+答案册重导出+旧 stages 备份 tmp/m5-leak/backup/+新基线清单 new-manifest.json+composite 复测+p121/p125 审板+检查点提交）。产物 `tmp/m5-leak/{red.log,green.log,removed-blocks.json,composite.json,shots/,report.md}`。
+判定完成法：看 report.md 存在+git log 新 commit；完成通知若丢失以落盘为准。
+
+**接手后顺序清单**：① 收两代理结果并复核（trust-but-verify：M4b 曾谎称守卫复跑，编排层补真先例）；①b d13/d14 表格三分流通电修（codeIssuesForM5B①：R5 首行守卫假红，外科式修+TDD+两册 table-v3 重跑通电+审板；其余 4 条代码问题按 B-45 先例登记或小额修）；② B-46 解阻：13 册+答案册 meta 刷新（meta-consistency 测试只认 stats 与产物一致）、corrections 过期条目逐条原卷 adjudicate（OXR 已读对⇒retire 带理由，不许静默删）、anchor `npm run audit:anchor:report` 看新异常归因后才 `audit:anchor:update`；③ `npm run check` 全绿拿新 stamp（B-46 三数据态红须先归因写者）；④ 台账落：B-47 结论+答案册基线重锁+B-48/B-49+M5/M6 行（branch §7/§5、ROUTE-LEDGER §5、BACKLOG）；⑤ 组 M5 NodeResult 喂 workflow_next（notCovered 必含：答案册切换暂缓、N13 真机、全册逐页审板、磁场若判天花板）→ M6 ask → M6 小修已做（final/final.js:1875+final/entry-paper.js:431 文案改多源口径，typecheck:viewer 绿，见本交接同提交）→ M6 NodeResult → RETURN；⑥ 检查点提交禁 push。
+
+**未闭合总目标项（显式登记勿漏）**：答案册仍 MinerU（暂缓）；qx B-44；磁场待归因；B-45 叠印不修；B-47 修后答案册基线重锁；N13 真机+全册审板（用户设备）。红线照 §5；另：OXR 免费档并发撞 429 须串行；缓存页号 0/1 基逐册混合必 R5 验归属；不动 Clash Verge；裁图 ffmpeg 不用 sips。

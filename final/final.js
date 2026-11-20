@@ -1872,7 +1872,7 @@ async function sideSection(token, d, label, side, w, fallback) {
         el(
           "p",
           "lost",
-          `原卷上这里有 ${crop.holes} 处墨迹，MinerU 和 OCR 都没读出来 —— 是内容缺失，不是留白。位置见下方裁切图里的洋红斜纹框。`,
+          `原卷上这里有 ${crop.holes} 处墨迹，读字源（OXR / 本地 OCR）都没读出来 —— 是内容缺失，不是留白。位置见下方裁切图里的洋红斜纹框。`,
         ),
       );
     }

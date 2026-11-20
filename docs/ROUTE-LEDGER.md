@@ -99,5 +99,9 @@
       前置全备：14 册缓存+203 表 res 本地、电路/磁场/答案册-OXR 解析件、lineage.json、answer-content-guard.json（65 页）；
       **M5-B 代码+文案 ✅**：MinerU 默认输入拆除（export-stages 缺参 exit 2 + ocr-fill 回退同拆，显式传参不变）、
       raw 文案多源口径（活面板验证）、叠印根因定案登记不修（B-45/§113）、答案册守卫 191/191；
-      收尾门被 M5-A 并发写 data/out 阻塞（B-46：meta/corrections/anchor 三数据态测试红，归因证据齐）；M5-A 12 册数据部分进行中
+      收尾门被 M5-A 并发写 data/out 阻塞（B-46：meta/corrections/anchor 三数据态测试红，归因证据齐）；
+      **M5-A 终报 ✅ 14 册实跑 12 达标**（95.17–97.84；磁场 93.16=诚实天花板已分类、qx 94.10=B-44 复现；配对小降=OXR 块切分差非错位；
+      遗留：d13/d14 表格三分流被 R5 首行守卫假红阻断未通电+codeIssuesForM5B 5 条，tmp/m5-books/progress.json）；
+      **M5-C ✅ 答案册切换暂缓**（13 真丢页/55 伪影页，tmp/m5-answer-guard/）⇒ 总目标未闭合项；副产物 B-47 跨页泄漏成品叠印实证（tmp/b47/）；
+      在飞：m5-residuals（磁场/配对裁图复核）、m5-leak（B-47 修+答案册基线重锁）；交接正文 docs/HANDOFF.md §9
 - [ ] M6 台账+RETURN+提交
