@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import {
+  buildJudgements,
   detectBaselineDrift,
   detectCorrectionMissed,
   detectCrossPageLeaks,
@@ -22,6 +23,7 @@ import {
   detectTextResidue,
   detectTitleGapHits,
   listProductionDocs,
+  scanAll,
   type Baselines,
 } from "../scripts/audit-defects.js";
 
@@ -201,7 +203,31 @@ test("listProductionDocs：跳 -OXR/-MinerU 与非文档目录", () => {
   }
 });
 
-test("CLI：默认 exit 0；--fail-on-hit 有命中 exit 1；JSON+Markdown 落盘", () => {
+test("裁定台账：每条命中一行（含 bbox/text/evidence/verdict/basis/ruleRef），stray} 保持待判", () => {
+  const root = mkdtempSync(join(tmpdir(), "l1-judgements-"));
+  try {
+    mkdirSync(join(root, "册A"), { recursive: true });
+    writeFileSync(
+      join(root, "册A", "layout.json"),
+      JSON.stringify(onePageLayout("}.重力加速度为g,不考虑空气阻力的影响")),
+      "utf8",
+    );
+    const { docScans, report } = scanAll(["册A"], root);
+    const j = buildJudgements(docScans, report.generatedAt);
+    const b = j.entries.find((e) => e.class === "B");
+    assert.ok(b, "应有 B 类命中行");
+    for (const k of ["class", "id", "doc", "page", "bbox", "text", "kind", "evidence", "verdict", "basis"]) {
+      assert.ok(k in b, `缺字段 ${k}`);
+    }
+    assert.equal(b.verdict, "待判", "折行切裂括号须人工回原卷，规则不得自动裁定");
+    assert.equal(b.ruleRef, "R-B-003");
+    assert.equal(b.text.slice(0, 1), "}", "text 保留可核对原文");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI：默认 exit 0；--fail-on-hit 有命中 exit 1；JSON+Markdown+judgements 落盘", () => {
   const root = mkdtempSync(join(tmpdir(), "l1-cli-"));
   try {
     mkdirSync(join(root, "册A"));
@@ -218,6 +244,10 @@ test("CLI：默认 exit 0；--fail-on-hit 有命中 exit 1；JSON+Markdown 落�
     const r1 = run([]);
     assert.equal(r1.status, 0, `${r1.stdout}${r1.stderr}`);
     assert.ok(existsSync(join(out, "result.json")), "result.json 应落盘");
+    const judgements = JSON.parse(readFileSync(join(out, "judgements.json"), "utf8")) as {
+      entries: { id: string; verdict: string }[];
+    };
+    assert.ok(judgements.entries.length >= 1, "judgements.json 应含命中行");
     const md = readFileSync(join(out, "report.md"), "utf8");
     assert.match(md, /无题号真题块/);
     assert.match(md, /退出码/);

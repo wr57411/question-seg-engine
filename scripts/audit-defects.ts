@@ -22,6 +22,7 @@
 //   npm run audit-defects -- --all                 # 显式全部
 //   npm run audit-defects -- --root <dir> --out <dir> [--fail-on-hit]
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,6 +33,8 @@ import {
   matchLabelFragmentQuestionLine,
   matchUnnumberedQuestionLine,
 } from "../src/patterns.js";
+import { matchDefectRule, RULES_VERSION } from "./defect-rules.js";
+import type { JudgementEntry } from "./audit-feedback.js";
 import { detectOxrTextResidue } from "./oxr-convert.js";
 import {
   detectTitleGaps as runTitleGuard,
@@ -71,6 +74,8 @@ export interface DefectSample {
   page?: number;
   kind: string;
   detail: string;
+  /** PDF 点 [x0,y0,x1,y1]（检测器拿得到时带上，供裁定回原卷核对） */
+  bbox?: [number, number, number, number];
   /** 排序权重（A 类按内容级条数降序取样例） */
   weight?: number;
 }
@@ -164,22 +169,33 @@ function countChar(s: string, ch: string): number {
 // ──────────────────────────── 检测器（纯函数，可单测） ────────────────────────────
 
 /** 生产 layout 的原始行（para_blocks → lines → spans），保留行形态供残留检测。 */
-export function rawLayoutLines(layoutRaw: unknown): { page: number; text: string }[] {
+export function rawLayoutLines(layoutRaw: unknown): {
+  page: number;
+  text: string;
+  bbox?: [number, number, number, number];
+}[] {
   const root = asRecord(layoutRaw);
-  const out: { page: number; text: string }[] = [];
+  const out: { page: number; text: string; bbox?: [number, number, number, number] }[] = [];
   const pages = asArray(root.pdf_info);
   for (let i = 0; i < pages.length; i++) {
     const rec = asRecord(pages[i]);
     for (const pbRaw of asArray(rec.para_blocks)) {
       const pb = asRecord(pbRaw);
       for (const lnRaw of asArray(pb.lines)) {
+        const ln = asRecord(lnRaw);
         const parts: string[] = [];
-        for (const spRaw of asArray(asRecord(lnRaw).spans)) {
+        for (const spRaw of asArray(ln.spans)) {
           const sp = asRecord(spRaw);
           const c = sp.content ?? sp.text ?? "";
           if (c) parts.push(String(c));
         }
-        if (parts.length) out.push({ page: i + 1, text: parts.join("") });
+        if (!parts.length) continue;
+        const lb = asArray(ln.bbox);
+        const bbox =
+          lb.length === 4 && lb.every((n) => typeof n === "number")
+            ? (lb as [number, number, number, number])
+            : undefined;
+        out.push({ page: i + 1, text: parts.join(""), ...(bbox ? { bbox } : {}) });
       }
     }
   }
@@ -208,9 +224,9 @@ export function detectStructureHits(layoutRaw: unknown, docId: string): DefectSa
         continue;
       }
       if (matchUnnumberedQuestionLine(fl)) {
-        out.push({ doc: docId, page: p.index + 1, kind: "C1-无题号真题块", detail: fl.slice(0, 50) });
+        out.push({ doc: docId, page: p.index + 1, kind: "C1-无题号真题块", detail: fl.slice(0, 50), bbox: b.bbox });
       } else if (matchLabelFragmentQuestionLine(fl, prevLine)) {
-        out.push({ doc: docId, page: p.index + 1, kind: "C2-标签折行残片", detail: fl.slice(0, 50) });
+        out.push({ doc: docId, page: p.index + 1, kind: "C2-标签折行残片", detail: fl.slice(0, 50), bbox: b.bbox });
       }
       prevLine = fl;
     }
@@ -225,7 +241,7 @@ export function detectStructureHits(layoutRaw: unknown, docId: string): DefectSa
  */
 export function detectTextResidue(layoutRaw: unknown, docId: string): DefectSample[] {
   const out: DefectSample[] = [];
-  for (const { page, text } of rawLayoutLines(layoutRaw)) {
+  for (const { page, text, bbox } of rawLayoutLines(layoutRaw)) {
     for (const raw of text.split("\n")) {
       const t = raw.trim();
       if (!t) continue;
@@ -236,7 +252,15 @@ export function detectTextResidue(layoutRaw: unknown, docId: string): DefectSamp
       if (t.startsWith("}") || (t.endsWith("}") && countChar(t, "}") > countChar(t, "{"))) {
         kinds.push("stray}");
       }
-      if (kinds.length) out.push({ doc: docId, page, kind: `B-${kinds.join("+")}`, detail: t.slice(0, 50) });
+      if (kinds.length) {
+        out.push({
+          doc: docId,
+          page,
+          kind: `B-${kinds.join("+")}`,
+          detail: t.slice(0, 50),
+          ...(bbox ? { bbox } : {}),
+        });
+      }
     }
   }
   return out;
@@ -253,6 +277,7 @@ export function detectCrossPageLeaks(layoutRaw: unknown, docId: string): DefectS
     page: r.fromPageIndex + 1,
     kind: `D-${r.action}`,
     detail: `${(r.text ?? "").slice(0, 40)} → p${r.toPageIndex + 1}`,
+    bbox: r.bbox,
   }));
 }
 
@@ -275,6 +300,7 @@ export function detectTitleGapHits(
         page: e.page,
         kind: `E-${e.category}`,
         detail: e.text.slice(0, 40),
+        bbox: e.bbox,
       })),
       hits: guard.length,
       ledger: {
@@ -310,6 +336,7 @@ export function detectTitleGapHits(
       page: e.page,
       kind: `E-${e.category}`,
       detail: e.text.slice(0, 40),
+      bbox: e.bbox,
     })),
     hits: r.entries.length,
     ledger: {
@@ -583,6 +610,68 @@ const CLASS_META: Record<
     metric: true,
   },
 };
+
+// ──────────────────────────── 裁定台账（结构化数据入口） ────────────────────────────
+
+export interface BuiltJudgements {
+  rulesVersion: number;
+  generatedAt: string;
+  entries: JudgementEntry[];
+}
+
+/**
+ * 每条命中一行落进 judgements.json：`{class,id,doc,page,bbox,text,evidence,verdict,basis,ruleRef?}`。
+ * 初始 verdict/basis 来自线上规则（=扫描器现有的归因建议）；**AI/人只改 verdict+basis 两栏**。
+ * id 由内容哈希生成（跨轮次稳定，便于增量对照）；排序按册→类→页→形态→文本，确定性输出。
+ */
+export function buildJudgements(
+  docScans: DocScan[],
+  generatedAt = new Date().toISOString(),
+): BuiltJudgements {
+  const entries: JudgementEntry[] = [];
+  const seen = new Map<string, number>();
+  const classIds: DefectClass[] = ["A", "B", "C", "D", "E", "F", "G"];
+  for (const d of docScans) {
+    for (const c of classIds) {
+      const meta = CLASS_META[c];
+      const samples = [...d.samples[c]].sort((a, b) => {
+        const pa = a.page ?? 0;
+        const pb = b.page ?? 0;
+        if (pa !== pb) return pa - pb;
+        if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
+        if (a.detail !== b.detail) return a.detail < b.detail ? -1 : 1;
+        return 0;
+      });
+      for (const s of samples) {
+        const rule = matchDefectRule({ class: c, kind: s.kind, detail: s.detail, ledger: d.ledgers[c] });
+        const hash = createHash("sha1")
+          .update([c, d.doc, s.page ?? -1, s.kind, s.detail].join("|"))
+          .digest("hex")
+          .slice(0, 10);
+        const base = `J-${hash}`;
+        const n = seen.get(base) ?? 0;
+        seen.set(base, n + 1);
+        const source = d.ledgers[c].source;
+        entries.push({
+          class: c,
+          id: n ? `${base}-${n + 1}` : base,
+          doc: d.doc,
+          ...(s.page !== undefined ? { page: s.page } : {}),
+          bbox: s.bbox ?? null,
+          text: s.detail,
+          kind: s.kind,
+          evidence:
+            meta.evidencePath + (typeof source === "string" && source ? `；来源 ${source}` : ""),
+          verdict: rule?.verdict ?? "待判",
+          basis: rule?.basis ?? `扫描器建议：${meta.suggestedAttribution}（手册 §1-${c}）——${meta.note}`,
+          ...(rule ? { ruleRef: rule.ruleId } : {}),
+          ...(meta.metric ? { metric: true } : {}),
+        });
+      }
+    }
+  }
+  return { rulesVersion: RULES_VERSION, generatedAt, entries };
+}
 
 function sortSamples(list: DefectSample[]): DefectSample[] {
   return [...list].sort((a, b) => {
@@ -900,12 +989,21 @@ if (isMain()) {
     process.exit(2);
   }
 
-  const { report } = scanAll(docIds, root);
+  const { report, docScans } = scanAll(docIds, root);
+  const judgements = buildJudgements(docScans, report.generatedAt);
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "result.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
   writeFileSync(join(out, "report.md"), renderMarkdown(report), "utf8");
+  writeFileSync(
+    join(out, "judgements.json"),
+    `${JSON.stringify(judgements, null, 2)}\n`,
+    "utf8",
+  );
 
   console.log(`聚合缺陷扫描：${docIds.length} 册 → ${out}`);
+  console.log(
+    `  裁定台账：judgements.json ${judgements.entries.length} 条（规则库 v${judgements.rulesVersion}；AI/人只改 verdict+basis）`,
+  );
   for (const c of report.classes) {
     console.log(`  ${c.name}：${c.hits}（${c.docs} 册）· 归因 ${c.suggestedAttribution}`);
   }

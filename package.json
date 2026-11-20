@@ -56,6 +56,7 @@
     "audit:numbering:cross:report": "tsx scripts/audit-numbering-cross.ts --report",
     "audit:numbering:cross:update": "tsx scripts/audit-numbering-cross.ts --update-baseline",
     "audit:defects": "tsx scripts/audit-defects.ts",
+    "audit:feedback": "tsx scripts/audit-feedback.ts",
     "audit:anchor": "tsx scripts/audit-anchor-reconcile.ts",
     "audit:anchor:report": "tsx scripts/audit-anchor-reconcile.ts --report",
     "audit:anchor:update": "tsx scripts/audit-anchor-reconcile.ts --update-baseline"
