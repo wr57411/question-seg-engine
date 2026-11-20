@@ -295,7 +295,7 @@ export function detectTitleGapHits(
     const entries = opts.artifact.entries;
     const guard = entries.filter((e) => e.origin === "guard");
     return {
-      samples: guard.slice(0, 5).map((e) => ({
+      samples: guard.map((e) => ({
         doc: docId,
         page: e.page,
         kind: `E-${e.category}`,
@@ -331,7 +331,7 @@ export function detectTitleGapHits(
   }
   const r = runTitleGuard(layoutRaw, v3);
   return {
-    samples: r.entries.slice(0, 5).map((e) => ({
+    samples: r.entries.map((e) => ({
       doc: docId,
       page: e.page,
       kind: `E-${e.category}`,
@@ -408,11 +408,11 @@ export function detectGeometry(
   }
   const contentCount = Number(ic.contentCount ?? 0);
   const over = contentCount > INK_CONTENT_BASELINE + INK_CONTENT_TOLERANCE;
+  // 全量页级样例都返回（裁定台账要「每条命中一行」）；报告聚合处仍只取前 5。
   const top = asArray(ic.pages)
     .map((p, i) => ({ page: i + 1, contentCount: Number(asRecord(p).contentCount ?? 0) }))
     .filter((p) => p.contentCount > 0)
     .sort((a, b) => b.contentCount - a.contentCount)
-    .slice(0, 5)
     .map((p) => ({
       doc: docId,
       page: p.page,

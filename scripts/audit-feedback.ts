@@ -293,6 +293,7 @@ export function renderFeedbackReport(
   lines.push("## 下一步（人工 gate）");
   lines.push("");
   lines.push("1. 「可上线」候选经人工确认后写入 `scripts/defect-rules.ts` 并 bump `RULES_VERSION`；");
+  lines.push("   ⚠️ 细化规则必须放在同类粗规则**之前**（`matchDefectRule` 首中即用，如 C1 误报须先于 R-C-001）；");
   lines.push("2. 「冲突待裁」先补裁定/查证据，再重跑本命令；");
   lines.push("3. 下一轮 `npm run audit:defects` 重新生成台账，规则命中会自动填 verdict+ruleRef，AI 裁定率应下降。");
   lines.push("");
