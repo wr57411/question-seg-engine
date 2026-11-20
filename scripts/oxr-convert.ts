@@ -90,6 +90,10 @@ export interface ConvertStats {
   dedupeDropped: number;
   /** 被合并块带徽标题号、而保留块没有时补回的次数 */
   dedupeMergedBadge: number;
+  /** `Chemical Structure` 块的 `\smiles{...}` 伪包装被剥掉的次数（明细写 oxr-text-cleanup.json） */
+  cleanupSmilesUnwrapped: number;
+  /** `blank` 块里纯 `\_` 噪声（原卷为分数线/横线）被丢弃的次数（明细同上） */
+  cleanupBlankDropped: number;
   fontSize: { p10: number; p50: number; p90: number };
 }
 
@@ -282,6 +286,38 @@ function htmlTableToText(content: string): string {
 }
 
 /** 从 markdown 图片语法或裸 URL 里剥出纯 URL */
+/**
+ * 剥掉 OXR「化学结构」块的 `\smiles{...}` 伪包装（B-55）。
+ *
+ * OXR 把若干物理公式误判为 `Chemical Structure`，内容包成 `$\smiles{公式}$`。
+ * 原卷对应位置**没有**任何化学结构符号（曲线 p11 / 机械能 p4、p14 逐张回原卷核对，
+ * 均为裸根式；T3 曾按 rad/s 语境猜 `\omega`，已证伪）⇒ 命令与外层花括号一并去掉，
+ * 保留内部公式即可。括号不配对时**不猜**，原样返回（红线：不静默改写）。
+ */
+function stripSmilesWrapper(s: string): string {
+  const marker = "\\smiles{";
+  let out = s;
+  let idx = out.indexOf(marker);
+  while (idx >= 0) {
+    let depth = 1;
+    let j = idx + marker.length;
+    for (; j < out.length && depth > 0; j++) {
+      if (out[j] === "{") depth++;
+      else if (out[j] === "}") depth--;
+    }
+    if (depth !== 0) break; // 不配对 ⇒ 不动
+    out = out.slice(0, idx) + out.slice(idx + marker.length, j - 1) + out.slice(j);
+    idx = out.indexOf(marker);
+  }
+  return out;
+}
+
+/** `blank` 块是否为纯 `\_` 噪声：OXR 把分数线/横线误判成「作答空白」（答案册 p5 实测）。 */
+function isBlankNoise(text: string): boolean {
+  const t = text.trim();
+  return t.length > 0 && /^[\\_]+$/.test(t);
+}
+
 function pickImageUrl(block: OxrBlock): string | null {
   if (block.img_url) return block.img_url;
   const md = /!\[[^\]]*\]\(([^)]+)\)/.exec(String(block.content ?? ""));
@@ -338,6 +374,9 @@ export async function convertOxrResponse(
   let imageBlocks = 0;
   let mergedBadgeTotal = 0;
   const droppedTotal: { page: number; type: string; bbox: number[]; content: string }[] = [];
+  /** B-55 文本残留清洗明细（`\smiles` 剥壳 / `\_` 空白噪声丢弃），落 oxr-text-cleanup.json */
+  const cleanupSmiles: { page: number; type: string; bbox: number[]; content: string }[] = [];
+  const cleanupBlanks: { page: number; type: string; bbox: number[]; content: string }[] = [];
   const fontSamples: number[] = [];
 
   for (const [pageIdx, page] of pages.entries()) {
@@ -386,7 +425,20 @@ export async function convertOxrResponse(
       }
 
       const rawText = String(block.content ?? "");
-      const text = lower === "table" ? htmlTableToText(rawText) : rawText;
+      let text = lower === "table" ? htmlTableToText(rawText) : rawText;
+      // B-55：OXR「化学结构」伪包装 `\smiles{...}` —— 原卷无此符号，剥壳保留内部公式。
+      if (lower === "chemical structure") {
+        const unwrapped = stripSmilesWrapper(text);
+        if (unwrapped !== text) {
+          cleanupSmiles.push({ page: pageIdx, type, bbox, content: text });
+          text = unwrapped;
+        }
+      }
+      // B-55：`blank` 块的纯 `\_` 噪声（原卷是分数线/横线）——整块丢弃并留痕。
+      if (lower === "blank" && isBlankNoise(text)) {
+        cleanupBlanks.push({ page: pageIdx, type, bbox, content: text });
+        continue;
+      }
       if (text.trim().length === 0) continue;
 
       // 拆行 + 反推字号（缺陷 B）。OXR 正文块**多数不带 \n**，不能靠数 \n 得行数。
@@ -435,6 +487,26 @@ export async function convertOxrResponse(
   const sorted = [...fontSamples].sort((a, b) => a - b);
   const pct = (p: number): number => Number((sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0).toFixed(1));
 
+  if (cleanupSmiles.length > 0 || cleanupBlanks.length > 0) {
+    writeFileSync(
+      join(opts.outDir, "oxr-text-cleanup.json"),
+      JSON.stringify(
+        {
+          docId: opts.docId,
+          generatedAt: new Date().toISOString(),
+          note: "B-55：\\smiles 伪包装剥壳（保留内部公式）；blank 块纯 \\_\\_ 噪声整块丢弃（原卷为分数线/横线）",
+          smilesUnwrapped: cleanupSmiles,
+          blankDropped: cleanupBlanks,
+        },
+        null,
+        2,
+      ),
+    );
+    opts.onProgress?.(
+      `🧹 OXR 文本清洗：剥 \\smiles 包装 ${cleanupSmiles.length} 处 · 丢弃 \\_ 空白噪声 ${cleanupBlanks.length} 块（明细 oxr-text-cleanup.json）`,
+    );
+  }
+
   if (droppedTotal.length > 0) {
     writeFileSync(
       join(opts.outDir, "oxr-dedupe.json"),
@@ -464,6 +536,8 @@ export async function convertOxrResponse(
       imageFail,
       dedupeDropped: droppedTotal.length,
       dedupeMergedBadge: mergedBadgeTotal,
+      cleanupSmilesUnwrapped: cleanupSmiles.length,
+      cleanupBlankDropped: cleanupBlanks.length,
       fontSize: { p10: pct(0.1), p50: pct(0.5), p90: pct(0.9) },
     },
   };
