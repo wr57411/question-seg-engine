@@ -17,10 +17,14 @@
 // 检测门不改写：本文件只读 data/out、corrections、scripts 基线，只写 --out 目录。
 //
 // 用法：
-//   npm run audit:defects                          # 全部生产册 → tmp/l1-defects/{report.md,result.json}
-//   npm run audit-defects -- --doc "<docId>"       # 指定册（可重复）
-//   npm run audit-defects -- --all                 # 显式全部
-//   npm run audit-defects -- --root <dir> --out <dir> [--fail-on-hit]
+//   npm run audit:defects                          # 全部生产册 → tmp/l1-defects/{report.md,result.json,judgements.json}
+//   npm run audit:defects -- --doc "<docId>"       # 指定册（可重复）
+//   npm run audit:defects -- --all                 # 显式全部
+//   npm run audit:defects -- --root <dir> --out <dir> [--fail-on-hit]
+//
+// 裁定闭环：judgements.json 是结构化入口（每条命中一行，初始 verdict/basis 来自
+// scripts/defect-rules.ts 的线上规则）；AI/人只改 verdict+basis，再跑
+// `npm run audit:feedback` 归纳候选规则 + 回放验证（不自动上线）。
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
