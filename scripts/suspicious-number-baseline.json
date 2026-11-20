@@ -1,5 +1,38 @@
 {
   "version": 1,
   "note": "可疑题号行审计（scripts/audit-suspicious-number.ts）的误报登记。每条必须写 note（原卷核对依据：页图路径或原卷文本）。登记不等于修复：真实误切要单独立项改切题判据。",
-  "entries": []
+  "entries": [
+    {
+      "kind": "S1",
+      "doc": "答案册-合订本",
+      "page": 160,
+      "block": 10,
+      "text": "7. $2.0\\times10^{5}$ Pa 10 m",
+      "note": "原卷 page-160.png 该位置印「7. 2.0×10⁵ Pa  10 m」（刷大题栏目，题号7+答案值，后接【解析】玻意耳定律）——原卷本该如此，非「1.5→1.$5」碎读；裁图 tmp/m7-switch/adjudicate/p160-susp.png（M7-B 回原卷核对）"
+    },
+    {
+      "kind": "S1",
+      "doc": "答案册-合订本",
+      "page": 166,
+      "block": 24,
+      "text": "5. $2.0\\times10^{8}$ $\\quad$ $5.0\\times10^{-10}$ $\\quad$ $3\\sqrt{5}\\times10^{-10}$",
+      "note": "原卷 page-166.png 该位置印「5. 2.0×10⁸  5.0×10⁻¹⁰  3√5×10⁻¹⁰」（题号5+答案值，后接【解析】光的折射和传播）——原卷本该如此，非碎读；裁图 tmp/m7-switch/adjudicate/p166-susp.png（M7-B 回原卷核对）"
+    },
+    {
+      "kind": "S2",
+      "doc": "答案册-合订本",
+      "page": 0,
+      "block": 0,
+      "text": "#7 $2.0\\times10^{5}$ Pa 10 m\n【解析】本题考查玻意耳定律.\n对瓶内气体始末状态进行分析，\n初状态有 $p_{1}=p_{0}=1.0\\times10^{5}$ Pa, $V_{1}=380$ mL - 80 mL = 30\n0 mL,\n末状态有 $V_{2}=380\\ \\mathrm{mL}-230\\ \\mathrm{mL}=150\\ \\mathrm{mL}$\n温度恒定,根据玻意耳定律有 $p_{1}V_{1}=pV_{2}$,\n解得 $p=2.0\\times10^{5}$ Pa，\n根据 $p-p_{0}=\\rho gh$ 得 $h=\\frac{p-p_{0}}{\\rho g}$,\n代入数据解得 $h=10$ m.",
+      "note": "原卷 page-160.png「7. 2.0×10⁵ Pa 10 m」题号+答案值形态，引擎按题号7切题正确；S1 同源，回原卷核对见 tmp/m7-switch/adjudicate/p160-susp.png / p166-susp.png（M7-B）"
+    },
+    {
+      "kind": "S2",
+      "doc": "答案册-合订本",
+      "page": 0,
+      "block": 0,
+      "text": "#5 $2.0\\times10^{8}$ $\\quad$ $5.0\\times10^{-10}$ $\\quad$ $3\\sqrt{5}\\times10^{-10}$\n【解析】本题考查光的折射和传播.该单色光在玻\n璃板内传播的速度为 $v=\\frac{c}{n}=2.0\\times10^{8}$ m/s;当入射\n光垂直入射时通过玻璃板所用时间最短,\n$t_{min}=\\frac{d}{v}=5.0\\times10^{-10}$ s,当玻璃板上方的入射光线刚\n好平行于玻璃板上表面入射时,单色光通过玻璃板\n所用时间最长,根据全反射和几何知识可得光在玻\n璃板内的传播路程 $s=\\frac{d}{\\frac{\\sqrt{n^{2}-1}}{n}}=6\\sqrt{5}$ cm,\n$t_{max}=\\frac{s}{v}=3\\sqrt{5}\\times10^{-10}$ s.\n刷大题",
+      "note": "原卷 page-166.png「5. 2.0×10⁸ …」题号+答案值形态，引擎按题号5切题正确；S1 同源，回原卷核对见 tmp/m7-switch/adjudicate/p160-susp.png / p166-susp.png（M7-B）"
+    }
+  ]
 }
