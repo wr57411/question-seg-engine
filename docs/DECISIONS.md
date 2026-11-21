@@ -5155,3 +5155,7 @@ B-47 是「错的东西」（修=窗口期内容正确）；且 B-47 修复产�
 **决策 ② push = 维持不推**。依据：用户已记录的既有规矩「commit 自动授权、push 需单独发话」——执行既有偏好而非新拍。**残余风险（如实登记）**：`feature/tool-no-mineru` 领先 `origin/main` 189 个提交，全仓库 worktree 共享单一 `.git` 对象库，磁盘故障即失；多 worktree 同 commit 冗余只覆盖工作区不覆盖对象库。解除方式：用户任一时点说「push」即可。
 
 **决策 ③ 220b 游离成果保护**：`git branch feature/formula-crops 478cd07` 已执行（审板迭代 R1，公式切图支线成果）。依据：公式切图方向 D1–D4 用户定案（2026-11-11/12，设计文档 `docs/superpowers/specs/2026-11-12-formula-image-crops-design.md`）+ 审板 sheet 自解释/行级判定控件的成果不应无引用悬挂。该分支未动任何工作区，纯加引用。
+
+## 117 push 授权升级为自动（2026-11-21，用户勘误 §116 决策②）
+
+用户原话：「这个修改一下，现在 Push 也可以自动做」⇒ 撤回 §116 决策②「push 维持不推」，push 与 commit 同级自动执行。执行序：worktree 内游离提交 ff 合回 `feature/tool-no-mineru`（主仓库侧 `merge --ff-only`）→ `git push origin feature/tool-no-mineru`（新建远端分支，首次推送解除 189+ 提交单点滞留风险）。`origin/main` 的推进随「支线合并回 main」收尾动作一并做，不在本条。
