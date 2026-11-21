@@ -1696,3 +1696,16 @@ layout.json / content_list.json
 - **对比视图开关**（2f6da4a）：「解析遗漏标记」默认关，`?uncovered=1/0`，localStorage `stages.uncovered` 记忆；三态截图 tmp/stages-toggle/shots/。
 - **未闭合（保持）**：B-45 叠印（登记不修）、N13 真机+全册审板（用户设备）、B-57 facade 用法、B-59；B-54 修向待独立决策。
 - **在飞**：无。
+
+### 9.4 长程任务轮（2026-11-21 夜，用户外出一天，自主执行 + 远程可监督）
+
+**用户指令**：不在电脑边一天，ZCode 自主完成长程任务（L-08 6维解析册进产线全链），OpenMausbot 监督（**受阻**：MCP 客户端写操作 403「must come from the desktop app or a paired device」，4 次尝试均失败——create_task 403 / send_bot_message 403 / 新 bot id 仍 Bot not found；监督改道=本节 + GitHub 提交流，最后一轮再试 Mausbot）。
+
+**里程碑计划**（每步完成即 commit+push，证据行内）：
+- M1 产线：`npm run daily -- "books/物理_教材基础连答案6维解析册.pdf" --parser oxr`（173 页，免费档 9 分片；**首跑失败教训：daily 新书默认 parser=mineru，OXR 必须显式 `--parser oxr`**——已按 L12 精神记入本节）。完成判据=meta.json 体检 + questions.json 有答案条目。
+- M2 A 档抽查（B-60 首跑）：分层抽样（公式 40%/长文本 30%/普通 30%）→ **按块裁图**（题目 bbox 并集会把跨栏条目撑成近整页——§33 教训，本次实测复现）→ 对照原卷逐字核对 → 错处走 corrections+adjudicate。工具=tmp 内联脚本（tmp/b60/ 冒烟已通过，答案册-合订本 8 题 31 张裁图逐字一致）。
+- M3 bank 配对：6维解析册 ↔ 教材基础练 6 本（bank-bindings 登记 + bank:all 内容尺子全达标）。
+- M4 质量门：`npm run check` 全绿（新册若触发 anchor/numbering 新登记，逐条 adjudicate 不静默）。
+- M5 收尾：BACKLOG L-08 状态更新 + 本节终报 + commit/push。
+
+**notCovered（需用户本人）**：N13 真机验收、A 档抽查结果的人工复评（Agent 已按原卷裁图自查，用户可复核）。
