@@ -1699,7 +1699,7 @@ layout.json / content_list.json
 
 ### 9.4 长程任务轮（2026-11-21 夜，用户外出一天，自主执行 + 远程可监督）
 
-**用户指令**：不在电脑边一天，ZCode 自主完成长程任务（L-08 6维解析册进产线全链），OpenMausbot 监督（**受阻**：MCP 客户端写操作 403「must come from the desktop app or a paired device」，4 次尝试均失败——create_task 403 / send_bot_message 403 / 新 bot id 仍 Bot not found；监督改道=本节 + GitHub 提交流，最后一轮再试 Mausbot）。
+**用户指令**：不在电脑边一天，ZCode 自主完成长程任务（L-08 6维解析册进产线全链），OpenMausbot 监督（**受阻**：MCP 客户端写操作 403「must come from the desktop app or a paired device」，4 次尝试均失败——create_task 403 / send_bot_message 403 / 新 bot id 仍 Bot not found；监督改道=本节 + GitHub 提交流。**用户深夜定案：不再尝试**——根因=MCP 客户端非配对设备，写通道需重启 ZCode 重新配对，本会话不可行）。
 
 **里程碑计划**（每步完成即 commit+push，证据行内）：
 - M1 产线：`npm run daily -- "books/物理_教材基础连答案6维解析册.pdf" --parser oxr`（173 页，免费档 9 分片；**首跑失败教训：daily 新书默认 parser=mineru，OXR 必须显式 `--parser oxr`**——已按 L12 精神记入本节）。完成判据=meta.json 体检 + questions.json 有答案条目。
