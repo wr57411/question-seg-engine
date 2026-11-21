@@ -1730,4 +1730,5 @@ layout.json / content_list.json
 - **书A（263 页）daily 已开跑**（OXR 14 分片），书B 队列中。
 - **书A daily ✅ + S3/S5 ✅**（2026-11-22）：**1064 题**（体检仅 27 题待复核+14 组编号不连续，题册层干净）；S3 抽查 12 条中 11 条规范逐字一致，**q0=前置页假题**（封面/目录被切题）→ 登记 **B-62**（行为变更不连夜改）；S5 check 全绿（书A 入库零新增审计命中）。
 - **书B（深度解析 170 页）daily 接力跑中**；完成后做 A↔B 配对（bank-bindings 登记 2026 新高考版↔深度解析）。
+- **书A V3 表格 ✅**：263/263 页（3315s）；R5 剔除 5 页（封面 p1 + 正文 4 页 p64/93/196/236）——**实测零损失**（5 页 table_res 全=0，剔除仅因对齐假红非真风险，res 留 tmp/m3-table-v3/bookA_excluded/）；**text=9/image=11 共 20 表插入**，重导出完成，check 全绿。
 - **6维册 V3 表格 ✅**（2026-11-22 凌晨）：笔记本 4070 全 173 页（7412s，json-only 跑法）；table-v3-full **text=16/image=45/borderless=0 ⇒ 61 表全插入**（覆盖 0+插入 61），墨迹未覆盖 15.81%→15.02%，check 复跑全绿 EXIT=0。**R5 守卫剔除封面/封底 2 页**（艺术字页首行对齐合理拒绝，res 留 tmp/m3-table-v3/j6w_excluded/ 留痕，非静默）。上机坑两条已记：① Windows `start /b` 重定向不落盘⇒ssh 直连流式 ② builder 要求 pNN_res.json 命名（page-0NN 需重命名）。
