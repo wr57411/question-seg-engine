@@ -1728,3 +1728,4 @@ layout.json / content_list.json
 - **M5** 本节即终报；提交随推。
 - **V3 后台**：笔记本 4070 跑 6维册 173 页（json-only 跑法，`start /b` 重定向坑已绕过=ssh 直连流式）；完成后 table-v3-full + 重导出。
 - **书A（263 页）daily 已开跑**（OXR 14 分片），书B 队列中。
+- **6维册 V3 表格 ✅**（2026-11-22 凌晨）：笔记本 4070 全 173 页（7412s，json-only 跑法）；table-v3-full **text=16/image=45/borderless=0 ⇒ 61 表全插入**（覆盖 0+插入 61），墨迹未覆盖 15.81%→15.02%，check 复跑全绿 EXIT=0。**R5 守卫剔除封面/封底 2 页**（艺术字页首行对齐合理拒绝，res 留 tmp/m3-table-v3/j6w_excluded/ 留痕，非静默）。上机坑两条已记：① Windows `start /b` 重定向不落盘⇒ssh 直连流式 ② builder 要求 pNN_res.json 命名（page-0NN 需重命名）。
