@@ -684,3 +684,19 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
     user-select: none;
   }
 }
+
+/* ── 右侧就地翻页按钮（stages.js initPageFloat；2026-11-22 用户需求）──
+   视口右缘垂直居中上下两颗，44px 触屏目标；翻页走 goPage（保滚动位置）。 */
+.page-float {
+  position: fixed; right: 12px; top: 50%; z-index: 50;
+  width: 46px; height: 46px; margin: 0; padding: 0;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 22px; line-height: 1;
+  cursor: pointer; box-shadow: 0 6px 18px rgba(43, 42, 38, .16);
+  display: flex; align-items: center; justify-content: center;
+}
+.page-float.prev { transform: translateY(calc(-50% - 28px)); }
+.page-float.next { transform: translateY(calc(-50% + 28px)); }
+.page-float:disabled { opacity: .35; cursor: default; }
+.page-float[hidden] { display: none; }

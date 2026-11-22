@@ -213,6 +213,7 @@ async function load() {
   buildStepper();
   buildPager();
   initCompareToggle();
+  initPageFloat();
   render();
 }
 
@@ -269,17 +270,61 @@ function buildPager() {
     sel.append(o);
   });
   sel.addEventListener("change", () => {
-    state.page = Number(sel.value);
-    render();
+    goPage(Number(sel.value));
   });
   const prev = /** @type {HTMLButtonElement} */ ($("page-prev"));
   const next = /** @type {HTMLButtonElement} */ ($("page-next"));
-  prev.addEventListener("click", () => {
-    if (state.page > 0) { state.page--; render(); }
-  });
-  next.addEventListener("click", () => {
-    if (state.page < data.pages.length - 1) { state.page++; render(); }
-  });
+  prev.addEventListener("click", () => goPage(state.page - 1));
+  next.addEventListener("click", () => goPage(state.page + 1));
+}
+
+/**
+ * 翻页并**保持滚动位置**（2026-11-22 用户需求：翻完页直接定位到当前位置，
+ * 不用重新往下滑）。为什么必须显式保存/恢复：render() 先 `replaceChildren()`
+ * 清空画布，页面高度瞬间塌陷，浏览器把 scrollTop 钳到 0，新页渲染完就停在顶部。
+ * 同页不滚（跳页下拉选当前页不应有动作）；越界静默忽略（与既有按钮语义一致）。
+ * @param {number} n 目标页（0 基）
+ */
+function goPage(n) {
+  const data = /** @type {Snapshot} */ (state.data);
+  if (!Number.isInteger(n) || n < 0 || n >= data.pages.length || n === state.page) return;
+  const y = window.scrollY;
+  state.page = n;
+  render();
+  window.scrollTo(0, y);
+  // 页图是异步加载：render() 同步返回时文档高度塌陷，上面的 scrollTo 会被钳到 0；
+  // 等新页未就位的图全部加载完，再校准一次滚动位置（2026-11-22 实测第 1 次校准被钳）。
+  const pending = (
+    /** @type {NodeListOf<HTMLImageElement>} */ (document.querySelectorAll("#canvas-wrap img"))
+  );
+  const loading = [...pending].filter((im) => !im.complete);
+  if (!loading.length) return;
+  let left = loading.length;
+  for (const im of loading) {
+    im.addEventListener("load", () => {
+      left -= 1;
+      if (left === 0) window.scrollTo(0, y);
+    }, { once: true });
+    im.addEventListener("error", () => {
+      left -= 1;
+      if (left === 0) window.scrollTo(0, y);
+    }, { once: true });
+  }
+}
+
+/* ── 右侧就地翻页按钮（视口右缘垂直居中；质检列表页无页码，隐藏）── */
+function initPageFloat() {
+  const mk = (/** @type {string} */ cls, /** @type {string} */ label) => {
+    const b = /** @type {HTMLButtonElement} */ (el("button", `page-float ${cls}`, label));
+    b.type = "button";
+    b.setAttribute("aria-label", cls === "prev" ? "上一页" : "下一页");
+    return b;
+  };
+  const fp = mk("prev", "‹");
+  const fn = mk("next", "›");
+  fp.addEventListener("click", () => goPage(state.page - 1));
+  fn.addEventListener("click", () => goPage(state.page + 1));
+  document.body.append(fp, fn);
 }
 
 /* ── 对比视图「解析遗漏」开关 ── */
@@ -311,6 +356,10 @@ function syncToolbar(p) {
   const nextBtn = /** @type {HTMLButtonElement} */ ($("page-next"));
   prev.disabled = p.index === 0;
   nextBtn.disabled = p.index === last;
+  const fp = /** @type {HTMLButtonElement | null} */ (document.querySelector(".page-float.prev"));
+  const fn = /** @type {HTMLButtonElement | null} */ (document.querySelector(".page-float.next"));
+  if (fp) fp.disabled = p.index === 0;
+  if (fn) fn.disabled = p.index === last;
   /** @type {HTMLSelectElement} */ ($("page-jump")).value = String(p.index);
   const origin = /** @type {HTMLAnchorElement} */ ($("origin-link"));
   origin.href = `/data/out/${enc(doc)}/origin.pdf#page=${p.index + 1}`;
@@ -726,6 +775,12 @@ function render() {
   $("origin-link").hidden = noToolbar;
   // 「解析遗漏标记」是对比视图专属开关：别的阶段没有这个视图，摆出来只会误导
   $("uncovered-toggle").hidden = state.stage !== 6;
+  // 右侧就地翻页按钮：质检是列表视图无页码 ⇒ 隐藏；其余阶段与翻页栏同进退
+  const floatShown = state.stage !== 4;
+  const fp = /** @type {HTMLButtonElement | null} */ (document.querySelector(".page-float.prev"));
+  const fn = /** @type {HTMLButtonElement | null} */ (document.querySelector(".page-float.next"));
+  if (fp) fp.hidden = !floatShown;
+  if (fn) fn.hidden = !floatShown;
 
   const wrap = $("canvas-wrap");
   const extra = $("stage-extra");
