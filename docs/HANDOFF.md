@@ -1756,8 +1756,8 @@ layout.json / content_list.json
 - **B-62 两级守卫**：封面导航行「N 刷X」+ **目录页页级抑制**（rule-engine 预扫描 CONTENTS/目录锚页整页不开题）。用户报障「章节目录不是题目却标了题号」实测=书A 前置页共 **13 道假题**（q0 封面 + q1-q13 目录条目）；全库 CONTENTS 锚仅书A p1-p4、其余 36 册 0 命中 ⇒ 零误伤。tests/cover-nav-guard.test.ts；书A 重导出 1064→1049（前置页残留 0）。
 - **B-63 两段修**：① 「N)」纯碎块守卫（OXR 把原卷小问标记 (2) 读碎成「2)」切假题，与真题 2 撞唯一键 17|66|2）② 对齐层**块级保序豁免**（原卷裁定配对内容全对、纯数组序倒挂；防交叉语义不变）。裁定证据 `docs/evidence/2026-11-22-B63-配对倒挂原卷裁定.md`。书A/B 重导出后 **2026 A↔B 配对 948 条 ✅ 全过**（保序+守恒+唯一键+图片守恒）；binding 已登记，**bank:all 1554 条全绿**（606+948）。书B 重导出 1095→1094（B-61 守卫顺带消 1 道解析册假题）。
 
-**反馈窗口（用户 2026-11-22 需求，N13 报障入口）**：后端完成并验证——`scripts/feedback-write-guards.ts`（契约守卫，tests/feedback-write.test.ts 9 例）+ `scripts/view-server.ts` 路由（GET/POST /api/feedback、FEEDBACK_WRITE 开关、截图落盘 shots/）；前端 `final/feedback.js` 子代理实现中（完成通知到后验收集成证据再提交）。
+**反馈窗口（用户 2026-11-22 需求，N13 报障入口）**：后端完成并验证——`scripts/feedback-write-guards.ts`（契约守卫，tests/feedback-write.test.ts 9 例）+ `scripts/view-server.ts` 路由（GET/POST /api/feedback、FEEDBACK_WRITE 开关、截图落盘 shots/）；前端 `final/feedback.js` 完成（705 行自挂载：FAB+面板+「我的反馈」列表+状态徽标+补充/修改；typecheck:viewer 绿；curl+浏览器端到端验证 6 截图 `tmp/feedback-frontend/`；载荷契约实测为 `{action,item:{docId,comment,page?,questionNumber?,shotDataUrl?}}`）。提交 `9adfa0a`。
 
 **台账**：BACKLOG B-61/62/63 → DONE；DECISIONS §120 落盘。
 
-**未闭合**：① feedback 前端（在飞）② N13 真机验收（用户设备；现在反馈窗口就位后可在翻书时直接报障）③ 书A/B 的 A 档抽查仅跑过修复前版本，重导出后未重跑（守卫只删假题不动真题，风险低；按 B-60 例行可下次新书进库时一并覆盖）。
+**未闭合**：① N13 真机验收（用户设备；现在反馈窗口就位后可在翻书时直接报障）③ 书A/B 的 A 档抽查仅跑过修复前版本，重导出后未重跑（守卫只删假题不动真题，风险低；按 B-60 例行可下次新书进库时一并覆盖）。
