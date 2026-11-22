@@ -21,6 +21,7 @@ import { contentLabelPlacements } from "./uncovered-layout.js";
 import { mergePlan } from "./block-dedup.js";
 import { stackContents, tagStackPlacements } from "./tag-layout.js";
 import { parseTableHtml } from "./table-html.js";
+import { isMisreadFigureText } from "./figure-misread.js";
 
 /**
  * 本渲染器消费的快照形状（只声明**读过**的字段，不追求与引擎 schema 完全一致）：
@@ -281,6 +282,16 @@ export function blockNode(b, p, canvasW = CANVAS_W, baseFont = null, mergeCtx = 
     img.src = `/data/out/${enc(doc)}/images/${enc(blk.img)}`;
     img.alt = "图片块";
     node.append(img);
+  } else if (
+    blk.kind === "text" &&
+    isMisreadFigureText(blk.text ?? "", (blk.bbox[3] ?? 0) - (blk.bbox[1] ?? 0))
+  ) {
+    // **图形误读压制**（B-64）：OXR 把数轴等简单图形读成 LaTeX array（A&&B&&C&&D 源码直出），
+    // 渲染成乱码行。压制=不渲染文本，保留虚线占位 + title 提示（stages 审计可见，不静默——
+    // 数据不删，红线「检测不改写」；原卷对照可见真图）。判据见 src/patterns.ts isMisreadFigureText。
+    node.classList.add("blk-misread-figure");
+    node.title = `（图形被上游误读为公式已压制：${(blk.text ?? "").slice(0, 40)}）`;
+    return node;
   } else {
     // prettifyLatex 返回 HTML 片段（\frac 竖排分式 / \sqrt 带上划线根号），必须 innerHTML
     const html = prettifyLatex(blk.text ?? "");

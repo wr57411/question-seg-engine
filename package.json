@@ -59,7 +59,8 @@
     "audit:feedback": "tsx scripts/audit-feedback.ts",
     "audit:anchor": "tsx scripts/audit-anchor-reconcile.ts",
     "audit:anchor:report": "tsx scripts/audit-anchor-reconcile.ts --report",
-    "audit:anchor:update": "tsx scripts/audit-anchor-reconcile.ts --update-baseline"
+    "audit:anchor:update": "tsx scripts/audit-anchor-reconcile.ts --update-baseline",
+    "feedback:collect": "tsx scripts/feedback-collect.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
