@@ -1,0 +1,15 @@
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/reports/2026-10-30-1306-REPORT-接管复查与当前基线.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/stitch/01-P1-full.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/real-api-notes.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/ink-groundtruth.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/stitch/06-P2-reveal.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/font-calibration.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/README.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/plans/20261105T100042+0800-PLAN-P0金标主线候选路线.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/stitch/09-P3-empty.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/stitch/04-P2-image.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/plans/2026-10-29-2151-PLAN-下一轮整改候选.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/stitch/07-P1-loading.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-11-02-minicpm-round3.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/specs/2026-10-15-ocr-attribution-audit.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/PRD-viewer.md

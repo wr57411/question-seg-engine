@@ -1,0 +1,17 @@
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/stitch/REVIEW.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/designs/2026-10-29-table-structure-design.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-10-30-topic-mvp-workflow.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-11-20-去MinerU续跑规划.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/gold/README.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/scripts/review-fill.template.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-11-09-换源立项建议书-OXR与云端VL.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/viewer-review.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/specs/2026-11-05-ocr-jobs-migration.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/viewer/index.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/DATA-MAP.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/INDEX.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/report.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-10-29-band-anchor-workflow.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/AGENTS.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/visual-pass.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/reports/2026-11-02-1525-REPORT-会话交接给下一位Agent.md

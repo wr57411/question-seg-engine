@@ -1,0 +1,4 @@
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/HANDOFF.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/BACKLOG.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/stages-review.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/oxr-evaluation.md

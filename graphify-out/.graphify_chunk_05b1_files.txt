@@ -1,0 +1,7 @@
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/design/stitch/10-G1-mobile.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/ROUTE-LEDGER.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-11-03-paddle-two-routes-probe.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-11-03-formula-five-way.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/fidelity-analysis.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/latin-metrics.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/20261030T224104+0800-REPORT-交接文档漂移与工作线分叉体检.md

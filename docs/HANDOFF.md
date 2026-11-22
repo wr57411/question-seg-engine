@@ -1761,3 +1761,5 @@ layout.json / content_list.json
 **台账**：BACKLOG B-61/62/63 → DONE；DECISIONS §120 落盘。
 
 **未闭合**：① N13 真机验收（用户设备；现在反馈窗口就位后可在翻书时直接报障）③ 书A/B 的 A 档抽查仅跑过修复前版本，重导出后未重跑（守卫只删假题不动真题，风险低；按 B-60 例行可下次新书进库时一并覆盖）。
+
+**§9.5 续（2026-11-22 长程任务轮：上会话遗漏补全）**：① **电路/磁场章头补识**——OXR 把图形化章头整块读丢（layout 0 次）致 chapter 空、6维册配对 0 条（L-08 行内登记）；修=corrections insert（回原卷核对 verified:true）→ chapter=9/10 → **bank:all 1554→1612 条全绿**（6/6 本配满）。② **isKnownDoc 真白名单**（`4b7b001`）——void join 假查改 stat 真查，10/10 测试。③ 书A/B A 档抽查重跑进行中。④ N13 真机/graphify-out 去留=等你（不等待）。

@@ -1,0 +1,7 @@
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/GLOSSARY.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/mineru-reparse-feasibility.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/reports/2026-10-30-2204-REPORT-会话交接给下一位Agent.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-10-29-table-structure-workflow.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/specs/2026-10-30-topic-knowledge-base-spec.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-11-13-巨带裁图坐标补充方案.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-11-20-去MinerU生产化.md

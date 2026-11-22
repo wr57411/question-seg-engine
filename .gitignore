@@ -25,3 +25,6 @@ tmp/
 # 本地工具缓存（Agent 工具目录，永不入库；2026-11-22）
 .mimosa/
 .serena/
+
+# graphify 知识图缓存（graph.json/html/report 入库，cache 不入）
+graphify-out/cache/

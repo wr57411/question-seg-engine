@@ -1,0 +1,10 @@
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/reports/20261028T174255+0800-REPORT-项目开发治理体检.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/superpowers/plans/2026-10-08-reconstruction-font-fidelity.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/minicpm-ocr-evaluation.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-10-30-pick-classify-workflow.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/dev/bgx/reports/20261105T100042+0800-REPORT-接管评审与路线图.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/specs/2026-10-28-batch-book-ingestion-spec.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/specs/2026-10-15-paper-question-tags.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/superpowers/plans/2026-08-18-mineru-api-integration.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-11-02-minicpm-p0p1.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/superpowers/plans/2026-08-22-viewer-independent-module.md

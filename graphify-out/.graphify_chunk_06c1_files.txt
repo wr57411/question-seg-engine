@@ -1,0 +1,9 @@
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-11-07-line-ink-align.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-11-02-P1-corrections回放证伪.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/plans/2026-10-30-viewer-types-final-workflow.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/ATTRIBUTION.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-10-31-step12-board.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-11-05-电路独立题号交叉.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-11-02-金标-word起草试跑.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/第二章答案-结构化提取.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/_fix1-append.md

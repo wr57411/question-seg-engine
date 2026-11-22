@@ -1,0 +1,8 @@
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/方案路线图.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/ocr-fill-feasibility.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/evidence/2026-11-02-minicpm-p0p1-scripts/README.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/viewer/docs/CONTRACT.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/stages/index.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/topic/index.html
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/CONTEXT.md
+/Users/john/.zcode/worktrees/3f0d/question-seg-engine/docs/adr/0001-topic-category-tag-separation.md
