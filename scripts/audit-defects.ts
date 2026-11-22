@@ -69,7 +69,7 @@ const INK_BASELINE_DOCS = [
 
 // ──────────────────────────── 类型 ────────────────────────────
 
-export type DefectClass = "A" | "B" | "C" | "D" | "E" | "F" | "G";
+export type DefectClass = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H";
 export type Attribution = "真丢" | "伪影" | "口径" | "误报" | "待判";
 
 export interface DefectSample {
@@ -484,7 +484,7 @@ export function listProductionDocs(root: string): string[] {
 }
 
 function emptyDocScan(doc: string): DocScan {
-  const classes: DefectClass[] = ["A", "B", "C", "D", "E", "F", "G"];
+  const classes: DefectClass[] = ["A", "B", "C", "D", "E", "F", "G", "H"];
   const hits = {} as Record<DefectClass, number>;
   const samples = {} as Record<DefectClass, DefectSample[]>;
   const ledgers = {} as Record<DefectClass, Record<string, unknown>>;
@@ -562,7 +562,67 @@ function scanDoc(docId: string, root: string, baselines: Baselines): DocScan {
   scan.hits.G = drift.hits;
   scan.ledgers.G = drift.ledger;
 
+  // H 幻影重复（B-65）：扫 questions.json 的 stem（引擎文本层，独立于 layout 类检测）
+  const qs = readJson<unknown[]>(join(dir, "questions.json"));
+  if (Array.isArray(qs)) {
+    const samples: DefectSample[] = [];
+    for (const q of qs) {
+      const stem = String((q as Record<string, unknown>)?.["stem"] ?? "");
+      const hit = phantomRepeatHits(stem);
+      if (hit) {
+        const src = (q as Record<string, unknown>)?.["source"] as Record<string, unknown> | undefined;
+        samples.push({
+          doc: docId,
+          page: Number((src as Record<string, unknown> | undefined)?.["pageIndex"] ?? -1) + 1,
+          kind: "H-幻影重复",
+          detail: `影子段「${hit.slice(0, 24)}…」`,
+        });
+      }
+    }
+    scan.samples.H = samples;
+    scan.hits.H = samples.length;
+    scan.ledgers.H = { scanned: qs.length };
+  }
+
   return scan;
+}
+
+/**
+ * **H 幻影重复**（B-65，2026-11-22 A 档抽查实证）：OXR 把同一段文字读成重复块拼进 stem——
+ * 实证 3 例（书A p123 题干尾整句重复 / 书B p46 尾行重复、p114 大段推导重复两轮半）。
+ * 判据：stem 去空白后 ≥60 字，且存在 ≥30 字连续片段在 stem 内出现 ≥2 次（滑窗步进 8）。
+ * 只检测不改写（红线）；命中即 stem 文本层有「影子段」，修法=corrections（B-65 台账）。
+ */
+export function phantomRepeatHits(stem: string): string | null {
+  const clean = stem.replace(/\s+/g, "");
+  if (clean.length < 60) return null;
+  // 主判据：**长段正文重复**（书B p114 形态——大段推导读两遍）。
+  // LaTeX/公式结构（$ \ {} ^）天然重复（选项句式/上标序列）不是幻影——
+  // 2026-11-22 首版全库 443 条误报实锤后收紧（汉数占比 ≥70% 且无结构符）。
+  for (let i = 0; i + 30 <= clean.length - 10; i += 8) {
+    const w = clean.slice(i, i + 30);
+    if (/[$\\{}^]/.test(w)) continue;
+    const han = (w.match(/[\u4e00-\u9fff]/g) ?? []).length;
+    if (han < 22) continue;
+    if (clean.indexOf(w, i + 1) >= 0) return w;
+  }
+  // 尾锚判据：**影子段贴尾**（书A p123 形态——短句在 stem 尾部整段重复出现）。
+  // 影子块与原句可能**标点全半角不一致**（q534 实测：原句「.()/,」影子「，（）」）
+  // ⇒ 匹配用**标点归一化副本**，返回影子段取归一化窗（报告用途足够）。
+  const norm = clean.replace(/[．，,]/g, ".").replace(/[（）]/g, "()"); // 标点弱化：句读/全半角差异不挡重复判定（q534 实测原句「.」影子「,」）
+  // **尾部偏移容错**（q534 实测：影子段尾多一对冗余「()」——OCR 拼接冗余让
+  // 所有从尾部对齐的窗错位）⇒ 每个窗长尝试尾部偏移 0..3 字符。
+  for (let L = 14; L <= 30; L += 2) {
+    for (let off = 0; off <= 3; off++) {
+      const w = off === 0 ? norm.slice(-L) : norm.slice(-L - off, norm.length - off);
+      if (/[$\\{}^]/.test(w)) continue;
+      const han = (w.match(/[\u4e00-\u9fff]/g) ?? []).length;
+      if (han < 9) continue;
+      const first = norm.indexOf(w);
+      if (first >= 0 && first < norm.length - L - off - 4) return w;
+    }
+  }
+  return null;
 }
 
 const CLASS_META: Record<
@@ -613,6 +673,12 @@ const CLASS_META: Record<
     note: "只报数不判：meta 数字与登记基线的差。",
     metric: true,
   },
+  H: {
+    name: "H 幻影重复",
+    suggestedAttribution: "伪影",
+    evidencePath: "data/out/<doc>/questions.json#stem（phantomRepeatHits）",
+    note: "OXR 同段读成重复块拼进 stem（B-65 实证 3 例）；修法=corrections replace_text。",
+  },
 };
 
 // ──────────────────────────── 裁定台账（结构化数据入口） ────────────────────────────
@@ -634,7 +700,7 @@ export function buildJudgements(
 ): BuiltJudgements {
   const entries: JudgementEntry[] = [];
   const seen = new Map<string, number>();
-  const classIds: DefectClass[] = ["A", "B", "C", "D", "E", "F", "G"];
+  const classIds: DefectClass[] = ["A", "B", "C", "D", "E", "F", "G", "H"];
   for (const d of docScans) {
     for (const c of classIds) {
       const meta = CLASS_META[c];
@@ -744,12 +810,14 @@ function summarizeClass(c: DefectClass, docScans: DocScan[], hits: number): stri
     }
     case "G":
       return `非零差 ${hits} 处（只报数，不判）`;
+    case "H":
+      return `幻影重复 ${hits} 处（stem 内 ≥30 字重复段，B-65）`;
   }
 }
 
 function aggregate(docScans: DocScan[]): { classes: ClassReport[]; perDoc: DocReport[] } {
   const classes = [] as ClassReport[];
-  const classIds: DefectClass[] = ["A", "B", "C", "D", "E", "F", "G"];
+  const classIds: DefectClass[] = ["A", "B", "C", "D", "E", "F", "G", "H"];
   for (const c of classIds) {
     const meta = CLASS_META[c];
     const allSamples = docScans.flatMap((d) => d.samples[c]);

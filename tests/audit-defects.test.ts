@@ -258,3 +258,30 @@ test("CLI：默认 exit 0；--fail-on-hit 有命中 exit 1；JSON+Markdown+judge
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ── H 幻影重复（B-65，2026-11-22 A 档抽查实证）──
+import { phantomRepeatHits } from "../scripts/audit-defects.js";
+
+test("H 判据：正常题干不命中", () => {
+  assert.equal(phantomRepeatHits("设集合 A = {x}，则 A 的元素个数为（　　）"), null);
+  assert.equal(phantomRepeatHits("物块从 P 点滑上斜面，根据动能定理得 $-mgh-\\mu mg\\cdot PQ=0$，即 $mgh+\\mu mg(PQ+x)=\\frac{1}{2}mv_{0}^{2}$"), null);
+});
+
+test("H 判据：题干尾整句重复命中（书A p123 形态，纯汉字段）", () => {
+  const stem = "某飞机着陆后先做匀速直线运动，后做匀减速运动至停下，运动的总路程为 s，则飞机着陆后匀速运动的时间为" + "飞行过程经过的位移大小可以表示为下列说法正确的是（）飞行过程经过的位移大小可以表示为下列说法正确的是（）";
+  assert.ok(phantomRepeatHits(stem));
+});
+
+test("H 判据：大段正文重复命中（书B p114 形态）", () => {
+  const seg = "由牛顿第二定律可知小球在最高点时绳子的拉力为零此时小球的速度最小重力提供向心力由此可以解出";
+  const stem = seg + "此后小球进入无场区域做匀速直线运动直到离开" + seg + seg.slice(0, 36);
+  assert.ok(phantomRepeatHits(stem));
+});
+
+test("H 判据：LaTeX 结构段重复不命中（首版 443 误报形态）", () => {
+  assert.equal(phantomRepeatHits("质子的电荷量为 ${}_6^{13}C$，另一处提到 ${}_6^{13}C$ 的半衰期约为 5700 年"), null);
+});
+
+test("H 判据：短题干（<60 字去空白）不判", () => {
+  assert.equal(phantomRepeatHits("下列说法正确的是 A&&B&&C&&D"), null);
+});
