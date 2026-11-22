@@ -763,3 +763,130 @@ body.pick-mode #toast { bottom: calc(112px + env(safe-area-inset-bottom)); }
   padding: 3px 5px;
   vertical-align: top;
 }
+
+/* ── 反馈窗口（final/feedback.js 自挂载）────────────────────────────────────────
+   按钮与面板沿用本文件的口径：纸面底/细线框/44px 触屏目标/阴影同 fb-menu。 */
+.fbk-fab {
+  position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 55;
+  min-height: 44px; padding: 0 18px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 13.5px; cursor: pointer;
+  box-shadow: 0 8px 22px rgba(43, 42, 38, .18);
+}
+/* 挑题托盘常驻时抬到托盘上方（同 #toast 的处理），别盖住托盘右侧按钮 */
+body.pick-mode .fbk-fab { bottom: calc(112px + env(safe-area-inset-bottom)); }
+.fbk-panel {
+  position: fixed; right: 12px; bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 56;
+  width: min(430px, calc(100vw - 24px)); max-height: min(72vh, 620px);
+  display: flex; flex-direction: column;
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(43, 42, 38, .22);
+  font-family: var(--sans);
+}
+.fbk-panel[hidden] { display: none; }
+.fbk-head {
+  display: flex; align-items: center; gap: 8px; flex: none;
+  padding: 8px 12px; border-bottom: 1px solid var(--line);
+}
+.fbk-head strong { font-size: 14px; color: var(--ink); }
+.fbk-sub { flex: 1 1 auto; min-width: 0; color: var(--ink-soft); font-size: 11.5px; }
+.fbk-ghost {
+  flex: none; min-height: 36px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 3px;
+  background: transparent; color: var(--ink-soft);
+  font-family: var(--sans); font-size: 12.5px; cursor: pointer;
+}
+/* 列宽 minmax(0,1fr)：隐式 auto 列会被长 option/长占位文本的 max-content 撑破面板（实测） */
+.fbk-body { overflow-y: auto; padding: 10px 12px; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+.fbk-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fbk-row label { flex: none; color: var(--ink-soft); font-size: 12px; }
+.fbk-row input, .fbk-doc {
+  min-width: 0; height: 38px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: 3px;
+  background: var(--paper-card); color: var(--ink);
+  font-family: var(--sans); font-size: 13px;
+}
+.fbk-doc { flex: 1 1 auto; }
+.fbk-page { flex: 0 1 90px; }
+.fbk-qnum { flex: 0 1 120px; }
+.fbk-zone {
+  display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 4px 10px;
+  border: 1px dashed var(--line); border-radius: 4px;
+  background: transparent; color: var(--ink-soft);
+  font-family: var(--sans); font-size: 12.5px; cursor: pointer;
+}
+.fbk-zone:hover { color: var(--ink); border-color: var(--ink-soft); }
+.fbk-preview { display: flex; align-items: center; gap: 8px; }
+.fbk-preview[hidden] { display: none; }
+.fbk-thumb {
+  width: 88px; height: 60px; object-fit: cover;
+  border: 1px solid var(--line); border-radius: 3px; background: #fff;
+}
+.fbk-shot {
+  display: block; max-width: 100%; max-height: 260px;
+  border: 1px solid var(--line); border-radius: 4px; background: #fff;
+}
+.fbk-comment {
+  min-height: 72px; padding: 8px 10px; resize: vertical;
+  border: 1px solid var(--line); border-radius: 3px;
+  background: var(--paper-card); color: var(--ink);
+  font-family: var(--sans); font-size: 13px; line-height: 1.5;
+}
+.fbk-actions { display: flex; align-items: center; gap: 10px; }
+.fbk-send {
+  flex: none; min-height: 44px; padding: 0 16px;
+  border: 1px solid var(--ink); border-radius: 3px;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--sans); font-size: 13.5px; cursor: pointer;
+}
+.fbk-send:disabled { opacity: .55; cursor: default; }
+.fbk-msg { min-width: 0; font-size: 12px; }
+.fbk-msg.err { color: var(--cinnabar); }
+.fbk-msg.ok { color: var(--azurite); }
+.fbk-list-head { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.fbk-list-head strong { font-size: 13px; color: var(--ink); }
+.fbk-count { flex: 1 1 auto; min-width: 0; color: var(--ink-soft); font-size: 11.5px; text-align: right; }
+.fbk-list { display: grid; gap: 6px; }
+.fbk-item { border: 1px solid var(--line); border-radius: 4px; background: var(--paper-card); overflow: hidden; }
+.fbk-item-head {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 6px 8px;
+  border: 0; background: transparent; cursor: pointer; text-align: left;
+  font-family: var(--sans); font-size: 12.5px; color: var(--ink);
+}
+.fbk-item-head:hover { background: color-mix(in srgb, var(--azurite) 8%, transparent); }
+.fbk-date { flex: none; color: var(--ink-soft); font-variant-numeric: tabular-nums; font-size: 11px; }
+.fbk-sum { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fbk-meta { flex: none; color: var(--ink-soft); font-size: 11px; }
+.fbk-badge {
+  flex: none; padding: 3px 5px; border-radius: 3px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px; line-height: 1;
+}
+.fbk-st-open { background: color-mix(in srgb, var(--cinnabar) 16%, transparent); color: var(--cinnabar); }
+.fbk-st-working { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink); }
+.fbk-st-fixed { background: color-mix(in srgb, var(--azurite) 18%, transparent); color: var(--azurite); }
+.fbk-st-wontfix { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-soft); }
+.fbk-item-body { display: grid; gap: 6px; padding: 6px 8px 10px; border-top: 1px dashed var(--line); }
+.fbk-full { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; color: var(--ink); }
+.fbk-loc { margin: 0; color: var(--ink-soft); font-size: 11.5px; }
+.fbk-sup { margin: 0; color: var(--ink-soft); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+.fbk-mini { display: flex; align-items: flex-start; gap: 6px; }
+.fbk-mini input, .fbk-mini textarea {
+  flex: 1 1 auto; min-width: 0; min-height: 36px; padding: 6px 8px;
+  border: 1px solid var(--line); border-radius: 3px;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 12.5px; line-height: 1.4;
+}
+.fbk-mini button {
+  flex: none; min-height: 36px; padding: 0 10px;
+  border: 1px solid var(--ink); border-radius: 3px;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 12px; cursor: pointer;
+}
+.fbk-mini button:disabled { opacity: .55; cursor: default; }
+.fbk-hint { margin: 0; color: var(--ink-soft); font-size: 11.5px; }
+.fbk-err { margin: 0; color: var(--cinnabar); font-size: 12px; }
+.fbk-empty { margin: 0; color: var(--ink-soft); font-size: 12.5px; }
+@media (pointer: coarse) {
+  .fbk-ghost, .fbk-mini button { min-height: 44px; }
+}

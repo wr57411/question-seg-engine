@@ -26,6 +26,16 @@ import {
   validateTeachPayload,
 } from "./teach-write-guards.js";
 import { countTeachUsage, planTeachManage, validateManageRequest } from "./teach-manage.js";
+import {
+  FEEDBACK_MAX_BODY,
+  feedbackWriteEnabled,
+  parseAction,
+  parseShotDataUrl,
+  shotFileName,
+  validateCreatePayload,
+  validateMutationPayload,
+  validateStoreShape,
+} from "./feedback-write-guards.js";
 import { classifyDoc, readLayoutBackend, TEST_DOC_NAMES } from "./doc-lineage.js";
 import type { Artifact, Lineage } from "./doc-lineage.js";
 
@@ -37,6 +47,8 @@ const READ_ONLY = !tagsWriteEnabled();
 const docId = process.argv[2] ?? "23必刷题 2相互作用";
 
 const TAG_DIR = join(ROOT, "data", "out", "tags");
+const FEEDBACK_DIR = join(ROOT, "data", "out", "feedback");
+const FEEDBACK_FILE = join(FEEDBACK_DIR, "feedbacks.json");
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -54,14 +66,14 @@ const MIME: Record<string, string> = {
   ".pdf": "application/pdf",
 };
 
-function readBody(req: IncomingMessage): Promise<Buffer> {
+function readBody(req: IncomingMessage, cap = MAX_BODY): Promise<Buffer> {
   return new Promise((res, rej) => {
     const chunks: Buffer[] = [];
     let size = 0;
     req.on("data", (c: Buffer) => {
       size += c.length;
-      if (size > MAX_BODY) {
-        rej(new Error(`请求体超过 ${MAX_BODY} 字节上限`));
+      if (size > cap) {
+        rej(new Error(`请求体超过 ${cap} 字节上限`));
         req.destroy();
         return;
       }
@@ -407,6 +419,154 @@ async function listDocs(): Promise<DocListItem[]> {
   return items;
 }
 
+/* ── 反馈写通道（第三条写路径，2026-11-22）── */
+
+/** 读 feedbacks.json：不存在 → 空库（首次写入才建目录）。 */
+async function readFeedbackStore(): Promise<Record<string, unknown>> {
+  try {
+    const raw = await readFile(FEEDBACK_FILE, "utf8");
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { version: 1, items: [] };
+  }
+}
+
+/** 反馈条目列表（按 doc 过滤，倒序=新的在前）。LAN 可读（验收场景需要）。 */
+async function handleFeedbackList(res: ServerResponse, url: URL): Promise<void> {
+  const doc = url.searchParams.get("doc") ?? "";
+  const store = await readFeedbackStore();
+  const invalid = validateStoreShape(store);
+  if (invalid) {
+    res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: `反馈库形状非法：${invalid}` }));
+    return;
+  }
+  const items = (store["items"] as Record<string, unknown>[]).filter(
+    (it) => !doc || it["docId"] === doc,
+  );
+  res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(JSON.stringify({ ok: true, items }));
+}
+
+/**
+ * 反馈写入：create（含截图 dataURL→文件）/ supplement / update。
+ * 开关 FEEDBACK_WRITE=0 时 403（默认开——iPad 真机验收是本功能主场景）。
+ * doc 白名单语义与 tags 相同（目录名即白名单）。
+ */
+async function handleFeedbackWrite(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!feedbackWriteEnabled()) {
+    res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: "反馈写通道已关闭（FEEDBACK_WRITE=0）" }));
+    return;
+  }
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse((await readBody(req, FEEDBACK_MAX_BODY)).toString("utf8")) as Record<string, unknown>;
+  } catch (e) {
+    res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: `载荷读取/解析失败：${String(e).slice(0, 200)}` }));
+    return;
+  }
+  const action = parseAction(payload);
+  if (!action) {
+    res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: "action 必须是 create|supplement|update" }));
+    return;
+  }
+  const store = await readFeedbackStore();
+  const invalid = validateStoreShape(store);
+  if (invalid) {
+    res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: `反馈库形状非法：${invalid}` }));
+    return;
+  }
+  const items = store["items"] as Record<string, unknown>[];
+
+  if (action === "create") {
+    const item = payload["item"];
+    const invalidItem = validateCreatePayload(item);
+    if (invalidItem) {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: invalidItem }));
+      return;
+    }
+    const it = item as Record<string, unknown>;
+    if (!(await isKnownDoc(ROOT, it["docId"]))) {
+      res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: "doc 不在白名单内（目录名即白名单）" }));
+      return;
+    }
+    const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
+    const rnd = Math.random().toString(36).slice(2, 6);
+    const id = `fb-${now}-${rnd}`;
+    const record: Record<string, unknown> = {
+      id,
+      docId: it["docId"],
+      page: Number.isFinite(it["page"] as number) ? Math.max(0, Math.floor(it["page"] as number)) : null,
+      questionNumber: typeof it["questionNumber"] === "string" ? it["questionNumber"] : "",
+      comment: (it["comment"] as string).trim(),
+      shot: null,
+      supplements: [],
+      status: "open",
+      reply: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const shot = parseShotDataUrl(it["shotDataUrl"]);
+    if (typeof shot === "string") {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: shot }));
+      return;
+    }
+    if (shot) {
+      const rel = shotFileName(id, shot.ext);
+      await mkdir(join(FEEDBACK_DIR, "shots"), { recursive: true });
+      await writeFile(join(FEEDBACK_DIR, rel), shot.bytes);
+      record["shot"] = rel;
+    }
+    items.push(record);
+    const text = `${JSON.stringify(store, null, 1)}\n`;
+    await mkdir(FEEDBACK_DIR, { recursive: true });
+    await atomicWrite(FEEDBACK_FILE, text);
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(JSON.stringify({ ok: true, id }));
+    return;
+  }
+
+  // supplement / update：按 id 定位
+  const mutErr = validateMutationPayload(action, payload);
+  if (mutErr) {
+    res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: mutErr }));
+    return;
+  }
+  const target = items.find((it) => it["id"] === payload["id"]);
+  if (!target) {
+    res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: false, error: `反馈不存在：${String(payload["id"]).slice(0, 80)}` }));
+    return;
+  }
+  const now = new Date().toISOString();
+  if (action === "supplement") {
+    const sup = target["supplements"] as unknown[];
+    sup.push({ at: now, text: String(payload["text"]).trim() });
+  } else {
+    // update：仅 open 状态允许改正文（Agent 开始处理后只许补充，防覆盖已读上下文）
+    if (target["status"] !== "open") {
+      res.writeHead(409, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: "该反馈已在处理中，只能追加补充，不能再改正文" }));
+      return;
+    }
+    target["comment"] = String(payload["comment"]).trim();
+  }
+  target["updatedAt"] = now;
+  const text = `${JSON.stringify(store, null, 1)}\n`;
+  await mkdir(FEEDBACK_DIR, { recursive: true });
+  await atomicWrite(FEEDBACK_FILE, text);
+  res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(JSON.stringify({ ok: true, id: payload["id"] }));
+}
+
 /* ── 静态读 ── */
 
 const server = createServer(async (req, res) => {
@@ -422,6 +582,10 @@ const server = createServer(async (req, res) => {
       await handleTeachUsage(res);
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/feedback") {
+      await handleFeedbackList(res, url);
+      return;
+    }
     if (req.method === "POST") {
       // 只读开关（`TAGS_WRITE=0`）必须罩住**所有**写入口，否则「只读」是假承诺：
       // 合并后 teach 的两条写路径（归类 / 跨卷管理）与业务标签同级，一并受控。
@@ -433,6 +597,7 @@ const server = createServer(async (req, res) => {
       if (url.pathname === "/api/tags") await handleTagsWrite(req, res, url);
       else if (url.pathname === "/api/teach") await handleTeachWrite(req, res, url);
       else if (url.pathname === "/api/teach-manage") await handleTeachManage(req, res);
+      else if (url.pathname === "/api/feedback") await handleFeedbackWrite(req, res);
       else res.writeHead(405).end("method not allowed");
       return;
     }

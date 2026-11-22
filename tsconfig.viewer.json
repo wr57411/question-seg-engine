@@ -33,6 +33,7 @@
     "final/entry-paper.js",
     "viewer/viewer.js",
     "stages/stages.js",
-    "final/final.js"
+    "final/final.js",
+    "final/feedback.js"
   ]
 }
