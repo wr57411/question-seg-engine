@@ -112,6 +112,14 @@ const SECTION_HEAD = /^第\s*(\d{1,3}|[一二三四五六七八九十]{1,3})\s*�
 const SECTION_HEAD_ALT = /^(专题[　\s]*(.{0,26})|全章综合测试\s*(.{0,26})|真题自测[　\s]*(.{0,26}))$/;
 
 /**
+ * **目录页锚**（B-62，2026-11-22）：目录页的标题行（「CONTENTS 目录」「目录 CONTENTS」）。
+ * 页内含此锚 ⇒ 整页是目录页，抑制开题（rule-engine 页级守卫消费）。
+ * 全库实测（2026-11-22）：该形态仅 2026 新高考版 p1-p4（目录 5 页每页都有锚），其余 36 册 0 命中
+ * ⇒ 零误伤。正文真题行不含此形态。
+ */
+export const TOC_PAGE_ANCHOR = /^(CONTENTS|目\s*录)\s*(?:CONTENTS|目\s*录)?$/;
+
+/**
  * 教材类教辅的栏目标题（不是题，也不是正文）：
  * `教材知识萃取 回归教材，萃精华` / `教材素材变式 多维变式，夯基础`；
  * 以及 `变式1 磁现象和磁场` 这类小节标题（题号在变式内从 1 重启）。
@@ -417,6 +425,27 @@ export function matchFirstLine(line: string, expectedNext: number | null = null)
     const tail =
       /^[1-9]\d{0,2}\s*[．、)）]([题个种条根块只张段次名位台辆本页章节道项分度所示米秒])/.exec(s);
     if (tail) return { ok: false, kind: "other" };
+    /**
+     * **纯小问标记碎块守卫**（B-63，2026-11-22）：OXR 把原卷小问标记 `(2)` 读丢
+     * 开括号成独立碎块「2)」（2026 新高考版 p249 实测：第 6 题小问 (2) 的标记被
+     * 读成独立块 → 切出假题号 2，吞掉真题 6 的小问正文「则水柱的电阻…」，
+     * 与真题 2 撞 bank 唯一键 17|66|2、并造成答案位倒挂——原卷 page-249.png 裁定：
+     * 该处无题号，是真题 6 小问 (2) 的标记）。真题「N)」形态后面必有正文（同行
+     * 题干），整行只剩「N)」必是折行/碎读残片 —— 拒绝，内容并入当前题不丢。
+     */
+    if (/^[1-9]\d{0,2}\s*[)）]$/.test(s)) return { ok: false, kind: "other" };
+    /**
+     * **纯公式行守卫**（B-61，2026-11-22）：编号推导方程行
+     * `1. $mgh+W=\frac{1}{2}…$` 被切成假题（实测 6维解析册 p40 b52 → q298，
+     * 证据 docs/evidence/2026-11-22-6维解析册-假题q298-动能定理编号方程.png）。
+     * 判据（最严 AND）：① 分隔符后紧跟 `$`；② 整行无汉字。
+     * 真题的公式行后面必然跟中文正文（「下列说法…/则…/求…」），纯公式行是
+     * 解答步骤编号方程的唯一形态 —— 两条同时成立才拒绝，宁漏不误。
+     */
+    const after = s.replace(/^[1-9]\d{0,2}\s*[.．、)）]\s*/, "");
+    if (/^\$/.test(after) && !/[\u4e00-\u9fff]/.test(after)) {
+      return { ok: false, kind: "other" };
+    }
     return { ok: true, kind: "question_no", captured: arabic[1] ?? arabic[2] ?? "" };
   }
 
@@ -441,6 +470,17 @@ export function matchFirstLine(line: string, expectedNext: number | null = null)
      * `expectedNext === null`（无上下文：首题/刚过节标题）时不判，保持原行为。
      */
     const weak = badge[1] === undefined;
+    /**
+     * **前置页导航守卫**（B-62，2026-11-22）：封面导览行「1 刷基础 / 3刷提分 /
+     * 5 刷实验 6 刷情境…」是必刷题系列**封面栏目导航**（全库实测：仅 2026 新高考版
+     * 封面 8 处、正文 0 处），数字+空格+汉字落入弱信号分支②且文档首题无序号佐证
+     * （`expectedNext === null` 放行）→ 切出「封面+目录拼合」假题 q0。
+     * 导航词锚定、不依赖上下文，直接拒绝 —— 封面块并入当前题或作无主块，
+     * 内容在 stages 的 discarded/uncovered 可见，不静默。
+     */
+    if (/^[1-9]\d{0,2}\s*刷(基础|提分|难关|实验|情境|真题|综合)/.test(s)) {
+      return { ok: false, kind: "other" };
+    }
     if (weak && expectedNext !== null) {
       const num = Number(badge[2]);
       if (num !== expectedNext && num !== 1) return { ok: false, kind: "other" };

@@ -15,6 +15,7 @@ import {
   isBandSubheading,
   isPageFurniture,
   isPageNoiseLine,
+  TOC_PAGE_ANCHOR,
   looksLikeAnswerEntry,
   matchAnswerEntry,
   matchBoxListItem,
@@ -254,6 +255,8 @@ class Ctx {
   private blockSlots = new Map<number, { page: number; within: number; text: string }>();
   /** 每页已处理块数（算页内下标用） */
   private pageSeen = new Map<number, number>();
+  /** 目录页集合（B-62 页级抑制）：constructor 预扫描 CONTENTS/目录锚。 */
+  private frontMatterPages = new Set<number>();
 
   /**
    * 板块头**待开题**（`DECISIONS §79`）：`教材实验 10 …` 这类栏目，整块可能本身就是一道大题
@@ -287,6 +290,16 @@ class Ctx {
     this.doc = doc;
     this.buildHeadingTimeline();
     this.extractRegions = buildExtractRegions(doc);
+    // **目录页预扫描**（B-62，2026-11-22）：页内含 CONTENTS/目录标题锚 ⇒ 目录页，
+    // takeBlock 对这些页整页抑制开题。全库实测该锚仅书A p1-p4、其余 36 册 0 命中。
+    for (const page of doc.pages) {
+      for (const b of page.blocks) {
+        if (b.kind === "text" && TOC_PAGE_ANCHOR.test(b.text.trim())) {
+          this.frontMatterPages.add(page.index);
+          break;
+        }
+      }
+    }
   }
 
   /** 该 (页, y) 是否落在某个「教材知识萃取」参考区内（B-50） */
@@ -408,6 +421,11 @@ class Ctx {
       within: withinPage,
       text: block.kind === "text" || block.kind === "table" ? block.text : "",
     });
+
+    // **目录页整页抑制**（B-62，2026-11-22）：页内含 CONTENTS/目录标题锚 ⇒ 目录页，
+    // 整页不开题、不并入题干（全库实测：CONTENTS 锚仅书A p1-p4，正文页 0 命中 ⇒ 零误伤）。
+    // 块已记账进 blockSlots（stages 展示可见，不静默）；image/table 同样跳过（目录页无题）。
+    if (this.frontMatterPages.has(entry.pageIndex)) return;
     // 待开题的板块头：把它之后的块先攒起来（开题时一次性归给题目；放弃开题时块仍在快照里）
     if (this.pendingBand) {
       this.pendingBand.blockIndexes.push(blockIndex);

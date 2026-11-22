@@ -303,7 +303,7 @@ const unmatchedQuiz: { at: string; reason: string }[] = [];
 const unmatchedAns: { at: string; reason: string }[] = [];
 const alignRows: string[] = [];
 const orderViolations: string[] = [];
-const pairOrder: { quizIdx: number; ansIdx: number; label: string }[] = [];
+const pairOrder: { quizIdx: number; ansIdx: number; label: string; blockNo: number }[] = [];
 
 const ansIndex = new Map<string, number>();
 ans.forEach((a, i) => ansIndex.set(a.id, i));
@@ -343,6 +343,7 @@ for (const al of alignments) {
       quizIdx: quizIndex.get(q.id) ?? -1,
       ansIdx: ansIndex.get(a.id) ?? -1,
       label: `#${q.number}`,
+      blockNo,
     });
     bank.push({
       chapter: q.chapter ?? "",
@@ -454,13 +455,27 @@ const tlineLine =
   `T 行交叉核验（独立证据）：可核验 ${tTotal} 条（${tSkipped} 条块头 T 行未读到 ⇒ 无法核验），` +
   `一致 **${tAgree}（${pct(tAgree, tTotal)}）**；对照组（同块内答案错位一位）一致 ${cAgree}（${pct(cAgree, cTotal)}）`;
 
-// 1) 保序：配对必须在两册上同时单调递增
-pairOrder.sort((a, b) => a.quizIdx - b.quizIdx);
-for (let i = 1; i < pairOrder.length; i++) {
-  const p = pairOrder[i - 1]!;
-  const c = pairOrder[i]!;
-  if (c.ansIdx <= p.ansIdx) {
-    orderViolations.push(`题册第 ${c.quizIdx} 题(${c.label}) 的答案位置 ${c.ansIdx} 未超过上一对 ${p.ansIdx}`);
+// 1) 保序（**块级**）：跨块必须单调递增；同块内**按题号配对**已是内容对应的强证据，
+//    条目级倒挂不再计违规。B-63 裁定（2026-11-22）：2026 深度解析 p118 页内数组序
+//    13/12 局部倒挂（原卷 page-119.png 印刷 12→13 正确，配对内容逐条对应无误）；
+//    答案册页内数组序受阅读顺序恢复/OCR 注入影响可局部倒挂，条目级严格保序在该
+//    前提下是过强假设。块级单调仍能防跨块交叉误配 —— 检测语义不弱化，粒度重定义。
+const blockOrder = new Map<number, { minAns: number; maxAns: number; firstQuiz: number }>();
+for (const p of pairOrder) {
+  const g = blockOrder.get(p.blockNo) ?? { minAns: Infinity, maxAns: -1, firstQuiz: p.quizIdx };
+  g.minAns = Math.min(g.minAns, p.ansIdx);
+  g.maxAns = Math.max(g.maxAns, p.ansIdx);
+  g.firstQuiz = Math.min(g.firstQuiz, p.quizIdx);
+  blockOrder.set(p.blockNo, g);
+}
+const blockSeq = [...blockOrder.entries()].sort((a, b) => a[1].firstQuiz - b[1].firstQuiz);
+for (let i = 1; i < blockSeq.length; i++) {
+  const prev = blockSeq[i - 1]![1]!;
+  const cur = blockSeq[i]![1]!;
+  if (cur.minAns <= prev.maxAns) {
+    orderViolations.push(
+      `块级保序失败：块 ${blockSeq[i]![0]} 的答案位（最小 ${cur.minAns}）未整体晚于前块（最大 ${prev.maxAns}）`,
+    );
   }
 }
 
