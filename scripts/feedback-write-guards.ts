@@ -9,6 +9,7 @@
  * 用户在局域网设备上报告缺陷正是本功能的全部意义 ⇒ 默认允许 LAN 写；
  * `FEEDBACK_WRITE=0` 才整体关闭（只读预览，POST 返回 403）。
  */
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 /** 反馈载荷上限（base64 截图是大头）：原始 body ≤ 12MB。 */
@@ -31,12 +32,12 @@ export function feedbackWriteEnabled(env: NodeJS.ProcessEnv = process.env): bool
   return env.FEEDBACK_WRITE !== "0";
 }
 
-/** doc 白名单：必须是 `data/out/<doc>/stages.json` 真实存在的目录名。 */
-export function isKnownDoc(root: string, doc: unknown): boolean {
+/** doc 白名单：必须是 `data/out/<doc>/stages.json` 真实存在的目录名：目录名即白名单。 */
+export async function isKnownDoc(root: string, doc: unknown): Promise<boolean> {
   if (typeof doc !== "string" || !doc || doc.length > DOC_MAX_LEN) return false;
   if (BAD_DOC_CHARS.test(doc)) return false;
-  void join; // join 保留给调用方组装真实路径（此函数镜像 tag-write-guards 的签名语义）
-  return true;
+  const info = await stat(join(root, "data", "out", doc, "stages.json")).catch(() => null);
+  return !!info?.isFile();
 }
 
 export type FeedbackAction = "create" | "supplement" | "update";

@@ -5,6 +5,9 @@
 // 「人记得 curl」从来不是回归防护。
 
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
   FEEDBACK_MAX_BODY,
@@ -38,12 +41,20 @@ test("parseAction：只认 create/supplement/update，未知动作拒绝", () =>
   assert.equal(parseAction(null), null);
 });
 
-test("doc 白名单：空/超长/路径字符拒绝（镜像 tag-write-guards 口径）", () => {
-  assert.equal(isKnownDoc("/root", ""), false);
-  assert.equal(isKnownDoc("/root", "a/b"), false);
-  assert.equal(isKnownDoc("/root", ".."), false);
-  assert.equal(isKnownDoc("/root", 123), false);
-  assert.equal(isKnownDoc("/root", "x".repeat(121)), false);
+test("doc 白名单：空/超长/路径字符拒绝（镜像 tag-write-guards 口径）", async () => {
+  assert.equal(await isKnownDoc("/root", ""), false);
+  assert.equal(await isKnownDoc("/root", "a/b"), false);
+  assert.equal(await isKnownDoc("/root", ".."), false);
+  assert.equal(await isKnownDoc("/root", 123), false);
+  assert.equal(await isKnownDoc("/root", "x".repeat(121)), false);
+});
+
+test("doc 白名单：真实 stages.json 存在才放行（目录名即白名单）", async () => {
+  const base = mkdtempSync(join(tmpdir(), "fb-doc-guard-"));
+  mkdirSync(join(base, "data", "out", "good-doc"), { recursive: true });
+  writeFileSync(join(base, "data", "out", "good-doc", "stages.json"), "{}");
+  assert.equal(await isKnownDoc(base, "good-doc"), true);
+  assert.equal(await isKnownDoc(base, "missing-doc"), false);
 });
 
 test("截图 dataURL：png/jpeg 收，其它/空字节/超 8MB 拒", () => {
