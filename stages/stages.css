@@ -700,3 +700,11 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 .page-float.next { transform: translateY(calc(-50% + 28px)); }
 .page-float:disabled { opacity: .35; cursor: default; }
 .page-float[hidden] { display: none; }
+
+/* ── B-54 止血（2026-11-22 用户报障 fb-20261122T134356-rdwi）──
+   oxr-convert 合成行框右缘过冲（短行 x 继承段框右缘，实测过冲 98-135pt），
+   文本框伸到图片下方，图片块 DOM 序在后时压住文字。
+   z 序止血：文本/表格恒高于图片——文字完整可读（文本框无背景不遮图），
+   图片被文本框「透」过去。位置几何不动（治本=合成行墨迹投影，另行立项）。 */
+.blk-line, .blk-table { z-index: 1; }
+.blk-line.kind-image { z-index: 0; }

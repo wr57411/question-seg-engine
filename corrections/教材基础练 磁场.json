@@ -14,6 +14,20 @@
       "source": "body-hole",
       "evidence": "原卷 page-001.png 左上角红块「第十章」+黑字「磁场」章头被 OXR 整块读丢（layout.json 0 次出现）；6维册配对需 chapter=10（6维册章10=磁场 35 题）。2026-11-22 回原卷核对，注入章头供 CHAPTER_HEAD 提升。",
       "verified": true
+    },
+    {
+      "page": 9,
+      "kind": "insert",
+      "text": "4[多选][人教版选修二P12第4题设问变式]易错如图所示是",
+      "bbox": [
+        59,
+        56,
+        309,
+        69
+      ],
+      "source": "body-hole",
+      "evidence": "原卷 page-009.png #4「4[多选][人教版选修二 P12 第 4 题设问变式][提示]如」磁流体发电机题完整（裁图 tmp/x2-p9.png 已核对）。章头补识重导出后 OCR 补行注入锚定错位致题号行丢失（旧版块 bbox x0=59 vs 新版 60 露馅），corrections 显式补回；文本采用旧版 OCR 读出版本（旧版 stem 拼合实证无重复）。2026-11-22 裁定。",
+      "verified": true
     }
   ]
 }
