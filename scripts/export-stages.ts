@@ -20,6 +20,11 @@ import { normalizeLayout } from "../src/normalize.js";
 import { detectColumnCenters, detectColumns, layoutPage } from "../src/layout.js";
 import { applyCorrections, type ApplyReport, type CorrectionFile } from "../src/corrections.js";
 import { scanFormulaNoise, type FormulaNoiseReport } from "../src/formula.js";
+import {
+  planBlockIndexRebuilds,
+  type FlatBlock,
+  type RebuildReport,
+} from "./lib/block-indexes-rebuild.js";
 import type { BBox, CrossPageLeakRecord, IndexedBlock, ParsedBlock, ParsedDocument, SegmentationResult } from "../src/types.js";
 import { normalizeGuardText, type TitleGuardEntry } from "./oxr-title-guard.js";
 
@@ -249,6 +254,14 @@ export interface StageSnapshot {
    * 非空 = 补回了 OXR 丢失的内容标题/散文/标签；逐条清单见产物本身。
    */
   titleGuard?: { entries: number; applied: number; skipped: number };
+  /**
+   * `source.blockIndexes` 导出期重建报告（B-66）。引擎记录的是切题游标区间且边界滞后
+   * ⇒ 系统性混入上一题（head 检验 书A 15.8% / 书B 26.1% miss，且低估）；
+   * 导出时按「stem 首段文本反查真实块范围」重建（判据纯函数见
+   * `scripts/lib/block-indexes-rebuild.ts`，不改引擎切题，stem/options/题数一字不动）。
+   * 缺省 = 重建未启用（`--no-block-rebuild`）或旧快照；保留原值的题全量列在 `keptIds`（不静默）。
+   */
+  blockIndexesRebuild?: RebuildReport;
   pages: StagePage[];
   reviews: SegmentationResult["reviews"];
 }
@@ -1747,6 +1760,52 @@ function main(): void {
       `  巨带裁图回退透传：${gc.attached} 行 coordSource=crop` +
         (gc.skipped ? `（${gc.skipped} 条受害者未匹配/无裁图，原样保留不静默）` : ""),
     );
+  }
+  // ── B-66：`source.blockIndexes` 导出期重建（stem 文本反查真实块范围；不改引擎切题） ──
+  // 根因（2026-11-22 实测修正 B-66 的原假设）：引擎在**注入后 doc 帧**上记录 blockIndexes
+  // 且在该帧内自洽（书A 引擎帧 head 检验 miss=0/1048），但 table-v3 三分流会向快照
+  // **插入新块**（本册 +20），此后 stages.json 的全局拍平帧相对引擎帧整体后移
+  // ⇒ 一切「把 blockIndexes 按 stages.json 拍平序取块」的下游（A 档抽查裁图、逻辑块裁图器、
+  //   head 命中检验）都系统性取到后移的块 = 「混入上一题」（书A p176:q744：引擎帧 11541 与
+  //   stages 帧 11553 是同一个题头块）。
+  // 修法：在**全部块变更（table-v3 插入/巨带/漏泄）落定之后**、写 questions.json 之前，
+  // 用 stem 首段在**最终快照帧**（pages[].order 阅读序拍平）里反查真实起始块，
+  // 区间 = 真实起始块 → 下一题真实起始块前；反查不中**保留原值并计数**（宁保原值不猜）。
+  // 快照 pages[].questions[].blocks（页内下标）不受影响：插入不重编号，页内帧稳定。
+  // 判据纯函数在 scripts/lib/block-indexes-rebuild.ts（有单测）；`--no-block-rebuild` 可关（A/B 对照）。
+  const blockRebuildEnabled = !process.argv.includes("--no-block-rebuild");
+  if (blockRebuildEnabled) {
+    // 最终快照帧：页升序 × 页内阅读序（pages[].order，含插入块）——
+    // 与一切按 stages.json 拍平回溯的下游同一口径；文本取值同快照（image 占位/公式 latex/text）。
+    const flatBlocks: FlatBlock[] = [];
+    let globalIndex = 0;
+    for (const page of [...snapshot.pages].sort((a, b) => a.index - b.index)) {
+      for (const i of page.order) {
+        const b = page.blocks[i];
+        if (!b) continue;
+        flatBlocks.push({ index: globalIndex++, pageIndex: page.index, text: b.text });
+      }
+    }
+    const plan = planBlockIndexRebuilds(result.questions, flatBlocks);
+    // 只换 source.blockIndexes，其余字段（stem/options/题数/…）引用原对象一字不动
+    result.questions = result.questions.map((q, i) => {
+      const range = plan.ranges[i];
+      return range ? { ...q, source: { ...q.source, blockIndexes: range } } : q;
+    });
+    snapshot.blockIndexesRebuild = plan.report;
+    const kr = plan.report.keptReasons;
+    console.log(
+      `  blockIndexes 重建（B-66，最终快照帧 ${flatBlocks.length} 块）：rebuilt ${plan.report.rebuilt}/${plan.report.total}` +
+        ` · kept ${plan.report.kept}（无探针 ${kr["no-probe"]} / 反查不中 ${kr["not-found"]} / 端点无锚 ${kr["next-unknown"]}）` +
+        (plan.report.widened ? ` · 放宽页邻近命中 ${plan.report.widened}` : ""),
+    );
+    if (plan.report.keptIds.length) {
+      const shown = plan.report.keptIds.slice(0, 8).join("、");
+      console.log(
+        `    保留原值的题（不静默）: ${shown}` +
+          (plan.report.keptIds.length > 8 ? ` … 等 ${plan.report.keptIds.length} 题` : ""),
+      );
+    }
   }
   // questions.json 与 stages.json 同源重生成：viewer 与 stages 消费同一份引擎产物，
   // 避免算法修复后两个展示层各说各话

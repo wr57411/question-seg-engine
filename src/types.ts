@@ -186,9 +186,12 @@ export interface Question {
   source: {
     file: string;
     pageIndex: number;
-    /** 参与构成本题的块序号。语义：跨页全局序号（segmentWithRules 展平阅读流后
-     * 的连续编号，跨题页累进）——不是页内序号；映射回页内块需按阅读顺序重建，
-     * 见 scripts/export-stages.ts 的 buildStageSnapshot。 */
+    /** 参与构成本题的块序号。语义：跨页全局序号——**最终快照帧**（data/out/<docId>/stages.json
+     * 的 pages[].order 阅读序拍平，含 table-v3 插入块，跨题页累进）——不是页内序号。
+     * 导出期由 B-66 文本反查重建（scripts/lib/block-indexes-rebuild.ts）保证与 stages.json
+     * 同帧；反查不中的题保留引擎帧原值（stages.json 的 blockIndexesRebuild.keptIds 可查）。
+     * ⚠️ 2026-11-22 之前的旧快照是引擎帧（注入后 doc、不含 table 插入块），按 stages 帧
+     * 消费会系统性错位（B-66）；映射回页内块见 scripts/export-stages.ts 的 buildStageSnapshot。 */
     blockIndexes: number[];
   };
   confidence: number;
