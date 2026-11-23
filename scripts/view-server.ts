@@ -35,6 +35,10 @@ import {
   validateCreatePayload,
   validateMutationPayload,
   validateStoreShape,
+  validateAskPayload,
+  validateAnswerPayload,
+  FEEDBACK_KINDS,
+  type FeedbackKind,
 } from "./feedback-write-guards.js";
 import { classifyDoc, readLayoutBackend, TEST_DOC_NAMES } from "./doc-lineage.js";
 import type { Artifact, Lineage } from "./doc-lineage.js";
@@ -453,6 +457,43 @@ async function handleFeedbackList(res: ServerResponse, url: URL): Promise<void> 
  * 开关 FEEDBACK_WRITE=0 时 403（默认开——iPad 真机验收是本功能主场景）。
  * doc 白名单语义与 tags 相同（目录名即白名单）。
  */
+/**
+ * 把「新反馈」作为事件送进 agent-autoloop 中台（2026-11-23 用户需求）。
+ * 中台是**被动 HTTP 协议**（它不主动连任何东西）⇒ 由本服务主动 POST。
+ * 配置：AGENT_AUTOLOOP_URL（默认 http://127.0.0.1:17171）+ AGENT_AUTOLOOP_KEY。
+ * 未配置 / 发送失败 ⇒ 只打一行日志（反馈本身已落盘，用户可随时用 npm run feedback:collect 拉）。
+ */
+async function notifyAutoloop(ev: {
+  id: string;
+  kind: string;
+  docId: unknown;
+  comment: unknown;
+}): Promise<void> {
+  const url = process.env["AGENT_AUTOLOOP_URL"];
+  const key = process.env["AGENT_AUTOLOOP_KEY"];
+  if (!url || !key) return;
+  try {
+    // 协议（docs/protocol.md）：id + type 必填；subject=标识符（进提示词）。
+    // summary/detail 只作记录不进提示词 ⇒ 反馈正文放 summary 会被 Agent 看到，需脱敏：正文放 detail。
+    const body = JSON.stringify({
+      id: ev.id,
+      type: "feedback.created",
+      subject: ev.id,
+      summary: `新反馈（${ev.kind}）：${String(ev.docId || "全站")}`,
+      detail: String(ev.comment ?? "").slice(0, 2000),
+    });
+    const r = await fetch(`${url.replace(/\/$/, "")}/v1/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) console.warn(`[feedback] 中台事件发送失败 HTTP ${r.status}`);
+  } catch (e) {
+    console.warn(`[feedback] 中台不可达（忽略）：${String(e).slice(0, 120)}`);
+  }
+}
+
 async function handleFeedbackWrite(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!feedbackWriteEnabled()) {
     res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
@@ -491,22 +532,27 @@ async function handleFeedbackWrite(req: IncomingMessage, res: ServerResponse): P
       return;
     }
     const it = item as Record<string, unknown>;
-    if (!(await isKnownDoc(ROOT, it["docId"]))) {
+    const isPageIssue = (it["kind"] ?? "page-issue") === "page-issue";
+    if (isPageIssue && !(await isKnownDoc(ROOT, it["docId"]))) {
       res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ ok: false, error: "doc 不在白名单内（目录名即白名单）" }));
+      res.end(JSON.stringify({ ok: false, error: "页面问题必须指向真实册（doc 不在白名单内）" }));
       return;
     }
     const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
     const rnd = Math.random().toString(36).slice(2, 6);
     const id = `fb-${now}-${rnd}`;
+    // doc 白名单：**只有页面问题**必须指向真实册；需求/想法/缺陷类可为空
+    const kind = typeof it["kind"] === "string" ? it["kind"] : "page-issue";
     const record: Record<string, unknown> = {
       id,
-      docId: it["docId"],
+      kind,
+      docId: typeof it["docId"] === "string" ? it["docId"] : "",
       page: Number.isFinite(it["page"] as number) ? Math.max(0, Math.floor(it["page"] as number)) : null,
       questionNumber: typeof it["questionNumber"] === "string" ? it["questionNumber"] : "",
       comment: (it["comment"] as string).trim(),
       shot: null,
       supplements: [],
+      questions: [],
       status: "open",
       reply: "",
       createdAt: new Date().toISOString(),
@@ -530,6 +576,72 @@ async function handleFeedbackWrite(req: IncomingMessage, res: ServerResponse): P
     await atomicWrite(FEEDBACK_FILE, text);
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
     res.end(JSON.stringify({ ok: true, id }));
+    // 通知中台（autoagentloop）：失败只记日志，绝不影响用户提交成功
+    void notifyAutoloop({ id, kind, docId: record["docId"], comment: record["comment"] });
+    return;
+  }
+
+  // ask / answer：追问清单的写入与回答（2026-11-23 双向对话）
+  if (action === "ask") {
+    const askErr = validateAskPayload(payload);
+    if (askErr) {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: askErr }));
+      return;
+    }
+    const target = items.find((it) => it["id"] === payload["id"]);
+    if (!target) {
+      res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: `反馈不存在：${String(payload["id"]).slice(0, 80)}` }));
+      return;
+    }
+    // 保留已有答案（幂等重写：追问文本可改，答案不丢）
+    const prev = Array.isArray(target["questions"]) ? (target["questions"] as Record<string, unknown>[]) : [];
+    const kept = new Map<string, unknown>(prev.map((q) => [String(q["id"]), q["answer"] ?? null]));
+    target["questions"] = (payload["questions"] as Record<string, unknown>[]).map((q, i) => ({
+      id: String(q["id"] ?? `q${i + 1}`),
+      text: String(q["text"]).trim(),
+      answer: kept.get(String(q["id"])) ?? null,
+      answeredAt: null,
+    }));
+    target["status"] = "need-info";
+    target["updatedAt"] = new Date().toISOString();
+    await mkdir(FEEDBACK_DIR, { recursive: true });
+    await atomicWrite(FEEDBACK_FILE, `${JSON.stringify(store, null, 1)}\n`);
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: true, id: payload["id"], questions: target["questions"] }));
+    return;
+  }
+  if (action === "answer") {
+    const ansErr = validateAnswerPayload(payload);
+    if (ansErr) {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: ansErr }));
+      return;
+    }
+    const target = items.find((it) => it["id"] === payload["id"]);
+    if (!target) {
+      res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: `反馈不存在：${String(payload["id"]).slice(0, 80)}` }));
+      return;
+    }
+    const qs = (target["questions"] as Record<string, unknown>[]) ?? [];
+    const q = qs.find((x) => String(x["id"]) === String(payload["questionId"]));
+    if (!q) {
+      res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: "该追问不存在" }));
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    q["answer"] = String(payload["answer"]).trim();
+    q["answeredAt"] = nowIso;
+    // 全部答完 ⇒ 回到处理队列；未答完 ⇒ 保持 need-info
+    target["status"] = qs.every((x) => x["answer"]) ? "working" : "need-info";
+    target["updatedAt"] = nowIso;
+    await mkdir(FEEDBACK_DIR, { recursive: true });
+    await atomicWrite(FEEDBACK_FILE, `${JSON.stringify(store, null, 1)}\n`);
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: true, id: payload["id"], status: target["status"] }));
     return;
   }
 

@@ -19,6 +19,8 @@ import {
   shotFileName,
   validateCreatePayload,
   validateItemShape,
+  validateAskPayload,
+  validateAnswerPayload,
   validateMutationPayload,
   validateStoreShape,
 } from "../scripts/feedback-write-guards.js";
@@ -108,4 +110,40 @@ test("文件名：id 已过字符校验后拼相对路径", () => {
 test("上限常量：body 12MB / 截图 8MB（防无界输入）", () => {
   assert.equal(FEEDBACK_MAX_BODY, 12 * 1024 * 1024);
   assert.equal(SHOT_MAX_BYTES, 8 * 1024 * 1024);
+});
+
+
+// ── ask/answer 追问清单（2026-11-23 双向对话）──
+test("ask 载荷：questions 数组校验", () => {
+  assert.equal(validateAskPayload({ id: "fb-1", questions: [{ id: "q1", text: "要影响哪些书？" }] }), null);
+  assert.ok(validateAskPayload({ id: "fb-1", questions: [] }) === null, "空数组合法（清空调用）");
+  assert.ok(validateAskPayload({ id: "fb-1" }), "缺 questions 拒绝");
+  assert.ok(validateAskPayload({ id: "fb-1", questions: [{ id: "q1", text: "" }] }), "空问题文本拒绝");
+  assert.ok(validateAskPayload({ id: "", questions: [] }), "空 id 拒绝");
+});
+
+test("answer 载荷：回答校验", () => {
+  assert.equal(validateAnswerPayload({ id: "fb-1", questionId: "q1", answer: "三本新书" }), null);
+  assert.ok(validateAnswerPayload({ id: "fb-1", questionId: "q1" }), "缺 answer 拒绝");
+  assert.ok(validateAnswerPayload({ id: "fb-1", answer: "x" }), "缺 questionId 拒绝");
+  assert.ok(validateAnswerPayload({ id: "", questionId: "q1", answer: "x" }), "空 id 拒绝");
+});
+
+test("kind 泛化：类型枚举校验", () => {
+  for (const k of ["page-issue", "request", "bug", "idea"]) {
+    assert.equal(validateCreatePayload({ comment: "内容", kind: k }), null, `${k} 应合法`);
+  }
+  assert.ok(validateCreatePayload({ comment: "内容", kind: "bogus" }), "未知 kind 拒绝");
+  assert.ok(validateCreatePayload({ comment: "内容", kind: 123 }), "非字符串 kind 拒绝");
+});
+
+test("读侧形状：questions 数组与 need-info 状态", () => {
+  assert.equal(validateItemShape({
+    id: "fb-1", docId: "doc", comment: "x", status: "need-info", createdAt: "t", updatedAt: "t",
+    supplements: [], questions: [{ id: "q1", text: "问", answer: null }],
+  }), null);
+  assert.ok(validateItemShape({
+    id: "fb-1", docId: "doc", comment: "x", status: "working", createdAt: "t", updatedAt: "t",
+    supplements: [], questions: "not-array",
+  }), "questions 非数组拒绝");
 });

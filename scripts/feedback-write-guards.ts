@@ -40,12 +40,16 @@ export async function isKnownDoc(root: string, doc: unknown): Promise<boolean> {
   return !!info?.isFile();
 }
 
-export type FeedbackAction = "create" | "supplement" | "update";
+export type FeedbackAction = "create" | "supplement" | "update" | "ask" | "answer";
+
+/** 反馈类型（2026-11-23 泛化）：入口不再只收页面问题。 */
+export type FeedbackKind = "page-issue" | "request" | "bug" | "idea";
+export const FEEDBACK_KINDS: FeedbackKind[] = ["page-issue", "request", "bug", "idea"];
 
 /** 动作判定：未知动作直接拒绝（不猜）。 */
 export function parseAction(body: unknown): FeedbackAction | null {
   if (!isRec(body) || !isStr(body.action)) return null;
-  if (body.action === "create" || body.action === "supplement" || body.action === "update") {
+  if (body.action === "create" || body.action === "supplement" || body.action === "update" || body.action === "ask" || body.action === "answer") {
     return body.action;
   }
   return null;
@@ -80,16 +84,41 @@ export function validateStoreShape(store: unknown): string | null {
 /** 单条反馈的形状校验（create 时由字段拼装，读侧逐条校验）。 */
 export function validateItemShape(it: unknown): string | null {
   if (!isRec(it)) return "item 必须是对象";
-  for (const k of ["id", "docId", "comment", "status", "createdAt", "updatedAt"] as const) {
+  for (const k of ["id", "comment", "status", "createdAt", "updatedAt"] as const) {
     if (!isStr(it[k]) || !(it[k] as string).length) return `item.${k} 必须是非空字符串`;
     if (isStr(it[k]) && (it[k] as string).length > ID_MAX_LEN * 8) return `item.${k} 超长`;
   }
+  // docId 必须是非空字符串，**但只有页面问题**才要求（2026-11-23 泛化）：需求/想法/缺陷
+  // 不指向某一册，服务端会写空串；若这里仍按「非空」卡，整条库读侧 500（实测）。
+  const docId = it["docId"];
+  if (!isStr(docId) || docId.length > DOC_MAX_LEN || BAD_DOC_CHARS.test(docId)) {
+    return "item.docId 必须是字符串";
+  }
+  const kindOf = typeof it["kind"] === "string" ? (it["kind"] as string) : "page-issue";
+  if (kindOf === "page-issue" && !docId) return "item.docId 必须是非空字符串";
   if (isStr(it["id"]) && BAD_ID_CHARS.test(it["id"])) return "item.id 含非法字符";
-  if (!["open", "working", "fixed", "wontfix"].includes(it["status"] as string)) {
+  if (!["open", "working", "need-info", "fixed", "wontfix"].includes(it["status"] as string)) {
     return "item.status 非法";
   }
   if (it["shot"] !== undefined && it["shot"] !== null && !isStr(it["shot"])) {
     return "item.shot 必须是字符串";
+  }
+  if (it["kind"] !== undefined && it["kind"] !== null) {
+    if (!isStr(it["kind"]) || !FEEDBACK_KINDS.includes(it["kind"] as FeedbackKind)) {
+      return `item.kind 必须是 ${FEEDBACK_KINDS.join("/")} 之一`;
+    }
+  }
+  if (it["questions"] !== undefined && it["questions"] !== null) {
+    if (!Array.isArray(it["questions"])) return "item.questions 必须是数组";
+    for (const q of it["questions"] as unknown[]) {
+      if (!isRec(q)) return "item.questions 每条必须是对象";
+      for (const k of ["id", "text"] as const) {
+        if (!isStr(q[k]) || !(q[k] as string).length) return `item.questions.${k} 必须是非空字符串`;
+      }
+      if (q["answer"] !== undefined && q["answer"] !== null && !isStr(q["answer"])) {
+        return "item.questions.answer 必须是字符串";
+      }
+    }
   }
   if (!Array.isArray(it["supplements"])) return "item.supplements 必须是数组";
   if ((it["supplements"] as unknown[]).length > SUPPLEMENT_MAX) return "supplements 超出上限";
@@ -115,6 +144,44 @@ export function validateCreatePayload(item: unknown): string | null {
   if (item["page"] !== undefined && item["page"] !== null && !Number.isFinite(item["page"])) {
     return "page 必须是数字";
   }
+  if (item["kind"] !== undefined && item["kind"] !== null && !isStr(item["kind"])) {
+    return "kind 必须是字符串";
+  }
+  if (isStr(item["kind"]) && !FEEDBACK_KINDS.includes(item["kind"] as FeedbackKind)) {
+    return `kind 必须是 ${FEEDBACK_KINDS.join("/")} 之一`;
+  }
+  return null;
+}
+
+/**
+ * **ask 载荷**（Agent 写追问清单）：整体覆盖 questions（幂等，重写安全）。
+ * 每条追问必须是非空问题文本；answer 初始为 null（等用户在网页组件里答）。
+ */
+export function validateAskPayload(body: Record<string, unknown>): string | null {
+  if (!isStr(body["id"]) || !(body["id"] as string).length || (body["id"] as string).length > ID_MAX_LEN) {
+    return "id 必须是非空字符串";
+  }
+  const qs = body["questions"];
+  if (!Array.isArray(qs)) return "questions 必须是数组";
+  if (qs.length > 10) return "questions 超过 10 条上限";
+  for (const q of qs) {
+    if (!isRec(q)) return "questions 每条必须是对象";
+    const text = q["text"];
+    if (!isStr(text) || !(text as string).trim()) return "questions.text 不能为空";
+    if ((text as string).length > TEXT_MAX_LEN) return "questions.text 超长";
+  }
+  return null;
+}
+
+/** **answer 载荷**（用户回答某条追问）：answer 非空。 */
+export function validateAnswerPayload(body: Record<string, unknown>): string | null {
+  if (!isStr(body["id"]) || !(body["id"] as string).length) return "id 必须是非空字符串";
+  if (!isStr(body["questionId"]) || !(body["questionId"] as string).length) {
+    return "questionId 必须是非空字符串";
+  }
+  const answer = body["answer"];
+  if (!isStr(answer) || !(answer as string).trim()) return "answer 不能为空";
+  if ((answer as string).length > TEXT_MAX_LEN) return "answer 超长";
   return null;
 }
 
