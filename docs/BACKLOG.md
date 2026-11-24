@@ -12,7 +12,7 @@
 > 6. 与 `docs/HANDOFF.md`（当前状态/风险）和 `docs/DECISIONS.md`（口径/决策）分工：
 >    本文件只管**状态**，不重复它们的细节。
 
-最后更新：2026-11-22（**B-61/62/63 三修 + 反馈窗口后端**：三项 A 档抽查线登记的假题/配对缺陷全部修复并重导出验证，2026 A↔B 配对 948 条接入 bank:all 1554 条全绿；§119 框架 Agent 自决，DECISIONS §120。前一版：2026-11-20（M7-B：oldMissing 628 行逐条裁定 composite 97.76%，B-58 DONE））
+最后更新：2026-11-23（**反馈功能重新设计全链上线**：入口泛化四类（page-issue/request/bug/idea）+ Agent 追问清单 ask/answer 双向对话 + autoagentloop 中台接线（Kimi Code 接管）——后端 a51b700、前端 9723a8c，浏览器端到端全通，测后用户数据零损失；HANDOFF §9.5 续四。前一版：2026-11-22（B-61/62/63 三修 + 反馈窗口后端；bank:all 1554 全绿；DECISIONS §120））
 前一版：2026-11-20（**M7-B** · 答案册 OXR 切换收尾：oldMissing 628 行逐条裁定，真丢仅 2 行已补识，composite 97.76% 复跑，`check` 全绿 EXIT=0；B-58 转 DONE）
 前一版：2026-11-20（**M7-A** · 答案册 OXR 切换前置标题守卫/补识落地，B-58；commit `5ec1f59`；13 真丢页可补回，抽样 2 册逐字节零回归）
 前一版：2026-11-20（**M6 收口** · `npm run check` 复跑全绿 EXIT=0（731 测试 730 过/0 败/1 跳；渲染审计 7/7；`audit:numbering:cross` X2 0/X1 1 已登记；anchor 7 段已登记；bank 429）· B-39 生产通电收口 / B-40 三分流落地 / B-47·B-50·B-52·B-55·B-56 DONE 复核）

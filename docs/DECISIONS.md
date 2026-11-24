@@ -5189,3 +5189,15 @@ B-47 是「错的东西」（修=窗口期内容正确）；且 B-47 修复产�
 **B-63 两段修**：① 题册侧「N)」纯碎块守卫——OXR 把原卷小问标记 (2) 读丢开括号成独立碎块「2)」切出假题号 2（书A p249 实测，与真题 2 力敏电阻撞唯一键 17|66|2），判据=整行只剩「N)」⇒ 拒，真题「N)」带同行正文不受影响；tests/bare-paren-fragment.test.ts。② 对齐层**块级保序豁免**——原卷 page-119.png 裁定：深度解析 p118 数组序 13/12 局部倒挂（原卷印刷 12→13 正确），但块内按题号配对已是内容对应强证据，条目级严格保序是过强假设；build-bank.ts 保序校验改块级单调（跨块防交叉误配语义不变，粒度重定义非门禁弱化）。
 
 **反馈窗口（用户新功能）**：final 页反馈通道——截图粘贴+评论+独立实体+可补充修改（iPad 真机验收 N13 的报障入口，用户「连续报问题入清单」工作流）。后端=feedback-write-guards.ts（契约守卫，tests/feedback-write.test.ts 9 例）+ view-server.ts 路由（GET/POST /api/feedback、FEEDBACK_WRITE 开关、shots 落盘）；前端 final/feedback.js 由子代理实现中。数据落 data/out/feedback/feedbacks.json（运行数据不入 git）。
+
+## 121 反馈入口泛化 + 追问清单 + 中台接管（2026-11-23，用户指令 + §119 框架自决）
+
+**背景**：用户要求把反馈功能重新设计——① 所有新需求都能从该入口提交（原设计锁定「页面问题」）；② Agent 列出不清楚之处、用户在网页组件里回复（清单出现在成品检查反馈网页上）；③ 用 `/Volumes/zhitai/project/autoagentloop` 中台监控反馈提交并及时调动 Agent；并明确「接管的换成 Kimi Code，不用 Claude Code」。
+
+**决策 1 · 类型模型**：新增 `FeedbackKind = page-issue | request | bug | idea`（默认 page-issue，旧数据零迁移）。**只有 page-issue 挂卷**（docId + 页码/题号），其余三类是全局诉求、提交不带 docId；列表不按卷过滤非页面问题（否则提交完立刻从「我的反馈」消失）。理由：用户要的是「轻便入口」，不该逼他为「想要个筛选功能」先选一卷。
+
+**决策 2 · 双向对话**：item.questions（`{id,text,answer?,answeredAt?}`）+ 两个新 action。`ask` = Agent 写追问，**幂等覆盖但保留已有答案**（重问不丢用户已答内容），status→need-info；`answer` = 用户逐条回答，全部答完 status→working，未答完保持 need-info。UI 未答项整行描边高亮 + 「待澄清 N 项」徽标，展开逐条作答。理由：光凭一句反馈常常信息不足，清单化追问把「猜」变成「问」，且答案落在结构化字段里可被 Agent 直接消费。
+
+**决策 3 · 中台接线与 Agent 选型**：view-server `notifyAutoloop()` POST `/v1/events`（Bearer source key，`{id,type:"feedback.created",subject,summary,detail}`；正文只进 detail 不进 summary——隐私；失败只 warn 不影响提交）。中台 rules.json：source local → agent `feedback`（`use:"command"`, `command:["/Users/john/.local/bin/kimi","-p","{prompt}"]`）→ rule「处理成品页反馈」（cwd=项目根，prompt 含读 feedbacks.json→修/排期/ask→回写 status+reply）。**为什么不是 ZCode**：ZCode 无 CLI（Electron 应用，进程名 zcode-cli 只是 GUI 内部进程），中台 command agent 调不起；kimi `-p` 非交互可直跑（`-p` 与 `--auto` 互斥，不可同用）。启动环境 `.local/view-server-env.sh`（gitignore，密钥动态读 config.json，不硬编码明文）。
+
+**验收**：typecheck:viewer 绿；813 测试 0 fail；浏览器端到端——四类切换正确隐藏卷/页码行、request 提交落盘 kind=request/docId=""、ask→need-info、答 1 条→「待澄清 1 项」、全答完→自动转「处理中」；中台探针 routed=["处理成品页反馈"]；kimi 冒烟通过。测后 E2E 垃圾数据清除，用户 3 条真实反馈零损失。提交 a51b700（后端）/ 9723a8c（前端）。
