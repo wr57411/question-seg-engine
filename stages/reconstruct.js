@@ -630,24 +630,47 @@ function applyFigureEdges(nodes, p) {
 function applyChoiceRows(nodes, p) {
   const rows = findHorizontalChoiceRows(p.blocks ?? [], p.width);
   const baseFont = baseFontOfPage(p.blocks ?? [], p.width, CANVAS_W);
-  // 栏界：优先用快照 centers（左缘、栏心），否则按页宽对半分
-  const centers = Array.isArray(p.centers) && p.centers.length >= 2 ? p.centers : [p.width / 2];
-  /** 该 pt 坐标落在哪个栏（返回栏的左右界，用于把横排组限制在栏内）
-   * @param {number} xPt */
-  const columnOf = (xPt) => {
-    const bounds = [];
-    let left = 0;
-    for (const c of centers) { bounds.push([left, c * 2 - left]); left = c * 2 - left; }
-    bounds.push([left, p.width]);
-    for (const [l, r] of bounds) if (xPt >= l && xPt < r) return [l, r];
-    return [0, p.width];
+  const centers = Array.isArray(p.centers) ? p.centers : undefined;
+  /**
+   * 该 pt 坐标落在哪个栏（返回栏号，0 起）。
+   * ⚠️ centers 是**各栏簇心**（引擎 detectColumnCenters，用块左缘聚类），例：[42,308]
+   * = 左栏簇心 42、右栏簇心 308。归属规则与引擎 restoreReadingOrder 的 assign 同源：**取最近簇心**。
+   * @param {number} xPt
+   * @returns {number}
+   */
+  const columnIndexOfLocal = (xPt) => {
+    if (!centers || centers.length < 2) return xPt < p.width / 2 ? 0 : 1;
+    let idx = 0;
+    let best = Infinity;
+    centers.forEach((c, i) => {
+      const d = Math.abs(c - xPt);
+      if (d < best) { best = d; idx = i; }
+    });
+    return idx;
+  };
+  /**
+   * 某栏的左右界：不用簇心硬推（会错），而是取**该栏所有文本块** bbox 的最小左缘 / 最大右缘，
+   * 再向两侧各留一点边距。这样横排组恰好铺满本栏，不会串位。
+   * @param {number} col
+   * @returns {[number, number]}
+   */
+  const columnBoundsOf = (col) => {
+    const xs = (p.blocks ?? [])
+      .filter((b) => b.kind === "text" && columnIndexOfLocal((b.bbox[0] + b.bbox[2]) / 2) === col)
+      .flatMap((b) => [b.bbox[0], b.bbox[2]]);
+    if (xs.length === 0) return [0, p.width];
+    const l = Math.min(...xs);
+    const r = Math.max(...xs);
+    return [Math.max(l - 4, 0), Math.min(r + 4, p.width)];
   };
   for (const row of rows) {
     const idxs = row.map((b) => p.blocks.indexOf(b));
     if (!nodes[idxs[0]]) continue;
-    const topPt = Math.min(...row.map((b) => b.bbox[1]));
+    // 纵向位置：**这一行原本占的垂直跨度**（首块顶 → 末块底），横排后按该跨度居中——
+    // 既不挤在题干行上（跨度被压扁时会上移重叠），也不会掉到下一题。
+    const spanTop = Math.min(...row.map((b) => b.bbox[1]));
+    const spanBot = Math.max(...row.map((b) => b.bbox[3]));
     const x0 = Math.min(...row.map((b) => b.bbox[0]));
-    const [colL, colR] = columnOf(x0);
 
     // 行高：按「装得下内容」取——分式 ~2.2×字号，普通 1.4×（字号为页面基准，pt 口径）
     const sizePt = (((baseFont ?? 12) * CANVAS_W) / p.width) || 10;
@@ -656,19 +679,24 @@ function applyChoiceRows(nodes, p) {
         hasTwoDimensionalMath(b.text ?? "") ? sizePt * 2.2 : sizePt * 1.4,
       ),
     );
+    // 纵向：在这一行**原本的垂直跨度**里垂直居中（跨度来自被竖切的四块），
+    // 既不会压到上方题干（横排后块变矮，若仍按首块顶放就会上移重叠），也不掉到下一题。
+    const topPt = Math.round(spanTop + Math.max((spanBot - spanTop - maxH) / 2, 0));
+    const colIdx = columnIndexOfLocal(x0);
+    const [colL, colR] = columnBoundsOf(colIdx);
 
-    // 每项宽度按**内容墨迹宽**估（em×字号），而不是被撑满的 bbox 宽——否则四项之和远超栏宽
-    const widths = row.map((b) => Math.max(emWidthOf(renderedTextOf(b.text ?? "")), 0.5) * sizePt);
-    const totalW = widths.reduce((a, w) => a + w, 0);
-    // 栏内可用宽（留 2% 边距）；若拼不下则等比收缩到栏宽
-    const avail = (colR - colL) * 0.98;
-    const scale = totalW > avail ? avail / totalW : 1;
+    // 每项宽度：原卷是**横排均分**（四项各占一份）。这里按各块**原始宽占比**分配本栏宽度——
+    // 不用内容墨迹估（分式的 em 估算远小于实际渲染宽，会把四项压成窄条），
+    // 也不用被撑满的段框宽（四块各占整栏 ⇒ 拼起来超栏）。
+    const rawW = row.map((b) => Math.max(b.bbox[2] - b.bbox[0], 1));
+    const rawTotal = rawW.reduce((a, w) => a + w, 0);
+    const avail = (colR - colL) * 0.98; // 栏内留 2% 边距
 
     let acc = 0;
     row.forEach((b, k) => {
       const n = nodes[idxs[k]];
       if (!n) return;
-      const w = widths[k] * scale;
+      const w = (rawW[k] / rawTotal) * avail;
       const xStart = colL + acc;
       acc += w;
       n.style.left = `${(xStart / p.width) * 100}%`;

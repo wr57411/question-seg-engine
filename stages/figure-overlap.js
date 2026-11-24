@@ -65,8 +65,10 @@ export function figureEdgeClamps(blocks, pageW, centers) {
       const icx = (ix0 + ix1) / 2;
       // ① 同栏
       if (columnIndexOf(icx, pageW, centers) !== col) continue;
-      // ⑤ 图足够大
-      if (ix1 - ix0 <= pageW * 0.15) continue;
+      // ⑤ 排除极小的碎图/细线（否则误伤）；竖长图（坐标轴、标尺）按高算也够格
+      const figW = ix1 - ix0;
+      const figH = iy1 - iy0;
+      if (figW <= pageW * 0.08 && figH <= pageW * 0.2) continue;
       // ④ 文字中心在图内 ⇒ 图内标注，跳过
       if (cx >= ix0 && cx <= ix1 && cy >= iy0 && cy <= iy1) continue;
       // ③ 文字在图左侧
