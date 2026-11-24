@@ -37,9 +37,9 @@ test("图内标注（文字中心在图内）⇒ 不动——甲/乙/图3 等本
   assert.equal(figureEdgeClamps(blocks, 596, [42, 308]).size, 0);
 });
 
-test("异栏不处理（左栏文字 × 右栏图）", () => {
+test("异栏的图不触发收缘（图归右栏，不做『左文右图』处理）", () => {
   const blocks = [
-    b(1, "text", 51, 235, 295, 246, "左栏正文"),
+    b(1, "text", 51, 235, 160, 246, "左栏正文（不越栏）"),
     b(2, "image", 458, 237, 553, 355),
   ];
   assert.equal(figureEdgeClamps(blocks, 596, [42, 308]).size, 0);
@@ -59,6 +59,30 @@ test("纵向无交集不处理", () => {
     b(2, "image", 458, 237, 553, 355),
   ];
   assert.equal(figureEdgeClamps(blocks, 596, [42, 308]).size, 0);
+});
+
+test("跨栏串行（书A p6 实证形态）：左栏文字右缘越栏心 ⇒ 收到栏界/右栏块左缘", () => {
+  // 左栏文字 i33 [51,649,295,679] 右缘越过栏心(≈175) 伸到右栏图 i40 [187,651,...]
+  const blocks = [
+    b(33, "text", 51, 649, 295, 660, "A. 2024 年 4 月 25 日 20 时 59 分"),
+    b(40, "image", 187, 651, 292, 686),
+  ];
+  const m = figureEdgeClamps(blocks, 596, [47, 309]);
+  // 收紧到右栏障碍（图 i40）左缘 187 —— 不用栏界 178 兜底，避免文字与图之间留白
+  assert.equal(m.get(33), 187);
+});
+
+test("跨栏但纵向不相干 ⇒ 不动", () => {
+  const blocks = [
+    b(1, "text", 51, 100, 295, 110, "左栏上方文字"),
+    b(2, "text", 350, 300, 550, 310, "右栏下方文字"),
+  ];
+  assert.equal(figureEdgeClamps(blocks, 596, [47, 309]).size, 0);
+});
+
+test("单栏页（无 centers）不判跨栏", () => {
+  const blocks = [b(1, "text", 51, 100, 550, 110, "整页通栏")];
+  assert.equal(figureEdgeClamps(blocks, 596).size, 0);
 });
 
 test("columnIndexOf：取最近簇心（与引擎 assign 一致）；缺 centers 时按页宽对半", () => {

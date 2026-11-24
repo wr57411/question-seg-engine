@@ -42,6 +42,12 @@ export function columnIndexOf(x, pageW, centers) {
 
 /**
  * 找出需要收缘的文字块：返回 `Map<文字块i, 新右缘pt>`。
+ *
+ * 覆盖两类同根因缺陷（框右缘继承段框导致过冲）：
+ * (A) **左文右图**：文字块右缘伸到同栏图片上（rdwi/8f0e）；
+ * (B) **跨栏串行**：左栏文字块右缘越过栏心、伸进右栏（用户 2026-11-24 反馈的「字重叠」，
+ *     实测书A 264 对/63 页）——对手是右栏的任意内容块。
+ *
  * @param {FBlock[]} blocks 页内块
  * @param {number} pageW
  * @param {number[]} [centers]
@@ -49,8 +55,24 @@ export function columnIndexOf(x, pageW, centers) {
  */
 export function figureEdgeClamps(blocks, pageW, centers) {
   const out = new Map();
-  const imgs = (blocks ?? []).filter((b) => b.kind === "image");
-  const texts = (blocks ?? []).filter((b) => b.kind === "text" && (b.text ?? "").trim());
+  const list = Array.isArray(blocks) ? blocks : [];
+  const imgs = list.filter((b) => b.kind === "image");
+  const texts = list.filter((b) => b.kind === "text" && (b.text ?? "").trim());
+  /** 栏界（左右缘）：跨栏判定用 */
+  const twoCol = Array.isArray(centers) && centers.length >= 2;
+  const sortedC = twoCol ? [...centers].sort((a, b) => a - b) : [];
+  const gutterX = twoCol ? (((sortedC[0] ?? 0) + (sortedC[1] ?? 0)) / 2) : pageW / 2;
+
+  /**
+   * 记录候选右缘（取最小者）
+   * @param {number} i
+   * @param {number} right
+   */
+  const put = (i, right) => {
+    const prev = out.get(i);
+    out.set(i, prev === undefined ? right : Math.min(prev, right));
+  };
+
   for (const t of texts) {
     if (!Array.isArray(t.bbox) || t.bbox.length < 4) continue;
     const [tx0 = 0, ty0 = 0, tx1 = 0, ty1 = 0] = t.bbox;
@@ -58,6 +80,34 @@ export function figureEdgeClamps(blocks, pageW, centers) {
     const cx = (tx0 + tx1) / 2;
     const cy = (ty0 + ty1) / 2;
     const col = columnIndexOf(cx, pageW, centers);
+
+    // (B) 跨栏串行：本块在左栏，右缘越过栏界且**右侧确有同纵向内容块** ⇒ 收到最近障碍左缘。
+    // 没有障碍时不收（避免误伤通栏标题/整段，它们本就横跨两栏）。
+    if (col === 0 && tx1 > gutterX + pageW * 0.02) {
+      /** 纵向是否与该块相交 @param {FBlock} b */
+      const oy_ok = (b) => {
+        if (!Array.isArray(b.bbox) || b.bbox.length < 4) return false;
+        const by0 = Number(b.bbox[1]);
+        const by1 = Number(b.bbox[3]);
+        if (!Number.isFinite(by0) || !Number.isFinite(by1)) return false;
+        return Math.min(ty1, by1) - Math.max(ty0, by0) > 0;
+      };
+      let limit = Infinity;
+      for (const r of list) {
+        if (r === t) continue; // 障碍可以是文字也可以是图（书A p6 实例就是左栏文字压右栏图）
+        if (!Array.isArray(r.bbox) || r.bbox.length < 4) continue;
+        const [rx0 = 0, , rx1 = 0] = r.bbox;
+        if (typeof rx0 !== "number" || typeof rx1 !== "number") continue;
+        if (columnIndexOf((rx0 + rx1) / 2, pageW, centers) !== 1) continue;
+        if (rx0 <= tx0 + pageW * 0.02) continue; // 贴着自己左缘的不算障碍
+        if (rx0 >= tx1) continue;                 // 障碍在文字右侧之外
+        if (!oy_ok(r)) continue;
+        limit = Math.min(limit, rx0);
+      }
+      if (Number.isFinite(limit) && limit > tx0 + pageW * 0.05) put(t.i, limit);
+    }
+
+    // (A) 左文右图
     for (const im of imgs) {
       if (!Array.isArray(im.bbox) || im.bbox.length < 4) continue;
       const [ix0 = 0, iy0 = 0, ix1 = 0, iy1 = 0] = im.bbox;
@@ -80,9 +130,7 @@ export function figureEdgeClamps(blocks, pageW, centers) {
       // 垂直方向要真有交集（否则只是横向越界、纵向不相干）
       const oy = Math.min(ty1, iy1) - Math.max(ty0, iy0);
       if (oy <= 0) continue;
-      const prev = out.get(t.i);
-      // 多图时取最保守（最小）的右缘
-      out.set(t.i, prev === undefined ? ix0 : Math.min(prev, ix0));
+      put(t.i, ix0);
     }
   }
   return out;

@@ -131,6 +131,45 @@ export function fitTables(root) {
   }
 }
 
+/** 取节点所在纸面画布的高度（px）——百分比样式的换算基准。
+ * @param {HTMLElement | undefined} node
+ */
+function rootClientH(node) {
+  const canvas = node?.closest?.(".canvas");
+  return canvas && typeof canvas.clientHeight === "number" ? canvas.clientHeight : 0;
+}
+
+/**
+ * 「收缘折行」块的**挂载后实测适配**（与 fitTables 同口径）：收窄后的文字按真实渲染高度撑开/收拢，
+ * 保证相邻块不互叠、内容不被裁。
+ *
+ * 为什么必须挂载后：建节点时 scrollHeight 是 0；纯估算（em×字号）实测偏大——书A p6 第4题
+ * 四个选项各算 3 行、实际只占 2 行，结果 A 的第 3 行压到 B 头上。
+ *
+ * @param {HTMLElement | null | undefined} root
+ * @param {Page} p
+ */
+export function fitFigureEdges(root, p) {
+  const all = root?.querySelectorAll ? Array.from(root.querySelectorAll(".blk-figure-edge")) : [];
+  const Hpx = rootClientH(/** @type {HTMLElement | undefined} */ (all[0]));
+  if (Hpx <= 0) return;
+  for (const rawNode of all) {
+    const node = /** @type {HTMLElement} */ (rawNode);
+    if (typeof node.scrollHeight !== "number" || typeof node.clientHeight !== "number") continue;
+    if (node.clientHeight <= 0 || node.scrollHeight <= 0) continue;
+    const i = Number(node.dataset.bi);
+    const b = p.blocks?.[i];
+    if (!b) continue;
+    // 只**向下撑高**：顶部固定在原 y（不动其他块的位置，避免连锁位移），
+    // 高度取「装得下的最小值」。原竖排间距按单行给，折行后行与行之间会紧，但不会互相覆盖。
+    const needPx = node.scrollHeight + 1;
+    if (needPx <= node.clientHeight) continue;
+    const newHpt = ((b.bbox[3] - b.bbox[1]) * needPx) / node.clientHeight;
+    node.style.height = `${(newHpt / p.height) * 100}%`;
+    node.style.top = `${(b.bbox[1] / p.height) * 100}%`;
+  }
+}
+
 /** 表格节点：按块 bbox 落位，内部按上游 HTML 的行/列画真网格（`DECISIONS §76`）。
  *
  * 为什么用内联样式：`stages/` 与 `final/` 各有自己的 CSS，但**共用本渲染器**。
@@ -608,6 +647,8 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
 function applyFigureEdges(nodes, p) {
   const clamps = figureEdgeClamps(p.blocks ?? [], p.width, Array.isArray(p.centers) ? p.centers : undefined);
   if (clamps.size === 0) return;
+  const baseFont = baseFontOfPage(p.blocks ?? [], p.width, CANVAS_W);
+  const sizePt = (((baseFont ?? 12) * CANVAS_W) / p.width) || 10;
   for (const [i, rightPt] of clamps) {
     const b = p.blocks[i];
     const n = nodes[i];
@@ -616,6 +657,9 @@ function applyFigureEdges(nodes, p) {
     if (!(rightPt > leftPt)) continue; // 图在文字左边等异常形态不处理
     n.style.left = `${(leftPt / p.width) * 100}%`;
     n.style.width = `${((rightPt - leftPt) / p.width) * 100}%`;
+    // 收窄后文字折行会变高——**不在建节点时估算**（估不准，实测会偏大导致相邻块互叠），
+    // 改为在 fitFigureEdges() 里挂载后按真实 scrollHeight 收放（同 fitTables 的实测口径）。
+    n.dataset.figFit = "1"; // 标记：交由实测器处理
     // 放开 nowrap：让文字在收窄后的框里像原书一样折行（否则只能压字号）
     n.classList.add("blk-figure-edge");
     n.title = `${n.title} ｜（文字框原伸出到图上，已收至图缘并按栏宽折行）`;
@@ -1132,6 +1176,7 @@ export function renderPaper(p, opts = {}) {
   // S2：宽裁图的「点按看原生尺寸」浮层同模式接线（浮层挂 body，canvas 外，R8）。
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => {
     fitTables(wrap);
+    fitFigureEdges(wrap, p);
     wireCropZoom(wrap);
   });
 

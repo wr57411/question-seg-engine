@@ -40,6 +40,7 @@ export function blockNode(b: any, p: any, canvasW?: number, baseFont?: number | 
 export function textWidthEm(s: string): number;
 export function tableColWidths(rows: any[], cols: number): number[];
 export function fitTables(root: any): void;
+export function fitFigureEdges(root: any, p: any): void;
 export function tableNode(b: any, p: any, canvasW?: number, baseFont?: number | null, doc?: string): any;
 export function mergeContext(p: any): any;
 export function appendBlockNodes(
