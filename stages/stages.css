@@ -217,6 +217,8 @@ main { max-width: 980px; margin: 0 auto; padding: 12px 20px 40px; }
 .blk-line.kind-image { border: 1.5px dashed var(--azurite); background: rgba(58,107,138,.08); }
 .blk-line.kind-image img { width: 100%; height: 100%; object-fit: contain; }
 .blk-line.orphan { opacity: 0.3; }
+/* 「一行多选项被上游竖切」还原（vk62）：琥珀虚线提示这是显示层还原，数据未改 */
+.blk-line.blk-choice-row { outline: 1px dashed rgba(179, 67, 43, 0.55); }
 .order-badge {
   position: absolute;
   min-width: 16px; height: 16px;

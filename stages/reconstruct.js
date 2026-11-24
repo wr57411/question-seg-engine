@@ -16,12 +16,13 @@
  * uncovered-layout / block-dedup），**不 import 引擎 src/**。
  */
 import { prettifyLatex } from "./latex-display.js";
-import { baseFontOfPage, clampByWidth, fontForBlock, isVerticalText } from "./font-metrics.js";
+import { baseFontOfPage, clampByWidth, emWidthOf, fontForBlock, hasTwoDimensionalMath, isVerticalText, renderedTextOf } from "./font-metrics.js";
 import { contentLabelPlacements } from "./uncovered-layout.js";
 import { mergePlan } from "./block-dedup.js";
 import { stackContents, tagStackPlacements } from "./tag-layout.js";
 import { parseTableHtml } from "./table-html.js";
 import { isMisreadFigureText } from "./figure-misread.js";
+import { findHorizontalChoiceRows } from "./choice-row.js";
 
 /**
  * 本渲染器消费的快照形状（只声明**读过**的字段，不追求与引擎 schema 完全一致）：
@@ -39,7 +40,7 @@ import { isMisreadFigureText } from "./figure-misread.js";
  * @typedef {{ bbox: number[], area: number, kind?: string }} Uncovered
  * @typedef {{ bbox: number[], win?: number[], text?: string, source?: string, accepted?: boolean, ratio?: number, crop?: string, raw?: string }} OcrItem
  * @typedef {{ id: string, number: string, blocks: number[], startsHere?: boolean }} PageQuestion
- * @typedef {{ width: number, height: number, blocks: Block[], questions: PageQuestion[], columns?: number, discarded?: Block[], uncovered?: Uncovered[], ocrFill?: OcrItem[] }} Page
+ * @typedef {{ width: number, height: number, blocks: Block[], questions: PageQuestion[], columns?: number, centers?: number[], discarded?: Block[], uncovered?: Uncovered[], ocrFill?: OcrItem[] }} Page
  * @typedef {{ text: string, short: string, name: string, color: string }} TagLike
  * @typedef {{ key: string, q: PageQuestion, tags: TagLike[], side: "left" | "right", topPx: number }} TagEntry
  * @typedef {{ doc?: string, paneW: number, diagnostics?: boolean, uncovered?: boolean, candidateStyle?: boolean, onChipClick?: ((q: PageQuestion, p: Page) => void) | null, resolveTags?: ((q: PageQuestion, p: Page) => TagLike[] | null) | null, ocrFill?: boolean, assignmentBadge?: ((q: PageQuestion, p: Page) => { topics: number, categories: number } | null) | null }} RenderOpts
@@ -587,8 +588,71 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
   nodes.forEach((n, i) => {
     if (n) n.dataset.bi = String(i); // 块索引 = p.blocks 下标（stages.json 的 i）
   });
+  /** 「一行多选项被上游竖切」还原（fb-20261122T143209-vk62）：判据见 choice-row.js。
+   *  命中的组按**同一行横排**摆放——不删块、不改数据，只把四个块摆回一行（检测不改写）。
+   *  位置算法：以组内首块左缘为起点，按各块**墨迹宽**（bboxW）顺序拼接，行高取组内最大块高。 */
+  applyChoiceRows(nodes, p);
   for (const n of nodes) if (n) c.append(n);
   return nodes;
+}
+
+/**
+ * 把「横排误切」的选项组摆回一行（纯显示层；数据不动）。
+ * @param {(HTMLElement | null)[]} nodes 与 p.blocks 同下标的节点数组
+ * @param {Page} p
+ */
+function applyChoiceRows(nodes, p) {
+  const rows = findHorizontalChoiceRows(p.blocks ?? [], p.width);
+  const baseFont = baseFontOfPage(p.blocks ?? [], p.width, CANVAS_W);
+  // 栏界：优先用快照 centers（左缘、栏心），否则按页宽对半分
+  const centers = Array.isArray(p.centers) && p.centers.length >= 2 ? p.centers : [p.width / 2];
+  /** 该 pt 坐标落在哪个栏（返回栏的左右界，用于把横排组限制在栏内）
+   * @param {number} xPt */
+  const columnOf = (xPt) => {
+    const bounds = [];
+    let left = 0;
+    for (const c of centers) { bounds.push([left, c * 2 - left]); left = c * 2 - left; }
+    bounds.push([left, p.width]);
+    for (const [l, r] of bounds) if (xPt >= l && xPt < r) return [l, r];
+    return [0, p.width];
+  };
+  for (const row of rows) {
+    const idxs = row.map((b) => p.blocks.indexOf(b));
+    if (!nodes[idxs[0]]) continue;
+    const topPt = Math.min(...row.map((b) => b.bbox[1]));
+    const x0 = Math.min(...row.map((b) => b.bbox[0]));
+    const [colL, colR] = columnOf(x0);
+
+    // 行高：按「装得下内容」取——分式 ~2.2×字号，普通 1.4×（字号为页面基准，pt 口径）
+    const sizePt = (((baseFont ?? 12) * CANVAS_W) / p.width) || 10;
+    const maxH = Math.max(
+      ...row.map((b) =>
+        hasTwoDimensionalMath(b.text ?? "") ? sizePt * 2.2 : sizePt * 1.4,
+      ),
+    );
+
+    // 每项宽度按**内容墨迹宽**估（em×字号），而不是被撑满的 bbox 宽——否则四项之和远超栏宽
+    const widths = row.map((b) => Math.max(emWidthOf(renderedTextOf(b.text ?? "")), 0.5) * sizePt);
+    const totalW = widths.reduce((a, w) => a + w, 0);
+    // 栏内可用宽（留 2% 边距）；若拼不下则等比收缩到栏宽
+    const avail = (colR - colL) * 0.98;
+    const scale = totalW > avail ? avail / totalW : 1;
+
+    let acc = 0;
+    row.forEach((b, k) => {
+      const n = nodes[idxs[k]];
+      if (!n) return;
+      const w = widths[k] * scale;
+      const xStart = colL + acc;
+      acc += w;
+      n.style.left = `${(xStart / p.width) * 100}%`;
+      n.style.top = `${(topPt / p.height) * 100}%`;
+      n.style.width = `${(w / p.width) * 100}%`;
+      n.style.height = `${(maxH / p.height) * 100}%`;
+      n.classList.add("blk-choice-row");
+      n.title = `${n.title} ｜（上游把一行横排选项切成竖排，已还原为一行）`;
+    });
+  }
 }
 
 /* ── 三类「额外内容/标记」 ── */
