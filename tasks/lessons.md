@@ -286,3 +286,43 @@ mbl 软增量 74% 是跨行垃圾——该范式的跷跷板（配带率↑=语�
   把状态落盘、结束本轮，人工回来时从落盘状态续跑。
 - 「等待用户」不是工作流步骤，是**会话终止条件**——循环里轮询一个只有人才能给的输入 = 空转。
 - 人工环节要做**负担最小化设计**（只勾错、预设原因标签、自动保存、服务器直收），让参与成本趋近于零。
+
+## L16. 主仓库不是「只有我在动」：`git checkout` 前必须先查谁在写（2026-11-24 事故）
+
+**事故**：2026-11-24 早，中台按 rules.json 把用户反馈派给 Kimi Code（`use:"command"`,
+`kimi -p`），它在**主仓库**里改 final.js / index.html / 新建 final/knowledge-filter.js。
+我查 `git status` 看到「未跟踪/已修改」后判定为「意外脏数据」，直接 `git checkout` 还原
+——**把 Kimi 正在写的在制品清了**。所幸它自己重做并最终提交了 `ace316d`，没造成不可逆损失。
+
+**根因**：我默认「主仓库只有本会话在写」。实际有三条独立写入源：本会话、中台派出的 Agent
+（kimi/claude/codex 的 `-p` 非交互模式）、以及用户自己的编辑器。它们的写入不会通知我。
+
+**规则**：
+
+- 在**主仓库**（非自己独占的 worktree）看到未提交改动时，**不要**直接 `checkout`/`reset`/`clean`。
+  先按顺序查三件事：① `git log --oneline -5` 看有没有新提交；② `ps aux | grep -E "kimi|claude|codex"`
+  看有没有 Agent 在跑；③ `ls -lt` 看改动文件的 mtime 是否在最近几分钟内。
+- 三者任一有异常（有新提交 / 有 Agent 进程 / mtime 很新）⇒ **只搬走不销毁**：
+  存成 patch + 复制到独立 worktree，再还原主仓库。绝不丢弃。
+- 中台派出 Agent 的 cwd 就是项目根（rules.json 里写死），所以它**天然会在主仓库写文件**。
+  这不是 bug，是设计；要隔离得改 rules 的 cwd，不是改 Agent 的行为。
+- 相关：[[multi-agent-parallel-workflow]]（多会话并行的检查清单）、[[subagent-concurrency-limit]]
+
+## L17. 说「加个参数」之前先 `kimi --help`（2026-11-24 用户纠正）
+
+**事故**：用户问「怎么让 Kimi 桌面版看到中台派出的会话」，我回答「给 command 加
+`--session-dir`，指到桌面版认的目录」。用户照做后发现**没有这个参数**。
+
+**根因**：我按印象（其他 CLI 工具常见的 `--session-dir`/`--data-dir`）编造了参数名，
+没有实际执行 `kimi --help` 验证。
+
+**规则**：
+
+- **任何**「给某工具加某参数」的建议，必须先 `tool --help` 或查官方文档确认该参数存在。
+  印象不是证据。
+- 拿不准时，宁可说「我需要先查一下」，也不要给一个看起来合理但没验证的参数。
+- 具体到 Kimi Code：会话存储根由 `KIMI_CODE_HOME` 环境变量决定（默认 `~/.kimi-code`），
+  **没有** `--session-dir` 这类命令行参数；`~/.local/bin/kimi` 是 wrapper，已设
+  `KIMI_CODE_HOME=/Volumes/zhitai/project/kimi-code/data`。桌面版 GUI 不读这个 wrapper，
+  所以它读默认的 `~/.kimi-code`——这才是「桌面版看不到 CLI 会话」的根因。
+- 相关：[[magpie-image-proxy-budget]]（同一轮排查中另一个「先验证再下结论」的例子）
