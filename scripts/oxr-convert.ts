@@ -104,6 +104,8 @@ export interface ConvertStats {
   cleanupSmilesUnwrapped: number;
   /** `blank` 块里纯 `\_` 噪声（原卷为分数线/横线）被丢弃的次数（明细同上） */
   cleanupBlankDropped: number;
+  /** 用外部真实行框（V3）替换掉的行数；未接线时为 0 */
+  replacedLines?: number;
   fontSize: { p10: number; p50: number; p90: number };
 }
 
@@ -587,6 +589,7 @@ export async function convertOxrResponse(
       dedupeMergedBadge: mergedBadgeTotal,
       cleanupSmilesUnwrapped: cleanupSmiles.length,
       cleanupBlankDropped: cleanupBlanks.length,
+      replacedLines,
       fontSize: { p10: pct(0.1), p50: pct(0.5), p90: pct(0.9) },
     },
   };

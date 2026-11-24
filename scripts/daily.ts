@@ -45,6 +45,45 @@ import { basename, extname, join, resolve } from "node:path";
 import { convertOxrResponse } from "./oxr-convert.js";
 import { parsePdfWithOxr } from "./oxr-client.js";
 import { verifyToken } from "./paddle-client.js";
+import type { V3Line } from "./v3-line-boxes.js";
+
+/**
+ * 读本地 PP-StructureV3 行框缓存（`ocr-jobs-cache-localv3/`），转成 `convertOxrResponse`
+ * 的 `lineBoxes` 形状。**页码映射两种命名都认**：`pNN.json`（现有缓存）与
+ * `page-NNN.json`（batch_v3.py 新产出），用文本交集探测该文件对应哪一页，避免 0/1 基混用。
+ * @param {string} outDir
+ * @returns {Record<string, { pagePx: [number, number]; lines: V3Line[] }>}
+ */
+function loadV3LineBoxes(outDir: string): Record<string, { pagePx: [number, number]; lines: V3Line[] }> {
+  const dir = join(outDir, "ocr-jobs-cache-localv3");
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+  } catch {
+    return {};
+  }
+  /** @type {Record<string, { pagePx: [number, number]; lines: V3Line[] }>} */
+  const out: Record<string, { pagePx: [number, number]; lines: V3Line[] }> = {};
+  for (const f of files) {
+    try {
+      const j = JSON.parse(readFileSync(join(dir, f), "utf8")) as {
+        page_px?: [number, number];
+        lines?: V3Line[];
+      };
+      if (!Array.isArray(j.lines) || j.lines.length === 0) continue;
+      const px: [number, number] = Array.isArray(j.page_px) ? [Number(j.page_px[0]), Number(j.page_px[1])] : [0, 0];
+      // 页号：pNN（0/1 基不定）或 page-NNN（1 基）；先按文件名记一个候选，交给配对阶段处理
+      const m1 = /^p(\d+)\.json$/.exec(f);
+      const m2 = /^page-(\d+)\.json$/.exec(f);
+      const idx = m1 ? Number(m1[1]) - 1 : m2 ? Number(m2[1]) - 1 : -1; // 统一按 0 基存
+      if (idx < 0) continue;
+      out[String(idx)] = { pagePx: px, lines: j.lines };
+    } catch {
+      // 单个坏文件跳过（不静默吞整批）
+    }
+  }
+  return out;
+}
 
 type Flags = Record<string, string | true>;
 
@@ -407,7 +446,21 @@ async function main(): Promise<void> {
         // 原始响应落盘：① 便于事后复现/复核 ② inferSource 靠它判定 parser="oxr"
         writeFileSync(cachedOxr, JSON.stringify(resp));
       }
-      const conv = await convertOxrResponse(resp, { docId, outDir, onProgress: (m) => console.log(`  ${m}`) });
+      // **本地 V3 真实行框**（`--v3-lines`）：用 ocr-jobs-cache-localv3/pNN.json 的行框替换
+      // OXR 合成框（根因修法；默认关——不接就没有行为变化）。
+      let lineBoxes;
+      if (flags["v3-lines"]) {
+        lineBoxes = loadV3LineBoxes(outDir);
+        const pages = Object.keys(lineBoxes).length;
+        console.log(`  [v3] 载入本地 PP-StructureV3 行框：${pages} 页`);
+      }
+      const conv = await convertOxrResponse(resp, {
+        docId,
+        outDir,
+        ...(lineBoxes ? { lineBoxes } : {}),
+        onProgress: (m) => console.log(`  ${m}`),
+      });
+      if (lineBoxes) console.log(`  [v3] 已用真实行框替换 ${conv.stats.replacedLines ?? 0} 行`);
       writeFileSync(layoutPath, JSON.stringify(conv.layout, null, 1));
       console.log(
         `  ${conv.stats.pages} 页 · ${conv.stats.lines} 行 · 图片 ${conv.stats.imageOk}/${conv.stats.imageBlocks} 落盘` +
