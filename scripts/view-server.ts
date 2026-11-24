@@ -460,8 +460,14 @@ async function handleFeedbackList(res: ServerResponse, url: URL): Promise<void> 
 /**
  * 把「新反馈」作为事件送进 agent-autoloop 中台（2026-11-23 用户需求）。
  * 中台是**被动 HTTP 协议**（它不主动连任何东西）⇒ 由本服务主动 POST。
- * 配置：AGENT_AUTOLOOP_URL（默认 http://127.0.0.1:17171）+ AGENT_AUTOLOOP_KEY。
- * 未配置 / 发送失败 ⇒ 只打一行日志（反馈本身已落盘，用户可随时用 npm run feedback:collect 拉）。
+ * 配置：AGENT_AUTOLOOP_URL + AGENT_AUTOLOOP_KEY（**无默认值**——见下）。
+ * 两者由 `.local/view-server-env.sh` 提供（密钥动态读 ~/.agent-autoloop/config.json，不硬编码明文）。
+ * **缺任一即打 warn 后返回**（反馈本身已落盘，用户可用 npm run feedback:collect 拉）。
+ *
+ * ⚠️ 2026-11-24 事故：`npm run view` 不会自动 source 那个 env 文件，直接在终端起服务就丢了中台接线
+ * （本函数静默 return ⇒ 反馈事件根本没发出，hub.db 查无此事件，中台因此从没处理过那条反馈）。
+ * 修法两条：①本函数把静默改成 warn；②新增 `npm run view:feedback` 脚本内部 source env 再启动（见 package.json）。
+ * 历史注释里的「默认 http://127.0.0.1:17171」是过期串（真实端口写在中台 config.json 的 hub.listen=3350），已删。
  */
 async function notifyAutoloop(ev: {
   id: string;
@@ -471,7 +477,13 @@ async function notifyAutoloop(ev: {
 }): Promise<void> {
   const url = process.env["AGENT_AUTOLOOP_URL"];
   const key = process.env["AGENT_AUTOLOOP_KEY"];
-  if (!url || !key) return;
+  if (!url || !key) {
+    console.warn(
+      "[feedback] 中台事件未发送：缺 AGENT_AUTOLOOP_URL/KEY（用 `npm run view:feedback` 启动才会带；" +
+        "反馈已落盘，不影响提交）",
+    );
+    return;
+  }
   try {
     // 协议（docs/protocol.md）：id + type 必填；subject=标识符（进提示词）。
     // summary/detail 只作记录不进提示词 ⇒ 反馈正文放 summary 会被 Agent 看到，需脱敏：正文放 detail。
@@ -767,6 +779,15 @@ server.listen(PORT, HOST, () => {
   console.log(`  无快照时先运行 npm run stages:export 生成`);
   console.log(`  换卷：npm run view <docId> 或用 ?doc=<docId> 查询参数（doc 需完整，空格写 %20）`);
   if (READ_ONLY) console.log(`  标签写通道：只读（TAGS_WRITE=0）`);
+  // 中台反馈接线状态：启动即报，避免「服务在跑但反馈事件静默不发」无声无息（2026-11-24 事故根因）。
+  if (process.env["AGENT_AUTOLOOP_URL"] && process.env["AGENT_AUTOLOOP_KEY"]) {
+    console.log(`  反馈中台：已接线 ${process.env["AGENT_AUTOLOOP_URL"]}（提交反馈会唤醒处理 Agent）`);
+  } else {
+    console.warn(
+      `  ⚠️ 反馈中台：未接线（缺 AGENT_AUTOLOOP_URL/KEY）——提交的反馈不会通知处理 Agent；` +
+        `用 \`npm run view:feedback\` 启动可自动带上`,
+    );
+  }
   if (lan) {
     // 显式开了 LAN 才报；默认只监听本机，避免同网段默认可写（HANDOFF §6-10）
     const hosts = lanAddresses();

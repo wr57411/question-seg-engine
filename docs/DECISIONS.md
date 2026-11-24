@@ -5201,3 +5201,15 @@ B-47 是「错的东西」（修=窗口期内容正确）；且 B-47 修复产�
 **决策 3 · 中台接线与 Agent 选型**：view-server `notifyAutoloop()` POST `/v1/events`（Bearer source key，`{id,type:"feedback.created",subject,summary,detail}`；正文只进 detail 不进 summary——隐私；失败只 warn 不影响提交）。中台 rules.json：source local → agent `feedback`（`use:"command"`, `command:["/Users/john/.local/bin/kimi","-p","{prompt}"]`）→ rule「处理成品页反馈」（cwd=项目根，prompt 含读 feedbacks.json→修/排期/ask→回写 status+reply）。**为什么不是 ZCode**：ZCode 无 CLI（Electron 应用，进程名 zcode-cli 只是 GUI 内部进程），中台 command agent 调不起；kimi `-p` 非交互可直跑（`-p` 与 `--auto` 互斥，不可同用）。启动环境 `.local/view-server-env.sh`（gitignore，密钥动态读 config.json，不硬编码明文）。
 
 **验收**：typecheck:viewer 绿；813 测试 0 fail；浏览器端到端——四类切换正确隐藏卷/页码行、request 提交落盘 kind=request/docId=""、ask→need-info、答 1 条→「待澄清 1 项」、全答完→自动转「处理中」；中台探针 routed=["处理成品页反馈"]；kimi 冒烟通过。测后 E2E 垃圾数据清除，用户 3 条真实反馈零损失。提交 a51b700（后端）/ 9723a8c（前端）。
+
+## 122 反馈事件丢线修复与「带 env 启动」入 script（2026-11-24，用户报障触发）
+
+**背景**：§121 接线后，用户提交的反馈再不被中台处理。定位（子代理独立复核 + 我复验）：发送侧 `notifyAutoloop()` 依赖 `AGENT_AUTOLOOP_URL/KEY`，这两个值只存在于 `.local/view-server-env.sh`（gitignore），而 `npm run view` 不会 source 它 ⇒ 直接在终端起服务时两者为空 → L474 `if (!url||!key) return;` **静默返回**，事件从未发出（hub.db `events` 表无该条可证；中台本身健康、规则正常）。这是「靠人工记着 source」的隐性约定，重启一次就断，且断得无声。
+
+**决策 1 · 不再静默**：缺配置/发送失败都打日志（`[feedback] …` warn）；启动日志固定报告「反馈中台：已接线 <url>」或「⚠️ 未接线」。理由：静默是这次排查成本的主要来源——宁可啰嗦，不可无声。
+
+**决策 2 · env 加载写进 npm script**：`view`/`view:server`/`view:lan` 改为 `sh -c '[ -f .local/view-server-env.sh ] && . ./.local/view-server-env.sh; exec tsx scripts/view-server.ts'`（文件存在才 source；不存在时行为同旧版，不阻断启动）。**为什么不把密钥挪进仓库/环境全局**：密钥由 `~/.agent-autoloop/config.json` 生成，硬编码会泄漏且轮换即失效；动态读取是唯一单一真源。
+
+**决策 3 · 补发漏掉的事件**：对已落盘但没通知的反馈，用 `POST /v1/events`（Bearer source key，协议保证同 id 幂等）按记录原样补发；本次为 fb-20261124T015614-8f0e。**不在代码里做「启动时扫描未通知反馈」的自动补偿**——那会把「漏发」变成隐式批量重放，与 B-69「Agent 可能重复处理」叠加；一次性人工补发更可控。
+
+**验收**：重启后日志显「已接线」；`/api/feedback` create 走完整链路 → hub.db 出现事件且中台立即派 run（#6），自测条目随后清理、未污染真实库；`npm test` 820（819 pass/0 fail/1 skip）、typecheck 绿。台账 B-72 DONE。
