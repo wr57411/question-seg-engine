@@ -23,6 +23,7 @@ import { stackContents, tagStackPlacements } from "./tag-layout.js";
 import { parseTableHtml } from "./table-html.js";
 import { isMisreadFigureText } from "./figure-misread.js";
 import { findHorizontalChoiceRows } from "./choice-row.js";
+import { figureEdgeClamps } from "./figure-overlap.js";
 
 /**
  * 本渲染器消费的快照形状（只声明**读过**的字段，不追求与引擎 schema 完全一致）：
@@ -592,8 +593,33 @@ export function appendBlockNodes(c, p, canvasW, baseFont, mergeCtx, doc = "", ca
    *  命中的组按**同一行横排**摆放——不删块、不改数据，只把四个块摆回一行（检测不改写）。
    *  位置算法：以组内首块左缘为起点，按各块**墨迹宽**（bboxW）顺序拼接，行高取组内最大块高。 */
   applyChoiceRows(nodes, p);
+  /** 「左文右图」文字框过冲收缘（fb-20261122T134356-rdwi）：判据见 figure-overlap.js。
+   *  命中块把**右缘收紧到图左缘**并允许换行（原书该处文字本就是两行），字号不再被 clampByWidth 压小。 */
+  applyFigureEdges(nodes, p);
   for (const n of nodes) if (n) c.append(n);
   return nodes;
+}
+
+/**
+ * 把「文字框右缘伸到图上」的块收到图左缘，并放开换行使文字按窄宽自然折行（纯显示层，数据不动）。
+ * @param {(HTMLElement | null)[]} nodes
+ * @param {Page} p
+ */
+function applyFigureEdges(nodes, p) {
+  const clamps = figureEdgeClamps(p.blocks ?? [], p.width, Array.isArray(p.centers) ? p.centers : undefined);
+  if (clamps.size === 0) return;
+  for (const [i, rightPt] of clamps) {
+    const b = p.blocks[i];
+    const n = nodes[i];
+    if (!b || !n) continue;
+    const leftPt = b.bbox[0];
+    if (!(rightPt > leftPt)) continue; // 图在文字左边等异常形态不处理
+    n.style.left = `${(leftPt / p.width) * 100}%`;
+    n.style.width = `${((rightPt - leftPt) / p.width) * 100}%`;
+    // 放开 nowrap：让文字在收窄后的框里像原书一样折行（否则只能压字号）
+    n.classList.add("blk-figure-edge");
+    n.title = `${n.title} ｜（文字框原伸出到图上，已收至图缘并按栏宽折行）`;
+  }
 }
 
 /**
