@@ -1776,3 +1776,25 @@ layout.json / content_list.json
 - **端到端验证**：探针事件 routed=["处理成品页反馈"]；真实 create→落盘 kind=request/docId=""/questions=[]；ask→status=need-info；浏览器内答 1 条→「待澄清 1 项」、全答完→自动转「处理中」；kimi 冒烟通过。测后 E2E 数据已清，`data/out/feedback/feedbacks.json` 与 `tmp/fb-backup.json` 字节一致（用户 3 条真实反馈零损失）。
 
 **未闭合**：① N13 真机验收（用户设备）② OpenMausBot 配对（MCP 写仍 403，需重启 ZCode；监督改道 GitHub 提交流+HANDOFF，见记忆 openmausbot-write-restricted）③ batch 无人值守演练（等投新书）④ entryCrop 裁图全库审计（收益边际，暂缓）。
+
+## 9.6 本轮（2026-11-24 · 成品页知识点筛选，反馈 request 落地）
+
+**背景**：反馈 `fb-20261124T002900-ln8j`（kind=request，无卷/无截图）：「【E2E】希望成品页能按知识点筛选题目」。按中台规则当需求处理：评估 → 落地 → 回写。
+
+**口径决定（为什么这样做）**：成品页原有「挑题 → 专题/类别」是**手工归类**，实测 `data/out/teach/topics.json` 4 个专题的绑定 **0 条**（`bindings: []`），拿它做筛选等于没数据。改取**题目自带的小节** `stages.json.pages[i].questions[j].section`（原书自己的知识组织，15 册快照全有值）。筛选**不删内容**：命中题号牌描边 + 结果面板列清单可跳，未命中的题照旧印在纸面。
+
+**落地**：
+- 纯逻辑 `final/knowledge-filter.js`（`// @ts-check` + JSDoc，纳入主 tsconfig）：`normalizeSection` / `facetKeyOf` / `buildKnowledgeFacets` / `filterByFacet` / `knowledgeSummary`。两条硬判据：① **面板与筛题共用 `facetKeyOf` 一把尺子**（杜绝「面板有这个知识点、点进去 0 题」）；② **含句号的格子不冒充知识点**（`.。；;！？!?`）——全库实测被误当小节的三种形态都含句号（大题说明「一、选择题:本题共10小题,共46分.…」2 册 24 题、题干残片「一、丙第二、乙第三.…」直线运动 8 题），这些题落「未分节」并排最后，**题不丢、只是不冒充知识点**。
+- 成品页 UI：`final/index.html` 顶栏加「知识点」按钮 + `#kp-menu` 面板（复用 `.fb-docs-menu` 样式）；`final/final.js` 加 `state.kp`、`renderKpMenu` / `toggleKpMenu` / `closeKpMenu` / `selectFacet` / `applyKpHighlight`（`renderBook` 尾部重贴、`loadDoc` 换卷复位、外部点击与 Esc 关闭、快照未就位时面板说「正在读取本册」不抛错）；`final/final.css` 加 `.fb-kp*` 与 `.q-chip.kp-hit`（box-shadow 描边，不改字号不动排版）。
+- TDD：`tests/knowledge-filter.test.ts` **7 例**（顺序/计数、空白归一、筛选不猜且不改输入、未分节、标题判据、面板与筛题同尺子）。
+
+**验证（可复现）**：
+- `npm run check` **全绿 EXIT=0**：820 测试（819 pass / 0 fail / 1 skip）、typecheck + typecheck:viewer 绿、渲染审计 7 卷、bank:all 1613 条；凭证 `30cc8b7992bcd4c7`。
+- 浏览器实测（headless Chrome 9229 + CDP，脚本 `tmp/kp-filter/cdp-kp*.mjs`，证据 `tmp/kp-filter/shots/*.png`）：`23必刷题 1 直线运动` 面板读数「本册 85 题 · 3 个知识点」= 全部 85 / 第2节…(1) 11 / 第3节…(2) 62 / 未分节 12；选第2节 ⇒ 命中 11、`.q-chip.kp-hit` 11、其余 73 个号牌仍在（`.q-chip` 总数 84 不变）；点清单第 1 条跳到 p3 并闪标；「全部题目」复位 ⇒ 描边 0；切「审计标记」整册重绘后描边仍为 11。计算样式实证：命中号牌 `box-shadow: rgb(176,125,0) 0 0 0 2px, rgba(176,125,0,.22) 0 0 0 4px`，未命中 `none`。
+- 已知边界：① 快照 85 题 vs 号牌 84 个（1 题无号牌，既有现象，非本次引入）；② 控制台 403=favicon、404=该册无 `tags/`、无 `teach/bindings/`（既有行为，`getJson` 404 返回 null 不报错）。
+
+**顺带**：① `tests/meta-consistency.test.ts` 加「逐个复核存在性」——并发下 `tests/batch.test.ts` 在 `data/out` 建/删临时册（`bgx-batch-*`）会让本门 ENOENT 假红，本轮实测复现过一次；② 登记 **B-68**（上游 `section` 被题干/大题说明污染，未修，需重导出复验）。
+
+**反馈回写**：`fb-20261124T002900-ln8j` 在中台派发到本会话期间被并行会话的「E2E 数据已清」清理掉了（`data/out/feedback/feedbacks.json` 现只剩用户 3 条真实反馈）——故**没有回写 status/reply**（不重建测试数据），需求本体按上文照做。
+
+**未闭合**：B-68（section 污染，待修向拍板）；知识点筛选目前只覆盖「题目自带小节」，`topic/` 自动知识点索引 `data/out/topics/index.json` 实测 **0 条**（`npm run topic:export` 产物为空），要按自动知识点筛需另立项。

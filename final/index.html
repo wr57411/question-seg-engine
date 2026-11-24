@@ -37,6 +37,14 @@
       <span class="fb-page" id="page-now">—</span>
     </div>
     <div class="fb-right">
+      <!-- 知识点筛选（2026-11-24 用户反馈）：按题目自带的小节（原书知识点）筛，
+           命中的题在纸面上描边标出、面板列清单可逐条跳；不隐藏任何题。 -->
+      <div class="fb-kp">
+        <button class="fb-kp-btn" id="t-kp" type="button" aria-haspopup="listbox"
+                aria-expanded="false" aria-pressed="false"
+                title="按知识点（题目自带的小节）筛选题目">知识点</button>
+        <div class="fb-docs-menu fb-kp-menu" id="kp-menu" role="listbox" aria-label="知识点" hidden></div>
+      </div>
       <button class="fb-pick" id="t-pick" type="button" aria-pressed="false"
         title="打开后点题目任意位置，把这道题归入专题/类别">挑题</button>
       <button class="fb-more" id="t-more" type="button" aria-expanded="false"

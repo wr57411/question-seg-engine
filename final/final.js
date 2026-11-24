@@ -29,6 +29,7 @@ import { entryCrop, entrySegments, fitEntryCrops } from "./entry-paper.js";
 import { pickQuestionAt } from "./pick-hit.js";
 import { prettifyLatex } from "../stages/latex-display.js";
 import { tagSection } from "./tag-panel.js";
+import { facetLabel, filterByFacet, knowledgeSummary } from "./knowledge-filter.js";
 import { anchorOf, loadBindings, loadLibrary, reconcile, saveBindings, saveLibrary, tagIdsFor } from "./tag-store.js";
 import {
   addCombo,
@@ -210,7 +211,8 @@ const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
  *   undo: UndoRecord | null,
  *   manage: { renaming: string | null, usage: TeachUsage | null } | null,
  *   teachUsage: TeachUsage | null,
- *   search: { on: boolean, q: string }
+ *   search: { on: boolean, q: string },
+ *   kp: string | null
  * }}
  */
 const state = {
@@ -242,6 +244,7 @@ const state = {
   manage: null, // 管理面板状态 {renaming: id|null, usage}；null=面板关着
   teachUsage: null, // 跨所有卷的「某个专题/类别被几题在用」，管理面板删除前要摆出来
   search: { on: false, q: "" }, // 托盘搜索：开着时组合条让位给搜索框，两行同步过滤
+  kp: null, // 知识点筛选：facet id = 原书小节名（见 knowledge-filter.js）；null = 看全册
 };
 
 /** 纸面宽度：像书一样尽量宽，但不超出视口（留出两侧留白与滚动条） */
@@ -2001,6 +2004,7 @@ function renderBook() {
     state.pages[i] = { sec, head, p, paper: pr };
   });
   if (state.picked) paintPickSelection(state.pages[state.picked.p.index]);
+  applyKpHighlight(); // 整册重绘（开关/屏宽变化）后把知识点描边贴回去
   updatePageIndicator();
 }
 
@@ -2118,6 +2122,10 @@ async function loadDoc(doc) {
     state.sheet = null;
     state.picked = null;
     state.lastClassified = null;
+    state.kp = null; // 知识点筛选跟着卷走：换卷即回全册（小节名逐册不同）
+    /** @type {HTMLButtonElement} */ ($("t-kp")).setAttribute("aria-pressed", "false");
+    closeKpMenu();
+    $("hits").hidden = true;
     hideUndo();
     closeCreate();
     closeComboPop();
@@ -2333,6 +2341,124 @@ function runJump(raw) {
   showHits(searchBlocks(q), q);
 }
 
+/* ── 知识点筛选（用户 2026-11-24 反馈：希望成品页能按知识点筛选题目）──
+ *
+ * 知识点 = **题目自带的小节**（`stages.json` 每题的 `section`，如「第2节 匀变速直线运动的
+ * 规律（1）」）—— 原书自己的知识组织，15 册全有值，不需要用户先手工归类（手工专题
+ * `teach/topics` 实测绑定为 0 条，拿它做筛选等于没数据）。
+ *
+ * 红线：**筛选不删内容**。命中的题号牌描边标出、结果面板列清单可逐条跳；没命中的题
+ * 照旧印在纸面上 —— 用户随时能滚回全册，不存在「被筛没了」。
+ */
+
+/** 当前册所有题（按页序 = 原书顺序）
+ * @returns {SnapQuestion[]} */
+function allQuestions() {
+  /** @type {SnapQuestion[]} */
+  const out = [];
+  for (const p of /** @type {Snap} */ (state.data).pages) for (const q of p.questions ?? []) out.push(q);
+  return out;
+}
+
+/** 某个知识点下的题（带页号，跳转用；保持原册顺序）
+ * @param {string | null | undefined} facetId
+ * @returns {Array<{ pageIndex: number, q: SnapQuestion }>} */
+function knowledgeHits(facetId) {
+  /** @type {Array<{ pageIndex: number, q: SnapQuestion }>} */
+  const out = [];
+  if (!facetId) return out;
+  /** @type {Snap} */
+  const data = /** @type {Snap} */ (state.data);
+  data.pages.forEach((p, i) => {
+    for (const q of filterByFacet(p.questions ?? [], facetId)) out.push({ pageIndex: i, q });
+  });
+  return out;
+}
+
+/** 命中题号牌描边（其它题不隐藏、不淡出）。整册重绘后要重贴，故 renderBook 尾部会调 */
+function applyKpHighlight() {
+  if (!state.data) return;
+  const on = new Set(knowledgeHits(state.kp).map((h) => h.q.id));
+  for (const chip of document.querySelectorAll(".q-chip")) {
+    const id = /** @type {HTMLElement} */ (chip).dataset.qid ?? "";
+    chip.classList.toggle("kp-hit", !!state.kp && on.has(id));
+  }
+}
+
+/** 知识点面板：抬头摆总数，逐条列知识点与题数（顺序 = 原书顺序，未分节在最后） */
+function renderKpMenu() {
+  const menu = $("kp-menu");
+  menu.replaceChildren();
+  // 快照还没到手（换卷中/首次加载）时面板也能点开：说清在等什么，不抛错、不空着
+  if (!state.data) {
+    menu.append(el("div", "fb-docs-group", "（正在读取本册，稍等一下）"));
+    return;
+  }
+  const { facets, total } = knowledgeSummary(allQuestions());
+  menu.append(el("div", "fb-docs-group", `本册 ${total} 题 · ${facets.length} 个知识点（按原书小节）`));
+  const all = el("button", "fb-docs-item" + (state.kp ? "" : " is-current"));
+  all.type = "button";
+  all.setAttribute("role", "option");
+  all.append(el("span", "fb-docs-label", "全部题目"));
+  all.append(el("span", "kp-count", String(total)));
+  all.addEventListener("click", () => selectFacet(null));
+  menu.append(all);
+  for (const f of facets) {
+    const b = el("button", "fb-docs-item" + (state.kp === f.id ? " is-current" : ""));
+    b.type = "button";
+    b.setAttribute("role", "option");
+    b.append(el("span", "fb-docs-label", f.label));
+    b.append(el("span", "kp-count", String(f.count)));
+    b.addEventListener("click", () => selectFacet(f.id));
+    menu.append(b);
+  }
+  if (!facets.length) menu.append(el("div", "fb-docs-group", "（本册快照里没有题目）"));
+}
+
+/** @param {boolean} [open] */
+function toggleKpMenu(open) {
+  const menu = $("kp-menu");
+  const next = open ?? menu.hidden;
+  menu.hidden = !next;
+  /** @type {HTMLButtonElement} */ ($("t-kp")).setAttribute("aria-expanded", String(next));
+  if (next) renderKpMenu();
+}
+
+function closeKpMenu() {
+  $("kp-menu").hidden = true;
+  /** @type {HTMLButtonElement} */ ($("t-kp")).setAttribute("aria-expanded", "false");
+}
+
+/** 选中一个知识点（null = 回到全册）：记状态 → 纸面描边 → 列清单 → 收起面板
+ * @param {string | null} facetId */
+function selectFacet(facetId) {
+  if (!state.data) {
+    flash("本册还在读取，稍等一下");
+    return;
+  }
+  state.kp = facetId ?? null;
+  /** @type {HTMLButtonElement} */ ($("t-kp")).setAttribute("aria-pressed", String(!!state.kp));
+  applyKpHighlight();
+  closeKpMenu();
+  if (!state.kp) {
+    $("hits").hidden = true;
+    flash("已显示全册");
+    return;
+  }
+  const label = facetLabel(state.kp);
+  const hits = knowledgeHits(state.kp);
+  showHits(
+    hits.map((h) => ({
+      kind: "question",
+      pageIndex: h.pageIndex,
+      q: h.q,
+      snippet: `第 ${h.q.number} 题${h.q.section ? ` · ${h.q.section}` : ""}`,
+    })),
+    label,
+  );
+  flash(`知识点「${label}」：${hits.length} 题（纸面已标出，其它题仍在）`);
+}
+
 /* ── 阅读进度（每册独立）──
  * 每天用的人不会每天从第 1 页翻起。位置存 localStorage：
  * 隐私模式/禁用存储时**写不进去也不影响阅读**（try/catch 兜住，不弹错）。 */
@@ -2523,6 +2649,11 @@ function initBar() {
   }
 
   $("t-pick").addEventListener("click", () => setPickMode(!state.pickMode));
+  // 知识点筛选：按钮开面板（面板是 DOM，截图可核、触屏目标 44px）
+  /** @type {HTMLButtonElement} */ ($("t-kp")).addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleKpMenu();
+  });
   $("pick-close").addEventListener("click", () => setPickMode(false));
   $("pick-same").addEventListener("click", applySameAsPrevious);
   $("pick-undo-btn").addEventListener("click", undoLast);
@@ -2554,6 +2685,7 @@ function initBar() {
     const has = (id) => path.some((n) => /** @type {{ id?: string }} */ (n)?.id === id) || !!/** @type {HTMLElement} */ (e.target)?.closest?.(`#${id}`);
     if (!has("manage-pop") && !has("pick-manage")) closeManage();
     if (!has("doc-menu") && !has("doc-pick")) closeDocMenu();
+    if (!has("kp-menu") && !has("t-kp")) closeKpMenu();
     const pop = $("combo-pop");
     if (!pop || pop.hidden) return;
     if (has("combo-pop") || has("combo-add")) return;
@@ -2564,6 +2696,7 @@ function initBar() {
     closeManage();
     closeComboPop();
     closeDocMenu();
+    closeKpMenu();
     if (state.search.on) setSearchOn(false);
   });
   $("pick-add-topics").addEventListener("click", () => openCreate("topics"));

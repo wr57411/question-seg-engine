@@ -122,6 +122,30 @@
   .fb-pick { min-height: 44px; padding: 0 16px; font-size: 14px; }
 }
 
+/* 知识点筛选（2026-11-24）：与卷切换共用 `.fb-docs-menu` 面板样式（DOM 面板，截图可核）。
+   选中态用「实心」跟挑题模式区分：知识点是"我在看哪一类题"，挑题是"我在给题归类"。 */
+.fb-kp { position: relative; flex: none; }
+.fb-kp-btn {
+  min-height: 32px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 3px;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 13px; cursor: pointer;
+}
+.fb-kp-btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.fb-kp-menu { right: 0; left: auto; width: min(340px, 92vw); max-height: min(64vh, 520px); }
+.kp-count {
+  flex: none; min-width: 2.2em; text-align: right;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+  color: var(--ink-soft);
+}
+/* 命中题在纸面上的记号：描边不改字号、不动排版（不挤邻块），也不遮号牌本身 */
+.q-chip.kp-hit {
+  box-shadow: 0 0 0 2px #b07d00, 0 0 0 4px rgba(176, 125, 0, .22);
+}
+@media (pointer: coarse) {
+  .fb-kp-btn { min-height: 44px; padding: 0 14px; font-size: 14px; }
+}
+
 .pick-tray {
   position: fixed; left: 50%; bottom: var(--pick-kb, 0px); transform: translateX(-50%);
   width: min(920px, 100%); z-index: 26;

@@ -32,6 +32,16 @@ test(
     assert.ok(DIRS.length > 0, "有 data/out 但没有任何可校验的文档，门是死的");
     const bad: string[] = [];
     for (const d of DIRS) {
+      // 并发下别的测试会在 data/out 建临时册再删掉（tests/batch.test.ts 的 bgx-batch-*）：
+      // 目录可能在上面那份快照之后消失。这里逐个复核，消失的直接跳过——
+      // 它本来就不是被检查对象（没有 meta.json 就无所谓"摘要与产物不一致"）。
+      if (
+        !existsSync(join(OUT, d, "meta.json")) ||
+        !existsSync(join(OUT, d, "questions.json")) ||
+        !existsSync(join(OUT, d, "stages.json"))
+      ) {
+        continue;
+      }
       const meta = JSON.parse(readFileSync(join(OUT, d, "meta.json"), "utf8")) as {
         stats?: { pages?: number; questions?: number };
       };
