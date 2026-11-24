@@ -40,6 +40,11 @@ export interface PairOptions {
   overlapMin?: number;
   /** 文本覆盖度下限（0..1）——**主判据**，默认 0.8（子代理标定：≥0.8 时误配率 0） */
   coverageMin?: number;
+  /**
+   * 同页图片框（pt 坐标 `[x0,y0,x1,y1]`）。给了才启用「不得更糟守卫」⑥——
+   * 防止 V3 拆段后尾段伸进图区、把「不压字」变成「压字」。不给则不启用该守卫。
+   */
+  images?: number[][];
 }
 
 /**
@@ -145,6 +150,44 @@ export function pairBlockToV3(
   const boxes = geo
     .map((l) => v3BoxToPt(l, opts))
     .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+
+  // ④ **并集尺寸守卫**（防「一个块吃到几行、并集远超原块」——实测书A p0 封面块旧宽 86pt
+  // 被换成 378pt 的并集，反而制造新的压字/串位）：并集相对原块的**水平扩张**不得超过 25%，
+  // **垂直不得超过 50%**（V3 行高通常略大于合成框，留余量）。
+  const uL = Math.min(...boxes.map((b) => b[0]));
+  const uR = Math.max(...boxes.map((b) => b[2]));
+  const uT = Math.min(...boxes.map((b) => b[1]));
+  const uB = Math.max(...boxes.map((b) => b[3]));
+  const oldW = blockBox[2] - blockBox[0];
+  const oldH = blockBox[3] - blockBox[1];
+  if (oldW > 0 && (uR - uL) > oldW * 1.25) return null;
+  if (oldH > 0 && (uB - uT) > oldH * 1.5) return null;
+
+  // ⑤ **覆盖守卫**（2026-11-24 实测补）：并集必须**盖住原块的水平范围**≥60%——
+  // 否则就是「一个整行块被换成其中一小片」（实测 p5 i69 整行 [313..557] 被换成 [514..524]，
+  // 文字全丢、只剩一个碎片压在图上）。这是「文本覆盖」判据的必要补充。
+  const coverX = Math.min(blockBox[2], uR) - Math.max(blockBox[0], uL);
+  if (oldW > 0 && coverX < oldW * 0.6) return null;
+
+  // ⑥ **不得更糟守卫**：替换后若任一段比原块**更往右越过本栏图片**（即制造了新的图压字），
+  // 则整体放弃（保持 OXR 原框）。实测书A p5/p12/p21 等：V3 把「横跨图左侧的行」拆成多段，
+  // 尾段落进图区 ⇒ 从「不压」变「压」。**保守优先：宁可不动，不可变差。**
+  const imgs = (opts as PairOptions & { images?: number[][] }).images ?? [];
+  if (imgs.length > 0) {
+    for (const box of boxes) {
+      for (const ib of imgs) {
+        const [ix0 = 0, iy0 = 0, ix1 = 0, iy1 = 0] = ib;
+        const ox = Math.min(box[2], ix1) - Math.max(box[0], ix0);
+        const oy = Math.min(box[3], iy1) - Math.max(box[1], iy0);
+        if (ox <= 0 || oy <= 0) continue;
+        // 新段是否比原块更深入图内？（右缘越界更多即「更糟」）
+        const newOver = box[2] - ix0;
+        const oldOver = blockBox[2] - ix0;
+        if (newOver > oldOver + Math.max(oldW * 0.05, 4)) return null;
+      }
+    }
+  }
+
   return { boxes, score: c };
 }
 

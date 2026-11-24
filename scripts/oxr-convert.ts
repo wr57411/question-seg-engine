@@ -489,9 +489,21 @@ export async function convertOxrResponse(
       // 命中则用 V3 的行框（真实墨迹位置）替换「均分块高」的合成框；配不上/未接线 ⇒ 原路合成。
       const ext = opts.lineBoxes?.[String(pageIdx)];
       if (ext && ext.lines?.length) {
+        const pageImgs = deduped.blocks
+          .filter((b) => String(b.type ?? "").toLowerCase() === "picture" || String(b.type ?? "").toLowerCase() === "figure")
+          .map((b) => {
+            const q = b.bbox ?? [];
+            return [
+              (Number(q[0]) || 0) * k,
+              (Number(q[1]) || 0) * k,
+              (Number(q[2]) || 0) * k,
+              (Number(q[3]) || 0) * k,
+            ];
+          });
         const hit = pairBlockToV3(text, bbox, ext.lines, {
           pagePx: ext.pagePx,
           pagePt: [A4_WIDTH_PT, Number(((A4_WIDTH_PT * h) / (w || 1)).toFixed(1))],
+          images: pageImgs,
         });
         if (hit) {
           for (const box of hit.boxes) {
