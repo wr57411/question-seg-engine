@@ -93,13 +93,15 @@ export function v3BoxToPt(line: V3Line, opts: PairOptions): [number, number, num
   // 像素 → pt 的比例（两方向各自算，容忍非等比缩放）
   const sx = pxW > 0 ? ptW / pxW : 1;
   const sy = pxH > 0 ? ptH / pxH : 1;
-  const b = Array.isArray(line.bbox) ? line.bbox : [];
-  const n = Array.isArray(line.norm) ? line.norm : [];
+  // 项目惯用写法：解构 + 默认值（与 oxr-convert.ts 取 bbox 一致，避开索引 undefined 推断）
+  const [bx0 = 0, by0 = 0, bx1 = 0, by1 = 0] = Array.isArray(line.bbox) ? line.bbox : [];
+  const [nx0 = NaN, ny0 = NaN, nx1 = NaN, ny1 = NaN] = Array.isArray(line.norm) ? line.norm : [];
   // norm 优先（V3 原生的页内归一化坐标）：乘页面 **pt** 尺寸
-  if (n.length >= 4 && n.slice(0, 4).every((v) => typeof v === "number" && Number.isFinite(v))) {
-    return [n[0] * ptW, n[1] * ptH, n[2] * ptW, n[3] * ptH];
+  if ([nx0, ny0, nx1, ny1].every((v) => Number.isFinite(v))) {
+    return [nx0 * ptW, ny0 * ptH, nx1 * ptW, ny1 * ptH];
   }
-  return [b[0] * sx, b[1] * sy, b[2] * sx, b[3] * sy];
+  // 退回像素换算
+  return [bx0 * sx, by0 * sy, bx1 * sx, by1 * sy];
 }
 
 /**
@@ -196,6 +198,7 @@ export function pairV3Lines(
       // 候选可被多个合成块复用吗？**不可**——同一 V3 行不能同时是两个合成行的替身。
       if (used.has(k)) continue;
       const c = cand[k];
+      if (!c) continue;
       const box = v3BoxToPt(c, opts);
       // ① 水平重叠比（用交集/较窄者）
       const ox = Math.min(s.bbox[2], box[2]) - Math.max(s.bbox[0], box[0]);

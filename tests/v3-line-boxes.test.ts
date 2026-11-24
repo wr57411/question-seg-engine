@@ -7,7 +7,7 @@ import {
   pairV3Lines,
   type V3Line,
   type SynthLine,
-} from "../scripts/v3-line-boxes.ts";
+} from "../scripts/v3-line-boxes.js";
 
 const OPTS = { pagePx: [993, 1404] as [number, number], pagePt: [596, 842.4] as [number, number] };
 

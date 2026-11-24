@@ -27,6 +27,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { emWidthOf, renderedTextOf } from "../stages/font-metrics.js";
+import { pairBlockToV3 } from "./v3-line-boxes.js";
 
 /** 试卷纸宽（pt）。与 MinerU layout.json 的 page_size[0] 同口径；150dpi 光栅 1243px ⇒ 596pt */
 const A4_WIDTH_PT = 596;
@@ -77,6 +78,15 @@ export interface ConvertOptions {
   noImages?: boolean;
   /** 进度回调（daily 用来打点） */
   onProgress?: (msg: string) => void;
+  /**
+   * 外部真实行框源（本地 PP-StructureV3）。给了就用它替换 OXR 合成行框——
+   * **默认不给** ⇒ 与历史行为逐字节一致（接线需显式，见红线「接线是行为变更」）。
+   * 形状：`{ [pageIdx]: { pagePx:[w,h], lines:[{text,score,bbox,norm}] } }`
+   * （与 data/out/<doc>/ocr-jobs-cache-localv3/pNN.json 同构）
+   */
+  lineBoxes?: Record<string, { pagePx: [number, number]; lines: import("./v3-line-boxes.js").V3Line[] }>;
+  /** 由外部行框替换的行数统计（diagnostics；不传就不计） */
+  onReplaced?: (n: number) => void;
 }
 
 export interface ConvertStats {
@@ -387,6 +397,8 @@ export async function convertOxrResponse(
   const cleanupSmiles: { page: number; type: string; bbox: number[]; content: string }[] = [];
   const cleanupBlanks: { page: number; type: string; bbox: number[]; content: string }[] = [];
   const fontSamples: number[] = [];
+  /** 被外部真实行框（V3）替换掉的行数——仅统计，供接线方评估覆盖率 */
+  let replacedLines = 0;
 
   for (const [pageIdx, page] of pages.entries()) {
     const { w, h } = readPageSize(page);
@@ -470,6 +482,34 @@ export async function convertOxrResponse(
       // 引擎 BlockKind 只有 text|image|table|formula，**没有 title**（MinerU 原始有 10 个
       // title、引擎产物 0 个 ⇒ 最终都归 text）。figure_caption/choice/equation/blank 同理。
       const outType = lower === "table" ? "table" : "text";
+
+      // —— **外部真实行框替换**（本地 V3，见 ConvertOptions.lineBoxes）——
+      // 命中则用 V3 的行框（真实墨迹位置）替换「均分块高」的合成框；配不上/未接线 ⇒ 原路合成。
+      const ext = opts.lineBoxes?.[String(pageIdx)];
+      if (ext && ext.lines?.length) {
+        const hit = pairBlockToV3(text, bbox, ext.lines, {
+          pagePx: ext.pagePx,
+          pagePt: [A4_WIDTH_PT, Number(((A4_WIDTH_PT * h) / (w || 1)).toFixed(1))],
+        });
+        if (hit) {
+          for (const box of hit.boxes) {
+            paraBlocks.push({
+              type: outType,
+              bbox: box,
+              lines: [
+                {
+                  bbox: box,
+                  font_size: fontSize,
+                  spans: [{ content: text, font_size: fontSize }],
+                },
+              ],
+            });
+            lineTotal++;
+          }
+          replacedLines += hit.boxes.length;
+          continue;
+        }
+      }
 
       // 每行**独立成块**（缺陷 D）：块 bbox 高取字号本身（墨迹口径），行位置按 lineH 步进。
       segments.forEach((seg, i) => {
